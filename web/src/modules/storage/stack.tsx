@@ -162,7 +162,7 @@ export const stackModule: ModuleDef<Scene, Cfg> = {
     useEffect(() => { if (draft.dataStr !== config.dataStr || draft.execTick !== config.execTick) setDraft(config); }, [config]);
     const loadExample = () => { const ns: Cfg = { ...draft, dataStr: '1,2,3', prevDataStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
     const clearAll = () => { const ns: Cfg = { ...draft, inited: false, dataStr: '', prevDataStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
-    const init = () => { const ns: Cfg = { ...draft, inited: true, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
+    const init = () => { const ns: Cfg = { ...draft, inited: true, dataStr: '', prevDataStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
     const needInit = draft.impl === 'array' && !draft.inited;
     const exec = () => {
       const op = (['push', 'pop', 'peek'] as Op[]).includes(draft.op) ? draft.op : 'push';

@@ -168,7 +168,7 @@ export const queueModule: ModuleDef<Scene, Cfg> = {
     useEffect(() => { if (draft.dataStr !== config.dataStr || draft.execTick !== config.execTick) setDraft(config); }, [config]);
     const loadExample = () => { const ns: Cfg = { ...draft, front: 0, dataStr: '1,2,3', prevDataStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
     const clearAll = () => { const ns: Cfg = { ...draft, inited: false, front: 0, dataStr: '', prevDataStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
-    const init = () => { const ns: Cfg = { ...draft, inited: true, front: 0, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
+    const init = () => { const ns: Cfg = { ...draft, inited: true, front: 0, dataStr: '', prevDataStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
     const needInit = draft.impl === 'array' && !draft.inited;
     const exec = () => {
       const op = (['enqueue', 'dequeue', 'peek'] as Op[]).includes(draft.op) ? draft.op : 'enqueue';

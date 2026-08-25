@@ -221,7 +221,7 @@ export const sequentialListModule: ModuleDef<Scene, Cfg> = {
     const set = (p: Partial<Cfg>) => setDraft(s => ({ ...s, ...p }));
     const loadExample = () => { const ns: Cfg = { ...draft, valuesStr: '10,20,30,40', prevValuesStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
     const clearAll = () => { const ns: Cfg = { ...draft, inited: false, valuesStr: '', prevValuesStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
-    const init = () => { const ns: Cfg = { ...draft, inited: true, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
+    const init = () => { const ns: Cfg = { ...draft, inited: true, valuesStr: '', prevValuesStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
     const exec = () => {
       const validOps: Op[] = ['get', 'insert', 'delete'];
       const op = validOps.includes(draft.op as any) ? draft.op : 'get';

@@ -223,7 +223,7 @@ export const hashTableModule: ModuleDef<Scene, Cfg> = {
     useEffect(() => { if (draft.keysStr !== config.keysStr || draft.execTick !== config.execTick) setDraft(config); }, [config]);
     const loadExample = () => { const ns: Cfg = { ...draft, keysStr: '3,8,13,18,1', prevKeysStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
     const clearAll = () => { const ns: Cfg = { ...draft, inited: false, keysStr: '', prevKeysStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
-    const init = () => { const ns: Cfg = { ...draft, inited: true, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
+    const init = () => { const ns: Cfg = { ...draft, inited: true, keysStr: '', prevKeysStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
     const exec = () => {
       const op = (['search', 'insert', 'delete'] as Op[]).includes(draft.op) ? draft.op : 'search';
       const cur = parseKeys(draft.keysStr);

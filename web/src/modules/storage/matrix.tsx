@@ -150,7 +150,7 @@ export const matrixModule: ModuleDef<Scene, Cfg> = {
     useEffect(() => { if (draft.dataStr !== config.dataStr || draft.execTick !== config.execTick) setDraft(config); }, [config]);
     const loadExample = () => { const ns: Cfg = { ...draft, dataStr: '1,2,3,4,5,6,7,8,9,10,11,12', prevDataStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
     const clearAll = () => { const ns: Cfg = { ...draft, inited: false, dataStr: '', prevDataStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
-    const init = () => { const ns: Cfg = { ...draft, inited: true, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
+    const init = () => { const ns: Cfg = { ...draft, inited: true, dataStr: '', prevDataStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
     const exec = () => {
       const op = (['get', 'set'] as Op[]).includes(draft.op) ? draft.op : 'get';
       const R = Math.max(1, Math.min(8, draft.rows | 0)); const C = Math.max(1, Math.min(8, draft.cols | 0));

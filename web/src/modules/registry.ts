@@ -5,6 +5,7 @@ import { unsignedIntModule } from './numeric/unsignedInt';
 import { twosComplementModule } from './numeric/twosComplement';
 import { ieee754Module } from './numeric/ieee754';
 import { characterEncodingModule } from './text/characterEncoding';
+import { stringOpsModule } from './text/stringOps';
 import { sequentialListModule } from './storage/sequentialList';
 import { linkedListModule } from './storage/linkedList';
 import { circularLinkedListModule } from './storage/circularLinkedList';
@@ -21,6 +22,7 @@ export const KNOWLEDGE: Record<string, ModuleDef> = {
   [twosComplementModule.id]: twosComplementModule as unknown as ModuleDef,
   [ieee754Module.id]: ieee754Module as unknown as ModuleDef,
   [characterEncodingModule.id]: characterEncodingModule as unknown as ModuleDef,
+  [stringOpsModule.id]: stringOpsModule as unknown as ModuleDef,
   [sequentialListModule.id]: sequentialListModule as unknown as ModuleDef,
   [linkedListModule.id]: linkedListModule as unknown as ModuleDef,
   [circularLinkedListModule.id]: circularLinkedListModule as unknown as ModuleDef,
