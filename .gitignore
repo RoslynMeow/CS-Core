@@ -1,0 +1,33 @@
+# LaTeX build artifacts
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fdb_latexmk
+*.fls
+*.nav
+*.snm
+*.vrb
+*.bbl
+*.blg
+*.idx
+*.ilg
+*.ind
+*.lof
+*.lot
+*.xdv
+
+# Editors
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Node / Vite (VisualWeb)
+node_modules
+dist
+.vite
+AGENTS.md
+progress.md
