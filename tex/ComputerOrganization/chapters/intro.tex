@@ -1,0 +1,70 @@
+\section{计算机系统概述}
+
+\subsection{计算机是什么}
+
+计算机（Computer）是由处理器、存储器、输入输出设备组成的通用信息处理系统。它的核心功能可以用冯·诺依曼模型概括：
+
+\begin{definition}[冯·诺依曼体系结构]
+计算机由五大部件构成：
+\begin{itemize}
+    \item 运算器（Arithmetic Logic Unit, ALU）：执行算术与逻辑运算
+    \item 控制器（Control Unit, CU）：取指令、译码、控制数据流向
+    \item 存储器（Memory）：存放程序与数据
+    \item 输入设备（Input）：键盘、鼠标、传感器等
+    \item 输出设备（Output）：显示器、打印机、网络接口等
+\end{itemize}
+运算器与控制器合称中央处理器（CPU）；程序与数据统一以二进制形式存储在同一存储器中——这是冯·诺依曼体系的核心特征：\textbf{存储程序}（Stored Program）。
+\end{definition}
+
+\begin{equation}
+\text{计算机 = CPU + 存储器 + I/O}
+\end{equation}
+
+\subsection{存储程序原理}
+
+冯·诺依曼模型的关键在于\textbf{指令和数据存放在同一个存储器中}，CPU 按顺序逐条取出并执行。这一设计使得计算机成为"通用机器"——更换程序即可完成不同任务，无需改动硬件。
+
+\begin{equation}
+\begin{aligned}
+&\text{Fetch} \rightarrow \text{Decode} \rightarrow \text{Execute} \\
+&\text{取指: } \text{PC} \rightarrow \text{MAR}, M[\text{MAR}] \rightarrow \text{MDR} \\
+&\text{译码: } \text{控制器解析操作码与地址码} \\
+&\text{执行: } \text{ALU运算 / 访存 / 跳转}
+\end{aligned}
+\end{equation}
+
+\subsection{计算机层次结构}
+
+现代计算机是一个层次化系统，每一层对上一层隐藏细节：
+
+\begin{itemize}
+    \item \textbf{应用层}：高级语言程序（C/Java/Python）
+    \item \textbf{系统软件层}：编译器、操作系统
+    \item \textbf{指令集层}：ISA——软件与硬件的接口
+    \item \textbf{微体系结构层}：处理器实现（流水线、缓存、乱序执行）
+    \item \textbf{数字逻辑层}：门电路、寄存器、加法器
+    \item \textbf{物理器件层}：晶体管、导线、集成电路
+\end{itemize}
+
+"计算机组成原理"关注的是指令集层到数字逻辑层之间的内容——\textbf{硬件如何执行指令}。
+
+\subsection{性能评价指标}
+
+\begin{table}[H]
+\centering
+\caption{计算机性能核心公式}
+\label{tab:perf_formula}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+\textbf{指标} & \textbf{公式} & \textbf{含义} \\
+\midrule
+CPU执行时间 & $T = \text{指令数} \times \text{CPI} \times \text{时钟周期}$ & 运行一段程序的总时间 \\
+CPI & 每条指令平均时钟周期数 & 效率指标 \\
+MIPS & 百万指令/秒 & 吞吐量指标 \\
+时钟频率 & $f = 1 / T_{\text{clk}}$ & CPU主频 \\
+Amdahl定律 & $S = \frac{1}{(1-f) + f/n}$ & 并行加速上限 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+% §1.5 已删除

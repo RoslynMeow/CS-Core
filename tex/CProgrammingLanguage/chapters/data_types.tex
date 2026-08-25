@@ -1,0 +1,223 @@
+﻿\chapter{数据类型}
+
+\section{四种基本数据类型}
+
+C语言的数据类型主要分为以下四大类：
+
+\begin{enumerate}
+    \item \textbf{算术类型（基础）}：包括整型（\texttt{int}）、字符型（\texttt{char}）、浮点型（\texttt{float}、\texttt{double}）等。
+    \item \textbf{枚举类型}：用于定义一组命名的整型常量。例如：\texttt{enum Sex \{ man = 1, woman = 0 \};}。
+    \item \textbf{空类型 (Void)}：表示无类型或无返回值。
+    \item \textbf{派生类型}：由基本类型延伸出来的复杂类型，包括数组（如 \texttt{int a[10]}）、指针（如 \texttt{int *p}）、结构体（如 \texttt{struct S1}）等。
+\end{enumerate}
+
+\section{算术类型详解（大小与取值范围）}
+
+不同类型在内存中所占占用的字节（Byte）大小及对应的数值范围如下（以现代 32位/64位 综合环境为例）：
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{类型} & \textbf{大小} & \textbf{取值范围} \\ \midrule
+\texttt{char}（有符号字符型） & 1 Byte & $-128 \sim 127$ \\ 
+\texttt{unsigned char}（无符号字符型） & 1 Byte & $0 \sim 255$ \\ 
+\texttt{signed char}（显式有符号字符型） & 1 Byte & $-128 \sim 127$ \\ 
+\texttt{short}（短整型） & 2 Byte & $-32768 \sim 32767$ \\ 
+\texttt{int}（整型） & 4 Byte & $-2147483648 \sim 2147483647$ \\ 
+\texttt{long}（长整型） & 4/8 Byte & 平台相关（Windows 为 4，Linux 64位 为 8） \\ 
+\texttt{long long} & 8 Byte & $-2^{63} \sim 2^{63}-1$ \\ 
+\texttt{float}（单精度浮点） & 4 Byte & 约 $\pm 3.4 \times 10^{38}$，6-7位有效数字 \\ 
+\texttt{double}（双精度浮点） & 8 Byte & 约 $\pm 1.8 \times 10^{308}$，15-16位有效数字 \\ \bottomrule
+\end{tabulary}
+\caption{C语言基本数据类型大小与范围}
+\label{tab:data_types}
+\end{table}
+
+\section{\texttt{sizeof} 运算符详解}
+
+\texttt{sizeof} 是 C语言的一元运算符（非函数），在编译期计算类型或变量所占的字节数，返回类型为 \texttt{size\_t}（无符号整型）。
+
+\begin{lstlisting}[caption={sizeof 使用示例}]
+printf("int:     %zu bytes\n", sizeof(int));
+printf("double:  %zu bytes\n", sizeof(double));
+
+int arr[10];
+printf("arr 总大小: %zu bytes\n", sizeof(arr));       // 40
+printf("数组元素个数: %zu\n", sizeof(arr)/sizeof(arr[0])); // 10
+\end{lstlisting}
+
+\textbf{关键注意事项}：
+
+\begin{itemize}
+    \item \texttt{sizeof} 在编译期求值，不产生运行时开销。
+    \item 当数组作为参数传递给函数时，会退化为指针，此时 \texttt{sizeof} 返回的是指针大小而非数组总大小。
+    \item 格式说明符应使用 \texttt{\%zu}（C99 标准）来打印 \texttt{size\_t} 类型。
+\end{itemize}
+
+\section{类型转换（Type Casting）}
+
+\subsection{隐式类型转换（Implicit Conversion）}
+
+编译器在运算过程中自动进行的类型转换，遵循"向高精度/大范围类型提升"的原则：
+
+\begin{lstlisting}[caption={隐式类型转换}]
+int a = 5;
+double b = 2.5;
+double result = a + b;  // int 自动提升为 double，结果为 7.5
+
+char c = 'A';           // char 隐式提升为 int，值为 65
+int n = c + 1;          // n = 66
+\end{lstlisting}
+
+隐式转换的优先级链（从低到高）：\texttt{char/short} $\to$ \texttt{int} $\to$ \texttt{unsigned} $\to$ \texttt{long} $\to$ \texttt{double}。
+
+\subsection{显式强制类型转换（Explicit Casting）}
+
+程序员通过强制转换语法 \texttt{(type)expression} 手动指定目标类型：
+
+\begin{lstlisting}[caption={显式类型转换}]
+double pi = 3.14159;
+int n = (int)pi;        // 截断小数部分，n = 3
+
+int x = 7, y = 2;
+double avg = (double)x / y;  // 先将 x 转为 double，再做除法，结果为 3.5
+// 若不加转换：x / y 为整数除法，结果为 3
+\end{lstlisting}
+
+\textbf{转换风险}：
+
+\begin{itemize}
+    \item 大范围类型转小范围类型时，高位数据会被截断丢失。
+    \item 有符号转无符号时，负数会被解释为极大的正数（补码重新解释）。
+    \item 浮点转整型时，小数部分直接截断（非四舍五入）。
+\end{itemize}
+
+\section{整型逆向溢出（Overflow）的边界现象}
+
+计算机内部用\textbf{补码}存储数字。一旦数值超过了该类型能表示的最大边界，就会发生"溢出"，产生反常的现象：
+
+\begin{lstlisting}[caption={整型溢出示例}]
+char c = 127;
+c = c + 1; 
+printf("%d", c); // 输出结果为 -128！因为二进制补码 01111111 加 1 变成了 10000000（即 -128 的补码）。
+\end{lstlisting}
+
+\section{枚举类型 (Enum)}
+
+\begin{enumerate}
+    \item \textbf{定义语法}：\texttt{enum 类型名 \{ 字面量 = 值, 字面量 = 值, ... \};} 其本质上仍然是整数类型。
+    \item \textbf{代替方案}：可以用 \texttt{\#define} 预处理命令来定义类似的常量组合。
+    \item \textbf{自增特性}：
+    \begin{itemize}
+        \item 若写 \texttt{enum A \{ A, B, C \};} $\rightarrow$ 默认 $A=0, B=1, C=2$。
+        \item 若写 \texttt{enum A \{ A = 1, B, C \};} $\rightarrow$ 后面依次递增，$B=2, C=3$。
+        \item 若写 \texttt{enum A \{ A = 1, B = 3, C \};} $\rightarrow$ \texttt{C} 在 \texttt{B} 的基础上递增，$C=4$。
+    \end{itemize}
+    \item \textbf{应用场景}：如果定义的枚举类型值是连续的，那么它非常适合作为 \texttt{switch} 语句的判定条件，增强代码可读性。
+\end{enumerate}
+
+\section{空类型 (Void)}
+
+\begin{itemize}
+    \item \textbf{\texttt{void}（纯控制流程）}：主要用于定义没有返回值的函数。
+    \item \textbf{\texttt{void*}（万能指针/泛型指针）}：可以指向任何数据类型的指针。
+\end{itemize}
+
+\begin{lstlisting}[caption={void* 使用示例}]
+#include <stdlib.h>
+int *arr = (int*)malloc(5 * sizeof(int)); // 将 void* 强转为 int*
+if (arr != NULL) {
+    arr[0] = 10;
+    free(arr); // 记得释放内存
+}
+\end{lstlisting}
+
+\section{派生类型 (Derived Types)}
+
+\subsection{结构体类型 (struct)}
+
+\begin{lstlisting}[caption={结构体定义示例}]
+struct Student {
+    char name[20];
+    int age;
+} s1; // 声明结构体的同时定义变量 s1
+\end{lstlisting}
+
+\textbf{注意}：C语言中没有类和对象的概念，绝不能写出像 Java/C\# 那样的 \texttt{A a = new A();}。
+
+\subsection{结构体内存对齐 (Padding)}
+
+结构体在内存中的总大小，往往\textbf{不等于}各个成员大小的总和。为了提高 CPU 读取内存的效率，编译器会进行"内存对齐"：
+
+\begin{lstlisting}[caption={内存对齐示例}]
+struct Target {
+    char a;   // 1 字节
+    int b;    // 4 字节
+};
+// 很多人认为 sizeof(struct Target) 是 1 + 4 = 5 字节
+// 但在 32/64位系统下，实际输出是 8 字节！因为 char a 后面被填充（Padding）了 3 个空字节，以对齐 4 字节的 int。
+\end{lstlisting}
+
+\textbf{对齐规则}：每个成员的起始地址必须是其自身大小的整数倍。结构体总大小必须是最大成员大小的整数倍。可通过调整成员声明顺序（将大类型成员放在前面）来减少填充浪费。
+
+\subsection{数组类型与指针类型}
+
+\begin{itemize}
+    \item \textbf{数组类型}：示例：一维数组 \texttt{int a[10];} 或多维数组 \texttt{int a[3][4];}
+    \item \textbf{指针类型}：示例：一级指针 \texttt{int *p;} 或二级/多级指针 \texttt{int **p;}
+\end{itemize}
+
+\section{C99/C11 核心新特性}
+
+\subsection{指定初始化器 (Designated Initializers)}
+
+C99 引入了指定初始化器，允许在初始化结构体或数组时，通过成员名或数组下标显式指定赋值目标。这极大提高了代码的可读性和维护性，特别是在结构体成员较多时。
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.95\textwidth}
+\begin{lstlisting}[caption={指定初始化器示例}]
+struct Point {
+    int x;
+    int y;
+    int z;
+};
+
+// 传统初始化（必须按顺序）
+struct Point p1 = {1, 2, 3};
+
+// C99 指定初始化（可乱序，未指定成员默认为 0）
+struct Point p2 = {.y = 2, .x = 1, .z = 3};
+
+// 数组指定初始化
+int arr[10] = {[0] = 10, [5] = 20, [9] = 30};
+// 等价于 arr[0]=10, arr[5]=20, arr[9]=30，其余为 0
+\end{lstlisting}
+\end{minipage}
+\end{figure}
+
+\subsection{柔性数组成员 (Flexible Array Member)}
+
+C99 允许在结构体的最后一个成员声明一个不指定大小的数组（通常写作 \texttt{type name[];}）。这常用于实现变长数据包或动态字符串。
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.95\textwidth}
+\begin{lstlisting}[caption={柔性数组示例}]
+struct Packet {
+    int length;
+    char data[]; // 柔性数组，不占用 sizeof 空间
+};
+
+// 分配内存时：sizeof(Packet) + 实际数据长度
+int payload_size = 100;
+struct Packet *pkt = malloc(sizeof(struct Packet) + payload_size);
+pkt->length = payload_size;
+// 现在可以安全访问 pkt->data[0] 到 pkt->data[99]
+\end{lstlisting}
+\end{minipage}
+\end{figure}
+
+\textbf{注意}：柔性数组成员必须是结构体的最后一个成员，且结构体必须至少包含一个其他成员。

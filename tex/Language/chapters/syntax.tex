@@ -1,0 +1,302 @@
+﻿\section{句法}
+
+\subsection{句法概述}
+
+句法(Syntax)研究词如何组合成短语和句子的规则。句法不仅告诉我们\emph{什么合法}(合法句子)，也告诉我们\emph{为什么合法}——合法性与句子结构的层次性、递归性紧密相关。
+
+\begin{example}[句法的层级性]
+\begin{equation}
+    \text{The cat} \quad \text{在句中作为整体出现} \quad \rightarrow \quad \text{The cat sat on the mat}
+\end{equation}
+"the cat"这个名词短语(NP)可以出现在"\_\_\_ sleeps""I saw \_\_\_""\_\_\_ is big"等位置，说明句法是成分组成的层级结构，而不是词的线性序列。
+\end{example}
+
+句法的核心问题：
+\begin{itemize}
+    \item 短语结构如何组织(成分分析)
+    \item 词类(范畴)如何决定组合方式
+    \item 语序为何因语言而异(跨语言比较的关键)
+    \item 有限的规则如何生成无限的句子(递归性)
+\end{itemize}
+
+\subsection{短语结构语法}
+
+\subsubsection{基本短语规则}
+
+短语结构语法用上下文无关文法式的重写规则描述句子结构：
+\begin{equation}
+    \begin{aligned}
+    S &\rightarrow NP \ VP \\
+    NP &\rightarrow Det \ (Adj) \ N \ (PP) \\
+    VP &\rightarrow V \ (NP) \ (PP) \ (Adv) \\
+    PP &\rightarrow P \ NP \\
+    AdjP &\rightarrow (Adv) \ Adj \\
+    AdvP &\rightarrow (Adv) \ Adv
+    \end{aligned}
+\end{equation}
+
+这里 $S$(句子)、$NP$(名词短语)、$VP$(动词短语)、$PP$(介词短语)是非终结符，规则递归地组合出无限多的句子。注意$VP \rightarrow V\ (NP)$ 允许多种结构的递归嵌套——这正是有限规则生成无限句子的机制。
+
+\subsubsection{句法树示例}
+
+"The cat sat on the mat":
+
+\begin{forest}
+for tree={s sep=8mm, l sep=8mm}
+[S
+    [NP
+        [Det [The]]
+        [N [cat]]
+    ]
+    [VP
+        [V [sat]]
+        [PP
+            [P [on]]
+            [NP
+                [Det [the]]
+                [N [mat]]
+            ]
+        ]
+    ]
+]
+\end{forest}
+
+句法树的每个子树对应一个\emph{成分}(constituent)，成分性是短语结构语法的基本概念：一个句子可以"被测试"出成分(前置、替代、省略测试)。
+
+\subsubsection{短语结构语法的类型学参数}
+
+同一套重写规则在不同语言中只是\emph{语序不同}。比较英语与日语：
+\begin{align}
+    \text{英语: } & S \rightarrow NP \ VP \quad (\text{中心词在前: 动-宾}) \\
+    \text{日语: } & S \rightarrow NP \ VP \quad (\text{中心词在后: 宾-动}) \\
+    \text{日语: } & NP \rightarrow NP \ P \quad (\text{后置词})
+\end{align}
+短语结构"骨架"惊人地一致，差异集中在中心词的方向——这一观察直接导向X-bar理论中的头参数。
+
+\subsection{X-bar理论}
+
+X-bar理论(Chomsky, 1970)提供统一的短语结构模板，消除了为每种短语分别写规则的必要。每个短语XP都有一个中心词X，模板如下：
+\begin{equation}
+    \begin{aligned}
+    XP &\rightarrow (Spec) \ X' \\
+    X' &\rightarrow X \ (Complement) \\
+    X' &\rightarrow (Adjunct) \ X'
+    \end{aligned}
+\end{equation}
+
+\begin{forest}
+for tree={s sep=8mm, l sep=8mm}
+[XP
+    [Spec]
+    [X$'$
+        [X$'$
+            [Adjunct]
+            [X$'$
+                [X]
+                [Complement]
+            ]
+        ]
+    ]
+]
+\end{forest}
+
+X-bar统一刻画了名词短语NP、动词短语VP、介词短语PP、形容词短语AP等一切短语：如NP的中心词是N，VP的中心词是V。通过递归的X'层，X-bar允许任意多个修饰语(Adjunct)附着，同时保持每个短语只有一个中心词和一个补足语。
+
+\subsubsection{头参数与跨语言差异}
+
+\begin{example}[头参数]
+\begin{align}
+    &\text{英语(中心词在前):} \quad NP = P + NP \quad (\text{前置词: in the house}) \\
+    &\text{日语(中心词在后):} \quad NP = NP + P \quad (\text{后置词: 家 の 中}) \\
+    &\text{英语(动-宾):} \quad VP = V + NP \quad (\text{eat an apple}) \\
+    &\text{日语(宾-动):} \quad VP = NP + V \quad (\text{りんご を 食べる})
+\end{align}
+头参数(Head parameter)决定了中心词在其补足语之前还是之后。这一参数贯穿整个短语结构，解释了英语(中心词前)与日语(中心词后)在语序上的系统性差异。我们将在最后一章详细展开。
+\end{example}
+
+\subsection{依存语法}
+
+依存语法(Dependency Grammar)不关心成分层级，而是关注\emph{词与词之间不对称的二元关系}。每个词有一个中心词(head)，全句的中心词是动词：
+
+\begin{equation}
+    \text{依存树} = (W, E)
+\end{equation}
+其中 $W$ 是词集合，$E \subseteq W \times R \times W$ 是有标记的依存边。
+
+\subsubsection{依存关系类型}
+
+\begin{table}[H]
+\centering
+\caption{常见依存关系(以英语为例)}
+\begin{tabulary}{\textwidth}{@{}CC@{}}
+\toprule
+\textbf{关系} & \textbf{示例} \\
+\midrule
+nsubj (名词主语) & \textbf{cat} sleeps \\
+dobj (直接宾语) & eat \textbf{apple} \\
+amod (形容词修饰) & \textbf{red} car \\
+det (限定词) & \textbf{the} cat \\
+prep (介词修饰) & sit \textbf{on} mat \\
+pobj (介词宾语) & on \textbf{mat} \\
+advmod (副词修饰) & \textbf{very} good \\
+aux (助动词) & \textbf{has} eaten \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsubsection{依存语法的跨语言优势}
+
+依存语法对语序高度"宽容"：不论动词在宾语前(SVO)还是后(SOV)，\emph{动词-宾语}的依存关系都成立。这使依存表示成为跨语言句法分析(Universal Dependencies项目)的标准格式——同一棵"语义骨架"在不同语言中有不同的表层语序，依存树完美地分离了"关系"与"语序"。这与短语结构语法形成互补：短语结构刻画成分层级，依存结构刻画中心词-从属关系。
+
+\subsection{转换生成语法}
+
+\subsubsection{深层结构与表层结构}
+
+早期生成语法(1957-1980年代)区分深层结构与表层结构：
+\begin{equation}
+    \text{深层结构(DS)} \xrightarrow{\text{转换规则}} \text{表层结构(SS)}
+\end{equation}
+
+深层结构承载论元结构与语义解释，表层结构是实际说出的形式。转换规则(移动、插入、删除)把深层结构映射到表层。这一机制使生成语法可以优雅地处理"同一个意思的多种句子形式"(主动/被动、陈述/疑问)之间的关系。
+
+\subsubsection{Wh-移动}
+
+\begin{align}
+    \text{DS: } & \text{You saw } \underline{\text{what}} \\
+    \text{SS: } & \text{What}_i \text{ did you see } t_i
+\end{align}
+
+\begin{equation}
+    \text{Move-}\alpha: \text{将成分 } \alpha \text{ 移至指定位置，留下语迹 } t
+\end{equation}
+
+疑问词 \emph{what} 从宾语位置移动到句首，原位置留下语迹 $t_i$(下标的 $i$ 表示同标索引，标明移动轨迹)。语迹理论解释了疑问句为何不能从某些位置提取(如孤岛约束)。
+
+\subsubsection{孤岛约束}
+
+某些结构是"移动禁区"：成分不能从中提取。
+\begin{equation}
+    \text{*What did you ask whether John bought \_ ?} \quad (\text{whether 从句是孤岛})
+\end{equation}
+这类约束在不同语言中表现出惊人的一致性，说明它们源于语法的普遍原则(Subjacency/条件约束)，而非个别语言的规则——这是普遍语法的重要证据。
+
+\subsection{最简方案}
+
+\subsubsection{合并(Merge)}
+
+最简方案(Chomsky, 1995-)把语法简化到极致：句法操作只剩下\emph{合并}(Merge)。Merge把两个句法对象组合成一个新对象：
+\begin{equation}
+    \text{Merge}(\alpha, \beta) = \{\alpha, \{\alpha, \beta\}\}
+\end{equation}
+
+合并是\emph{递归}的，因而能生成无限结构：
+\begin{equation}
+    \begin{aligned}
+    &\text{Merge}(the, cat) = \{the, \{the, cat\}\} = NP \\
+    &\text{Merge}(NP, saw) = \{NP, \{NP, saw\}\} = VP \\
+    &\text{Merge}(VP, NP) = \{VP, \{VP, NP\}\} = S
+    \end{aligned}
+\end{equation}
+
+\subsubsection{移动是合并的副产品}
+
+最简方案中，移动(如Wh-移动)只是"内部合并"(再合并已经合并过的成分)。语言的递归性和"离散无限性"(离散的、无限的能力)由此获得最简约的解释：
+\begin{equation}
+    \text{语言的生成能力} = \text{合并的递归应用}
+\end{equation}
+
+\subsection{范畴语法}
+
+\subsubsection{组合范畴语法(CCG)}
+
+范畴语法把每个词与一个\emph{范畴}关联，组合规则是纯粹的"函数应用"。范畴用斜线标注参数方向：
+\begin{equation}
+    \begin{aligned}
+    \text{cat} &:= N \\
+    \text{the} &:= NP/N \\
+    \text{sleeps} &:= S\backslash NP \\
+    \text{loves} &:= (S\backslash NP)/NP
+    \end{aligned}
+\end{equation}
+
+\subsubsection{组合规则}
+
+\begin{equation}
+    \begin{aligned}
+    X/Y \quad Y &\Rightarrow X \quad \text{(前向应用)} \\
+    Y \quad X\backslash Y &\Rightarrow X \quad \text{(后向应用)}
+    \end{aligned}
+\end{equation}
+
+\begin{example}[CCG推导]
+\begin{equation}
+    \frac{\text{the} : NP/N \quad \text{cat}: N}{NP} \quad (\text{前向应用})
+\end{equation}
+"the cat"的范畴 $NP/N$ 与 $N$ 结合，前向应用得到 $NP$。CCG的范畴系统与语义学中的类型论(最后一章的Lambda演算)完全同构：每个范畴对应一个语义类型，句法推导直接对应语义组合。
+\end{example}
+
+CCG的一个重要优点是它的组合规则能产生\emph{松散成分}(non-constituent)协调，使它在机器翻译和跨语言句法分析中特别有用。
+
+\subsection{树邻接文法(TAG)}
+
+TAG使用两棵树作为基本对象：
+\begin{equation}
+    G_{TAG} = (\Sigma, V, I, A, S)
+\end{equation}
+其中 $I$ 是初始树集合，$A$ 是辅助树集合。
+
+操作：
+\begin{itemize}
+    \item \textbf{替换(Substitution)}: 将一棵树插入叶节点
+    \item \textbf{附加(Adjoining)}: 将辅助树插入内部节点(可以描述长距离依赖和修饰语的递归嵌套)
+\end{itemize}
+
+TAG的表达能力恰好处于上下文无关文法与上下文有关文法之间(\emph{温和上下文有关})，能处理自然语言中的跨串依赖，同时保持多项式可解析性。这是TAG在计算语言学中占据重要地位的原因。
+
+\subsection{概率句法分析}
+
+\subsubsection{概率上下文无关文法(PCFG)}
+
+把概率赋给每条产生式，就得到PCFG。它允许在歧义句法树之间选择概率最高的一棵：
+\begin{equation}
+    P(T|S) = \prod_{r \in T} P(r)
+\end{equation}
+
+其中 $T$ 是句法树，$S$ 是句子，$r$ 是产生式规则。PCFG可以从语料自动学习(最大似然估计)，是统计句法分析的基础。
+
+\subsubsection{CKY算法}
+
+CKY算法是PCFG句法分析的标准动态规划算法(要求文法为CNF)：
+\begin{equation}
+    \pi[i,j,X] = \max_{Y,Z,k} P(X \rightarrow YZ) \cdot \pi[i,k,Y] \cdot \pi[k+1,j,Z]
+\end{equation}
+
+\begin{equation}
+    \pi[i,i,X] = P(X \rightarrow w_i)
+\end{equation}
+
+CKY自底向上填表：先算单个词的可能范畴，再逐步合并相邻区间，最终检查 $\pi[1,n,S]$ 是否为最大概率。对长度为 $n$ 的句子，复杂度为 $O(n^3)$。CKY在词性标注、机器翻译、语音识别的句法约束中被广泛使用。
+
+\subsection{跨语言的句法参数}
+
+句法理论积累的洞见可以概括为一组跨语言比较的参数(详见最后一章)：
+\begin{itemize}
+    \item \textbf{头参数}: 中心词在前(英语) vs. 中心词在后(日语、土耳其语)
+    \item \textbf{主语优先 vs. 话题优先}: 英语、日语是主语优先，汉语、朝鲜语是话题优先
+    \item \textbf{Pro-省略(Pro-drop)}: 意大利语、西班牙语、日语可省略主语，英语、法语、德语不可
+    \item \textbf{疑问词移动 vs. 原位}: 英语疑问词移动，汉语、日语疑问词留在原位
+    \item \textbf{格标记 vs. 语序}: 俄语靠格标记，汉语靠语序
+\end{itemize}
+
+\begin{example}[疑问词原位 vs 移动]
+\begin{align}
+    \text{英语: } & \text{What did you see \_ ?} \quad (\text{移动}) \\
+    \text{汉语: } & \text{你看到了什么?} \quad (\text{原位}) \\
+    \text{日语: } & \text{あなたは何を見たか?} \quad (\text{原位})
+\end{align}
+同一命题"你看见了什么"在三语言中的句法实现截然不同：英语把疑问词提到句首，汉语和日语留在宾语位置。这是"参数差异"最直观的例子之一。
+\end{example}
+
+\subsection{本章小结}
+
+句法是语言学的核心：短语结构语法刻画成分层级，X-bar理论统一短语模板并引出头参数，依存语法刻画中心词关系且天然跨语言友好，转换语法与最简方案追问"句法操作的普遍形式"，范畴语法与TAG提供计算上可实现的句法形式体系，PCFG与CKY让句法分析可以自动化。句法的深层启示是：人类语言共享一套普遍原则(递归合并、中心词-补足语结构)，而语言之间的差异源于少数参数的取值。这正是最后一章"不同语言之间的差异"的理论基础。下一章转向意义：语义学。

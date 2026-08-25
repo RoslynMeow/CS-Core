@@ -1,0 +1,269 @@
+﻿\section{计算语言学}
+
+\subsection{概述}
+
+计算语言学(Computational Linguistics, CL)使用计算方法研究语言，是自然语言处理(NLP)的理论基础。它既是语言学的分支(用计算模型验证语言理论)，也是计算机科学的分支(让计算机理解和生成语言)。
+
+\begin{equation}
+    \text{CL} = \text{语言学理论} \times \text{算法与统计模型}
+\end{equation}
+
+本书前几章讨论的语言学理论——形态学、句法、语义、音系——在这里都转化为可计算的模型：FST形态分析、PCFG句法分析、组合语义、HMM词性标注。
+
+\subsection{语言模型}
+
+\subsubsection{N-gram模型}
+
+语言模型给任意字符串赋予概率，用于回答"这句话有多自然"。联合概率按链式法则展开：
+\begin{equation}
+    P(w_1, \ldots, w_n) = \prod_{i=1}^{n} P(w_i | w_1, \ldots, w_{i-1})
+\end{equation}
+
+但由于历史词序列太长，实际无法估计，因此引入\emph{马尔可夫假设}(n-gram近似)：
+\begin{equation}
+    P(w_i | w_1, \ldots, w_{i-1}) \approx P(w_i | w_{i-n+1}, \ldots, w_{i-1})
+\end{equation}
+
+即"当前词只依赖最近的 $n-1$ 个词"。bigram($n=2$)是最常用的一种。
+
+\subsubsection{最大似然估计}
+
+\begin{equation}
+    P(w_i | w_{i-1}) = \frac{C(w_{i-1}, w_i)}{C(w_{i-1})}
+\end{equation}
+其中 $C(\cdot)$ 是语料中的计数。若某个bigram未出现，则概率为零——这会导致整个句子概率为零，因此需要平滑。
+
+\subsubsection{平滑技术}
+
+平滑技术为未见事件分配非零概率。Add-k平滑：
+\begin{equation}
+    P_{\text{add-k}}(w_i | w_{i-1}) = \frac{C(w_{i-1}, w_i) + k}{C(w_{i-1}) + k \cdot |V|}
+\end{equation}
+
+更先进的平滑方法包括：Good-Turing估计、Kneser-Ney平滑(目前最常用)以及回退(back-off)模型。平滑的本质是对"零计数"事件按频率衰减重新分配概率，同时保持总和为1。
+
+\subsubsection{语言模型与语言差异}
+
+语言模型直接反映语言的统计规律：训练自不同语言的语言模型，其n-gram分布差异巨大。例如汉语没有词边界(分词是预处理难题)、日语n-gram以"假名/形态素"为单位、形态丰富的语言(俄语、芬兰语)词形众多导致数据稀疏。这些差异催生了"子词(tokenization)"技术(如BPE)，成为现代多语言NLP的标准做法。
+
+\subsection{词性标注}
+
+\subsubsection{隐马尔可夫模型(HMM)}
+
+词性标注的任务是：给定词序列，推断最可能的词性序列。HMM假设：
+\begin{equation}
+    P(t_1, \ldots, t_n | w_1, \ldots, w_n) = \prod_{i=1}^{n} P(t_i | t_{i-1}) \cdot P(w_i | t_i)
+\end{equation}
+
+\begin{itemize}
+    \item $P(t_i | t_{i-1})$: 转移概率(词性之间的过渡)
+    \item $P(w_i | t_i)$: 发射概率(某个词性下出现某个词)
+\end{itemize}
+
+HMM是一个生成模型：先按转移概率生成词性序列，再按发射概率生成词序列。标注就是求使 $P(t | w)$ 最大的词性序列，用贝叶斯法则：
+\begin{equation}
+    \hat{t} = \arg\max_t \prod_{i=1}^{n} P(t_i | t_{i-1}) \cdot P(w_i | t_i)
+\end{equation}
+
+\subsubsection{Viterbi算法}
+
+HMM的解码用动态规划。定义 $v_t(j)$ 为"时刻 $t$ 处于状态 $j$ 且路径最优的最大概率"：
+\begin{equation}
+    v_t(j) = \max_{i} [v_{t-1}(i) \cdot a_{ij}] \cdot b_j(o_t)
+\end{equation}
+其中 $a_{ij}$ 是转移概率，$b_j(o_t)$ 是发射概率。同时用回溯指针记录最优路径。Viterbi时间复杂度 $O(T \cdot |S|^2)$，是NLP中最经典的算法之一。
+
+\subsubsection{词性标注的跨语言差异}
+
+不同语言的词性标注难度不同：
+\begin{itemize}
+    \item 英语: 形态简单，歧义主要来自词形相同(like可以是动词/介词/形容词)
+    \item 汉语: 无词边界，分词与标注联合进行；词性相对稳定
+    \item 俄语/德语: 屈折丰富，词形本身携带大量信息，但词形变化大、数据稀疏
+    \item 日语: 词与词之间无空格，需先形态分析(分词)再标注
+\end{itemize}
+
+\subsection{词向量表示}
+
+\subsubsection{分布语义假说}
+
+"词的意义由其使用语境决定"(Firth, 1957)。分布语义把词表示为高维向量，使语义相似性转化为向量距离。
+
+\subsubsection{Word2Vec}
+
+Word2Vec(Mikolov et al., 2013)用神经网络从语料学习词向量，两种架构：
+\begin{equation}
+    \begin{aligned}
+    &\text{Skip-gram: } \max \sum_{t} \sum_{-c \leq j \leq c, j \neq 0} \log P(w_{t+j} | w_t) \\
+    &P(w_O | w_I) = \frac{\exp({v'_{w_O}}^\top v_{w_I})}{\sum_{w \in V} \exp({v'_w}^\top v_{w_I})}
+    \end{aligned}
+\end{equation}
+
+Skip-gram用中心词预测上下文词，通过softmax输出概率。优化用负采样加速(不遍历整个词表)。
+
+\subsubsection{词向量类比}
+
+词向量编码了语义关系(词向量空间中的平移向量对应语义关系)：
+\begin{equation}
+    \text{king} - \text{man} + \text{woman} \approx \text{queen}
+\end{equation}
+
+\begin{equation}
+    \text{king} - \text{man} \approx \text{queen} - \text{woman} \quad (\text{性别关系的平行位移})
+\end{equation}
+
+\subsubsection{多语言词向量}
+
+多语言词向量把不同语言映射到同一向量空间，实现跨语言语义对齐：
+\begin{equation}
+    \text{英语} \xrightarrow{\text{线性变换}} \text{西班牙语向量空间}
+\end{equation}
+这种对齐(如MUSE、VecMap)使"语言之间的差异"可以被定量刻画：同一概念在不同语言中的向量相近，而语言特有的结构差异反映在对齐误差上。
+
+\subsection{句法分析}
+
+\subsubsection{依存分析}
+
+依存分析预测每个词的中心词与关系：
+\begin{equation}
+    P(y|x) = \frac{\exp(w \cdot \Phi(x, y))}{\sum_{y'} \exp(w \cdot \Phi(x, y'))}
+\end{equation}
+其中 $\Phi(x,y)$ 是特征向量(词形、词性、距离等)，$w$ 是权重。这是最大熵/softmax分类器，可由带标注的树库训练。
+
+\subsubsection{转移系统}
+
+主流依存分析器(如Greedy transition-based parser)把句法分析建模为状态转移：
+\begin{equation}
+    \begin{aligned}
+    &\text{SHIFT: } (\sigma, i|Q, A) \Rightarrow (\sigma|i, Q, A) \\
+    &\text{LEFT-ARC: } (\sigma|i, j|Q, A) \Rightarrow (\sigma|i, Q, A \cup \{(j, r, i)\}) \\
+    &\text{RIGHT-ARC: } (\sigma|i, j|Q, A) \Rightarrow (\sigma|i|j, Q, A \cup \{(i, r, j)\})
+    \end{aligned}
+\end{equation}
+
+Arc-Eager系统维护栈 $\sigma$、队列 $Q$ 和已建立弧的集合 $A$，每次选择一个操作(移进/建左弧/建右弧)。贪心解析器用分类器选择下一个动作，复杂度 $O(n)$。
+
+\subsubsection{跨语言依存分析: Universal Dependencies}
+
+Universal Dependencies(UD)项目为100+语言标注统一的依存关系与词性体系。它的价值在于：\emph{用同一套标注体系描述世界语言}，使得跨语言句法研究(依存距离、语序倾向、树结构统计)成为可能。这正是"跨语言差异的形式化比较"的计算基础设施。
+
+\subsection{Transformer与注意力}
+
+\subsubsection{自注意力机制}
+
+注意力机制让模型动态聚焦输入的相关部分。缩放点积注意力：
+\begin{equation}
+    \text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^\top}{\sqrt{d_k}}\right)V
+\end{equation}
+
+\begin{equation}
+    \begin{aligned}
+    Q &= XW_Q \\
+    K &= XW_K \\
+    V &= XW_V
+    \end{aligned}
+\end{equation}
+
+其中 $Q$(查询)、$K$(键)、$V$(值)是输入 $X$ 经过不同权重矩阵投影的结果，除以 $\sqrt{d_k}$ 防止softmax饱和。
+
+\subsubsection{多头注意力}
+
+多个注意力头并行捕捉不同关系：
+\begin{equation}
+    \text{MultiHead}(X) = \text{Concat}(\text{head}_1, \ldots, \text{head}_h)W_O
+\end{equation}
+\begin{equation}
+    \text{head}_i = \text{Attention}(XW_Q^i, XW_K^i, XW_V^i)
+\end{equation}
+
+研究表明不同注意力头分别捕捉句法依存(主谓关系)、共指、长距离依赖等——注意力模式部分再现了语言学知识(依存树、语法角色)。Transformer也因此被称为"隐式学习语法的模型"。
+
+\subsubsection{位置编码}
+
+自注意力本身对位置不敏感，需要加入位置编码：
+\begin{equation}
+    PE_{(pos, 2i)} = \sin(pos / 10000^{2i/d})
+\end{equation}
+\begin{equation}
+    PE_{(pos, 2i+1)} = \cos(pos / 10000^{2i/d})
+\end{equation}
+
+\subsection{大语言模型}
+
+\subsubsection{语言建模目标}
+
+大语言模型(LLM)的训练目标是自回归语言建模：最大化给定前文的条件下预测下一词的概率。
+\begin{equation}
+    \mathcal{L} = -\sum_{t=1}^{T} \log P(w_t | w_{<t}; \theta)
+\end{equation}
+
+这个"预测下一个词"的目标虽然简单，却迫使模型学习语法、语义、常识和世界知识。
+
+\subsubsection{缩放定律}
+
+模型性能随参数量、数据量、计算量遵循幂律(缩放定律, Scaling Laws)：
+\begin{equation}
+    L(N, D) = \frac{A}{N^\alpha} + \frac{B}{D^\beta} + E
+\end{equation}
+其中 $N$ 是参数量，$D$ 是训练数据量，$E$ 是数据不可约损失，$\alpha, \beta$ 是幂律指数。
+
+\subsubsection{多语言模型}
+
+现代LLM(如GPT系列)同时训练几十上百种语言，其多语言能力为"语言差异"提供了新的计算视角：
+\begin{itemize}
+    \item 模型内部形成了相对"语言中立"的语义表示(语言共享意义空间)
+    \item 低资源语言受益于跨语言迁移(从数据多的语言学到模式)
+    \item 模型对相近语言(英德、中韩)的迁移效果显著优于远缘语言
+\end{itemize}
+这从计算角度验证了语义学一章的结论：\emph{语义结构跨语言共享，表层编码各异}。
+
+\subsection{机器翻译}
+
+\subsubsection{统计机器翻译}
+
+基于词的翻译模型：
+\begin{equation}
+    P(e | f) = \sum_{a} P(f | e, a) \cdot P(e)
+\end{equation}
+其中 $a$ 是词对齐。经典IBM模型用期望最大化(EM)估计对齐概率。
+
+\subsubsection{神经机器翻译}
+
+Transformer序列到序列模型直接学习 $P(e|f)$，端到端训练。注意力让解码器动态对齐源语言的对应片段。机器翻译的性能与语言对之间的距离相关：近缘语言对(英法)容易，远缘类型(英日、中英)难——语言差异的量化体现在翻译难度上。
+
+\subsection{评估指标}
+
+\subsubsection{困惑度(Perplexity)}
+
+困惑度衡量语言模型的不确定度：
+\begin{equation}
+    \text{PPL}(W) = \sqrt[N]{\frac{1}{P(w_1, \ldots, w_N)}} = 2^{-\frac{1}{N}\sum_{i=1}^{N}\log_2 P(w_i | w_{<i})}
+\end{equation}
+困惑度越低越好(模型越确定)。注意PPL只能比较同一token化方案下的模型。
+
+\subsubsection{BLEU分数}
+
+BLEU衡量机器翻译与参考译文的 n-gram 重合度：
+\begin{equation}
+    \text{BLEU} = \text{BP} \cdot \exp\left(\sum_{n=1}^{N} w_n \log p_n\right)
+\end{equation}
+其中 $p_n$ 是 $n$-gram 精确率，BP是惩罚过短译文的"简短惩罚"。
+
+\subsubsection{跨语言评估的挑战}
+
+不同语言的评估难度不同：形态丰富的语言(俄语)BLEU对词形变化敏感；汉语、日语无空格分词影响token化；这些技术性差异本身也是"语言差异"的一部分。
+
+\subsection{计算语言学与语言学的相互反哺}
+
+计算语言学不只是应用语言学知识，它也反哺理论语言学：
+\begin{itemize}
+    \item \textbf{验证理论}: 依存分析器、词向量在数据上检验了语言学假说(主谓优先、距离倾向)
+    \item \textbf{发现模式}: 大规模多语言模型揭示了语言共性(如依存距离的普遍最短化倾向)
+    \item \textbf{量化差异}: 语料库方法把"语言差异"从定性描述变成可测度的数值(语素密度、语序倾向、依存距离)
+\end{itemize}
+
+\subsection{本章小结}
+
+计算语言学把前几章的语言学理论转化为可计算的模型：语言模型刻画词汇的统计规律，HMM和Viterbi做词性标注，Word2Vec与Transformer学习语义表示，依存分析器与UD项目做跨语言句法分析，LLM通过下一个词预测隐式习得语法。计算视角下，"语言差异"成为可以定量测量的对象——而所有现代系统都验证了一个结论：语言共享深层结构，差异在表层参数与统计分布。
+
+至此，我们已经系统学习了语言学各核心领域的理论。最后一章把这些视角整合起来，专门讨论\emph{不同语言之间的差异}：差异有哪些维度、如何形式化、以及为什么语言既"各不同"又"都一样"。

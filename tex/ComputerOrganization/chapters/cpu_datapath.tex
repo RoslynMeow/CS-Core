@@ -1,0 +1,78 @@
+﻿\section{处理器：数据通路}
+
+\subsection{单周期 CPU 概述}
+
+单周期 CPU 在\textbf{一个时钟周期内}完成从取指到写回的全部操作。CPI = 1，但时钟周期受最慢指令（如 $\texttt{lw}$）限制。
+
+\subsection{数据通路组件}
+
+\begin{table}[H]
+\centering
+\caption{基本数据通路组件}
+\label{tab:datapath_components}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+\textbf{组件} & \textbf{功能} & \textbf{控制信号} \\
+\midrule
+程序计数器（PC） & 存放下一条指令地址 & PCWrite \\
+指令存储器 & 按地址取指令 & — \\
+寄存器堆 & 32 个 32 位通用寄存器 & RegWrite \\
+ALU & 算术/逻辑运算 & ALUOp, ALUSrc \\
+数据存储器 & 读写数据 & MemRead, MemWrite \\
+多路选择器（MUX） & 选择数据来源 & 选择信号 \\
+符号扩展单元 & 16-bit $\to$ 32-bit 扩展 & — \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{基本指令的执行}
+
+\subsubsection{R 型指令}
+
+\begin{equation}
+\text{add } \$rd, \$rs, \$rt \quad \longrightarrow \quad \$rd = \$rs + \$rt
+\end{equation}
+
+数据流：$\text{PC} \to \text{取指} \to \text{译码（读} \$rs, \$rt\text{）} \to \text{ALU} \to \text{写回} \$rd \to \text{PC+4}$
+
+\subsubsection{I 型：lw}
+
+\begin{equation}
+\text{lw } \$rt, \text{offset}(\$rs) \quad \longrightarrow \quad \$rt = M[\$rs + \text{SignExt}(16\text{-bit offset})]
+\end{equation}
+
+数据流：$\text{PC} \to \text{取指} \to \text{译码（读} \$rs\text{）} \to \text{ALU 算地址} \to \text{访存} \to \text{写回} \$rt \to \text{PC+4}$
+
+存储器访问额外需要 ALU 用于地址计算，结果经数据存储器读出。
+
+\subsubsection{I 型：sw}
+
+\begin{equation}
+\text{sw } \$rt, \text{offset}(\$rs) \quad \longrightarrow \quad M[\$rs + \text{SignExt}(16\text{-bit offset})] = \$rt
+\end{equation}
+
+与 lw 类似，但写入方向相反——寄存器的值写入存储器而非读回。
+
+\subsubsection{I 型：beq}
+
+\begin{equation}
+\text{beq } \$rs, \$rt, \text{label} \quad \longrightarrow \quad \text{if } \$rs = \$rt \text{ then } \text{PC} \leftarrow \text{PC}+4 + \text{offset}\times4
+\end{equation}
+
+ALU 做减法判断是否相等。若相等，PC 取分支目标（PC+4 + offset$\times$4），否则取 PC+4。
+
+\subsection{完整单周期数据通路}
+
+将上述组件用多路选择器和总线连接，形成完整的 MIPS 单周期数据通路。控制信号由控制器根据指令操作码生成。
+
+\begin{itemize}
+    \item \textbf{取指阶段}：PC 送指令存储器，取出 32 位指令
+    \item \textbf{译码阶段}：寄存器堆读出 rs、rt 值，符号扩展立即数
+    \item \textbf{执行阶段}：ALU 执行运算（算术 / 地址计算 / 比较）
+    \item \textbf{访存阶段}：读/写数据存储器（仅 lw / sw）
+    \item \textbf{写回阶段}：结果写回寄存器堆（ALU 结果 / 存储器数据）
+\end{itemize}
+
+\subsection{关键路径与性能}
+
+单周期 CPU 的时钟周期由最长路径（$\texttt{lw}$ 指令：取指+译码+ALU+访存+写回）决定。这导致简单指令（如 $\texttt{add}$）也必须等待相同的长周期，效率很低。这是后续流水线设计的直接动机。

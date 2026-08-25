@@ -1,0 +1,80 @@
+\documentclass[12pt,a4paper]{ctexart}
+\usepackage{amsmath,amssymb,amsfonts,amsthm,mathtools,stmaryrd}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{tabularx}
+\usepackage{tabulary}
+\usepackage{tikz}
+\usepackage{forest}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{fontspec}
+\xeCJKsetup{AutoFallBack = true}
+\setCJKfallbackfamilyfont\CJKrmdefault{Malgun Gothic}[Scale=MatchLowercase]
+\setCJKfallbackfamilyfont\CJKsfdefault{Malgun Gothic}[Scale=MatchLowercase]
+\setCJKfallbackfamilyfont\CJKttdefault{Malgun Gothic}[Scale=MatchLowercase]
+\renewcommand{\textsc}[1]{{\upshape\scshape #1}}
+
+\newfontfamily\ipafont{Segoe UI}[Scale=MatchLowercase]
+\newcommand{\ipa}[1]{\text{\ipafont #1}}
+
+\newfontfamily\cyrfont{Segoe UI}[Scale=MatchLowercase]
+\newcommand{\cyr}[1]{\text{\cyrfont #1}}
+
+\newtheorem{definition}{定义}[section]
+\newtheorem{example}{例子}[section]
+\newtheorem{theorem}{定理}[section]
+
+\geometry{left=2.5cm,right=2.5cm,top=3cm,bottom=3cm}
+
+\title{\huge 语言学形式化教程\\ \large From Natural Language to Formal Systems}
+\author{Language Tutorial Project}
+\date{\today}
+
+\begin{document}
+
+\clearpage
+\vspace*{\fill}
+
+\begin{center}
+{\huge 语言学形式化教程}\\[0.8em]
+{\large From Natural Language to Formal Systems}\\[2.5em]
+{\large MS Roslyn}\\[0.6em]
+{\large \today}
+\end{center}
+
+\vspace{2.5em}
+
+\begin{abstract}
+\centering
+本教程系统介绍语言学的核心领域及其形式化方法，涵盖语言起源与分类、形式语言理论、形态学、句法学、语义学、音系学、计算语言学，并在最后一章集中讨论不同语言之间的差异。通过数学公式、自动机理论和逻辑演算，展示语言学如何像数学一样进行精确的形式化分析，并说明语言差异如何在共享的深层结构上以参数化的方式呈现。
+\end{abstract}
+
+\vspace*{\fill}
+\clearpage
+
+\tableofcontents
+\clearpage
+
+\input{chapters/origin_history}
+\newpage
+\input{chapters/language_classification}
+\newpage
+\input{chapters/formal_language_basics}
+\newpage
+\input{chapters/morphology}
+\newpage
+\input{chapters/syntax}
+\newpage
+\input{chapters/semantics}
+\newpage
+\input{chapters/phonology_phonetics}
+\newpage
+\input{chapters/computational_linguistics}
+\newpage
+\input{chapters/language_comparison}
+
+\end{document}

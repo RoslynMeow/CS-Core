@@ -1,0 +1,501 @@
+\section{数字逻辑基础}
+
+\subsection{布尔代数与门电路}
+
+数字电路的基础是布尔代数，变量取值 $\{0, 1\}$，三种基本运算：
+
+\begin{equation}
+\begin{aligned}
+\text{与（AND）: } & A \cdot B = 1 \iff A=1 \land B=1 \\
+\text{或（OR）: } & A + B = 1 \iff A=1 \lor B=1 \\
+\text{非（NOT）: } & \overline{A} = 1 \iff A=0
+\end{aligned}
+\end{equation}
+
+由这三种基本运算可组合出所有逻辑函数。下表给出常用门电路的真值表：
+
+\begin{table}[H]
+\centering
+\caption{基本门电路真值表}
+\label{tab:gates}
+\begin{tabulary}{\textwidth}{CCCCC}
+\toprule
+\textbf{A} & \textbf{B} & \textbf{AND} & \textbf{OR} & \textbf{XOR} \\
+\midrule
+0 & 0 & 0 & 0 & 0 \\
+0 & 1 & 0 & 1 & 1 \\
+1 & 0 & 0 & 1 & 1 \\
+1 & 1 & 1 & 1 & 0 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+门电路在电路图中的标准符号如下：
+
+\begin{figure}[H]
+\centering
+\resizebox{0.85\textwidth}{!}{%
+\begin{circuitikz}[scale=1.2]
+\draw (0,4.5)   node[and port] (and)  {};
+\draw (4.5,4.5) node[or port]  (or)   {};
+\draw (8.5,4.5) node[not port] (not)  {};
+\draw (0,0)     node[xor port] (xor)  {};
+\draw (4.5,0)   node[nand port](nand) {};
+
+\draw (and.in 1)  -- ++(-0.8,0) node[left] {$A$};
+\draw (and.in 2)  -- ++(-0.8,0) node[left] {$B$};
+\draw (and.out)   -- ++(0.6,0) node[right] {$A \cdot B$};
+
+\draw (or.in 1)   -- ++(-0.8,0) node[left] {$A$};
+\draw (or.in 2)   -- ++(-0.8,0) node[left] {$B$};
+\draw (or.out)    -- ++(0.6,0) node[right] {$A + B$};
+
+\draw (not.in)    -- ++(-0.8,0) node[left] {$A$};
+\draw (not.out)   -- ++(0.6,0) node[right] {$\overline{A}$};
+
+\draw (xor.in 1)  -- ++(-0.8,0) node[left] {$A$};
+\draw (xor.in 2)  -- ++(-0.8,0) node[left] {$B$};
+\draw (xor.out)   -- ++(0.6,0) node[right] {$A \oplus B$};
+
+\draw (nand.in 1) -- ++(-0.8,0) node[left] {$A$};
+\draw (nand.in 2) -- ++(-0.8,0) node[left] {$B$};
+\draw (nand.out)  -- ++(0.6,0) node[right] {$\overline{A \cdot B}$};
+
+\node[below=0.5cm] at (and.south)  {AND};
+\node[below=0.5cm] at (or.south)   {OR};
+\node[below=0.5cm] at (not.south)  {NOT};
+\node[below=0.5cm] at (xor.south)  {XOR};
+\node[below=0.5cm] at (nand.south) {NAND};
+\end{circuitikz}%
+}
+\caption{基本门电路符号}
+\label{fig:gates}
+\end{figure}
+
+\textbf{NAND（与非门）}是"万能门"——仅用 NAND 可实现 AND、OR、NOT 等全部逻辑，是数字集成电路最常见的实现方式。
+
+\subsection{逻辑表达式化简}
+
+\subsubsection{代数化简}
+
+结合律、分配律、吸收律、德·摩根定律：
+
+\begin{equation}
+\overline{A \cdot B} = \overline{A} + \overline{B}, \quad \overline{A + B} = \overline{A} \cdot \overline{B}
+\end{equation}
+
+德·摩根定律的电路等价性：一个 NAND 门等效于反相输入后的 OR 门；一个 NOR 门等效于反相输入后的 AND 门。这为 CMOS 实现提供了理论基础。
+
+\subsubsection{卡诺图（Karnaugh Map）}
+
+最多 4–6 变量的图形化化简工具：将真值表画在网格上，圈出相邻的 1 形成最小项合并。
+
+\subsection{组合逻辑电路：加法器}
+
+加法器是从门电路到 CPU 运算器的桥梁。先从半加器开始。
+
+\subsubsection{半加器（Half Adder）}
+
+半加器将两个比特相加，输出和位（Sum）与进位（Carry）：
+
+\begin{equation}
+S = A \oplus B, \quad C_{\text{out}} = A \cdot B
+\end{equation}
+
+\begin{figure}[H]
+\centering
+\resizebox{0.55\textwidth}{!}{%
+\begin{circuitikz}[scale=1.3]
+\draw (0,1.5)  node[xor port] (xor) {};
+\draw (0,-1.5) node[and port] (and) {};
+
+\draw (xor.in 1) -- ++(-1.5,0) coordinate(x1);
+\draw (xor.in 2) -- ++(-0.6,0) coordinate(x2);
+\draw (and.in 1) -- ++(-1.5,0) coordinate(a1);
+\draw (and.in 2) -- ++(-0.6,0) coordinate(a2);
+\draw (x1) -- (a1);
+\draw (x2) |- (a2);
+\draw (x1) -- ++(-0.6,0) node[left] {$A$};
+\draw (x2) node[left] {$B$};
+
+\draw (xor.out) -- ++(1,0) node[right] {$S$（和）};
+\draw (and.out) -- ++(1,0) node[right] {$C_{\text{out}}$（进位）};
+\end{circuitikz}%
+}
+\caption{半加器：一个 XOR 和一个 AND}
+\label{fig:half_adder}
+\end{figure}
+
+\subsubsection{全加器（Full Adder）}
+
+全加器加上了来自低位的进位 $C_{\text{in}}$：
+
+\begin{equation}
+\begin{aligned}
+S &= A \oplus B \oplus C_{\text{in}} \\
+C_{\text{out}} &= AB + (A \oplus B)C_{\text{in}}
+\end{aligned}
+\end{equation}
+
+\begin{figure}[H]
+\centering
+\resizebox{0.9\textwidth}{!}{%
+\begin{circuitikz}[scale=1.3]
+\draw (0,2.8)   node[xor port] (xor1) {};
+\draw (4.5,2.8) node[xor port] (xor2) {};
+\draw (1.8,-1.2) node[and port] (and1) {};
+\draw (4.5,-1.2) node[and port] (and2) {};
+\draw (8,-1.2)   node[or  port] (or1)  {};
+
+\draw (xor1.in 1) -- ++(-0.8,0) node[left] {$A$};
+\draw (xor1.in 2) -- ++(-0.8,0) node[left] {$B$};
+
+\draw (xor1.out) -- (xor2.in 1);
+\draw (xor2.in 2) -- ++(-0.8,0) node[left] {$C_{\text{in}}$};
+\draw (xor2.out) -- ++(1,0) node[right] {$S$（和）};
+
+\draw (and1.in 2) -- ++(-0.4,0) |- (xor1.in 1);
+\draw (and1.in 1) -- ++(-0.8,0) node[left] {$C_{\text{in}}$};
+
+\draw (and2.in 1) -- ++(-0.4,0) |- (xor1.in 1);
+\draw (and2.in 2) -- ++(-0.8,0) node[left] {$B$};
+
+\draw (and1.out) -- (and1.out -| or1.in 1) -- (or1.in 1);
+\draw (and2.out) -- (and2.out -| or1.in 2) -- (or1.in 2);
+\draw (or1.out) -- ++(1,0) node[right] {$C_{\text{out}}$（进位）};
+\end{circuitikz}%
+}
+\caption{全加器：2 个半加器 + 1 个 OR 门}
+\label{fig:full_adder}
+\end{figure}
+
+\subsubsection{行波进位加法器（Ripple Carry Adder）}
+
+将 $n$ 个全加器串联，进位像"波浪"一样从低位向高位传播：
+
+\begin{figure}[H]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[>=Stealth]
+    \node[draw, minimum width=1.8cm, minimum height=2cm,
+          label=below:$\text{FA}_0$] (fa0) at (0,0) {};
+    \node[draw, minimum width=1.8cm, minimum height=2cm,
+          label=below:$\text{FA}_1$] (fa1) at (3.6,0) {};
+    \node[draw, minimum width=1.8cm, minimum height=2cm,
+          label=below:$\text{FA}_2$] (fa2) at (7.2,0) {};
+    \node[draw, minimum width=1.8cm, minimum height=2cm,
+          label=below:$\text{FA}_{n-1}$] (fa3) at (11.6,0) {};
+    \node at (9.4,0) {$\cdots$};
+
+    \draw[->] (fa0.east) -- node[above] {\footnotesize $C_1$} (fa1.west);
+    \draw[->] (fa1.east) -- node[above] {\footnotesize $C_2$} (fa2.west);
+    \draw[->] (fa2.east) -- node[above] {\footnotesize $C_3$} (fa3.west);
+    \draw[->] (fa3.east) -- ++(0.9,0) node[right] {\footnotesize $C_{\text{out}}$};
+
+    \draw[<-] (fa0.west) -- ++(-1.4,0) node[left] {\footnotesize $A_0,B_0$};
+    \draw[<-] (fa1.west) -- ++(-1.4,0) node[left] {\footnotesize $A_1,B_1$};
+    \draw[<-] (fa2.west) -- ++(-1.4,0) node[left] {\footnotesize $A_2,B_2$};
+    \draw[<-] (fa3.west) -- ++(-1.8,0) node[left] {\footnotesize $A_{n-1},B_{n-1}$};
+
+    \draw[<-] (fa0.north) -- ++(0,0.6) node[above] {\footnotesize $C_{\text{in}}$};
+    \draw[->] (fa0.south) -- ++(0,-1.1) node[below] {\footnotesize $S_0$};
+    \draw[->] (fa1.south) -- ++(0,-1.1) node[below] {\footnotesize $S_1$};
+    \draw[->] (fa2.south) -- ++(0,-1.1) node[below] {\footnotesize $S_2$};
+    \draw[->] (fa3.south) -- ++(0,-1.1) node[below] {\footnotesize $S_{n-1}$};
+\end{tikzpicture}%
+}
+\caption{$n$ 位行波进位加法器：进位逐级传播，延迟 $O(n)$}
+\label{fig:ripple_carry}
+\end{figure}
+
+行波进位加法器的延迟为 $O(n)$——最高位必须等待所有低位进位算出。下一节介绍加速方案。
+
+\subsubsection{超前进位加法器（Carry Lookahead Adder）}
+
+定义传播信号 $P_i = A_i \oplus B_i$ 和生成信号 $G_i = A_i \cdot B_i$，则进位的递推关系可展开为超前进位逻辑：
+
+\begin{equation}
+\begin{aligned}
+C_1 &= G_0 + P_0 C_0 \\
+C_2 &= G_1 + P_1 G_0 + P_1 P_0 C_0 \\
+C_3 &= G_2 + P_2 G_1 + P_2 P_1 G_0 + P_2 P_1 P_0 C_0 \\
+C_4 &= G_3 + P_3 G_2 + P_3 P_2 G_1 + P_3 P_2 P_1 G_0 + P_3 P_2 P_1 P_0 C_0
+\end{aligned}
+\end{equation}
+
+每级进位由独立的"超前进位单元"（Carry Lookahead Unit, CLU）并行产生，延迟 $O(\log n)$。实际设计中常用 4 位块 CLA 级联（Ripple between blocks）。
+
+\subsubsection{溢出检测}
+
+\begin{itemize}
+    \item 同号相加得异号 $\to$ 溢出
+    \item $O = C_n \oplus C_{n-1}$：最高位和次高位的进位不同即溢出
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\resizebox{0.4\textwidth}{!}{%
+\begin{circuitikz}[scale=1.3]
+\draw (0,0) node[xor port] (ovf) {};
+\draw (ovf.in 1) -- ++(-1,0) node[left] {$C_{n}$};
+\draw (ovf.in 2) -- ++(-1,0) node[left] {$C_{n-1}$};
+\draw (ovf.out) -- ++(1,0) node[right] {$\text{Overflow}$};
+\end{circuitikz}%
+}
+\caption{溢出检测电路}
+\label{fig:overflow}
+\end{figure}
+
+\subsection{组合逻辑电路：数据选择器与译码器}
+
+\subsubsection{多路选择器（Multiplexer, MUX）}
+
+$2^n$ 路输入 + $n$ 位选择信号 $\to$ 1 路输出。下面是 2-to-1 MUX 的门级实现：
+
+\begin{figure}[H]
+\centering
+\resizebox{0.75\textwidth}{!}{%
+\begin{circuitikz}[scale=1.2]
+\draw (0,5)   node[and port] (and0) {};
+\draw (0,0)   node[and port] (and1) {};
+\draw (-4,4.4) node[not port] (not) {};
+\draw (6,2.5) node[or port]  (or)   {};
+
+\draw (not.in) -- ++(-1,0) coordinate(sel) node[left] {$S$};
+\draw (not.out) -- (and0.in 2);
+
+\draw (and0.in 1) -- ++(-0.6,0) -- ++(0,1.2) -- ++(-4,0) node[left] {$D_0$};
+\draw (and1.in 1) -- ++(-0.8,0) node[left] {$D_1$};
+
+\draw (sel) -- ++(0,-5.5) -| (and1.in 2);
+
+\draw (and0.out) -- ++(0.4,0) |- (or.in 1);
+\draw (and1.out) -- ++(0.4,0) |- (or.in 2);
+\draw (or.out) -- ++(1,0) node[right] {$Y$};
+\end{circuitikz}%
+}
+\caption{2-to-1 MUX 门级实现：$Y = \overline{S}\cdot D_0 + S \cdot D_1$}
+\label{fig:mux}
+\end{figure}
+
+\begin{equation}
+Y = \overline{S} \cdot D_0 + S \cdot D_1
+\end{equation}
+
+抽象层面上，MUX 常用梯形符号表示（宽边为输入，窄边为输出，底部为选择信号）：
+
+\begin{figure}[H]
+\centering
+\begin{circuitikz}[scale=0.9]
+\node[trapezium, draw, trapezium angle=70, minimum width=1.8cm, minimum height=2.6cm,
+      shape border rotate=90] (mux) at (0,0) {MUX};
+\draw ([yshift=0.75cm]mux.west) -- ++(-1,0) node[left] {$D_0$};
+\draw ([yshift=-0.75cm]mux.west) -- ++(-1,0) node[left] {$D_1$};
+\draw (mux.east) -- ++(1,0) node[right] {$Y$};
+\draw (mux.south) -- ++(0,-0.7) node[below] {$S$};
+\end{circuitikz}
+\caption{MUX 抽象符号}
+\label{fig:mux_symbol}
+\end{figure}
+
+\subsubsection{译码器（Decoder）}
+
+$n$ 位输入 $\to$ $2^n$ 位输出，任意时刻仅有 1 位有效。2-to-4 译码器示意（4 条垂直"总线"分别携带 $A_1,\overline{A_1},A_0,\overline{A_0}$，各 AND 门横向接入避免走线交叉）：
+
+\begin{figure}[H]
+\centering
+\resizebox{0.95\textwidth}{!}{%
+\begin{circuitikz}[scale=1.15]
+\draw (0.5,5.6) node[not port] (nota) {};
+\draw (3,4.9)   node[not port] (notb) {};
+
+\draw (-2,5.6) node[left] {$A_1$} -- (0,5.6) coordinate(pa1);
+\draw (pa1) -- (nota.in);
+\draw (pa1) -- ++(0,-10.6) coordinate (a1bot);
+\draw (nota.out) -- ++(0.5,0) coordinate(pa1n);
+\draw (pa1n) -- ++(0,-10.6) coordinate(a1nbot);
+
+\draw (-2,4.9) node[left] {$A_0$} -- (2.5,4.9) coordinate(pa0);
+\draw (pa0) -- (notb.in);
+\draw (pa0) -- ++(0,-9.9) coordinate (a0bot);
+\draw (notb.out) -- ++(0.5,0) coordinate(pa0n);
+\draw (pa0n) -- ++(0,-9.9) coordinate(a0nbot);
+
+\draw (8,3.6)  node[and port] (y0) {};
+\draw (8,1.2)  node[and port] (y1) {};
+\draw (8,-1.2) node[and port] (y2) {};
+\draw (8,-3.6) node[and port] (y3) {};
+
+\draw (y0.in 1) -- (1,0 |- y0.in 1);
+\draw (y0.in 2) -- (3,0 |- y0.in 2);
+\draw (y1.in 1) -- (1,0 |- y1.in 1);
+\draw (y1.in 2) -- (2.5,0 |- y1.in 2);
+\draw (y2.in 1) -- (0,0 |- y2.in 1);
+\draw (y2.in 2) -- (3,0 |- y2.in 2);
+\draw (y3.in 1) -- (0,0 |- y3.in 1);
+\draw (y3.in 2) -- (2.5,0 |- y3.in 2);
+
+\draw (y0.out) -- ++(0.6,0) node[right] {$Y_0=\overline{A_1}\overline{A_0}$};
+\draw (y1.out) -- ++(0.6,0) node[right] {$Y_1=\overline{A_1}A_0$};
+\draw (y2.out) -- ++(0.6,0) node[right] {$Y_2=A_1\overline{A_0}$};
+\draw (y3.out) -- ++(0.6,0) node[right] {$Y_3=A_1A_0$};
+\end{circuitikz}%
+}
+\caption{2-to-4 译码器}
+\label{fig:decoder}
+\end{figure}
+
+\subsection{算术逻辑单元（ALU）}
+
+ALU 是 CPU 的核心运算部件。下图展示一个支持 AND、OR、ADD 三种运算的 1-bit ALU：
+
+\begin{figure}[H]
+\centering
+\resizebox{0.95\textwidth}{!}{%
+\begin{circuitikz}[scale=1.2]
+\draw (0,5) node[and port] (and) {};
+\draw (0,1.5) node[or port] (or) {};
+\node[draw, minimum width=2.2cm, minimum height=1.3cm] (adder) at (0,-2) {Full Adder};
+
+\node[trapezium, draw, trapezium angle=70, minimum width=1.8cm, minimum height=4.6cm,
+      shape border rotate=90] (mux) at (7.5,1.5) {\begin{tabular}{c}MUX\\3-to-1\end{tabular}};
+
+\draw (and.in 1) -- ++(-0.8,0) node[left] {$A$};
+\draw (and.in 2) -- ++(-0.8,0) node[left] {$B$};
+\draw (or.in 1)  -- ++(-0.8,0) node[left] {$A$};
+\draw (or.in 2)  -- ++(-0.8,0) node[left] {$B$};
+\draw (adder.west) -- ++(-0.8,0) node[left] {\footnotesize $A,B,C_{\text{in}}$};
+
+\draw (and.out) -| ([yshift=1.4cm]mux.west) node[above left, xshift=0.3cm] {\scriptsize $D_0$};
+\draw (or.out)  -| ([yshift=0cm]mux.west)   node[above left, xshift=0.3cm, yshift=0.1cm] {\scriptsize $D_1$};
+\draw (adder.east) -| ([yshift=-1.4cm]mux.west) node[below left, xshift=0.3cm] {\scriptsize $D_2$};
+
+\draw[-latex] ([yshift=0.3cm]mux.north) -- ++(0,0.6) node[above] {\footnotesize Op[1:0]};
+\draw (mux.east) -- ++(0.9,0) node[right] {Result};
+\end{circuitikz}%
+}
+\caption{1-bit ALU 结构}
+\label{fig:alu}
+\end{figure}
+
+\begin{equation}
+\text{Result} = \begin{cases}
+A \land B, & \text{Op}=00 \\
+A \lor B,  & \text{Op}=01 \\
+A + B + C_{\text{in}}, & \text{Op}=10
+\end{cases}
+\end{equation}
+
+32 位 ALU 由 32 个 1-bit ALU 并行构成，进位在各位之间传递（行波或超前进位）。
+
+\subsection{时序逻辑电路}
+
+时序逻辑电路的输出取决于当前输入 \textbf{和} 历史状态（有记忆）。
+
+\subsubsection{SR 锁存器}
+
+SR 锁存器是最基本的存储单元，用两个 NOR 门交叉耦合构成：
+
+\begin{figure}[H]
+\centering
+\resizebox{0.6\textwidth}{!}{%
+\begin{circuitikz}[scale=1.3]
+\draw (0,2.5)  node[nor port] (nor1) {};
+\draw (0,-2.5) node[nor port] (nor2) {};
+
+\draw (nor1.in 1) -- ++(-1,0) node[left] {$R$（Reset）};
+\draw (nor2.in 2) -- ++(-1,0) node[left] {$S$（Set）};
+
+\draw (nor1.out) -- ++(3,0) coordinate(qout) node[right] {$Q$};
+\draw (nor2.out) -- ++(1.6,0) coordinate(qbarout) node[right] {$\overline{Q}$};
+
+\draw (qout) |- (nor2.in 1);
+\draw (qbarout) |- (nor1.in 2);
+\end{circuitikz}%
+}
+\caption{SR 锁存器（NOR 实现）}
+\label{fig:sr_latch}
+\end{figure}
+
+\begin{itemize}
+    \item $S=0, R=0$：保持原值
+    \item $S=1, R=0$：置位（$Q=1$）
+    \item $S=0, R=1$：复位（$Q=0$）
+    \item $S=1, R=1$：非法（$Q=\overline{Q}=0$，不稳定）
+\end{itemize}
+
+\subsubsection{D 触发器（D Flip-Flop）}
+
+SR 锁存器不方便定时，D 触发器是同步的 1-bit 存储单元，用时钟边沿（三角形符号）采样：
+
+\begin{figure}[H]
+\centering
+\begin{circuitikz}[scale=1.1]
+\draw (0,0) node[flipflop D] (ff) {};
+\draw (ff.pin 1) -- ++(-1,0) node[left] {$D$};
+\draw (ff.pin 3) -- ++(-1,0) node[left] {\footnotesize clk};
+\draw (ff.pin 6) -- ++(1,0) node[right] {$Q$};
+\draw (ff.pin 4) -- ++(1,0) node[right] {$\overline{Q}$};
+\end{circuitikz}
+\caption{D 触发器}
+\label{fig:d_flipflop}
+\end{figure}
+
+\begin{equation}
+Q_{\text{next}} = D \quad (\text{时钟上升沿采样})
+\end{equation}
+
+D 触发器在\textbf{时钟边沿}采样 $D$ 并更新 $Q$，其余时间 $Q$ 不变。$n$ 个 D 触发器并联即构成 $n$ 位寄存器。
+
+\subsubsection{\texorpdfstring{$n$}{n} 位寄存器}
+
+$n$ 个 D 触发器共享时钟信号，同时输入/输出 $n$ 位数据：
+
+\begin{figure}[H]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{circuitikz}
+\draw (0,0)  node[flipflop D] (ff0) {};
+\draw (6,0)  node[flipflop D] (ff1) {};
+\draw (12,0) node[flipflop D] (ff2) {};
+\draw (19,0) node[flipflop D] (ff3) {};
+\node at (15.5,0) {$\cdots$};
+
+\draw (ff0.pin 1) -- ++(-1,0) node[left] {$d_0$};
+\draw (ff1.pin 1) -- ++(-1,0) node[left] {$d_1$};
+\draw (ff2.pin 1) -- ++(-1,0) node[left] {$d_2$};
+\draw (ff3.pin 1) -- ++(-1,0) node[left] {$d_{n-1}$};
+
+\draw (ff0.pin 6) -- ++(1,0) node[right] {$q_0$};
+\draw (ff1.pin 6) -- ++(1,0) node[right] {$q_1$};
+\draw (ff2.pin 6) -- ++(1,0) node[right] {$q_2$};
+\draw (ff3.pin 6) -- ++(1,0) node[right] {$q_{n-1}$};
+
+\draw (ff0.pin 3) -- ++(0,-1) coordinate(c0);
+\draw (ff1.pin 3) -- ++(0,-1) coordinate(c1);
+\draw (ff2.pin 3) -- ++(0,-1) coordinate(c2);
+\draw (ff3.pin 3) -- ++(0,-1) coordinate(c3);
+\draw (c0) -- (c3);
+\draw (c0) ++(-1,0) node[left] {clk} -- (c0);
+\end{circuitikz}%
+}
+\caption{$n$ 位寄存器：$n$ 个 D 触发器共享时钟}
+\label{fig:register}
+\end{figure}
+
+\subsection{有限状态机（FSM）}
+
+\begin{definition}[FSM]
+一个时序逻辑系统可抽象为有限状态机：
+\begin{equation}
+M = (S, I, O, \delta, \lambda, s_0)
+\end{equation}
+$S$：有限状态集，$I$：输入集，$O$：输出集，$\delta$：状态转移函数，$\lambda$：输出函数，$s_0$：初始状态。
+\end{definition}
+
+\begin{itemize}
+    \item \textbf{Moore 状态机}：输出仅取决于当前状态
+    \item \textbf{Mealy 状态机}：输出取决于当前状态和输入
+\end{itemize}
+
+控制器就是 FSM 的经典应用：状态是各执行阶段（取指、译码、执行、访存、写回），输入是指令操作码和条件标志，输出是各数据通路组件的控制信号。

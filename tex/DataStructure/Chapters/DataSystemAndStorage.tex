@@ -1,0 +1,238 @@
+\chapter{Data System and Physical Storage}
+
+本章自底向上探讨数据在计算机底层的物理本质，从最基本的比特流开始，逐步演进到数字系统、字符系统以及物理内存的组织形式。
+
+\section{最根本元起点}
+
+\begin{itemize}
+    \item \textbf{基本域}：$\mathbb{B} = \{0, 1\}$。
+    \item \textbf{比特序列空间}：$\mathbb{B}^* = \bigcup_{n=0}^{\infty} \mathbb{B}^n$。计算机中所有存储对象均可视为 $\mathbb{B}^*$ 中的元素。
+    \item \textbf{解释协议（Interpretation Protocols）}：通过映射函数 $\mathcal{I}: \mathbb{B}^n \to \mathcal{D}$，将底层比特流解释为特定的数学对象集合 $\mathcal{D}$（如整数、字符、地址等）。
+\end{itemize}
+
+\section{数字体系 (Number)}
+
+\subsection{\texorpdfstring{自然数 ($\mathbb{N}$)}{自然数 (N)}}
+
+\begin{itemize}
+    \item \textbf{集合定义}：$\mathbb{N} = \{0, 1, 2, \dots\}$。
+    \item \textbf{有限位表示}：若分配 $n$ 位存储空间（即 $b \in \mathbb{B}^n$），其可表示的绝对数值范围为：
+    $$[0, \ 2^n - 1]$$
+    \item \textbf{解码映射}：$\mathcal{I}_{\mathbb{N}}(b) = \sum_{i=0}^{n-1} b_i \cdot 2^i$。
+\end{itemize}
+
+\subsection{\texorpdfstring{整数 ($\mathbb{Z}$)}{整数 (Z)}}
+
+\begin{itemize}
+    \item \textbf{集合定义}：$\mathbb{Z} = \{\dots, -2, -1, 0, 1, 2, \dots\}$。
+    \item \textbf{补码系统（Two's Complement）}：
+    为统一加减法运算，引入补码映射。对于 $n$ 位二进制序列 $b = b_{n-1}b_{n-2}\dots b_0 \in \mathbb{B}^n$，其解码方程为：
+    $$\mathcal{I}_{\mathbb{Z}}(b) = -b_{n-1} \cdot 2^{n-1} + \sum_{i=0}^{n-2} b_i \cdot 2^i$$
+    \item \textbf{值域}：该映射将 $\mathbb{B}^n$ 双射到 $[-2^{n-1}, 2^{n-1}-1] \subset \mathbb{Z}$，消除了 $+0$ 与 $-0$ 的二义性。
+\end{itemize}
+
+\subsection{\texorpdfstring{实数/有理数 ($\mathbb{R} \to \mathbb{Q}_{\text{discrete}}$)}{实数/有理数 (R 到 Q discrete)}}
+
+\textbf{物理事实}：计算机为离散状态机，无法精确表达连续无理数。实数被离散化为有理数子集 $\mathbb{Q}_{\text{discrete}} \subset \mathbb{Q}$。
+
+\begin{enumerate}
+    \item \textbf{定点数 (Fixed-Point)}：小数点位置固定。数学表达为 $x = m \cdot B^{-f}$，其中 $m \in \mathbb{Z}$，$f$ 为固定小数位数。
+    \item \textbf{浮点数 (Floating-Point)}：
+    \begin{itemize}
+        \item \textbf{通用形式}：$x = (-1)^s \cdot m \cdot 2^e$，其中 $s \in \mathbb{B}$，$m$ 为尾数，$e$ 为指数。
+        \item \textbf{IEEE 754 结构}：将 $n$ 位划分为 $[s \mid e \mid f]$。指数部分采用偏置表示：$E = e + \text{Bias}$，其中 $\text{Bias} = 2^{k-1}-1$（$k$ 为指数位宽）。
+        \item \textbf{特殊值}：
+        \begin{itemize}
+            \item $\text{NaN}$：$e = 2^k-1 \land f \neq 0$。
+            \item $\pm\infty$：$e = 2^k-1 \land f = 0$。
+            \item $\pm 0$：$e = 0 \land f = 0$。
+        \end{itemize}
+        \item \textbf{浮点相等判定}：引入容差 $\epsilon > 0$，定义等价关系 $a \equiv_\epsilon b \iff |a - b| < \epsilon$。
+    \end{itemize}
+\end{enumerate}
+
+\section{字符体系 (Character)}
+
+字符系统建立了从底层数字到人类符号的双射映射。
+
+\subsection{ANSI / ASCII}
+标准 ASCII 为映射 $\phi: \{0, \dots, 127\} \to \Sigma_{\text{ASCII}}$，物理存储占用 8 位（1 字节），最高位恒为 0。
+
+\subsection{Unicode 架构}
+\begin{enumerate}
+    \item \textbf{抽象字符集 (UCS)}：定义全局字符空间 $\mathcal{U}$，每个字符 $c \in \mathcal{U}$ 对应唯一码点 $u \in \mathbb{N}$，记作 $\text{U}+XXXX$。
+    \item \textbf{编码方案 (UTF)}：实现映射 $\psi: \mathcal{U} \to \mathbb{B}^*$。
+    \begin{itemize}
+        \item \textbf{UTF-8}：变长编码，$\psi(c) \in \mathbb{B}^8 \cup \mathbb{B}^{16} \cup \mathbb{B}^{24} \cup \mathbb{B}^{32}$，向下兼容 ASCII。
+        \item \textbf{UTF-16/32}：定长/变长编码，常用于系统内核。
+    \end{itemize}
+\end{enumerate}
+
+\section{物理存储结构：线性表（Linear List）}
+
+线性表是具有相同特性数据元素的有限序列 $L = \langle d_1, d_2, \dots, d_n \rangle$，其中 $d_i \in \mathcal{D}$。
+
+\subsection{顺序存储结构（顺序表 / 数组）}
+
+\begin{itemize}
+    \item \textbf{内存特征}：分配连续物理地址空间 $[\beta, \beta + n \cdot \sigma)$，其中 $\beta$ 为首地址，$\sigma$ 为元素大小。
+    \item \textbf{随机访问映射}：定义索引函数 $\text{Addr}: \{0, \dots, n-1\} \to \text{Memory}$：
+    $$\text{Addr}(i) = \beta + i \cdot \sigma$$
+    \item \textbf{多维压平（行优先）}：对于 $M \times N$ 矩阵，逻辑坐标 $(i, j)$ 映射为：
+    $$\text{Addr}(i, j) = \beta + (i \cdot N + j) \cdot \sigma$$
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    cell/.style={draw, minimum width=1.4cm, minimum height=0.8cm, font=\ttfamily},
+    addr/.style={font=\small},
+    arrow/.style={->, >=latex}
+]
+    \node[cell] (c0) at (0,0) {$d_0$};
+    \node[cell] (c1) at (2.6,0) {$d_1$};
+    \node[cell] (c2) at (5.2,0) {$d_2$};
+    \node[cell] (c3) at (7.8,0) {$d_3$};
+    \node[cell] (c4) at (10.4,0) {$\dots$};
+    \draw[arrow] (c0.south) -- ++(0,-0.5) node[addr, below] {$\beta$};
+    \draw[arrow] (c1.south) -- ++(0,-0.5) node[addr, below] {$\beta+\sigma$};
+    \draw[arrow] (c2.south) -- ++(0,-0.5) node[addr, below] {$\beta+2\sigma$};
+    \node[addr, anchor=west] at ($(c4.east)+(0.3,0)$) {$\leftarrow$ 物理地址连续，支持 $O(1)$ 随机访问};
+\end{tikzpicture}
+\caption{一维顺序表物理内存布局}
+\label{fig:array_1d}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    cell/.style={draw, minimum size=0.75cm, font=\ttfamily},
+    bigcell/.style={draw, minimum width=1.1cm, minimum height=0.75cm, font=\ttfamily},
+    arrow/.style={->, >=latex, thick},
+    brace/.style={decorate, decoration={brace, amplitude=5pt, mirror}}
+]
+    \matrix (mlog) [matrix of nodes, nodes={cell}, column sep=-\pgflinewidth, row sep=-\pgflinewidth] {
+        (0,0) & (0,1) & (0,2) \\
+        (1,0) & (1,1) & (1,2) \\
+    };
+    \node[left=0.3cm of mlog, font=\bfseries] {逻辑结构};
+
+    \draw[arrow] (mlog.south) -- ++(0,-0.7) node[midway, right, font=\small] {行优先压平};
+
+    \matrix (mphy) [matrix of nodes, nodes={bigcell}, column sep=-\pgflinewidth, below=1.1cm of mlog.south] {
+        (0,0) & (0,1) & (0,2) & (1,0) & (1,1) & (1,2) \\
+    };
+    \node[right=0.3cm of mphy, font=\bfseries] {物理内存排列};
+
+    \draw[brace] (mphy-1-1.south west) -- (mphy-1-3.south east) node[midway, below=5pt, font=\small] {第 0 行};
+    \draw[brace] (mphy-1-4.south west) -- (mphy-1-6.south east) node[midway, below=5pt, font=\small] {第 1 行};
+
+    \node[font=\small] (base) at ($(mphy-1-1.south)+(0,-1.3)$) {$\beta$};
+    \draw[arrow] (base.north) -- ($(mphy-1-1.south)+(0,-0.05)$);
+\end{tikzpicture}
+\caption{二维数组行优先 (Row-Major) 压平排列}
+\label{fig:array_2d}
+\end{figure}
+
+\begin{itemize}
+    \item \textbf{稀疏矩阵压缩}：对于稀疏矩阵 $A \in \mathbb{R}^{M \times N}$，采用三元组集合表示：
+    $$\mathcal{T} = \{ (i, j, A_{ij}) \mid A_{ij} \neq 0 \}$$
+\end{itemize}
+
+\subsection{链式存储结构（链表 / Link List）}
+
+\begin{itemize}
+    \item \textbf{内存特征}：节点 $n_k = (d_k, p_k)$ 物理地址离散，其中 $d_k \in \mathcal{D}$ 为数据域，$p_k \in \text{Memory} \cup \{\emptyset\}$ 为指针域。
+    \item \textbf{拓扑维系}：链表 $L$ 由节点序列构成，满足 $p_k = \text{Addr}(n_{k+1})$，且 $p_{\text{last}} = \emptyset$。
+    \item \textbf{访问复杂度}：丧失直接寻址能力，检索第 $i$ 个元素需顺序遍历，时间复杂度 $O(n)$。
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    head/.style={draw, minimum width=1.1cm, minimum height=0.8cm, font=\ttfamily},
+    lnode/.style={rectangle split, rectangle split horizontal, rectangle split parts=2,
+                  rectangle split part align={center, center},
+                  draw, minimum height=0.8cm, font=\ttfamily, inner sep=6pt},
+    arrow/.style={->, >=latex, thick},
+    node distance=1.2cm
+]
+    \node[head] (h) {$h$};
+    \node[lnode, right=of h] (a) {$d_1$ \nodepart{two} $\bullet$};
+    \node[lnode, right=of a] (b) {$d_2$ \nodepart{two} $\bullet$};
+    \node[lnode, right=of b] (c) {$d_3$ \nodepart{two} $\emptyset$};
+
+    \draw[arrow] (h.east) -- (a.west);
+    \draw[arrow] (a.east) -- (b.west);
+    \draw[arrow] (b.east) -- (c.west);
+\end{tikzpicture}
+\caption{单向链表 (Singly Linked List)}
+\label{fig:linked_singly}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    head/.style={draw, minimum width=1.1cm, minimum height=0.8cm, font=\ttfamily},
+    dnode/.style={rectangle split, rectangle split horizontal, rectangle split parts=3,
+                  rectangle split part align={center, center, center},
+                  draw, minimum height=0.8cm, font=\ttfamily, inner sep=5pt},
+    arrow/.style={->, >=latex, thick},
+    node distance=1.2cm
+]
+    \node[head] (h) {$h$};
+    \node[dnode, right=of h] (a) {$\emptyset$ \nodepart{two} $d_1$ \nodepart{three} $\bullet$};
+    \node[dnode, right=of a] (b) {$\bullet$ \nodepart{two} $d_2$ \nodepart{three} $\bullet$};
+    \node[dnode, right=of b] (c) {$\bullet$ \nodepart{two} $d_3$ \nodepart{three} $\emptyset$};
+
+    \draw[arrow] (h.east) -- (a.west);
+    \draw[arrow] ($(a.east)+(0,0.18)$) -- ($(b.west)+(0,0.18)$);
+    \draw[arrow] ($(b.west)-(0,0.18)$) -- ($(a.east)-(0,0.18)$);
+    \draw[arrow] ($(b.east)+(0,0.18)$) -- ($(c.west)+(0,0.18)$);
+    \draw[arrow] ($(c.west)-(0,0.18)$) -- ($(b.east)-(0,0.18)$);
+\end{tikzpicture}
+\caption{双向链表 (Doubly Linked List)}
+\label{fig:linked_doubly}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    head/.style={draw, minimum width=1.1cm, minimum height=0.8cm, font=\ttfamily},
+    lnode/.style={rectangle split, rectangle split horizontal, rectangle split parts=2,
+                  rectangle split part align={center, center},
+                  draw, minimum height=0.8cm, font=\ttfamily, inner sep=6pt},
+    arrow/.style={->, >=latex, thick},
+    node distance=1.2cm
+]
+    \node[head] (h) {$h$};
+    \node[lnode, right=of h] (a) {$d_1$ \nodepart{two} $\bullet$};
+    \node[lnode, right=of a] (b) {$d_2$ \nodepart{two} $\bullet$};
+    \node[lnode, right=of b] (c) {$d_3$ \nodepart{two} $\bullet$};
+
+    \draw[arrow] (h.east) -- (a.west);
+    \draw[arrow] (a.east) -- (b.west);
+    \draw[arrow] (b.east) -- (c.west);
+    \coordinate (ret) at ($(h.south)+(0,-0.9)$);
+    \draw[arrow, rounded corners=4pt] (c.east) -- ++(0.6,0) |- (ret) -- (h.south);
+\end{tikzpicture}
+\caption{循环链表 (Circular Linked List)}
+\label{fig:linked_circular}
+\end{figure}
+
+\section{核心矛盾对比：顺序表 vs 链表}
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\textwidth}{@{}CCC@{}}
+\toprule
+\textbf{特性维度} & \textbf{顺序存储（数组）} & \textbf{链式存储（链表）} \\
+\midrule
+\textbf{物理内存要求} & 连续区间 $[\beta, \beta + n\sigma)$ & 离散节点集合 $\{n_1, \dots, n_k\}$ \\
+\textbf{元素访问效率} & $O(1)$：$\text{Addr}(i) = \beta + i\sigma$ & $O(n)$：需顺序遍历指针链 \\
+\textbf{插入与删除} & $O(n)$：需平移后续元素 $d_{i+1}, \dots, d_n$ & $O(1)$：仅需修改相邻节点指针域 \\
+\textbf{空间利用率} & 预分配，易产生空闲碎片; 扩容代价高 & 动态分配，但指针域引入额外开销 \\
+\bottomrule
+\end{tabulary}
+\end{table}

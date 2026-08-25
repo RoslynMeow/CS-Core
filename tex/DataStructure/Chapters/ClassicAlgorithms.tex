@@ -1,0 +1,168 @@
+\chapter{Dynamic Classic Algorithms and Core Operators}
+
+本章探讨从静态结构向动态算子的演进，涵盖算法设计范式、排序、查找以及高级图论算法。
+
+\section{顶层设计范式}
+
+\subsection{分治策略 (Divide and Conquer)}
+将规模 $n$ 的问题 $P$ 划分为 $a$ 个子问题 $\{P_1, \dots, P_a\}$，每个规模为 $n/b$。时间递推关系：
+$$T(n) = aT\left(\frac{n}{b}\right) + f(n)$$
+由主定理（Master Theorem）决定渐进复杂度。
+
+\subsection{贪心算法 (Greedy)}
+每一步选择局部最优解 $s_i = \arg\max_{x \in C} \mathcal{F}(x)$。全局最优需满足：
+\begin{enumerate}
+    \item \textbf{最优子结构}：$P$ 的最优解包含子问题 $P'$ 的最优解。
+    \item \textbf{贪心选择性}：可通过局部最优序列构造全局最优解。
+\end{enumerate}
+
+\newpage
+
+\section{排序算法算子 (Sort)}
+
+输入序列 $A = \langle a_1, \dots, a_n \rangle$，目标输出 $A' = \langle a'_1, \dots, a'_n \rangle$ 使得 $a'_1 \le a'_2 \le \dots \le a'_n$。
+
+\subsection{比较类排序}
+\begin{enumerate}
+    \item \textbf{冒泡排序}：通过相邻交换减少逆序对数 $I(A) = |\{(i, j) \mid i < j \land a_i > a_j\}|$。每轮将最大值移至末尾。
+    \item \textbf{选择排序}：第 $k$ 轮选择 $a_k' = \min\{a_k, \dots, a_n\}$ 并与 $a_k$ 交换。比较次数固定为 $\frac{n(n-1)}{2}$。
+    \item \textbf{插入排序}：维护已排序前缀 $A[1..k]$，将 $a_{k+1}$ 插入正确位置。最好情况 $O(n)$（已有序）。
+    \item \textbf{快速排序}：选取基准 $p$，划分 $A$ 为 $A_L = \{x \in A \mid x \le p\}$ 与 $A_R = \{x \in A \mid x > p\}$。递归排序 $A_L, A_R$。
+    \item \textbf{归并排序}：$T(n) = 2T(n/2) + O(n)$。将 $A$ 对半分割后合并，稳定且 $O(n \log n)$，但需 $O(n)$ 辅助空间。
+    \item \textbf{堆排序}：建堆 $O(n)$，重复提取根节点并下滤。时间 $O(n \log n)$，空间 $O(1)$。
+\end{enumerate}
+
+\begin{algorithm}[H]
+\caption{快速排序伪代码 (Quick Sort)}
+\begin{algorithmic}[1]
+\Procedure{QuickSort}{$A, l, r$}
+    \If{$l \ge r$} \State \Return \EndIf
+    \State $p \gets \text{Partition}(A, l, r)$ \Comment{划分操作}
+    \State \text{QuickSort}$(A, l, p - 1)$
+    \State \text{QuickSort}$(A, p + 1, r)$
+\EndProcedure
+\Procedure{Partition}{$A, l, r$}
+    \State $pivot \gets A[r]$ \Comment{选取末尾元素为基准}
+    \State $i \gets l - 1$
+    \For{$j \gets l$ \textbf{to} $r - 1$}
+        \If{$A[j] \le pivot$}
+            \State $i \gets i + 1$
+            \State \textbf{Swap}($A[i], A[j]$)
+        \EndIf
+    \EndFor
+    \State \textbf{Swap}($A[i + 1], A[r]$)
+    \State \Return $i + 1$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{非比较类排序}
+\begin{enumerate}
+    \item \textbf{计数排序}：统计频次 $C[x] = |\{a_i \mid a_i = x\}|$，计算前缀和 $S[x] = \sum_{k \le x} C[k]$ 确定位置。
+    \item \textbf{桶排序}：将值域 $[Min, Max]$ 划分为 $k$ 个区间 $B_1, \dots, B_k$，桶内排序后串联。
+    \item \textbf{基数排序}：按位 $d=0 \dots D-1$ 进行稳定排序（通常用计数排序）。
+\end{enumerate}
+
+\newpage
+
+\section{查找与并查集}
+
+\subsection{二分查找 (Binary Search)}
+作用于有序数组 $A$。维护搜索区间 $[l, r]$，取中点 $m = \lfloor (l+r)/2 \rfloor$。
+$$\text{若 } A[m] = x \implies \text{找到}; \text{若 } A[m] < x \implies l = m+1; \text{否则 } r = m-1$$
+时间复杂度 $O(\log n)$。
+
+\subsection{并查集 (Union-Find)}
+维护不相交集合族 $\mathcal{S} = \{S_1, \dots, S_k\}$，$S_i \subseteq V$。
+\begin{itemize}
+    \item $\text{Find}(x)$：返回 $x$ 所在集合的代表元。
+    \item $\text{Union}(x, y)$：合并 $S_x$ 与 $S_y$。
+\end{itemize}
+引入按秩合并与路径压缩后，摊还复杂度 $O(\alpha(n))$，其中 $\alpha$ 为反阿克曼函数。
+
+\newpage
+
+\section{图论核心算法}
+
+\subsection{基础遍历}
+维护已访问集合 $\text{Visited} \subseteq V$。
+\subsubsection{BFS}
+\begin{enumerate}
+    \item 初始化 $Q = \{s\}$，$\text{Visited} = \{s\}$。
+    \item 当 $Q \neq \emptyset$，弹出 $u$。
+    \item $\forall v \in N(u) \setminus \text{Visited}$：$\text{Visited} \leftarrow \text{Visited} \cup \{v\}$，$Q \leftarrow Q \cup \{v\}$。
+\end{enumerate}
+
+\subsubsection{DFS}
+递归定义：$\text{DFS}(u) \implies \text{Visited} \leftarrow \text{Visited} \cup \{u\} \land \forall v \in N(u) \setminus \text{Visited}, \text{DFS}(v)$。
+
+\subsection{最短路径算法}
+维护距离函数 $D: V \to \mathbb{R} \cup \{\infty\}$。松弛操作：
+$$\text{若 } D[u] + w(u, v) < D[v] \implies D[v] \leftarrow D[u] + w(u, v)$$
+
+\begin{enumerate}
+    \item \textbf{Dijkstra}：贪心策略。维护集合 $S$（已确定最短路径），每次选 $u \in V \setminus S$ 使 $D[u]$ 最小，加入 $S$ 并松弛邻边。不支持负权边。
+    \item \textbf{Bellman-Ford}：对 $E$ 进行 $|V|-1$ 轮全量松弛。若第 $|V|$ 轮仍可松弛，则存在负环。
+    \item \textbf{Floyd-Warshall}：动态规划。$D^{(k)}[i][j] = \min(D^{(k-1)}[i][j], D^{(k-1)}[i][k] + D^{(k-1)}[k][j])$。支持负权，但负环导致 $D[i][i] < 0$。
+\end{enumerate}
+
+\begin{algorithm}[H]
+\caption{Dijkstra 最短路径伪代码}
+\begin{algorithmic}[1]
+\State \textbf{输入}: 图 $G=(V, E)$, 源点 $s$, 权重 $w$
+\State \textbf{初始化}: $\forall v \in V, D[v] \gets \infty, D[s] \gets 0$
+\State $S \gets \emptyset$ \Comment{已确定最短路径集合}
+\State $Q \gets V$ \Comment{优先队列}
+\While{$Q \neq \emptyset$}
+    \State $u \gets \text{ExtractMin}(Q)$ \Comment{取出 $D[u]$ 最小的节点}
+    \State $S \gets S \cup \{u\}$
+    \ForAll{$v \in N(u)$}
+        \If{$D[u] + w(u, v) < D[v]$} \Comment{松弛操作}
+            \State $D[v] \gets D[u] + w(u, v)$
+            \State $\text{DecreaseKey}(Q, v, D[v])$
+        \EndIf
+    \EndFor
+\EndWhile
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{最小生成树 (MST)}
+\begin{enumerate}
+    \item \textbf{Prim}：从任意 $r \in V$ 开始，维护树节点集 $T$。每次选横切边 $(u, v)$ 中 $w(u, v)$ 最小且 $u \in T, v \notin T$ 的边，将 $v$ 加入 $T$。
+    \item \textbf{Kruskal}：将 $E$ 按权重升序排列。依序选边 $(u, v)$，若 $u, v$ 不在同一连通分量（用并查集判定），则加入 MST。
+\end{enumerate}
+
+\subsection{拓扑排序：Kahn 算法}
+\begin{enumerate}
+    \item 计算所有顶点入度 $\text{indeg}(v) = |\{u \mid (u, v) \in E\}|$。
+    \item 初始化队列 $Q = \{v \mid \text{indeg}(v) = 0\}$。
+    \item 弹出 $u$，加入序列 $\sigma$。$\forall v \in N(u)$，$\text{indeg}(v) \leftarrow \text{indeg}(v) - 1$; 若为 0 则入队。
+    \item 若 $|\sigma| < |V|$，则图含环。
+\end{enumerate}
+
+\section{高级工程专项算子}
+
+\subsection{网络流 (Network Flow)}
+图 $G=(V, E)$ 带容量 $c: E \to \mathbb{R}^+$。流 $f: E \to \mathbb{R}$ 满足：
+\begin{enumerate}
+    \item 容量限制：$0 \le f(u, v) \le c(u, v)$
+    \item 流量守恒：$\forall u \in V \setminus \{s, t\}, \sum_{v} f(u, v) = 0$
+\end{enumerate}
+\textbf{Edmonds-Karp}：在残量网络 $c_f(u, v) = c(u, v) - f(u, v)$ 中用 BFS 找增广路，更新 $f$ 直至无增广路。复杂度 $O(|V| \cdot |E|^2)$。
+
+\subsection{二分图最大匹配}
+二分图 $G=(X \cup Y, E)$。匹配 $M \subseteq E$ 满足任意两条边无公共顶点。
+\textbf{匈牙利算法}：寻找增广路 $P$（交替未匹配/匹配边，端点均未匹配）。若存在，则 $M' = M \oplus P$（对称差）为更大匹配。重复至无增广路。
+
+\subsection{强连通分量 (SCC)：Tarjan 算法}
+基于 DFS 维护时间戳 $DFN[u]$ 与追溯值 $LOW[u]$。
+\begin{itemize}
+    \item 初始化：$DFN[u] = LOW[u] = \text{timer}$，$u$ 入栈。
+    \item 遍历邻接点 $v$：
+    \begin{itemize}
+        \item 若 $v$ 未访问：$\text{DFS}(v)$，$LOW[u] = \min(LOW[u], LOW[v])$
+        \item 若 $v$ 在栈中：$LOW[u] = \min(LOW[u], DFN[v])$
+    \end{itemize}
+    \item 若 $LOW[u] = DFN[u]$，则栈中 $u$ 及上方节点构成一个 SCC，批量弹栈。
+\end{itemize}
+时间复杂度 $O(|V| + |E|)$。

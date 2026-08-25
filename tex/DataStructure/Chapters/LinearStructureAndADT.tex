@@ -1,0 +1,352 @@
+\chapter{Linear Structures and Abstract Data Types}
+
+\section{栈 (Stack)}
+
+\subsection{代数定义}
+栈 $S$ 是定义在元素集 $E$ 上的代数结构，由以下算子与公理刻画：
+\begin{itemize}
+    \item \textbf{构造算子}：
+    \begin{itemize}
+        \item $\text{empty}: \to S$ （空栈）
+        \item $\text{push}: S \times E \to S$ （压入）
+    \end{itemize}
+    \item \textbf{观测算子}：
+    \begin{itemize}
+        \item $\text{pop}: S \to S \cup \{\bot\}$ （弹出）
+        \item $\text{top}: S \to E \cup \{\bot\}$ （栈顶元素）
+        \item $\text{isEmpty}: S \to \mathbb{B}$ （判空）
+    \end{itemize}
+\end{itemize}
+
+\textbf{公理系统}（$\forall s \in S, e \in E$）：
+\begin{enumerate}
+    \item $\text{isEmpty}(\text{empty}) = \text{true}$
+    \item $\text{isEmpty}(\text{push}(s, e)) = \text{false}$
+    \item $\text{pop}(\text{push}(s, e)) = s$
+    \item $\text{top}(\text{push}(s, e)) = e$
+    \item $\text{pop}(\text{empty}) = \bot, \quad \text{top}(\text{empty}) = \bot$
+\end{enumerate}
+
+\subsection{物理实现方案}
+\begin{enumerate}
+    \item \textbf{顺序栈}：映射到连续数组 $A[0..m-1]$，栈顶指针 $t \in \{-1, \dots, m-1\}$。$\text{push}$ 操作需满足 $t < m-1$，否则栈溢出。
+    \item \textbf{链栈}：映射到单向链表，表头即为栈顶，无容量上限。
+\end{enumerate}
+
+\begin{algorithm}[H]
+\caption{栈操作伪代码 (Stack Operations)}
+\begin{algorithmic}[1]
+\State \textbf{数据结构}: 数组 $A[0..m-1]$, 整数 $t \gets -1$
+\Procedure{Push}{$e$}
+    \If{$t = m - 1$}
+        \State \Return \textbf{Error} (Stack Overflow)
+    \EndIf
+    \State $t \gets t + 1$
+    \State $A[t] \gets e$
+\EndProcedure
+\Procedure{Pop}{}
+    \If{$t = -1$}
+        \State \Return \textbf{Error} (Stack Underflow)
+    \EndIf
+    \State $e \gets A[t]$
+    \State $t \gets t - 1$
+    \State \Return $e$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    cell/.style={draw, minimum width=1.4cm, minimum height=0.75cm, font=\ttfamily},
+    arrow/.style={->, >=latex, thick},
+    lbl/.style={font=\small}
+]
+    \node[cell] (a) at (0,0) {$d_1$};
+    \node[cell] (b) at (0,0.75) {$d_2$};
+    \node[cell] (c) at (0,1.5) {$d_3$};
+    \node[cell, draw=none, minimum height=0.4cm] (d) at (0,2.25) {};
+    \draw (d.south west) -- (d.north west);
+    \draw (d.south east) -- (d.north east);
+    \draw[arrow] (-2.2, 2.25) -- node[lbl, below] {$\text{push}(e)$} (d.west);
+    \draw[arrow] (d.east) -- node[lbl, below] {$\text{pop}()$} (2.2, 2.25);
+    \node[lbl, anchor=west] at ($(c.east)+(0.2,0)$) {$\leftarrow$ 栈顶 ($t$)};
+    \node[lbl, anchor=west] at ($(a.east)+(0.2,0)$) {$\leftarrow$ 栈底};
+\end{tikzpicture}
+\caption{栈 (Stack) 逻辑模型}
+\label{fig:stack_model}
+\end{figure}
+
+\section{队列 (Queue)}
+
+\subsection{代数定义}
+队列 $Q$ 是定义在元素集 $E$ 上的代数结构：
+\begin{itemize}
+    \item \textbf{构造算子}：$\text{emptyQ}: \to Q$，$\text{enqueue}: Q \times E \to Q$
+    \item \textbf{观测算子}：$\text{dequeue}: Q \to Q \cup \{\bot\}$，$\text{front}: Q \to E \cup \{\bot\}$，$\text{isEmptyQ}: Q \to \mathbb{B}$
+\end{itemize}
+
+\textbf{公理系统}（$\forall q \in Q, e \in E$）：
+\begin{enumerate}
+    \item $\text{isEmptyQ}(\text{emptyQ}) = \text{true}$
+    \item $\text{dequeue}(\text{enqueue}(\text{emptyQ}, e)) = \text{emptyQ}$
+    \item $\text{dequeue}(\text{enqueue}(\text{enqueue}(q, e_1), e_2)) = \text{enqueue}(\text{dequeue}(\text{enqueue}(q, e_1)), e_2)$
+    \item $\text{front}(\text{enqueue}(\text{emptyQ}, e)) = e$
+    \item 若 $\text{isEmptyQ}(q) = \text{false}$，则 $\text{front}(\text{enqueue}(q, e)) = \text{front}(q)$
+\end{enumerate}
+
+\subsection{循环队列 (Circular Queue)}
+为消除假溢出，将数组索引映射到模 $m$ 剩余类环 $\mathbb{Z}_m$。
+\begin{itemize}
+    \item \textbf{指针移动}：$f \leftarrow (f + 1) \bmod m$，$r \leftarrow (r + 1) \bmod m$。
+    \item \textbf{队满判据}：$(r + 1) \bmod m = f$（牺牲一槽位）。
+    \item \textbf{队空判据}：$r = f$。
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{循环队列操作伪代码 (Circular Queue Operations)}
+\begin{algorithmic}[1]
+\State \textbf{数据结构}: 数组 $Q[0..m-1]$, 整数 $f \gets 0, r \gets 0$
+\Procedure{Enqueue}{$e$}
+    \If{$(r + 1) \bmod m = f$}
+        \State \Return \textbf{Error} (Queue Full)
+    \EndIf
+    \State $Q[r] \gets e$
+    \State $r \gets (r + 1) \bmod m$
+\EndProcedure
+\Procedure{Dequeue}{}
+    \If{$r = f$}
+        \State \Return \textbf{Error} (Queue Empty)
+    \EndIf
+    \State $e \gets Q[f]$
+    \State $f \gets (f + 1) \bmod m$
+    \State \Return $e$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    cell/.style={draw, minimum width=1.1cm, minimum height=0.75cm, font=\ttfamily},
+    arrow/.style={->, >=latex, thick},
+    lbl/.style={font=\small}
+]
+    \matrix (q) [matrix of nodes, nodes={cell}, column sep=-\pgflinewidth] {
+        $d_1$ & $d_2$ & $d_3$ & $d_4$ & \phantom{A} & \phantom{A} \\
+    };
+    \draw[arrow] (q-1-1.west) -- ++(-4,0) node[lbl, midway, above] {$\text{dequeue}()$};
+    \draw[arrow] ($(q-1-6.east)+(4,0)$) -- ++(-4,0) node[lbl, midway, above] {$\text{enqueue}(e)$};
+    \node[lbl] (front) at ($(q-1-1.south)+(0,-0.9)$) {$f$};
+    \draw[arrow] (front.north) -- (q-1-1.south);
+    \node[lbl] (rear) at ($(q-1-4.south)+(0,-0.9)$) {$r$};
+    \draw[arrow] (rear.north) -- (q-1-4.south);
+\end{tikzpicture}
+\caption{普通队列 (Queue)}
+\label{fig:queue_model}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    cell/.style={draw, minimum size=0.8cm, font=\ttfamily},
+    arrow/.style={->, >=latex},
+    lbl/.style={font=\small}
+]
+    \node[cell] (s5) at (90:1.8) {5};
+    \node[cell] (s0) at (30:1.8) {0};
+    \node[cell] (s1) at (-30:1.8) {1};
+    \node[cell] (s2) at (-90:1.8) {2};
+    \node[cell] (s3) at (-150:1.8) {3};
+    \node[cell] (s4) at (150:1.8) {4};
+    \draw[arrow] (s5) to[bend left=15] (s0);
+    \draw[arrow] (s0) to[bend left=15] (s1);
+    \draw[arrow] (s1) to[bend left=15] (s2);
+    \draw[arrow] (s2) to[bend left=15] (s3);
+    \draw[arrow] (s3) to[bend left=15] (s4);
+    \draw[arrow] (s4) to[bend left=15] (s5);
+    \node[lbl, anchor=west] at ($(s0.east)+(0.3,0)$) {$\leftarrow f$};
+    \node[lbl, anchor=east] at ($(s3.west)+(-0.3,0)$) {$r \rightarrow$};
+    \node[lbl, align=left, anchor=north west] at (3.2, -0.8) {
+        队满判据 ($m=6$):\\
+        $(r + 1) \bmod 6 = f$\\
+        $(4 + 1) \bmod 6 = 5$
+    };
+\end{tikzpicture}
+\caption{循环队列 (Circular Queue)}
+\label{fig:queue_circular}
+\end{figure}
+
+\section{字符串 (String)}
+
+\subsection{形式化定义}
+\begin{itemize}
+    \item \textbf{字母表}：$\Sigma$ 为有限非空字符集合。
+    \item \textbf{字符串集合}：$\Sigma^* = \bigcup_{k=0}^{\infty} \Sigma^k$，其中 $\Sigma^k$ 为长度为 $k$ 的字符串集合。
+    \item \textbf{空串}：$\varepsilon \in \Sigma^0$。
+    \item \textbf{连接运算}：$\circ: \Sigma^* \times \Sigma^* \to \Sigma^*$，满足结合律，且 $\varepsilon$ 为单位元。
+    \item \textbf{物理存储}：在底层语言中，字符串 $s \in \Sigma^*$ 映射为字符数组，以终结符 $\# \notin \Sigma$（如 C 语言的 \texttt{\textbackslash 0}）界定边界。
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    cell/.style={draw, minimum width=1.5cm, minimum height=0.75cm, font=\ttfamily},
+    lbl/.style={font=\small}
+]
+    \matrix (str) [matrix of nodes, nodes={cell}, column sep=-\pgflinewidth] {
+        $c_1$ & $c_2$ & $c_3$ & $\#$ \\
+    };
+    \node[lbl] at ($(str-1-1.south)+(0,-0.35)$) {0};
+    \node[lbl] at ($(str-1-2.south)+(0,-0.35)$) {1};
+    \node[lbl] at ($(str-1-3.south)+(0,-0.35)$) {2};
+    \node[lbl] at ($(str-1-4.south)+(0,-0.35)$) {3};
+    \node[lbl, anchor=west] at ($(str.east)+(0.3,0)$) {$\leftarrow s \in \Sigma^*$ 的物理映射};
+\end{tikzpicture}
+\caption{字符串物理存储布局}
+\label{fig:string_layout}
+\end{figure}
+
+\section{高级映射与哈希表体系}
+
+\subsection{字典 (Dictionary) / 映射 (Map)}
+\begin{itemize}
+    \item \textbf{逻辑定义}：映射关系 $\mathcal{M}: K \rightharpoonup V$，其中 $K$ 为键集，$V$ 为值集，$\rightharpoonup$ 表示偏函数。
+    \item \textbf{约束}：$\forall k_1, k_2 \in \text{dom}(\mathcal{M}), \mathcal{M}(k_1) = \mathcal{M}(k_2) \implies k_1 = k_2$（单射性）。
+\end{itemize}
+
+\subsection{哈希表 (Hash Table)}
+通过哈希函数 $h: K \to \mathbb{Z}_m$ 将键空间压缩至有限数组槽位 $\{0, \dots, m-1\}$。
+
+\subsubsection{(1) 哈希函数}
+\begin{itemize}
+    \item \textbf{除留余数法}：$h(k) = k \bmod m$，通常取 $m$ 为质数以最小化冲突。
+    \item \textbf{理想哈希}：$\forall k_i \neq k_j \implies h(k_i) \neq h(k_j)$。
+\end{itemize}
+
+\subsection{哈希碰撞 (Hash Collision)}
+\subsubsection{(1) 碰撞必然性}
+由鸽巢原理，若 $|K| > m$，则 $\exists k_i \neq k_j$ 使得 $h(k_i) = h(k_j)$。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    keybox/.style={draw, minimum width=2.2cm, minimum height=0.7cm, font=\ttfamily},
+    cell/.style={draw, minimum width=2cm, minimum height=0.7cm, font=\small},
+    arrow/.style={->, >=latex, thick},
+    lbl/.style={font=\small}
+]
+    \node[keybox] (k1) at (0, 0.55) {$k_1$};
+    \node[keybox] (k2) at (0, -0.55) {$k_2$};
+    \node[lbl, anchor=south] at ($(k1.north)+(0,0.15)$) {【输入键 $K$】};
+    \node[cell] (s0) at (6.5, 0.7) {0: $\emptyset$};
+    \node[cell, fill=yellow!25] (s1) at (6.5, 0) {1: $v$};
+    \node[cell] (s2) at (6.5, -0.7) {2: $\emptyset$};
+    \node[lbl, anchor=south] at ($(s0.north)+(0,0.3)$) {【槽位 $\mathbb{Z}_m$】};
+    \draw[arrow] (k1.east) -- node[lbl, above, midway] {$h(k) \bmod m$} (s1.west);
+    \draw[arrow] (k2.east) -- (s1.west);
+    \node[lbl, red, anchor=west] at ($(s1.east)+(0.2,0)$) {$\leftarrow$ 碰撞：$h(k_1) = h(k_2)$};
+\end{tikzpicture}
+\caption{哈希碰撞三大核心要素模型}
+\label{fig:hash_collision}
+\end{figure}
+
+\subsubsection{(2) 冲突解决方案}
+\begin{enumerate}
+    \item \textbf{开放寻址法 (Open Addressing)}
+    \begin{itemize}
+        \item 探测序列：$h_i(k) = (h(k) + \delta(i)) \bmod m$，其中 $\delta(i)$ 为步长函数；所有槽位都存放在主表数组中，冲突时按序列继续探测。
+
+        \item \textbf{线性探测 (Linear Probing)}：$\delta(i) = i$，探测 $h(k), h(k)+1, h(k)+2, \dots$
+        \begin{itemize}
+            \item 实现最简单、缓存友好，期望探测次数 $O(1 + \alpha)$。
+            \item 缺点：易产生\textbf{主聚集 (Primary Clustering)}——冲突键连续堆叠成块，探测链越拖越长，性能急剧恶化。
+        \end{itemize}
+
+        \item \textbf{二次探测 (Quadratic Probing)}：$\delta(i) = i^2$，探测 $h(k), h(k)+1, h(k)+4, h(k)+9, \dots$
+        \begin{itemize}
+            \item 探测间距随 $i$ 增大而拉大，同簇键迅速分散，缓解主聚集（\textbf{次级聚集}仍可能存在）。
+            \item 注意：$i^2 \bmod m$ 可能提前循环，仅当 $m$ 为质数且负载因子 $\alpha < 0.5$ 时才能保证遍历全部槽位。
+        \end{itemize}
+
+        \item \textbf{双重散列 (Double Hashing)}：$h_i(k) = (h_1(k) + i \cdot h_2(k)) \bmod m$，其中 $h_2(k) \not\equiv 0 \pmod m$
+        \begin{itemize}
+            \item 典型取法：$h_1(k) = k \bmod m$，$h_2(k) = 1 + (k \bmod (m-1))$，步长随键变化且与 $m$ 互质（$m$ 与 $m-1$ 恒互质）。
+            \item 每个键拥有\emph{独立}的探测序列，分布最均匀，最接近理想随机探测，冲突性能最优。
+        \end{itemize}
+
+        \item \textbf{开放寻址公共缺陷}：删除不能直接置空（会截断后续键的探测链），须以「墓碑」标记被删槽位；负载因子过高时须\textbf{再散列 (Rehashing)}扩容重建。
+    \end{itemize}
+
+    \item \textbf{链地址法 (Chaining)}
+    \begin{itemize}
+        \item 每个槽位 $i \in \mathbb{Z}_m$ 维护一个链表 $L_i = \{ (k, v) \mid h(k) = i \}$。
+        \item 检索时间复杂度：期望 $O(1 + \alpha)$，其中 $\alpha = n/m$ 为负载因子。
+        \item \textbf{动态重构}：当 $|L_i| > \tau$（阈值）时，将链表重构为自平衡二叉搜索树（如红黑树），最坏检索复杂度降为 $O(\log n)$。
+    \end{itemize}
+\end{enumerate}
+
+\begin{algorithm}[H]
+\caption{哈希表查找与插入伪代码 (Hash Table Operations)}
+\begin{algorithmic}[1]
+\State \textbf{数据结构}: 数组 $T[0..m-1]$ (初始为 $\emptyset$), 哈希函数 $h(k)$
+\Procedure{Search}{$k$}
+    \State $i \gets 0$
+    \Repeat
+        \State $j \gets (h(k) + i) \bmod m$ \Comment{线性探测}
+        \If{$T[j] = \emptyset$ \textbf{or} $T[j].key = k$}
+            \State \Return $T[j]$
+        \EndIf
+        \State $i \gets i + 1$
+    \Until{$i = m$}
+    \State \Return \textbf{Error} (Not Found)
+\EndProcedure
+\Procedure{Insert}{$k, v$}
+    \State $item \gets \text{Search}(k)$
+    \If{$item \neq \textbf{Error}$}
+        \State $item.value \gets v$ \Comment{更新}
+    \Else
+        \State $i \gets 0$
+        \While{True}
+            \State $j \gets (h(k) + i) \bmod m$
+            \If{$T[j] = \emptyset$}
+                \State $T[j] \gets \langle k, v \rangle$
+                \State \Return
+            \EndIf
+            \State $i \gets i + 1$
+        \EndWhile
+    \EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    cell/.style={draw, minimum width=1.1cm, minimum height=0.7cm, font=\ttfamily},
+    kv/.style={draw, minimum width=1.9cm, minimum height=0.6cm, font=\small},
+    arrow/.style={->, >=latex, thick},
+    lbl/.style={font=\small}
+]
+    \matrix (bkt) [matrix of nodes, nodes={cell}, row sep=-\pgflinewidth] {
+        0 \\
+        1 \\
+        2 \\
+    };
+    \node[lbl, anchor=south] at ($(bkt-1-1.north)+(0,0.15)$) {槽位 $i$};
+    \node[kv, right=1.2cm of bkt-1-1] (ka) {$(k_1, v_1)$};
+    \node[kv, right=0.5cm of ka] (kb) {$(k_2, v_2)$};
+    \draw[arrow] (bkt-1-1.east) -- (ka.west);
+    \draw[arrow] (ka.east) -- (kb.west);
+    \node[lbl, anchor=west] at ($(kb.east)+(0.3,0)$) {$\to \emptyset$};
+    \draw[arrow] (bkt-2-1.east) -- ++(1.2,0) node[lbl, anchor=west] {$\emptyset$};
+    \node[draw, minimum width=2.2cm, minimum height=0.65cm, font=\small, right=1.2cm of bkt-3-1] (rbt) {红黑树};
+    \draw[arrow] (bkt-3-1.east) -- (rbt.west);
+    \node[lbl, anchor=north, align=center] at ($(rbt.south)+(0,-0.2)$) {
+        （冲突数 $> \tau$ 时重构，\\
+        检索复杂度 $O(\log n)$）
+    };
+\end{tikzpicture}
+\caption{链地址法与动态重构模型}
+\label{fig:hash_chaining}
+\end{figure}

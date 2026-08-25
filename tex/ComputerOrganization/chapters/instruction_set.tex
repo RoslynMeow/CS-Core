@@ -1,0 +1,116 @@
+\section{指令系统与汇编}
+
+\subsection{指令集架构（ISA）}
+
+指令集架构（Instruction Set Architecture, ISA）是\textbf{软件与硬件的接口}。它定义了：
+\begin{itemize}
+    \item 寄存器组：名称、数量、位宽
+    \item 指令格式：操作码+操作数的编码方式
+    \item 寻址方式：如何定位操作数
+    \item 数据类型：支持的整数/浮点数宽
+    \item I/O 模型：内存映射/独立 I/O
+\end{itemize}
+
+\subsection{RISC 与 CISC}
+
+\begin{table}[H]
+\centering
+\caption{RISC 与 CISC 对比}
+\label{tab:risc_cisc}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+\textbf{特征} & \textbf{RISC} & \textbf{CISC} \\
+\midrule
+指令长度 & 定长（如 32-bit） & 变长（1–15 字节） \\
+指令数量 & 少（约 100 条） & 多（约 300+ 条） \\
+寻址方式 & 简单（Load/Store 架构） & 复杂（可直接访存运算） \\
+典型代表 & MIPS、ARM、RISC-V & x86、VAX \\
+硬件设计 & 简洁，易流水 & 复杂，需微程序 \\
+编译负担 & 重（编译器优化关键） & 轻（硬件承担更多） \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{MIPS 指令集}
+
+MIPS 是经典 RISC 架构，32 个 32 位通用寄存器（\$0 始终为 0），Load/Store 架构。
+
+\subsubsection{MIPS 寄存器约定}
+
+\begin{table}[H]
+\centering
+\caption{MIPS 寄存器用途}
+\label{tab:mips_regs}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+\textbf{寄存器号} & \textbf{名称} & \textbf{用途} \\
+\midrule
+\$0 & \$zero & 恒为 0 \\
+\$1 & \$at & 汇编器保留 \\
+\$2–\$3 & \$v0–\$v1 & 函数返回值 \\
+\$4–\$7 & \$a0–\$a3 & 函数参数 \\
+\$8–\$15 & \$t0–\$t7 & 临时变量 \\
+\$16–\$23 & \$s0–\$s7 & 保存变量（需恢复） \\
+\$29 & \$sp & 栈指针 \\
+\$31 & \$ra & 返回地址 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsubsection{三种指令格式}
+
+\begin{itemize}
+    \item \textbf{R 型}（寄存器型）：op(6) + rs(5) + rt(5) + rd(5) + shamt(5) + funct(6)
+    \item \textbf{I 型}（立即数型）：op(6) + rs(5) + rt(5) + immediate(16)
+    \item \textbf{J 型}（跳转型）：op(6) + address(26)
+\end{itemize}
+
+\begin{example}[MIPS 指令示例]
+\begin{lstlisting}[caption={MIPS 汇编示例：数组求和}]
+    # 计算 a[0] + a[1] + ... + a[9]
+    li   $t0, 0          # sum = 0
+    li   $t1, 0          # i = 0
+    la   $t2, array      # $t2 = &a[0]
+loop:
+    lw   $t3, 0($t2)     # $t3 = a[i]
+    addu $t0, $t0, $t3   # sum += $t3
+    addi $t1, $t1, 1     # i++
+    addi $t2, $t2, 4     # $t2 += 4 (next word)
+    blt  $t1, 10, loop   # if i < 10 goto loop
+done:
+    move $v0, $t0        # return sum
+\end{lstlisting}
+\end{example}
+
+\subsubsection{寻址方式}
+
+\begin{itemize}
+    \item \textbf{寄存器寻址}：$\text{add } \$1, \$2, \$3$
+    \item \textbf{立即数寻址}：$\text{addi } \$1, \$2, 100$
+    \item \textbf{基址偏移寻址}：$\text{lw } \$1, 8(\$2)$（$\$1 = M[\$2+8]$）
+    \item \textbf{PC 相对寻址}：$\text{beq } \$1, \$2, \text{label}$（$\text{PC} = \text{PC}+4 + \text{offset}\times4$）
+    \item \textbf{伪直接寻址}：$\text{j } \text{addr}$（跳转地址 = $\text{PC}$ 高 4 位拼接 26 位地址 $\times4$）
+\end{itemize}
+
+\subsection{过程调用约定}
+
+MIPS 过程调用用 $\texttt{jal}$（jump and link）跳转并保存返回地址到 \$ra，用 $\texttt{jr \$ra}$ 返回。
+
+\begin{lstlisting}[caption={MIPS 过程调用示例}]
+    # 调用
+    jal  my_func          # $ra = PC+4; 跳转到 my_func
+    
+    # 过程内部（栈帧）
+    addi $sp, $sp, -8     # 分配栈帧
+    sw   $ra, 4($sp)      # 保存返回地址
+    sw   $s0, 0($sp)      # 保存 callee-saved 寄存器
+    # ... 过程体 ...
+    lw   $s0, 0($sp)      # 恢复 $s0
+    lw   $ra, 4($sp)      # 恢复 $ra
+    addi $sp, $sp, 8      # 释放栈帧
+    jr   $ra              # 返回
+\end{lstlisting}
+
+\subsection{x86 指令集简介}
+
+x86 是典型的 CISC 架构：变长指令（1–15 字节），寄存器较少（8 个通用寄存器，x86-64 扩展到 16 个），支持内存直接参与运算（非 Load/Store）。x86-64 是目前桌面/服务器主流架构。

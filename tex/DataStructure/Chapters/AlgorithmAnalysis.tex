@@ -1,0 +1,160 @@
+\chapter{Algorithm Definition and Asymptotic Analysis}
+
+本章探讨评价算法优劣的统一数学度量衡，建立时间与空间复杂度的渐进趋势评估模型。
+
+\section{算法的定义与四大核心特征}
+
+算法（Algorithm）是指解决特定问题的一组明确的、有穷的、可执行的指令序列。一个合格的算法必须具备以下四大核心特征：
+
+\begin{enumerate}
+    \item \textbf{有穷性（Finiteness）}：算法必须在执行有限个操作步骤后自动结束，不能陷入死循环，且每一步都应在有穷时间内完成。
+    \item \textbf{确定性（Definiteness）}：算法中的指令每一步都必须有确切的含义，在任何条件下都具有唯一一条执行路径，不产生任何歧义。
+    \item \textbf{可行性（Effectiveness）}：算法中涉及的所有操作均是最基础、可执行的，能够通过已经实现的底层基本运算在有限时间内准确运行。
+    \item \textbf{输入/输出（Input / Output）}：一个算法拥有零个或多个输入（作为算法处理的初始物理量），并必然产生一个或多个输出（作为算法执行的结果回馈）。
+\end{enumerate}
+
+\section{算法的描述媒介}
+
+根据“信息流动方向”与“面向对象（人或机器）”的不同，算法的描述主要分为两大阵营、四种流派：
+
+\begin{itemize}
+    \item \textbf{面向人类思维（人写人看）}：
+    \begin{enumerate}
+        \item \textbf{自然语言}：用人类日常语言描述。优点是通俗易懂，缺点是过于冗长且容易产生语义歧义。
+        \item \textbf{流程图（Flowchart）}：利用图形化、具有严密逻辑关系的有向图来表达控制流。
+        \item \textbf{伪代码（Pseudo-code）}：介于自然语言与编程语言之间。直接利用公式与控制流算子进行映射，具备接近代码的严密性，是学术界描述算法的标准媒介。
+    \end{enumerate}
+    \item \textbf{面向底层执行（人写机看）}：
+    \begin{enumerate}
+        \setcounter{enumi}{3}
+        \item \textbf{高级编程语言}：如 C++、Java、Python 等。直接翻译为计算机硬件可以理解并编译运行的二进制指令。
+    \end{enumerate}
+\end{itemize}
+
+\section{算法的时间复杂度 (Time Complexity)}
+
+评价一个算法的优劣不能依靠绝对的计时。科学的评估方法是分析\textbf{输入规模 $n$ 与资源消耗规模之间的渐进趋势关系}。
+
+\subsection{大 O 表示法的渐进上界定义}
+
+大 O 符号用于寻求算法执行时间随着规模 $n$ 放大时的渐进上界。其严格数学定义为：若存在正连续常数 $c$ 和 $n_0$，使得当 $n \ge n_0$ 时，算法的实际运行时间 $T(n)$ 均满足：
+$$T(n) \le c \cdot f(n)$$
+则记作 $T(n) = O(f(n))$。它忽略了低阶项与常数系数，专注于长远增长趋势。
+
+\subsection{复杂度阶数}
+
+随着输入规模 $n$ 的爆炸式增长，不同复杂度阶数的资源消耗会产生明显的趋势分流。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=15cm, height=10cm,
+    axis lines=left,
+    axis line style={-latex, thick},
+    xlabel={输入规模},
+    ylabel={资源消耗},
+    xmin=-2, xmax=45, ymin=-2.5, ymax=45,
+    xtick={0,10,20,30,40},
+    ytick={0,10,20,30,40},
+    domain=0:40,
+    samples=120,
+    clip=false,
+    every axis x label/.style={at={(ticklabel* cs:1)}, anchor=north},
+    every axis y label/.style={at={(ticklabel* cs:1)}, anchor=south},
+    legend style={draw=none},
+]
+    % 负半轴虚线延伸
+    \draw[dashed, gray, thick] (axis cs:0,0) -- (axis cs:-2,0);
+    \draw[dashed, gray, thick] (axis cs:0,0) -- (axis cs:0,-2.5);
+    
+    % O(1)
+    \addplot[thick, gray] {1};
+    \addplot[dashed, gray, domain=-2:0] {1};
+    \node[anchor=west, font=\small, gray] at (axis cs:40,0.6) {$O(1)$ };
+    % O(log n)
+    \addplot[thick, green!60!black, domain=1:40] {log2(x)};
+    \node[anchor=west, font=\small, green!60!black] at (axis cs:40,4.5) {$O(\log n)$ };
+    % O(n)
+    \addplot[thick, blue] {x};
+    \addplot[dashed, blue, domain=-2:0] {x};
+    \node[anchor=west, font=\small, blue] at (axis cs:40,38.5) {$O(n)$ };
+    % O(n log n)
+    \addplot[thick, cyan!60!black, domain=1:10] {x*log2(x)};
+    \node[anchor=west, font=\small, cyan!60!black] at (axis cs:10,33.2) {$O(n \log n)$ };
+    % O(n^2)
+    \addplot[thick, magenta!80!black, domain=0:6.32] {x^2};
+    \addplot[dashed, magenta!80!black, domain=-2:0] {x^2};
+    \node[anchor=south west, font=\small, magenta!80!black] at (axis cs:6,38) {$O(n^2)$ };
+    % O(2^n)
+    \addplot[thick, red, domain=0:5.32] {2^x};
+    \addplot[dashed, red, domain=-2:0] {2^x};
+    \node[anchor=south west, font=\small, red] at (axis cs:1,35) {$O(2^n)$ };
+    % O(n!) - 严格经过整数点并用平滑曲线连接
+    \addplot[thick, red!60!black, samples at={0,1,2,3,4}, smooth] {factorial(x)};
+    \node[anchor=south west, font=\small, red!60!black] at (axis cs:0,20) {$O(n!)$ };
+\end{axis}
+\end{tikzpicture}
+\caption{大 O 渐进曲线趋势对比}
+\label{fig:big_o_curves}
+\end{figure}
+
+\subsection{复杂度组合乘法原理}
+
+当算法的各个模块相互嵌套或串联时，其大 O 符号满足乘法运算法则：
+$$O(a) \cdot O(b) = O(a \cdot b)$$
+
+\section{算法的空间复杂度 (Space Complexity)}
+
+空间复杂度用于衡量随着输入规模 $n$ 的扩大，算法运行期间\textbf{额外占用的辅助存储空间}的增幅趋势。
+
+\subsection{\texorpdfstring{$O(1)$}{O(1)} 常数级辅助空间（In-place 原地置换）}
+
+算法在原输入数据的存储空间上直接进行修改与操作。整个过程不需要开辟随 $n$ 增长的新空间，仅需要常数个辅助变量用于临时中转。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    cell/.style={draw, minimum width=1.4cm, minimum height=0.75cm, font=\ttfamily},
+    lbl/.style={font=\small}
+]
+    \matrix (arr) [matrix of nodes, nodes={cell}, column sep=-\pgflinewidth] {
+        $d_1$ & $d_2$ & $d_3$ & $d_4$ \\
+    };
+    \node[lbl, anchor=south west] at ($(arr.north west)+(0,0.15)$) {原数组 $A$:};
+    \draw[<->, >=latex, thick]
+        ($(arr-1-1.south)+(0,-0.25)$) to[bend right=35]
+        node[midway, below, lbl] {交换}
+        ($(arr-1-2.south)+(0,-0.25)$);
+    \node[lbl, anchor=north west, align=left] at ($(arr.south west)+(0,-1.0)$) {
+        $\longrightarrow$ 借助常数槽位 $\tau$ 临时中转\\
+        （辅助空间 $O(1)$）
+    };
+\end{tikzpicture}
+\caption{原地置换 (Swap In-place) 内存状态机模型}
+\label{fig:space_o1}
+\end{figure}
+
+\subsection{\texorpdfstring{$O(n)$}{O(n)} 线性级辅助空间（Clone 副本生成）}
+
+在算法执行期间（如为了保持原数据不被破坏，或者为了进行高效率的哈希映射），必须在物理内存中动态生成一份与原输入规模等大的副本（Clone）。其开辟的内存槽位随 $n$ 同步线性增长。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    cell/.style={draw, minimum width=1.4cm, minimum height=0.75cm, font=\ttfamily},
+    lbl/.style={font=\small}
+]
+    \matrix (src) [matrix of nodes, nodes={cell}, column sep=-\pgflinewidth] {
+        $d_1$ & $d_2$ & $d_3$ & $d_4$ \\
+    };
+    \node[lbl, anchor=south west] at ($(src.north west)+(0,0.15)$) {原数组 $A$（规模 $n$）:};
+    \matrix (dst) [matrix of nodes, nodes={cell}, column sep=-\pgflinewidth, below=1.6cm of src] {
+        $d'_1$ & $d'_2$ & $d'_3$ & $d'_4$ \\
+    };
+    \node[lbl, anchor=south west] at ($(dst.north west)+(0,0.15)$) {辅助数组 $A'$（随 $n$ 线性增长）:};
+    \node[lbl, anchor=west] at ($(dst.east)+(0.3,0)$) {$\leftarrow$ 空间复杂度 $O(n)$};
+\end{tikzpicture}
+\caption{副本克隆 (Clone) 内存空间扩张模型}
+\label{fig:space_on}
+\end{figure}

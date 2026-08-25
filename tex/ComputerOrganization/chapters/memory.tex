@@ -1,0 +1,116 @@
+\section{存储层次与缓存}
+
+\subsection{存储层次概述}
+
+存储器的速度、容量和价格三者存在矛盾：容量越大越慢越便宜。解决方案是\textbf{存储层次}（Memory Hierarchy）：
+
+\begin{equation}
+\text{寄存器} \ll \text{L1 缓存} \ll \text{L2 缓存} \ll \text{L3 缓存} \ll \text{主存} \ll \text{磁盘/SSD}
+\end{equation}
+
+\subsection{局部性原理}
+
+\begin{definition}[时间局部性]
+刚访问过的数据很可能在不久的将来再次被访问（如循环中的 $\texttt{sum}$ 变量）。
+\end{definition}
+
+\begin{definition}[空间局部性]
+如果访问了地址 $x$，附近的地址（$x+1$, $x+2$, ...）很可能很快被访问（如顺序数组遍历）。
+\end{definition}
+
+缓存就是利用这两个局部性，把当前"用得着"的数据从慢速存储器拷贝到快速存储器。
+
+\subsection{SDRAM 与 DRAM}
+
+\begin{itemize}
+    \item \textbf{DRAM}（动态随机存取存储器）：存储单元为电容，需要定期刷新。密度大但慢。HBM（高带宽存储器）是 DRAM 的 3D 堆叠变体。
+    \item \textbf{SRAM}（静态随机存取存储器）：6 个晶体管构成双稳态电路，速度快但面积大。用作缓存（Cache）。
+\end{itemize}
+
+\subsection{缓存（Cache）}
+
+缓存是 CPU 和主存之间的高速小容量缓冲。现代 CPU 通常有 L1、L2、L3 三级缓存。
+
+\subsubsection{直接映射缓存（Direct-Mapped）}
+
+\begin{equation}
+\text{缓存行索引} = (\text{块地址}) \bmod \text{（缓存行数）}
+\end{equation}
+
+每个内存块只能映射到唯一一个缓存位置。硬件简单但冲突缺失多。
+
+\subsubsection{组相联缓存（Set-Associative）}
+
+\begin{equation}
+\text{组索引} = (\text{块地址}) \bmod \text{（组数）}
+\end{equation}
+
+每组有多路（通常 2–16 路）。是直接映射与全相联的折中。
+
+\subsubsection{缓存地址划分}
+
+\[
+\text{地址} = [\text{Tag} \,|\, \text{Index} \,|\, \text{Block Offset}]
+\]
+
+\begin{itemize}
+    \item Block Offset：块内字节偏移
+    \item Index：选择缓存行（直接映射）或缓存组（组相联）
+    \item Tag：验证该缓存行是否存的是所需数据
+\end{itemize}
+
+\subsubsection{缓存缺失与写策略}
+
+\begin{table}[H]
+\centering
+\caption{缓存写策略}
+\label{tab:cache_write}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+\textbf{策略} & \textbf{写命中} & \textbf{写缺失} \\
+\midrule
+写穿透（Write-Through） & 同时更新缓存和主存 & 直接写主存 \\
+写回（Write-Back） & 只更新缓存，标记 dirty & 先分配缓存行，再写入 \\
+分配（Write-Allocate） & — & 分配缓存行（常配合写回） \\
+非分配（No-Write-Allocate） & — & 不分配，直接写主存 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsubsection{缓存性能}
+
+\[
+\text{平均访存时间} = \text{命中时间} + \text{缺失率} \times \text{缺失代价}
+\]
+
+\[
+\text{AMAT} = T_{\text{hit}} + \text{Miss Rate} \times \text{Miss Penalty}
+\]
+
+\subsection{虚拟内存}
+
+虚拟内存使每个进程拥有独立的地址空间，且程序可用的地址可以超过物理内存容量。
+
+\begin{definition}[虚拟地址与物理地址]
+\[
+\text{虚拟地址} \xrightarrow{\text{MMU + TLB}} \text{物理地址}
+\]
+MMU（Memory Management Unit）负责转换，页表（Page Table）存储映射关系。
+\end{definition}
+
+\subsubsection{TLB（快表）}
+
+TLB（Translation Lookaside Buffer）是页表的专用缓存，缓存最近使用的虚拟$\to$物理地址映射。TLB 缺失的代价非常高（需要走访页表，甚至引起缺页中断）。
+
+\subsubsection{多级页表}
+
+现代操作系统使用多级页表减少页表本身的内存开销（如 x86-64 的 4 级页表）。
+
+\subsection{存储层次设计原则}
+
+\begin{itemize}
+    \item 越靠近 CPU 的层次，容量越小、速度越快、单价越贵
+    \item 包含性（Inclusion）：L1 数据也在 L2 和 L3 中（多数实现）
+    \item 排他性（Exclusion）：不同层次不重叠数据（AMD 的缓存策略）
+    \item 一致性（Coherence）：多核共享数据时保证所有核看到的值一致
+\end{itemize}

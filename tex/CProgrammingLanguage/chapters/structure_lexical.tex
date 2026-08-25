@@ -1,0 +1,253 @@
+\chapter{程序结构与词法基础}
+
+\section{词法单元 (Token)}
+
+C语言程序由各种令牌（Tokens）组成，Token 是程序中具有独立语义的最小语法单位。
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{@{}CCC@{}}
+\toprule
+\textbf{分类} & \textbf{定义} & \textbf{示例} \\
+\midrule
+关键字 (Keyword) & 系统预留的、具有特定语法意义的单词 & \texttt{if}, \texttt{int}, \texttt{return}, \texttt{void} \\
+标识符 (Identifier) & 用户自定义的各种名称，用于给变量、函数、数组等命名 & \texttt{a}, \texttt{b}, \texttt{number1} \\
+常量 (Constant) & 在程序运行过程中，其值固定不变的量 & \texttt{3.1415926}, \texttt{100} \\
+字面量 (Literal) & 直接在源代码中写出的具体数值或文本 & \texttt{"ABC"} \\
+运算符 (Operator) & 用于执行数学或逻辑运算的符号 & \texttt{+}, \texttt{-}, \texttt{*}, \texttt{/}, \texttt{=}, \texttt{--} \\
+分隔符 (Separator) & 用于分隔各语法单元，辅助编译器解析代码结构 & \texttt{\{}, \texttt{\}}, \texttt{;}, \texttt{(}, \texttt{)}, \texttt{,}, \texttt{.}, \texttt{->} \\
+\bottomrule
+\end{tabulary}
+\caption{C语言六大 Token 分类}
+\label{tab:token_types}
+\end{table}
+
+\vspace{0.5em}
+\noindent\textbf{命名规则}：标识符只能由\textbf{字母}、\textbf{数字}和\textbf{下划线}组成，且\textbf{第一个字符绝对不能是数字}。同时，C语言严格区分大小写（例如 \texttt{Value} 和 \texttt{value} 是两个完全不同的变量）。
+
+\vspace{0.5em}
+\noindent\textbf{底层机制}：字面量是没有名字的"硬编码值"（通常直接硬编码在代码段中，无法直接对其取地址）；而常量通常是指用 \texttt{const} 修饰的变量，它有名字、内存类型和地址，只是在编译期被限制了修改权限。
+
+\section{代码基本框架}
+
+一个标准的C语言程序通常包含以下基本元素：
+
+\begin{lstlisting}[caption={标准C语言程序框架}]
+#include <stdio.h>  // 预处理指令：包含标准输入输出库
+
+int main() {        // 主函数：程序的执行入口
+    int a;          // 变量声明
+    printf("Hello");// 语句/表达式：调用打印函数
+    return 0;       // 返回值：表示程序正常结束
+}                   // 结束大括号
+\end{lstlisting}
+
+\newpage
+
+\section{预处理指令}
+
+预处理指令在程序编译前由预处理器处理，以 \texttt{\#} 开头。
+
+\subsection{\texorpdfstring{\texttt{\#include} 头文件包含}{\#include 头文件包含}}
+
+\begin{itemize}
+    \item \texttt{<stdio.h>}：引用官方/标准库头文件（编译器会优先去系统标准库路径下寻找）。
+    \item \texttt{"my.h"}：引用用户自定义的本地头文件（编译器会优先在当前源文件所在的项目目录下寻找）。
+\end{itemize}
+
+\subsection{\texorpdfstring{\texttt{\#define} 宏定义}{\#define 宏定义}}
+
+\begin{itemize}
+    \item \texttt{PI 3.14}：定义常量/字面量。
+    \item \texttt{MAX(a, b) ((a) > (b) ? (a) : (b))}：定义宏函数（类似于内联函数）。
+\end{itemize}
+
+\subsection{带参数宏定义的副作用}
+
+宏定义的本质是\textbf{纯文本替换}，在使用时极易因为逻辑优先级或者多次求值引发错误。
+
+\begin{lstlisting}[caption={宏定义陷阱示例}]
+// 陷阱 1：未加括号导致优先级错误
+#define MULTIPLY(a, b) a * b
+// 期望 2 * (3 + 4) = 14，实际替换为 2 * 3 + 4 = 10
+int res = MULTIPLY(2, 3 + 4); 
+
+// 陷阱 2：双重求值副作用
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+int x = 5, y = 3;
+// 实际替换为：((x++) > (y) ? (x++) : (y))
+// 导致 x 被自增了两次，最终结果和 x 的值都不符合预期！
+int z = MAX(x++, y); 
+\end{lstlisting}
+
+\newpage
+
+\section{函数声明、实现与文件结构}
+
+C语言通常将代码拆分为\textbf{头文件}和\textbf{源文件}来管理。
+
+\subsection{头文件 (Header File) —— 后缀为 \texttt{.h}}
+
+\begin{itemize}
+    \item \textbf{作用}：存储所有希望暴露给外部使用的函数声明、变量或接口（Interface）。
+    \item \textbf{示例内容}：
+    \begin{enumerate}
+        \item \texttt{int Add(int a, int b);} —— 函数声明（提供给外部调用的接口）。
+        \item \texttt{int a = 5;} —— 变量。
+        \item \texttt{const float a = 3.14;} —— 常量。
+    \end{enumerate}
+\end{itemize}
+
+\subsection{源文件 (Source File) —— 后缀为 \texttt{.c} / \texttt{.cpp}}
+
+\begin{itemize}
+    \item \textbf{作用}：存储具体的业务逻辑与代码实现。
+    \item \textbf{规则}：在头文件中声明的函数，\textbf{必须}在源文件中给出具体实现。
+\end{itemize}
+
+\begin{lstlisting}[caption={源文件实现示例}]
+int Add(int a, int b) { 
+    return a + b; 
+}
+\end{lstlisting}
+
+\section{语句与表达式}
+
+\begin{enumerate}
+    \item \textbf{语句 (Statement) —— 代表"行为"}
+    \begin{itemize}
+        \item 控制语句：如 \texttt{if (...) \{ ... \}}
+        \item 调用语句：如 \texttt{Add(1, 2);}
+        \item 赋值语句：如 \texttt{a = b = c = 0;}（支持从右往左的连续赋值）。
+    \end{itemize}
+    \item \textbf{表达式 (Expression) —— 代表"计算"}
+    \begin{itemize}
+        \item 示例：\texttt{a + b;}（计算 \texttt{a} 加 \texttt{b} 的值，表达式本身具有返回值）。
+    \end{itemize}
+\end{enumerate}
+
+\newpage
+
+\section{控制流程}
+
+通过特定关键字控制程序执行顺序，主要分为以下三类：
+
+\begin{enumerate}
+    \item \textbf{分支结构 / 选择循环}
+    \begin{itemize}
+        \item \texttt{if (...) -- else if (...) -- else}：若……则……或者……则……否则……
+        \item \texttt{switch (...) \{ case 1: ... default: ... \}}：多分支选择语句
+    \end{itemize}
+
+    \item \textbf{循环语句 / 迭代流程}
+    \begin{itemize}
+        \item \texttt{while (...)}：当……时，执行循环
+        \item \texttt{do \{ ... \} while (...)}：先执行一次体，再判断条件直到……
+        \item \texttt{for (x; y; z)}：最常用的标准循环/迭代语句
+    \end{itemize}
+
+    \item \textbf{跳转语句 / 分流作用}
+    \begin{itemize}
+        \item \texttt{break}：退出当前循环或 \texttt{switch} 结构
+        \item \texttt{continue}：跳过本次循环剩余代码，直接进入下一次循环
+        \item \texttt{return}：函数返回，结束当前函数的运行
+        \item \texttt{goto}：无条件跳转到指定标签（极易破坏代码结构，非特殊底层处理不建议使用）
+    \end{itemize}
+\end{enumerate}
+
+\section{作用域 (Scope)}
+
+作用域决定了变量的可见性和生命周期。
+
+\begin{enumerate}
+    \item \textbf{命名唯一性}：在\textbf{同一个作用域内}，变量名必须是唯一的。
+    \item \textbf{最小单元}：大括号 \texttt{\{ \}} 是 C语言中划分作用域的最小单元（块级作用域）。
+    \item \textbf{隔离规则}：外层作用域\textbf{不可以}访问内层作用域中定义的变量（内层变量外部不可访问）。
+    \item \textbf{生命周期}：一旦代码执行超过了变量所在的作用域，该变量就不能再被访问。
+    \item \textbf{继承与暴露}：作用域具有继承性，\textbf{内层作用域可以访问外层作用域}的变量（从内向外层层暴露）。
+\end{enumerate}
+
+\subsection{局部变量遮蔽 (Variable Shadowing)}
+
+当内层作用域声明了一个与外层同名的变量时，外层变量在内层会暂时失效（被遮蔽）。这容易让人在多层循环或嵌套代码中写出逻辑 Bug：
+
+\begin{lstlisting}[caption={变量遮蔽示例}]
+int i = 100;
+for (int i = 0; i < 5; i++) {
+    // 这里的 i 访问的是循环变量 i（0~4），外层的 i = 100 被遮蔽了
+    printf("%d ", i); 
+}
+printf("\n外层 i 的值依旧是: %d", i); // 此时输出 100
+\end{lstlisting}
+
+\newpage
+
+\section{递归 (Recursion)}
+
+递归是指函数在其函数体内直接或间接调用自身的编程技术。递归的本质是将一个大问题分解为规模更小的同类子问题，直到子问题规模缩小到可以直接求解的基准情形（Base Case）。
+
+\subsection{递归的两大核心要素}
+
+\begin{enumerate}
+    \item \textbf{基准情形（Base Case）}：递归必须有一个明确的终止条件，否则将陷入无限递归导致栈溢出（Stack Overflow）。
+    \item \textbf{递推关系（Recursive Step）}：每次递归调用必须使问题规模向基准情形收敛。
+\end{enumerate}
+
+\subsection{递归示例：阶乘计算}
+
+数学上 $n! = n \times (n-1)!$，且 $0! = 1$。
+
+\begin{lstlisting}[caption={递归实现阶乘}]
+int factorial(int n) {
+    if (n == 0) return 1;          // 基准情形
+    return n * factorial(n - 1);   // 递推关系
+}
+\end{lstlisting}
+
+\subsection{递归示例：斐波那契数列}
+
+斐波那契数列定义为 $F(n) = F(n-1) + F(n-2)$，且 $F(0) = 0, F(1) = 1$。
+
+\begin{lstlisting}[caption={递归实现斐波那契}]
+int fibonacci(int n) {
+    if (n <= 1) return n;
+    return fibonacci(n - 1) + fibonacci(n - 2);
+}
+\end{lstlisting}
+
+\textbf{注意}：上述朴素递归实现存在大量重复子问题计算，时间复杂度为 $O(2^n)$。工程实践中通常改用迭代法或记忆化搜索（Memoization）优化至 $O(n)$。
+
+\subsection{递归与栈的关系}
+
+每次函数调用都会在调用栈（Call Stack）上压入一个新的栈帧（Stack Frame），保存局部变量、参数和返回地址。递归深度过大时会耗尽栈空间，因此递归适用于问题规模可控的场景。对于树遍历、分治算法等天然具有递归结构的问题，递归是最自然的表达方式。
+
+\newpage
+
+\section{命令行参数（\texttt{argc}, \texttt{argv}）}
+
+实际工程中的 C 程序通常通过命令行接收参数。主函数的标准签名支持接收命令行参数：
+
+\begin{lstlisting}[caption={命令行参数示例}]
+#include <stdio.h>
+
+int main(int argc, char *argv[]) {
+    printf("参数个数: %d\n", argc);
+    for (int i = 0; i < argc; i++) {
+        printf("argv[%d] = %s\n", i, argv[i]);
+    }
+    return 0;
+}
+\end{lstlisting}
+
+\begin{itemize}
+    \item \textbf{\texttt{argc}（Argument Count）}：命令行参数的总个数，至少为 1（程序名本身算一个参数）。
+    \item \textbf{\texttt{argv}（Argument Vector）}：字符串数组，\texttt{argv[0]} 是程序名，\texttt{argv[1]} 到 \texttt{argv[argc-1]} 是用户传入的参数。
+\end{itemize}
+
+例如运行命令：
+\begin{lstlisting}[basicstyle=\ttfamily\footnotesize]
+./program input.txt 100
+\end{lstlisting}
+则 \texttt{argc = 3}，\texttt{argv[0] = "./program"}，\texttt{argv[1] = "input.txt"}，\texttt{argv[2] = "100"}。

@@ -1,0 +1,49 @@
+\chapter{Algorithm Comparison}
+
+\section{核心排序算法算子对比}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\textwidth}{@{}CCCCCCC@{}}
+\toprule
+\textbf{算法} & \textbf{最好} & \textbf{最坏} & \textbf{平均} & \textbf{空间} & \textbf{稳定性} & \textbf{核心特征} \\
+\midrule
+\textbf{冒泡} & $O(n)$ & $O(n^2)$ & $O(n^2)$ & $O(1)$ & 稳定 & 消除逆序对，对有序敏感 \\
+\textbf{选择} & $O(n^2)$ & $O(n^2)$ & $O(n^2)$ & $O(1)$ & 不稳定 & 比较次数固定 $\frac{n(n-1)}{2}$ \\
+\textbf{插入} & $O(n)$ & $O(n^2)$ & $O(n^2)$ & $O(1)$ & 稳定 & 顺移偏置，适合近似有序 \\
+\textbf{快速} & $O(n \log n)$ & $O(n^2)$ & $O(n \log n)$ & $O(\log n)$ & 不稳定 & 分治划分，基准随机化防退化 \\
+\textbf{归并} & $O(n \log n)$ & $O(n \log n)$ & $O(n \log n)$ & $O(n)$ & 稳定 & 严格分治合并，需辅助数组 \\
+\textbf{堆排} & $O(n \log n)$ & $O(n \log n)$ & $O(n \log n)$ & $O(1)$ & 不稳定 & 完全二叉树隐式维护偏序 \\
+\textbf{计数} & $O(n+k)$ & $O(n+k)$ & $O(n+k)$ & $O(k)$ & 稳定 & 前缀和寻址，突破比较下界 \\
+\bottomrule
+\end{tabulary}
+\caption{核心排序算法算子对比}
+\label{tab:sort_compare}
+\end{table}
+
+\section{高级图论与检索算子对比}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\textwidth}{@{}CCCCCC@{}}
+\toprule
+\textbf{算法} & \textbf{目标} & \textbf{时间} & \textbf{空间} & \textbf{核心依赖} & \textbf{限制/判据} \\
+\midrule
+\textbf{二分查找} & 有序检索 & $O(\log n)$ & $O(1)$ & 顺序存储对切 & 需连续且绝对有序 \\
+\textbf{并查集} & 集合维护 & $O(\alpha(n))$ & $O(n)$ & 树森林、路径压缩 & 摊还接近 $O(1)$ \\
+\textbf{Dijkstra} & 单源最短路 & $O(|E| \log |V|)$ & $O(|V|)$ & 优先队列、贪心 & \textbf{不支持负权边} \\
+\textbf{Bellman-Ford} & 单源带权 & $O(|V| \cdot |E|)$ & $O(|V|)$ & $|V|-1$ 轮松弛 & 第 $|V|$ 轮松弛成功 $\implies$ 负环 \\
+\textbf{Floyd-Warshall} & 多源最短路 & $O(|V|^3)$ & $O(|V|^2)$ & 状态转移矩阵 & 支持负权，负环 $\implies D[i][i]<0$ \\
+\textbf{Prim} & MST & $O(|E| \log |V|)$ & $O(|V|)$ & 割定理、横切边 & 适合稠密图 \\
+\textbf{Kruskal} & MST & $O(|E| \log |E|)$ & $O(|E|)$ & 边升序、并查集 & 适合稀疏图 \\
+\textbf{Kahn} & 拓扑序 & $O(|V| + |E|)$ & $O(|V|)$ & 入度统计、队列 & $|\sigma| < |V| \implies$ 有环 \\
+\textbf{Tarjan} & SCC & $O(|V| + |E|)$ & $O(|V|)$ & DFS 双时间戳、栈 & $LOW[u] = DFN[u] \implies$ 弹栈 \\
+\bottomrule
+\end{tabulary}
+\caption{高级图论与检索算子对比}
+\label{tab:graph_compare}
+\end{table}

@@ -1,0 +1,100 @@
+\section{流水线与指令级并行}
+
+\subsection{流水线原理}
+
+流水线（Pipeline）将一条指令的执行分解为多个阶段，不同指令的不同阶段**在时间上重叠执行**。类比工厂流水线：每个工位（阶段）同时处理不同产品（指令）。
+
+\begin{definition}[流水线加速比]
+假设 $k$ 级流水线执行 $n$ 条指令（无冒险）：
+\begin{equation}
+T_{\text{流水}} = \text{填充时间} + (n-1) \times \text{最优段延时}
+\end{equation}
+加速比 $S \approx k$（当 $n \gg k$ 时）。
+\end{definition}
+
+\subsection{经典五级流水线}
+
+MIPS 五级流水线：
+
+\begin{itemize}
+    \item \textbf{IF}（Instruction Fetch）：取指令
+    \item \textbf{ID}（Instruction Decode）：译码 + 读寄存器
+    \item \textbf{EX}（Execute）：ALU 运算 / 地址计算
+    \item \textbf{MEM}（Memory Access）：访存（读/写数据存储器）
+    \item \textbf{WB}（Write Back）：结果写回寄存器
+\end{itemize}
+
+\subsection{流水线冒险（Pipeline Hazards）}
+
+冒险是指流水线在正常推进中遇到的阻碍，分三类：
+
+\subsubsection{结构冒险（Structural Hazard）}
+
+多个指令争用同一硬件资源。
+
+\textbf{解决方案}：增加硬件（如分离指令缓存和数据缓存——哈佛结构）、流水化功能单元。
+
+\subsubsection{数据冒险（Data Hazard）}
+
+后续指令依赖前一条指令尚未写回的结果。
+
+\begin{example}[数据冒险]
+\begin{lstlisting}
+add  $1, $2, $3    # $1 在 WB 阶段才被写入
+sub  $4, $1, $5    # 但 sub 的 ID 阶段就需要 $1——冒险！
+\end{lstlisting}
+\end{example}
+
+\textbf{解决方案}：
+
+\begin{enumerate}
+    \item \textbf{转发/旁路（Forwarding / Bypassing）}：在结果"产生时刻"（EX 阶段结束）直接送给下一条指令的 EX 阶段入口，跳过写回再读出的等待。
+    \item \textbf{插入气泡（Stall / Bubble）}：在无法转发时（如 $\texttt{lw}$ 后紧接使用该数据），暂停流水线一个周期。
+    \item \textbf{编译调度}：重排指令顺序，增大数据依赖的距离。
+\end{enumerate}
+
+\subsubsection{控制冒险（Control Hazard）}
+
+分支/跳转指令改变程序流，后续已取指令可能无效。
+
+\textbf{解决方案}：
+
+\begin{itemize}
+    \item \textbf{流水线阻塞（Stall）}：等分支结果再取下一指令（浪费周期）
+    \item \textbf{分支预测（Branch Prediction）}：预测分支走向，提前取指
+    \item \textbf{延迟分支（Delayed Branch）}：分支后执行一条"延迟槽"指令
+\end{itemize}
+
+\subsection{分支预测}
+
+\begin{table}[H]
+\centering
+\caption{分支预测策略}
+\label{tab:branch_prediction}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+\textbf{策略} & \textbf{原理} & \textbf{准确率} \\
+\midrule
+静态预测 & 向后分支（循环）预测跳转 & 约 65\% \\
+1-bit 动态预测 & 记录上次跳转与否 & 约 80\% \\
+2-bit 饱和计数器 & 两次跳转成功才改预测 & 约 90\% \\
+GShare / 锦标赛 & 结合全局历史 + 局部模式 & 95\%+ \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{超标量与乱序执行}
+
+\begin{itemize}
+    \item \textbf{超标量（Superscalar）}：每个周期发射多条指令。IPC > 1，需多个功能单元并行。
+    \item \textbf{乱序执行（Out-of-Order Execution）}：不按程序顺序执行指令，只保留"提交"（commit）顺序。用重排序缓冲区（ROB）和寄存器重命名消除假依赖。
+    \item \textbf{同时多线程（SMT / Hyper-threading）}：同一核心交替执行两个线程的指令，隐藏访存延迟。
+\end{itemize}
+
+\subsection{流水线的性能极限}
+
+\[
+\text{实际IPC} = \text{理想IPC} \times (1 - \text{冒险损失})
+\]
+
+影响流水线效率的主要因素：缓存缺失、数据依赖链长度、分支误预测惩罚、指令发射带宽。

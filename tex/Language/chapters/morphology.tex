@@ -1,0 +1,674 @@
+﻿\section{词法(形态学)}
+
+\subsection{形态学概述}
+
+形态学(Morphology)研究词的内部结构和构词规则。词不是不可分割的意义单元——大多数词都可以分解为更小的、携带意义的构件。
+
+\begin{definition}[语素]
+语素(Morpheme)是最小的有意义的语言单位，不能再继续分割为更小的有意义的部件。
+\end{definition}
+
+例如 \emph{unhappiness} 可以分解为 $un$ + $happi$ + $ness$ 三个语素，而 \emph{cat} 虽然可分割为语音 /kæt/，但那些音段本身没有意义，因此 \emph{cat} 是一个语素。
+
+形态学研究的两大任务：
+\begin{itemize}
+    \item \textbf{屈折(Inflection)}: 同一个"词"的不同语法形式(如 walk/walked/walking)
+    \item \textbf{派生(Derivation)}: 由已有词构成新词(happy → happiness)
+\end{itemize}
+
+形态学还提供了一个重要的类型学参数：语素与词的比率——这个比率决定了语言的形态类型(孤立语/黏着语/屈折语/多式综合语)，是最后一章跨语言比较的核心维度之一。
+
+\subsection{语素类型}
+
+\subsubsection{按独立性}
+
+\begin{itemize}
+    \item \textbf{自由语素(Free morpheme)}: 可以独立成词，单独使用
+    \begin{equation}
+        \text{例: cat, run, happy, 桌子}
+    \end{equation}
+    
+    \item \textbf{黏着语素(Bound morpheme)}: 必须依附于其他语素，不能单独成词
+    \begin{equation}
+        \text{例: -s, -ed, un-, -ness, 汉语中的 "们" 在单独出现时无意义}
+    \end{equation}
+\end{itemize}
+
+\subsubsection{按功能}
+
+\begin{itemize}
+    \item \textbf{词根(Root)}: 词的核心意义，去掉所有词缀后剩下的部分
+    \item \textbf{词干(Stem)}: 可以添加屈折词缀的形式(可能是"词根+派生词缀")
+    \item \textbf{词缀(Affix)}: 附着在词根/词干上的黏着语素，按位置分类：
+    \begin{itemize}
+        \item 前缀(Prefix): un-, re-, pre- (位于词根之前)
+        \item 后缀(Suffix): -s, -ed, -ing, -ness (位于词根之后，世界上最多见)
+        \item 中缀(Infix): 插入词根内部，较少见，如他加禄语 \textit{-um-}
+        \item 环缀(Circumfix): 同时加在词根前后，如德语过去分词 ge-mach-t
+        \item 异干法(Suppletion): 完全不同形式的语素交替，如 go/went
+    \end{itemize}
+\end{itemize}
+
+\subsection{屈折(Inflection)}
+
+\subsubsection{屈折的性质}
+
+屈折不改变词的词汇意义和词类，只添加\emph{语法}信息(如数、格、时态)，并且一个屈折范畴是强制性的——英语名词一旦用作复数就必须加 \emph{-s}，不能省略：
+\begin{equation}
+    \text{walk} \xrightarrow{+\text{过去时}} \text{walked}
+\end{equation}
+
+\subsubsection{屈折范畴}
+
+\begin{itemize}
+    \item 数(Number): cat/cats，汉语"猫/猫们"(有限制，只用于人)
+    \item 格(Case): he/him/his —— 英语保留了主格/宾格/属格残迹
+    \item 时态(Tense): walk/walked —— 时间定位
+    \item 体(Aspect): walk/walking —— 动作的内部时间结构(进行/完成)
+    \item 人称(Person): am/are/is
+    \item 性(Gender): 德语 der/die/das，法语 le/la —— 语法性不一定是自然性别
+    \item 语气(Mood): 陈述/虚拟/祈使 (英语 subjunctive 残存于 "I suggest that he \emph{be} here")
+    \item 态(Voice): 主动/被动 (was eaten)
+    \item 级(Degree): tall/taller/tallest (形容词屈折)
+\end{itemize}
+
+\subsubsection{屈折的跨语言差异}
+
+屈折范畴在不同语言中的分布差异极大，这是跨语言比较的重点之一：
+\begin{itemize}
+    \item 汉语几乎无屈折，时态靠时间词和体助词("了""着""过")表达
+    \item 英语保留了少量屈折(复数-s、过去时-ed、第三人称-s)，但比德语、俄语少得多
+    \item 俄语名词有6个格，形容词有24种形式(数×性×格)
+    \item 日语、韩语动词有人称无关、但极复杂的敬体/简体系统
+    \item 许多语言名词没有"格"，但有的语言有几十种格(如芬兰语名词有15个格)
+\end{itemize}
+
+\subsection{派生(Derivation)}
+
+\subsubsection{派生的性质}
+
+派生通过加词缀创造\emph{新词}，可以改变词类或改变核心意义，且派生是选择性的(不一定能派生所有同类词)：
+\begin{align}
+    \text{happy (adj.)} &\xrightarrow{+\text{-ness}} \text{happiness (n.)} \\
+    \text{write (v.)} &\xrightarrow{+\text{re-}} \text{rewrite (v.)} \\
+    \text{kind (adj.)} &\xrightarrow{+\text{un-}} \text{unkind (adj.)} \\
+    \text{teach (v.)} &\xrightarrow{+\text{-er}} \text{teacher (n.)}
+\end{align}
+
+\subsubsection{派生与屈折的对比}
+
+\begin{table}[H]
+\centering
+\caption{屈折与派生的区别}
+\begin{tabulary}{\textwidth}{@{}CCC@{}}
+\toprule
+\textbf{特征} & \textbf{屈折} & \textbf{派生} \\
+\midrule
+是否创造新词 & 否 & 是 \\
+是否改变词类 & 否 & 常改变 \\
+强制性 & 是 & 否 \\
+与语法环境相关 & 是 & 否 \\
+产出顺序 & 在派生之后 & 在屈折之前 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+这一顺序(派生在内、屈折在外)是语言普遍存在的规律，可形式化为词缀顺序约束(见下文)。
+
+\subsection{构词方式总览}
+
+构词方式(Word Formation)研究新词是如何被创造出来的。除了前面介绍的屈折与派生，语言学家还归纳出大量其他构词方式，大致可分为"词内新造"与"外来借入"两大类，词内新造又分为组合型、缩短型与转换/语义型。下表给出全貌：
+
+\begin{table}[H]
+\centering
+\caption{构词方式一览}
+\begin{tabulary}{\textwidth}{@{}CCCC@{}}
+\toprule
+\textbf{类别} & \textbf{方式} & \textbf{机制} & \textbf{例} \\
+\midrule
+组合型 & 复合 & 词根+词根 & 火车、blackboard \\
+组合型 & 重叠 & 重复语素 & 人人、anak-anak \\
+组合型 & 拟声词 & 语音模拟声音 & buzz、叮当 \\
+组合型 & 专名转化 & 专名转为通名 & sandwich、牛顿 \\
+缩短型 & 截短 & 删去词的一部分 & lab、bus \\
+缩短型 & 逆构词 & 删去误认的词缀 & edit$\leftarrow$editor \\
+缩短型 & 缩写 & 取各词首字母 & radar、FBI \\
+缩短型 & 混成 & 两词部分融合 & brunch、smog \\
+转换/语义 & 转类 & 词形不变换词类 & email(v.) \\
+转换/语义 & 语义造词 & 词义引申出新义 & web$\rightarrow$互联网 \\
+转换/语义 & 比喻造词 & 隐喻/转喻造词 & 瓶颈、bug \\
+借入 & 音译 & 借音不借形 & 沙发(sofa) \\
+借入 & 意译 & 译义造新词 & 电脑(computer) \\
+借入 & 仿译 & 逐语素对应翻译 & 热狗(hot dog) \\
+借入 & 音义兼译 & 音义兼顾 & 可口可乐 \\
+借入 & 借形 & 借字形不借音 & 电话(自日语) \\
+借入 & 语义借用 & 旧词借新义项 & 病毒(计算机) \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+下面分组详述。
+
+\subsection{组合型构词}
+
+组合型构词把已有的词根或语素"拼"在一起，是汉语、英语、日语、德语中最能产的构词方式。
+
+\subsubsection{复合(Compounding)}
+
+复合(Compounding)是两个或以上的词根直接组合成新词的过程，产物叫复合词(compound)。它是世界上绝大多数语言都具备的构词方式。
+
+\begin{table}[H]
+\centering
+\caption{复合词的内部结构类型(汉语为例)}
+\begin{tabulary}{\textwidth}{@{}CCC@{}}
+\toprule
+\textbf{类型} & \textbf{结构关系} & \textbf{例子} \\
+\midrule
+并列复合 & 两成分地位平等 & 山水、黑白、声音 \\
+偏正复合 & 前修饰、后中心 & 火车、黑板、白菜 \\
+动宾复合 & 动词+宾语 & 开门、司令、起草 \\
+动补复合 & 动词+补语 & 提高、证明、扩大 \\
+主谓复合 & 主语+谓语 & 地震、心疼、民主 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+英语名词复合词最常见的是"修饰语+中心语"结构(football = foot+ball，中心在"球")，但词性组合很多样：名词+名词(rainbow)、形容词+名词(blackboard)、动词+名词(swimming pool)等。
+
+复合词与短语的区别在英语中可以用\emph{重音}来检验：复合词重音落在第一成分(blackboard 黑板)，而短语重音落在第二成分(black board 黑色的板)。汉语中复合词与短语的界限较模糊："火车""黑板"已经完全词汇化，而"大门""红车"既可看作复合词也可看作短语。
+
+复合是汉语最能产、最古老的构词方式之一，现代汉语新词绝大多数是复合词：手机、高铁、网红、外卖。德语也以复合著称，可以造出很长的复合词(Rindfleischetikettierungsüberwachungsaufgabenübertragungsgesetz，牛肉标签监管任务转移法)；英语同样用复合不断造新词(firewall、lockdown、greenhouse)。
+
+\subsubsection{重叠(Reduplication)}
+
+重叠(Reduplication)通过重复语素或音节构成新词形，可以是全部重复，也可以是部分重复：
+
+\begin{table}[H]
+\centering
+\caption{重叠的类型与功能}
+\begin{tabulary}{\textwidth}{@{}CCC@{}}
+\toprule
+\textbf{类型} & \textbf{方式} & \textbf{例子} \\
+\midrule
+完全重叠 & 整个词根重复 & 人人、日日、anak-anak(孩子们) \\
+部分重叠 & 只重复部分音节 & 他加禄语、拉丁语完成时(cecini) \\
+变韵重叠 & 重叠时元音变化 & chit-chat、ping-pong、zigzag \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+重叠的功能因语言而异，非常多样：
+\begin{itemize}
+    \item 名词：表示复数或"每一"——印尼语 anak-anak(孩子们)、汉语"人人"(每个人)、"家家"
+    \item 动词：表示尝试或随意——汉语"看看""想想""试试"
+    \item 形容词：表示程度加深或生动——汉语"高高""红红的""漂漂亮亮"
+    \item 量词：表示"逐个"——汉语"一个个""一天天"
+    \item 拟声拟态：摹写声音或状态——日语"わくわく"(心怦怦)、"ざあざあ"(雨声)
+\end{itemize}
+
+汉语、印尼语、马来语、日语是重叠极丰富的语言；英语重叠较少，主要用于拟声(ding-dong)和口语叠词(tip-top、hush-hush)。
+
+\subsubsection{拟声词(Onomatopoeia)}
+
+拟声词(Onomatopoeia)用语音模拟事物声音，是"以声造词"。
+
+\begin{itemize}
+    \item \textbf{直接拟声}: 模拟自然界或动物的声音。英语 buzz(嗡嗡)、meow(喵)、clap(啪)、cuckoo(布谷)，汉语"叮当""哗啦""喵""汪汪"。
+    \item \textbf{拟声拟态词(ideophone)}: 不仅模拟声音，还摹写形状、状态、心情。日语拟声拟态词极其丰富，数量达数千个，如"わくわく"(心怦怦跳)、"きらきら"(闪闪发光)、"ぐっすり"(熟睡)；韩语、西非语言也有庞大的拟态词系统。
+\end{itemize}
+
+拟声词具有高度的\emph{语言特异性}：同一种声音在不同语言中"听感"截然不同，因为每种语言都用自己有限的音位系统去模拟：
+
+\begin{table}[H]
+\centering
+\caption{同一声音在不同语言中的拟声差异}
+\begin{tabulary}{\textwidth}{@{}CCCC@{}}
+\toprule
+\textbf{声音} & \textbf{英语} & \textbf{日语} & \textbf{汉语} \\
+\midrule
+狗叫 & woof / bark & ワンワン (wan-wan) & 汪汪 (wāngwāng) \\
+鸡叫 & cock-a-doodle-doo & コケコッコー (kokekokkō) & 喔喔喔 (wōwōwō) \\
+猫叫 & meow & ニャー (nyā) & 喵 (miāo) \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsubsection{专名转化(Eponym)}
+
+专名转化(Eponym)把专有名词——人名、地名、品牌名、文学人物——转用为普通名词：
+
+\begin{table}[H]
+\centering
+\caption{专名转化的来源}
+\begin{tabulary}{\textwidth}{@{}CCC@{}}
+\toprule
+\textbf{来源} & \textbf{机制} & \textbf{例子} \\
+\midrule
+人名 & 以发明者或人物命名 & sandwich(三明治)、volt(伏特)、牛顿、瓦特 \\
+地名 & 以产地命名 & champagne(香槟)、denim(牛仔布)、china(瓷器) \\
+品牌 & 品牌名泛化 & kleenex(纸巾)、xerox(复印)、百度一下 \\
+神话文学 & 以文学人物命名 & quixotic(唐吉诃德式)、阿斗 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+品牌名"普通化"(genericide)是专名转化最活跃的类型：品牌一旦成为某类商品的通称，商标就失去专有性。kleenex 原是面巾纸品牌，现泛指纸巾；xerox 原是复印机品牌，现作动词"复印"。汉语"百度"也正在经历同样的转化："百度一下"就是"搜索一下"。历史人物"阿斗"(扶不起的阿斗)、"雷锋"(助人为乐者)则是人物转义的典型。
+
+\subsection{缩短型构词}
+
+缩短型构词从已有的长词或短语中删减材料，形成更短的新形式，追求简便。
+
+\subsubsection{截短(Clipping)}
+
+截短(Clipping)删去原词的一部分，词义与词类不变，只是形式变短：
+
+\begin{table}[H]
+\centering
+\caption{截短的部位}
+\begin{tabulary}{\textwidth}{@{}CCC@{}}
+\toprule
+\textbf{类型} & \textbf{方式} & \textbf{例子} \\
+\midrule
+保留词首 & 删去词尾 & exam(examination)、lab(laboratory)、phone(telephone) \\
+保留词尾 & 删去词首 & bus(omnibus)、phone(telephone) \\
+保留中部 & 删去首尾 & flu(influenza)、fridge(refrigerator) \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+截短词通常带口语、亲切的色彩，如 \emph{prof}（professor）、\emph{gym}（gymnasium）、\emph{math}（mathematics）、\emph{tech}（technology）。
+
+人名也常被截短作昵称，如 \emph{Jen}（Jennifer）、\emph{Pat}（Patricia）。有些截短词完全取代了原词，如 \emph{bus} 已很少有人知道它来自 \emph{omnibus}。
+
+\subsubsection{逆构词(Back-formation)}
+
+逆构词(Back-formation)通过删去一个被\emph{误认为}词缀的部分，逆向造出"更简单"的词。其关键在于词形的历史顺序：先有长形式，后逆推出短形式。
+
+\begin{table}[H]
+\centering
+\caption{逆构词例子}
+\begin{tabulary}{\textwidth}{@{}CCC@{}}
+\toprule
+\textbf{新词} & \textbf{来源} & \textbf{机制} \\
+\midrule
+edit(编辑) & editor & 误以为 -er 是"施事者"后缀 \\
+swindle(诈骗) & swindler & 同上 \\
+babysit(照看婴儿) & babysitter & 删去 -er \\
+donate(捐赠) & donation & 误以为 -ion 是名词化后缀 \\
+pea(豌豆) & pease & 误以为 -s 是复数后缀 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+逆构词与截短的区别：截短只是缩短形式、不改变词类与构词结构(lab 仍是名词)；逆构词则\emph{改变词类或结构}(editor 名词$\rightarrow$edit 动词)。逆构词反映说者对构词的"再分析"——把不存在的词缀去掉，类比地推出新词，甚至 laser 也被戏谑地逆构为动词 to lase(发射激光)。
+
+\subsubsection{缩写(Abbreviation)}
+
+缩写从短语中取首字母(或首音节)形成新词，是科技与网络时代最活跃的构词方式：
+
+\begin{table}[H]
+\centering
+\caption{缩写的类型}
+\begin{tabulary}{\textwidth}{@{}CCCC@{}}
+\toprule
+\textbf{类型} & \textbf{读音} & \textbf{例子} & \textbf{来源} \\
+\midrule
+首字母缩略词(Acronym) & 按单词拼读 & radar、laser、NATO、scuba & 各词首字母 \\
+首字母缩写(Initialism) & 按字母逐个读 & FBI、TV、UN、IBM & 各词首字母 \\
+音节缩略/简称 & 取首音节 & 北外、央视、スマホ、東大 & 首音节/简称 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{itemize}
+    \item \textbf{Acronym(按词拼读)}: radar = RAdio Detection And Ranging、laser = Light Amplification by Stimulated Emission of Radiation、NATO = North Atlantic Treaty Organization、scuba = self-contained underwater breathing apparatus。
+    \item \textbf{Initialism(按字母读)}: FBI、TV、UN、IBM、USA。
+    \item \textbf{音节缩略/简称}: 汉语"北外"(北京外国语大学)、"央视"(中央电视台)；日语"スマホ"(スマートフォン，smartphone)、"東大"(東京大学)；俄语也有大量音节缩略词。
+\end{itemize}
+
+\subsubsection{混成(Blending)}
+
+混成(Blending)把两个词的部分音节"嫁接"成一个新词，又称拼合词(portmanteau)。与复合不同，混成通常只保留源词的部分音节：
+
+\begin{table}[H]
+\centering
+\caption{混成的结构}
+\begin{tabulary}{\textwidth}{@{}CCC@{}}
+\toprule
+\textbf{结构} & \textbf{例子} & \textbf{来源} \\
+\midrule
+前词首+后词尾 & brunch(早午餐) & breakfast+lunch \\
+前词首+后词首 & modem(调制解调器) & modulator+demodulator \\
+重叠混成(音相近) & guesstimate(毛估)、spork(勺叉) & guess+estimate、spoon+fork \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+其他经典混成：smog = smoke+fog(烟雾)、motel = motor+hotel(汽车旅馆)、sitcom = situation+comedy(情景喜剧)、telethon = television+marathon(电视马拉松)。"portmanteau"一词来自刘易斯·卡罗尔在《爱丽丝镜中奇遇》中造的词 chortle = chuckle+snort。
+
+混成在英语中最为活跃；汉语因每个字都是独立语素，混成较少见，口语缩合(如"高大上")更接近简称而非典型混成，日语中也较少见。
+
+\subsection{词类转换与语义构词}
+
+\subsubsection{转类(Conversion)}
+
+转类(Conversion)不改变词形、只改变词类，因此又称"零派生"(zero derivation)。它是英语最活跃的构词方式之一——英语屈折很弱，词本身几乎不带词类标记：
+
+\begin{table}[H]
+\centering
+\caption{转类的方向}
+\begin{tabulary}{\textwidth}{@{}CCC@{}}
+\toprule
+\textbf{转换方向} & \textbf{例子} & \textbf{说明} \\
+\midrule
+名词$\rightarrow$动词 & email(v.)、google(v.)、access(v.) & 网络时代尤为典型 \\
+动词$\rightarrow$名词 & walk(n.)、run(n.)、guess(n.) & 动作转指事件/结果 \\
+形容词$\rightarrow$动词 & empty(v.)、clean(v.)、dry(v.) & 使然动词 \\
+形容词$\rightarrow$名词 & the rich、the poor、original & 指人/指事物 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+汉语的转类表现为"兼类"与"词类活用"：名词"雷锋"可临时用作形容词("他很雷锋")；"百度"由名词转作动词("百度一下")。传统语法学界长期争论"汉语到底有没有词类"，正是因为汉语词几乎没有形态标记，同一个词形可以出现在多种语法位置。
+
+\subsubsection{语义造词:词义变化(Semantic Change)}
+
+语义造词不改变词形，而是通过\emph{词义变化}让已有词获得新义。历史语义学归纳出词义变化的几种基本类型：
+
+\begin{table}[H]
+\centering
+\caption{词义变化的类型}
+\begin{tabulary}{\textwidth}{@{}CCC@{}}
+\toprule
+\textbf{类型} & \textbf{机制} & \textbf{例子} \\
+\midrule
+词义扩大 & 指称范围变大 & 汉语"江""河"(专指长江黄河$\rightarrow$泛指河流)；英语 holiday(圣日$\rightarrow$假日) \\
+词义缩小 & 指称范围变小 & 汉语"禽"(鸟兽总称$\rightarrow$家禽)；英语 meat(食物$\rightarrow$肉)、deer(动物$\rightarrow$鹿) \\
+词义转移 & 所指对象改变 & 汉语"走"(跑$\rightarrow$走)、"涕"(眼泪$\rightarrow$鼻涕)；英语 gay(快乐$\rightarrow$同性恋) \\
+词义贬化 & 感情色彩变坏 & 英语 villain(村民$\rightarrow$坏人)、silly(幸福$\rightarrow$愚蠢) \\
+词义褒化 & 感情色彩变好 & 英语 knight(男孩$\rightarrow$骑士)、nice(愚蠢$\rightarrow$好) \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+科技词汇尤其依赖词义引申造出新义：web(蜘蛛网$\rightarrow$万维网)、cloud(云$\rightarrow$云计算)、window(窗$\rightarrow$窗口)、desktop(桌面$\rightarrow$桌面系统)、virus(病毒$\rightarrow$计算机病毒)。
+
+\subsubsection{比喻造词:隐喻与转喻}
+
+比喻造词通过隐喻(metaphor)与转喻(metonymy)把具体概念投射到抽象领域，是最富创造性的构词方式：
+
+\begin{itemize}
+    \item \textbf{隐喻(Metaphor)}: 用具体事物理解抽象概念。计算机领域几乎全部使用隐喻造词：鼠标(mouse)、病毒(virus)、防火墙(firewall)、垃圾邮件(spam)、窗口(window)、桌面(desktop)、云计算(cloud)、瓶颈(bottleneck)。汉语"鼠标"正是"鼠+标"的隐喻造词。
+    \item \textbf{转喻(Metonymy)}: 用相关事物代替目标事物。白宫(代美国政府)、华盛顿(代美国政府)、华尔街(代金融界)、皇冠(代王权)、"红领巾"(代少先队员)。
+    \item \textbf{提喻(Synecdoche)}: 用部分代整体(或反之)。"人手"(hand 代工人)、"饭碗"(代工作)。
+\end{itemize}
+
+认知语言学认为，人类抽象思维本身就建立在隐喻之上("时间是金钱""争论是战争")，语言中的比喻造词只是这一认知机制的表层体现。
+
+\subsection{借词:外来词的吸收}
+
+语言接触导致的词汇借入(borrowing)是最重要的"外部"造词来源。外来词进入汉语时，要接受汉语语音、语法和构词规则的改造，形成多种吸收方式：
+
+\begin{table}[H]
+\centering
+\caption{外来词的吸收方式}
+\begin{tabulary}{\textwidth}{@{}CCC@{}}
+\toprule
+\textbf{方式} & \textbf{机制} & \textbf{例子} \\
+\midrule
+音译 & 借音不借形 & 沙发(sofa)、咖啡(coffee) \\
+意译 & 译义造新词 & 电脑(computer)、足球(football) \\
+仿译 & 逐语素对应翻译 & 热狗(hot dog)、黑板(blackboard) \\
+音义兼译 & 音义兼顾 & 可口可乐(Coca-Cola)、黑客(hacker) \\
+借形 & 借字形不借音 & 电话、经济(自日语) \\
+语义借用 & 旧词借新义项 & 病毒($\rightarrow$计算机病毒) \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsubsection{音译(Transliteration)}
+
+音译(Transliteration)按源语读音用汉字转写，汉字只表音、不表义：
+\begin{itemize}
+    \item \textbf{纯音译}: 沙发(sofa)、咖啡(coffee)、巧克力(chocolate)、的士(taxi)、比基尼(bikini)
+    \item \textbf{音译+类名}: 在音译后加汉语类名帮助理解，如"卡车"(car+车)、"啤酒"(beer+酒)、"芭蕾舞"(ballet+舞)、"艾滋病"(AIDS+病)
+    \item \textbf{半音半意}: 前音译后意译，如"冰淇淋"(ice-cream)、"呼啦圈"(hula-hoop)、"因特网"(internet)
+\end{itemize}
+
+音译词可能因方言读音不同而有异体，如 chocolate 普通话作"巧克力"、粤语作"朱古力"；人名、地名则按国家规定的音译规则处理(如 Clinton$\rightarrow$克林顿)。
+
+\subsubsection{意译(Semantic Translation)}
+
+意译用本族语材料把外来概念\emph{整体}翻译成新词，不保留源语读音：
+\begin{itemize}
+    \item 电脑(computer)、软件(software)、硬件(hardware)、数据库(database)
+    \item 互联网(Internet)、搜索引擎(search engine)、足球(football)、口香糖(chewing gum)
+\end{itemize}
+
+意译词在汉语外来词中占相当比重：汉语双音节为主、表意文字的特点，使音译词(如"德律风")往往被意译词(如"电话")淘汰。意译与仿译的区别在于：意译只翻译整体概念，仿译还要保留源语的构词结构(见下)。
+
+\subsubsection{仿译(Calque)}
+
+仿译(Calque，又称借译、仿造)把源语词的\emph{每个语素}逐一翻译，保留源语的内部结构：
+\begin{itemize}
+    \item 热狗(hot dog)、黑板(blackboard)、马力(horsepower)、超人(superman)
+    \item 冷战(cold war)、蓝图(blueprint)、瓶颈(bottleneck)、超级市场(supermarket)
+    \item 千年虫(millennium bug)、防火墙(firewall)
+\end{itemize}
+
+仿译与意译的界限并不总是清晰："足球"(football)既可以说是意译(整体翻译概念)，也符合仿译的定义(逐语素对应 foot=足、ball=球)。一般以"是否逐语素保留源语结构"来区分——热狗是仿译(因为 hot dog 作为食物名与字面义无关，只能是逐成分仿造)，电脑则是意译(computer 没有可拆解的语素对应)。
+
+\subsubsection{音义兼译(Phono-Semantic Matching)}
+
+音义兼译所选汉字既接近源语读音，又能在意义上产生联想，是"形神兼备"的理想译法：
+\begin{itemize}
+    \item 可口可乐(Coca-Cola)、黑客(hacker)、维他命(vitamin)、香波(shampoo)
+    \item 幽默(humour)、逻辑(logic)、俱乐部(club)、奔驰(Benz)、宝马(BMW)
+    \item 托福(TOEFL)、雅思(IELTS)
+\end{itemize}
+
+"可口可乐"既是 Coca-Cola 的音译，又暗示"可口、快乐"；"奔驰"既近 Benz 读音又暗示汽车飞驰；"宝马"既近 BMW 的读音又令人联想到名马。这类译名音义兼得，是语言学界公认的最佳译法。
+
+\subsubsection{借形(Borrowing of Written Form)}
+
+借形直接借用源语的\emph{书写形式}，读音按本族语，是汉字文化圈特有的借词方式。最典型的是汉语借自日语的"和制汉语词"——日本在明治维新时期用汉字创造或重新组合的大量译词，随后回流中国：
+\begin{itemize}
+    \item 汉语借自日语的"和制汉语": 电话、经济、社会、干部、哲学、法律、美术、物理、化学、文化、主义、政党、义务
+    \item 英语借自汉语(借音): tofu(豆腐)、kung fu(功夫)、dim sum(点心)、typhoon(台风)、tea(茶)
+\end{itemize}
+
+借形与借音不同：英语借 tofu 属于音译(借读音)，汉语借"经济"只借字形、读音完全是汉语的。由于日语词义也用汉字承载，汉语借形词几乎"无缝"融入词汇系统，成为现代汉语的基本词汇。
+
+\subsubsection{语义借用(Semantic Loan)}
+
+语义借用不借字形、不借读音，只把源语词的一个\emph{新义项}加在本族已有的词上：
+\begin{itemize}
+    \item 病毒：本义"生物病毒"，借英语 virus 的引申义后增加"计算机病毒"
+    \item 明星：本义"明亮的星"，借英语 star 的引申义后增加"演艺明星"
+    \item 天使：本义"神的使者"，借英语 angel 的引申义后增加"善良的人"
+    \item 人口爆炸、信息爆炸：仿译 population explosion 的同时，"爆炸"获得"急剧增加"的新义
+\end{itemize}
+
+语义借用与仿译的区别：仿译产生新词(热狗是新的组合)，语义借用不产生新词、只是旧词获得新义。判断一个"新义"是自身引申还是语义借用，要看语言接触的历史。
+
+\begin{example}[同一外来概念可有不同吸收方式]
+\begin{align}
+    \text{Coca-Cola} &\rightarrow \text{可口可乐(音义兼译)} \qquad \text{laser} \rightarrow \text{莱塞(音译)} / \text{激光(意译)} \\
+    \text{telephone} &\rightarrow \text{德律风(音译)} / \text{电话(借形自日语)} \\
+    \text{taxi} &\rightarrow \text{的士(音译)} / \text{出租车(意译)}
+\end{align}
+同一外来词往往音译与意译并存，最后由语言社区的选择淘汰其一部。
+\end{example}
+
+\subsection{汉语的造字法:六书}
+
+汉语的构词基础是汉字的构造。东汉许慎在《说文解字》中提出"六书"理论，系统归纳了汉字的构造与使用方式。其中象形、指事、会意、形声是\emph{造字法}，转注、假借是\emph{用字法}：
+
+\begin{table}[H]
+\centering
+\caption{六书:汉字的构造方式}
+\begin{tabulary}{\textwidth}{@{}CCCC@{}}
+\toprule
+\textbf{名称} & \textbf{性质} & \textbf{说明} & \textbf{字例} \\
+\midrule
+象形 & 造字法 & 直接描画事物形状 & 日月山水 \\
+指事 & 造字法 & 抽象符号/在象形上加点标示 & 上下刃本 \\
+会意 & 造字法 & 两个以上部件组合出新义 & 武信休森 \\
+形声 & 造字法 & 形符表义+声符表音 & 江河清湖 \\
+转注 & 用字法 & 同义字互相注释 & 考老 \\
+假借 & 用字法 & 借同音字记录新义 & 令长其 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{itemize}
+    \item \textbf{象形(Pictographic)}: 描摹客观事物的形状。"日"像太阳、"月"像月牙、"水"像流水、"山"像山峰。象形是最古老的造字法，但数量很少。
+    \item \textbf{指事(Indicative)}: 用抽象符号标示位置或状态。"上""下"用一长横加一短横标示方位，"刃"在"刀"的象形上加一点，指出刀刃所在。
+    \item \textbf{会意(Associative compound)}: 用两个或以上部件会合出新义。"休"=人+木(人倚树休息)、"明"=日+月(明亮)、"森"=三木(树木众多)。
+    \item \textbf{形声(Phonetic compound)}: 由表义的形符和表音的声符构成，是汉字中最能产的造字法，占现代汉字的80\%以上。"江"从水工声、"河"从水可声、"清"从水青声。近代化学元素"氦""氧""氢"等都是新造的形声字。部分声符还兼表意义(如"悌"的声符"弟"兼提示"弟弟敬爱兄长"义)，称"形声兼会意"。
+    \item \textbf{转注(Mutual explanatory)}: 同义字互相注释。"考""老"同义，许慎以"考"训"老"、以"老"训"考"。学界对转注历来有"互训说""部首说""语音说"等不同解释，尚无定论，一般归为用字法。
+    \item \textbf{假借(Phonetic loan)}: 借用已有的同音字记录新词义。"令"本义命令，借作县令之"令"；"长"本义长久，借作官长之"长"；"其"本义簸箕，借作代词"其"。假借也是用字法，不造新字。
+\end{itemize}
+
+\subsection{构词方式的跨语言对比}
+
+不同语言在构词方式的侧重上有明显差异，这本身也是跨语言比较的重要维度：
+
+\begin{table}[H]
+\centering
+\caption{不同语言构词方式的侧重}
+\begin{tabulary}{\textwidth}{@{}CCCC@{}}
+\toprule
+\textbf{方式} & \textbf{汉语} & \textbf{英语} & \textbf{日语} \\
+\midrule
+复合 & 极能产(火车) & 极能产(blackboard) & 极能产(山道) \\
+派生 & 较少(词缀有限) & 极能产(-ness, re-) & 极能产(动词变形丰富) \\
+混成 & 较少 & 能产(brunch) & 罕见 \\
+截短/缩写 & 较少(北外) & 能产(lab, FBI) & 常见(スマホ) \\
+借词 & 音译+意译+借形 & 直接借用(sofa) & 外来语音译+借形汉字词 \\
+六书造字 & 独有 & — & — \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+这一节说明：\emph{词的创造有规律可循}。复合、派生等"组合型"方式在汉语、英语、日语中都极其能产；缩短型方式(截短、缩写、混成)在英语中尤为活跃；而借词方式则与书写系统和文化接触密切相关——汉语的六书造字法与丰富的音译/意译/借形方式，正是汉字文化圈与外部语言长期接触的产物。
+
+\subsection{形态音位学}
+
+语素组合时常常发生语音变化，研究这种变化的学科叫\emph{形态音位学}(Morphophonology)。最经典的例子是英语复数后缀的三种读音。
+
+\subsubsection{英语复数规则}
+
+\begin{equation}
+    \text{复数后缀} = 
+    \begin{cases}
+        /s/ & \text{清辅音后 (cats)} \\
+        /z/ & \text{浊辅音/元音后 (dogs, bees)} \\
+        /\ipa{ɪ}z/ & \text{咝音后 (buses, churches)}
+    \end{cases}
+\end{equation}
+
+形式化表示(这是音系规则格式的典型应用)：
+\begin{equation}
+    \text{Plural} \rightarrow 
+    \begin{cases}
+        [s] / [\text{-voice, -sibilant}] \_ \\
+        [z] / [\text{+voice}] \_ \text{ 或 } [\text{+sonorant}] \_ \\
+        [\ipa{ɪ}z] / [\text{+sibilant}] \_
+    \end{cases}
+\end{equation}
+
+这个规则不是英语独有的"拼写习惯"，而是语音学上的普遍倾向——清音与清音相邻、浊音与浊音相邻(语音同化)。在土耳其语、德语、俄语的复数/格后缀中可以看到完全相同的机制。
+
+\subsubsection{语素变体(Allomorph)}
+
+复数语素 \{-s\} 在 cats、dogs、buses 中有三个变体 /s/、/z/、/\ipa{ɪ}z/，它们是同一个语素的\emph{语素变体}。异干法(go/went)是语素变体的极端情况——词根形式完全互补。
+
+\subsection{形态分析的形式化}
+
+\subsubsection{有限状态形态学}
+
+形态分析可以建模为\emph{有限状态转换器}(FST, Finite-State Transducer)：一个把词的表层拼写映射为"词干+语法标注"序列的有限自动机。
+\begin{equation}
+    \text{FST: } T \subseteq \Sigma^* \times \Sigma^*
+\end{equation}
+
+\begin{example}
+\begin{align*}
+    \text{输入: } & \text{cats} \\
+    \text{输出: } & \text{cat +N +Pl}
+\end{align*}
+FST把表层形式 \emph{cats} 转写为词汇层分析 \emph{cat + N + Pl}。形态学自动机是许多NLP系统(拼写检查、词形还原、机器翻译形态分析)的基础。
+\end{example}
+
+\subsubsection{双层面模型}
+
+著名的双层面形态学(Koskenniemi, 1983)把形态变化表示为两个层面的对应：
+\begin{equation}
+    \text{词表层形式} \xleftrightarrow{\text{FST}} \text{词法分析}
+\end{equation}
+
+规则示例：
+\begin{equation}
+    \begin{aligned}
+    &\text{Lexical: } cat +N +Pl \\
+    &\xrightarrow{\text{拼写规则}} \\
+    &\text{Surface: } cats
+    \end{aligned}
+\end{equation}
+
+\begin{example}[y→i拼写规则]
+\begin{equation}
+    \text{carry + Pl} \xrightarrow{y \rightarrow ies} \text{carries}
+\end{equation}
+双层面模型中，词汇层面是 \emph{carry+Pl}，表层是 \emph{carries}，FST同时处理"插入e"和"y变i"两个操作。
+\end{example}
+
+\subsection{构词规则的形式化}
+
+\subsubsection{语素顺序约束}
+
+英语词缀有严格的线性顺序，这是形态学中的普遍约束：
+\begin{equation}
+    \text{词根} \rightarrow \text{派生前缀} \rightarrow \text{词根} \rightarrow \text{派生后缀} \rightarrow \text{屈折后缀}
+\end{equation}
+
+\begin{example}
+\begin{equation}
+    \text{un-happi-ness-es}
+\end{equation}
+\begin{itemize}
+    \item un-: 派生前缀
+    \item happi: 词根
+    \item -ness: 派生后缀
+    \item -es: 屈折后缀
+\end{itemize}
+这个顺序不是偶然的：屈折后缀永远在最外层(英语中动词屈折不能出现在派生词缀之内)。汉语中同样存在顺序约束："桌子们"合法而"*桌子"的复数须加"们"且不能提前。
+\end{example}
+
+\subsubsection{形态生成的图论表示}
+
+词的形态结构可以看作一棵树(形态树)：词根是根节点，词缀是叶子：
+\begin{equation}
+    \text{un-happiness: } \underbrace{un}_{\text{前缀}} + \underbrace{happi}_{\text{词根}} + \underbrace{ness}_{\text{后缀}}
+\end{equation}
+
+\subsection{形态类型学的形式刻画}
+
+上一章的孤立语/黏着语/屈折语/多式综合语四分法，可以在形态学的框架下精确刻画。定义语素密度(词素比率)为：
+\begin{equation}
+    \text{形态综合度} = \frac{\#\text{语素}}{\#\text{词}} \quad (\text{对一段语料取平均})
+\end{equation}
+
+\begin{itemize}
+    \item 孤立语(汉语): 比率 $\approx 1$
+    \item 黏着语(土耳其语): 比率高且词缀边界清晰(一一对应)
+    \item 屈折语(俄语): 比率较高且词缀融合(一个词缀多重意义)
+    \item 多式综合语(因纽特语): 比率极高(一个词内整合主语宾语)
+\end{itemize}
+
+这个量化指标是跨语言比较的直接工具：给定两段平行文本，计算各自的语素密度，就能客观比较两种语言在形态上的"综合性"差异。
+
+\subsection{本章小结}
+
+形态学研究词内的结构世界：语素是最小的意义单位，屈折与派生是两大构词机制，语素变体和语音规则把深层形式映射到表层拼写。形态学既能用有限状态转换器精确计算，又是语言类型学(孤立/黏着/屈折/复综)的核心坐标。不同语言在形态上的巨大差异——从汉语的几乎没有屈折，到俄语的复杂格系统，到日语的黏着堆叠——正是理解"语言之间差异"的最佳入口，我们将在最后一章系统比较。下一章上升到句子的组织方式：句法。

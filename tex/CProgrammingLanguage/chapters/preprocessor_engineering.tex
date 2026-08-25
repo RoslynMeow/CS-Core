@@ -1,0 +1,307 @@
+﻿\chapter{预处理器与工程实践}
+
+\section{条件编译}
+
+条件编译允许根据特定条件决定是否编译某段代码，是实现跨平台兼容和调试开关的核心工具。
+
+\subsection{\texorpdfstring{\texttt{\#ifdef} / \texttt{\#ifndef} / \texttt{\#endif}}{\#ifdef / \#ifndef / \#endif}}
+
+\begin{lstlisting}[caption={条件编译基本用法}]
+#define DEBUG 1
+
+#ifdef DEBUG
+    printf("调试模式：变量 x = %d\n", x);
+#endif
+
+#ifndef MAX_SIZE
+    #define MAX_SIZE 100
+#endif
+\end{lstlisting}
+
+\begin{itemize}
+    \item \texttt{\#ifdef MACRO}：如果 \texttt{MACRO} 已被 \texttt{\#define} 定义，则编译其后代码。
+    \item \texttt{\#ifndef MACRO}：如果 \texttt{MACRO} 未被定义，则编译其后代码。
+    \item \texttt{\#endif}：结束条件编译块。
+    \item \texttt{\#else} / \texttt{\#elif}：可配合使用，形成多分支条件编译。
+\end{itemize}
+
+\subsection{\texorpdfstring{\texttt{\#if} 表达式编译}{\#if 表达式编译}}
+
+\begin{lstlisting}[caption={if 表达式条件编译}]
+#define VERSION 2
+
+#if VERSION >= 3
+    printf("版本 3 及以上功能\n");
+#elif VERSION == 2
+    printf("版本 2 功能\n");
+#else
+    printf("旧版本兼容代码\n");
+#endif
+\end{lstlisting}
+
+\section{头文件保护符（Include Guard）}
+
+在多文件项目中，同一头文件可能被多个源文件间接多次包含，导致重复声明错误。头文件保护符通过条件编译确保头文件内容仅被编译一次。
+
+\subsection{传统 \texttt{\#ifndef} 保护模式}
+
+\begin{lstlisting}[caption={头文件保护符}]
+// student.h
+#ifndef STUDENT_H
+#define STUDENT_H
+
+struct Student {
+    char name[20];
+    int age;
+};
+
+void printStudent(struct Student s);
+
+#endif // STUDENT_H
+\end{lstlisting}
+
+命名约定：将头文件名转为大写，将点号替换为下划线，前后加下划线。例如 \texttt{my\_header.h} 转为 \texttt{MY\_HEADER\_H}。
+
+\subsection{\texttt{\#pragma once} 模式}
+
+\begin{lstlisting}[caption={pragma once}]
+#pragma once
+
+struct Student {
+    char name[20];
+    int age;
+};
+\end{lstlisting}
+
+\texttt{\#pragma once} 是编译器扩展指令，现代编译器（GCC、Clang、MSVC）均支持。它由编译器在文件级别保证唯一包含，书写更简洁，但不属于 C 标准。在存在符号链接或同一文件多条路径的工程中，\texttt{\#ifndef} 模式更为可靠。
+
+\section{多文件项目管理}
+
+一个规范的 C 语言项目通常按以下结构组织：
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    folder/.style={font=\ttfamily\small, align=left},
+    arrow/.style={->, >=latex, thick},
+    lbl/.style={font=\small}
+]
+    \node[folder, anchor=west] (root) at (0, 0) {project/};
+    \node[folder, anchor=west] (inc) at (0.6, -0.6) {include/};
+    \node[folder, anchor=west] (sh) at (1.4, -1.2) {student.h};
+    \node[folder, anchor=west] (uh) at (1.4, -1.8) {utils.h};
+    \node[folder, anchor=west] (src) at (0.6, -2.6) {src/};
+    \node[folder, anchor=west] (mc) at (1.4, -3.2) {main.c};
+    \node[folder, anchor=west] (sc) at (1.4, -3.8) {student.c};
+    \node[folder, anchor=west] (uc) at (1.4, -4.4) {utils.c};
+    \node[folder, anchor=west] (mk) at (0.6, -5.0) {Makefile};
+
+    % 树形连线
+    \draw[thick] (root.south west) ++(0.3,0) |- (inc.west);
+    \draw[thick] (root.south west) ++(0.3,0) |- (src.west);
+    \draw[thick] (root.south west) ++(0.3,0) |- (mk.west);
+    \draw[thick] (inc.south west) ++(0.3,0) |- (sh.west);
+    \draw[thick] (inc.south west) ++(0.3,0) |- (uh.west);
+    \draw[thick] (src.south west) ++(0.3,0) |- (mc.west);
+    \draw[thick] (src.south west) ++(0.3,0) |- (sc.west);
+    \draw[thick] (src.south west) ++(0.3,0) |- (uc.west);
+
+    % 注释
+    \node[lbl, anchor=west, text=gray] at (3.2, -1.2) {结构体定义和函数声明};
+    \node[lbl, anchor=west, text=gray] at (3.2, -1.8) {工具函数声明};
+    \node[lbl, anchor=west, text=gray] at (3.2, -3.2) {主程序入口};
+    \node[lbl, anchor=west, text=gray] at (3.2, -3.8) {student.h 的实现};
+    \node[lbl, anchor=west, text=gray] at (3.2, -4.4) {utils.h 的实现};
+    \node[lbl, anchor=west, text=gray] at (3.2, -5.0) {构建脚本};
+\end{tikzpicture}
+\caption{典型项目文件结构}
+\label{fig:project_structure}
+\end{figure}
+
+\textbf{编译与链接流程}：
+
+\begin{enumerate}
+    \item 每个 \texttt{.c} 文件独立编译为 \texttt{.o} 目标文件。
+    \item 链接器将所有 \texttt{.o} 文件和系统库合并为最终可执行文件。
+    \item 修改某个 \texttt{.c} 文件时，只需重新编译该文件，无需重新编译整个项目。
+\end{enumerate}
+
+\section{Makefile 基础}
+
+Makefile 是 Unix/Linux 系统下的自动化构建工具，用于管理多文件项目的编译流程。
+
+\begin{lstlisting}[caption={简单 Makefile 示例}]
+CC = gcc
+CFLAGS = -Wall -Wextra -std=c11
+TARGET = program
+SRCS = src/main.c src/student.c src/utils.c
+OBJS = $(SRCS:.c=.o)
+
+$(TARGET): $(OBJS)
+	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS)
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+clean:
+	rm -f $(OBJS) $(TARGET)
+\end{lstlisting}
+
+\begin{itemize}
+    \item \texttt{CC}：指定编译器。
+    \item \texttt{CFLAGS}：编译选项，\texttt{-Wall} 开启所有警告，\texttt{-Wextra} 开启额外警告，\texttt{-std=c11} 指定 C11 标准。
+    \item \texttt{make}：执行构建。
+    \item \texttt{make clean}：清理编译产物。
+\end{itemize}
+
+\section{常用编译选项}
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{选项} & \textbf{作用} \\ \midrule
+\texttt{-Wall} & 开启所有常用警告 \\ 
+\texttt{-Wextra} & 开启额外警告 \\ 
+\texttt{-Werror} & 将警告视为错误，阻止编译通过 \\ 
+\texttt{-g} & 生成调试信息（供 GDB 使用） \\ 
+\texttt{-O0 / -O1 / -O2 / -O3} & 优化等级（0为不优化，3为最高优化） \\ 
+\texttt{-std=c99 / c11 / c17} & 指定 C 语言标准版本 \\ 
+\texttt{-o output} & 指定输出文件名 \\ 
+\texttt{-c} & 仅编译不链接，生成 .o 文件 \\ 
+\texttt{-I dir} & 添加头文件搜索路径 \\ 
+\texttt{-l lib} & 链接指定库（如 \texttt{-lm} 链接数学库） \\ \bottomrule
+\end{tabulary}
+\caption{GCC 常用编译选项}
+\label{tab:gcc_flags}
+\end{table}
+
+\section{调试技巧}
+
+\subsection{使用 GDB 调试}
+
+\begin{lstlisting}[caption={GDB 基本命令}]
+gcc -g -o program main.c    // 编译时加 -g 生成调试信息
+gdb ./program               // 启动 GDB
+
+(gdb) break main            // 在 main 函数处设置断点
+(gdb) run                   // 运行程序
+(gdb) next                  // 单步执行（不进入函数）
+(gdb) step                  // 单步执行（进入函数）
+(gdb) print x               // 打印变量 x 的值
+(gdb) continue              // 继续执行到下一个断点
+(gdb) quit                  // 退出 GDB
+\end{lstlisting}
+
+\subsection{常见运行时错误排查}
+
+\begin{itemize}
+    \item \textbf{段错误 (Segmentation Fault)}：访问了非法内存地址，常见原因包括空指针解引用、数组越界、访问已释放的内存。
+    \item \textbf{内存泄漏 (Memory Leak)}：\texttt{malloc} 分配的内存未调用 \texttt{free} 释放。可使用 Valgrind 工具检测。
+    \item \textbf{未定义行为 (Undefined Behavior)}：如 signed integer overflow、use-after-free 等，编译器不保证任何结果，可能导致难以复现的随机 Bug。
+\end{itemize}
+
+\section{静态库与动态库}
+
+在实际工程中，通常将常用的功能打包成库（Library），供多个项目复用。C 语言支持两种库：静态库和动态库。
+
+\subsection{静态库 (Static Library)}
+
+静态库在编译时直接将目标代码复制到最终的可执行文件中。生成的可执行文件体积较大，但运行时不需要额外的库文件。
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.95\textwidth}
+\begin{lstlisting}[caption={静态库制作与使用 (Linux)}]
+# 1. 编译目标文件
+gcc -c math_utils.c -o math_utils.o
+
+# 2. 打包为静态库 (libmath.a)
+ar rcs libmath.a math_utils.o
+
+# 3. 链接静态库
+gcc main.c -L. -lmath -o program
+# -L. 表示在当前目录查找库，-lmath 表示链接 libmath.a
+\end{lstlisting}
+\end{minipage}
+\end{figure}
+
+\subsection{动态库/共享库 (Shared Library)}
+
+动态库在编译时仅记录引用信息，在程序运行时才加载到内存。多个程序可共享同一份动态库，节省内存和磁盘空间。
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.95\textwidth}
+\begin{lstlisting}[caption={动态库制作与使用 (Linux)}]
+# 1. 编译位置无关代码 (Position Independent Code)
+gcc -c -fPIC math_utils.c -o math_utils.o
+
+# 2. 打包为动态库 (libmath.so)
+gcc -shared -o libmath.so math_utils.o
+
+# 3. 链接动态库
+gcc main.c -L. -lmath -o program
+
+# 4. 运行时指定库路径（否则可能找不到 .so）
+export LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH
+./program
+\end{lstlisting}
+\end{minipage}
+\end{figure}
+
+\section{从 Makefile 到 CMake}
+
+Makefile 是 Unix/Linux 系统下的经典构建工具，但语法较为晦涩。现代 C/C++ 项目广泛采用 \textbf{CMake}，它通过跨平台的 \texttt{CMakeLists.txt} 脚本生成对应平台的构建系统（如 Makefile、Ninja、Visual Studio 工程）。
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.95\textwidth}
+\begin{lstlisting}[caption={CMakeLists.txt 基础示例}]
+cmake_minimum_required(VERSION 3.10)
+project(MyProject C)
+
+# 设置 C 标准
+set(CMAKE_C_STANDARD 11)
+
+# 添加可执行文件
+add_executable(program src/main.c src/utils.c)
+
+# 链接数学库
+target_link_libraries(program m)
+\end{lstlisting}
+\end{minipage}
+\end{figure}
+
+\textbf{CMake 构建流程}：
+\begin{enumerate}
+    \item 在项目根目录创建 \texttt{CMakeLists.txt}。
+    \item 运行 \texttt{cmake -S . -B build} 生成构建文件到 \texttt{build/} 目录。
+    \item 运行 \texttt{cmake --build build} 执行编译。
+\end{enumerate}
+
+\section{未定义行为 (UB) 常见清单}
+
+C 语言为了追求极致性能，将许多边界情况定义为"未定义行为"（Undefined Behavior, UB）。编译器不对 UB 做任何保证，可能导致程序崩溃、静默错误或看似正常但逻辑错误的结果。以下是最高频的 UB 清单：
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CC}
+\toprule
+\textbf{未定义行为} & \textbf{示例代码} \\ \midrule
+有符号整数溢出 & \texttt{int x = INT\_MAX; x++;} \\ 
+解引用空指针 & \texttt{int *p = NULL; *p = 10;} \\ 
+访问已释放内存 (Use-After-Free) & \texttt{free(p); *p = 5;} \\ 
+数组越界访问 & \texttt{int a[5]; a[5] = 10;} \\ 
+修改字符串字面量 & \texttt{char *s = "hello"; s[0] = 'H';} \\ 
+同一表达式多次修改同一变量 & \texttt{int i = 0; i = i++;} \\ 
+函数返回值类型不匹配 & 声明返回 \texttt{int} 但实际返回 \texttt{float} \\ \bottomrule
+\end{tabulary}
+\caption{C语言常见未定义行为 (UB) 清单}
+\label{tab:ub_list}
+\end{table}
+
+\textbf{防御建议}：始终开启编译器警告（\texttt{-Wall -Wextra}），使用静态分析工具（如 Clang-Tidy、Cppcheck），并在关键逻辑中加入 \texttt{assert} 断言。

@@ -1,0 +1,326 @@
+\chapter{C标准库函数速查手册 (系统、类型与环境)}
+
+本章汇总 C语言标准库中的系统工具、类型定义、错误处理与环境配置函数。
+
+\section{\texorpdfstring{\texttt{<assert.h>} 断言库}{<assert.h> 断言库}}
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.6}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{宏/函数} & \textbf{功能说明} & \textbf{行为} \\ \midrule
+\texttt{assert(expression)} & 运行时断言检查 & 表达式为假时打印错误信息并调用 abort() \\ 
+\texttt{NDEBUG} & 宏定义 & 在 \texttt{\#include <assert.h>} 前定义 \texttt{NDEBUG} 可禁用所有 assert \\ \bottomrule
+\end{tabulary}
+\caption{assert.h 断言宏}
+\label{tab:assert_funcs}
+\end{table}
+
+\begin{lstlisting}[caption={assert 使用示例}]
+#include <assert.h>
+
+int divide(int a, int b) {
+    assert(b != 0);  // 如果 b 为 0，程序终止并输出错误信息
+    return a / b;
+}
+\end{lstlisting}
+
+\section{\texorpdfstring{\texttt{<errno.h>} 错误码库}{<errno.h> 错误码库}}
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.6}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{宏/变量} & \textbf{功能说明} & \textbf{典型值} \\ \midrule
+\texttt{errno} & 全局错误码变量 & 由库函数在出错时设置 \\ 
+\texttt{EDOM} & 数学函数定义域错误 & 如 sqrt(-1) \\ 
+\texttt{ERANGE} & 结果超出表示范围 & 如溢出 \\ 
+\texttt{EAGAIN} & 资源暂时不可用 & 非阻塞 I/O 场景 \\ 
+\texttt{EINVAL} & 无效参数 & 传入非法参数 \\ \bottomrule
+\end{tabulary}
+\caption{errno.h 错误码}
+\label{tab:errno_funcs}
+\end{table}
+
+\begin{lstlisting}[caption={errno 使用示例}]
+#include <stdio.h>
+#include <errno.h>
+#include <string.h>
+#include <math.h>
+
+int main() {
+    errno = 0;
+    double result = sqrt(-1.0);
+    if (errno == EDOM) {
+        printf("数学定义域错误: %s\n", strerror(errno));
+    }
+    return 0;
+}
+\end{lstlisting}
+
+\section{\texorpdfstring{\texttt{<stdarg.h>} 可变参数库}{<stdarg.h> 可变参数库}}
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.6}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{宏/类型} & \textbf{功能说明} & \textbf{用法} \\ \midrule
+\texttt{va\_list} & 可变参数列表类型 & 用于声明参数遍历变量 \\ 
+\texttt{va\_start(ap, last)} & 初始化 va\_list & last 是最后一个固定参数名 \\ 
+\texttt{va\_arg(ap, type)} & 获取下一个参数 & type 为期望的参数类型 \\ 
+\texttt{va\_end(ap)} & 清理 va\_list & 在函数返回前调用 \\ \bottomrule
+\end{tabulary}
+\caption{stdarg.h 可变参数宏}
+\label{tab:stdarg_funcs}
+\end{table}
+
+\begin{lstlisting}[caption={可变参数函数示例}]
+#include <stdio.h>
+#include <stdarg.h>
+
+double average(int count, ...) {
+    va_list args;
+    va_start(args, count);
+    double sum = 0.0;
+    for (int i = 0; i < count; i++) {
+        sum += va_arg(args, double);
+    }
+    va_end(args);
+    return sum / count;
+}
+
+int main() {
+    printf("平均值: %.2f\n", average(4, 10.0, 20.0, 30.0, 40.0));
+    return 0;
+}
+\end{lstlisting}
+
+\section{\texorpdfstring{\texttt{<limits.h>} 与 \texttt{<float.h>} 极限值常量}{<limits.h> 与 <float.h> 极限值常量}}
+
+\subsection{limits.h 整型极限}
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{宏} & \textbf{含义} & \textbf{典型值} \\ \midrule
+\texttt{CHAR\_BIT} & char 的位数 & 8 \\ 
+\texttt{CHAR\_MIN / CHAR\_MAX} & char 最小/最大值 & -128 / 127 \\ 
+\texttt{INT\_MIN / INT\_MAX} & int 最小/最大值 & -2147483648 / 2147483647 \\ 
+\texttt{LONG\_MIN / LONG\_MAX} & long 最小/最大值 & 平台相关 \\ 
+\texttt{LLONG\_MIN / LLONG\_MAX} & long long 最小/最大值 & $\approx \pm 9.22 \times 10^{18}$ \\ 
+\texttt{UINT\_MAX} & unsigned int 最大值 & 4294967295 \\ \bottomrule
+\end{tabulary}
+\caption{limits.h 常用宏常量}
+\label{tab:limits_consts}
+\end{table}
+
+\subsection{float.h 浮点型极限}
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{宏} & \textbf{含义} & \textbf{典型值} \\ \midrule
+\texttt{FLT\_MIN / DBL\_MIN} & float/double 最小正值 & $1.175 \times 10^{-38}$ / $2.225 \times 10^{-308}$ \\ 
+\texttt{FLT\_MAX / DBL\_MAX} & float/double 最大值 & $3.402 \times 10^{38}$ / $1.797 \times 10^{308}$ \\ 
+\texttt{FLT\_EPSILON / DBL\_EPSILON} & 机器精度 $\epsilon$ & $1.192 \times 10^{-7}$ / $2.220 \times 10^{-16}$ \\ 
+\texttt{FLT\_DIG / DBL\_DIG} & 有效十进制位数 & 6 / 15 \\ \bottomrule
+\end{tabulary}
+\caption{float.h 常用宏常量}
+\label{tab:float_consts}
+\end{table}
+
+\section{\texorpdfstring{\texttt{<stddef.h>} 标准定义库}{<stddef.h> 标准定义库}}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{宏/类型} & \textbf{说明} & \textbf{典型值/用法} \\ \midrule
+\texttt{size\_t} & 无符号整型，用于表示对象大小 & \texttt{sizeof} 的返回类型 \\ 
+\texttt{ptrdiff\_t} & 有符号整型，用于表示指针差值 & 两个指针相减的结果类型 \\ 
+\texttt{wchar\_t} & 宽字符类型，用于存储宽字符 & 通常为 2 或 4 字节 \\ 
+\texttt{NULL} & 空指针常量 & 通常定义为 \texttt{((void*)0)} 或 \texttt{0} \\ 
+\texttt{offsetof(type, member)} & 计算结构体成员相对于起始地址的偏移量 & \texttt{offsetof(struct S, a)} \\ \bottomrule
+\end{tabulary}
+\caption{stddef.h 标准定义}
+\label{tab:stddef}
+\end{table}
+
+\section{\texorpdfstring{\texttt{<setjmp.h>} 非局部跳转库}{<setjmp.h> 非局部跳转库}}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{宏/类型} & \textbf{功能说明} & \textbf{返回值/行为} \\ \midrule
+\texttt{jmp\_buf} & 数组类型，用于保存调用环境（寄存器状态、栈指针等） & 供 \texttt{setjmp} 和 \texttt{longjmp} 使用 \\ 
+\texttt{int setjmp(jmp\_buf env)} & 保存当前执行环境到 \texttt{env} 中 & 直接调用返回 0；通过 \texttt{longjmp} 返回非零值 \\ 
+\texttt{void longjmp(jmp\_buf env, int val)} & 恢复到 \texttt{env} 保存的环境，并继续从 \texttt{setjmp} 处执行 & \texttt{setjmp} 将返回 \texttt{val}（若 val 为 0 则返回 1） \\ \bottomrule
+\end{tabulary}
+\caption{setjmp.h 非局部跳转宏}
+\label{tab:setjmp}
+\end{table}
+
+\section{\texorpdfstring{\texttt{<signal.h>} 信号处理库}{<signal.h> 信号处理库}}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{宏/函数} & \textbf{功能说明} & \textbf{典型值/行为} \\ \midrule
+\texttt{SIGINT} & 交互式注意信号（通常由 Ctrl+C 触发） & 值为 2 \\ 
+\texttt{SIGTERM} & 终止请求信号 & 值为 15 \\ 
+\texttt{SIGSEGV} & 无效内存访问（段错误） & 值为 11 \\ 
+\texttt{SIG\_DFL} & 默认信号处理动作 & 恢复系统默认行为 \\ 
+\texttt{SIG\_IGN} & 忽略信号 & 信号被丢弃，不执行任何操作 \\ 
+\texttt{signal(int sig, void (*func)(int))} & 注册信号处理函数 & 返回旧的处理函数指针 \\ 
+\texttt{raise(int sig)} & 向当前进程发送指定信号 & 成功返回 0，失败返回非零 \\ \bottomrule
+\end{tabulary}
+\caption{signal.h 信号处理宏与函数}
+\label{tab:signal}
+\end{table}
+
+\section{\texorpdfstring{\texttt{<locale.h>} 本地化设置库}{<locale.h> 本地化设置库}}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{宏/函数} & \textbf{功能说明} & \textbf{典型值/行为} \\ \midrule
+\texttt{LC\_ALL} & 设置所有本地化类别 & 涵盖数字、货币、时间、字符等 \\ 
+\texttt{LC\_COLLATE} & 影响字符串比较和排序规则 & 如 \texttt{strcoll} 的行为 \\ 
+\texttt{LC\_CTYPE} & 影响字符分类与转换函数 & 如 \texttt{isalpha}, \texttt{toupper} \\ 
+\texttt{LC\_MONETARY} & 影响货币格式化 & 如 \texttt{localeconv} 返回的货币符号 \\ 
+\texttt{LC\_NUMERIC} & 影响数字格式化（如小数点符号） & 如 \texttt{printf} 的小数点 \\ 
+\texttt{LC\_TIME} & 影响日期和时间格式化 & 如 \texttt{strftime} 的输出 \\ 
+\texttt{char* setlocale(int category, const char* locale)} & 设置或查询当前程序的本地化环境 & \texttt{""} 表示使用系统环境变量 \\ 
+\texttt{struct lconv* localeconv(void)} & 获取当前本地化环境的数字和货币格式信息 & 返回指向 \texttt{lconv} 结构体的指针 \\ \bottomrule
+\end{tabulary}
+\caption{locale.h 本地化设置宏与函数}
+\label{tab:locale}
+\end{table}
+
+\section{\texorpdfstring{\texttt{<stdbool.h>} 布尔类型库 (C99)}{<stdbool.h> 布尔类型库 (C99)}}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CC}
+\toprule
+\textbf{宏/类型} & \textbf{说明} \\ \midrule
+\texttt{bool} & 扩展为 \texttt{\_Bool} 类型 \\ 
+\texttt{true} & 扩展为整数常量 1 \\ 
+\texttt{false} & 扩展为整数常量 0 \\ 
+\texttt{\_\_bool\_true\_false\_are\_defined} & 扩展为 1，表示宏已定义 \\ \bottomrule
+\end{tabulary}
+\caption{stdbool.h 布尔类型宏}
+\label{tab:stdbool}
+\end{table}
+
+\section{\texorpdfstring{\texttt{<inttypes.h>} 固定宽度整型库 (C99)}{<inttypes.h> 固定宽度整型库 (C99)}}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{类型/宏} & \textbf{说明} & \textbf{典型值} \\ \midrule
+\texttt{int8\_t / uint8\_t} & 精确 8 位有符号/无符号整数 & 范围 $\pm 127$ / $0 \sim 255$ \\ 
+\texttt{int16\_t / uint16\_t} & 精确 16 位有符号/无符号整数 & 范围 $\pm 32767$ / $0 \sim 65535$ \\ 
+\texttt{int32\_t / uint32\_t} & 精确 32 位有符号/无符号整数 & 范围 $\pm 2\times 10^9$ / $0 \sim 4\times 10^9$ \\ 
+\texttt{int64\_t / uint64\_t} & 精确 64 位有符号/无符号整数 & 范围 $\pm 9\times 10^{18}$ \\ 
+\texttt{PRIu32 / PRId64} & \texttt{printf} 格式化固定宽度整型的宏 & 如 \texttt{PRIu32} 展开为 \texttt{"u"} \\ 
+\texttt{SCNd32 / SCNu64} & \texttt{scanf} 格式化固定宽度整型的宏 & 如 \texttt{SCNd32} 展开为 \texttt{"d"} \\ \bottomrule
+\end{tabulary}
+\caption{inttypes.h 固定宽度整型与格式化宏}
+\label{tab:inttypes}
+\end{table}
+
+\section{\texorpdfstring{\texttt{<stdint.h>} 精确宽度整型库 (C99)}{<stdint.h> 精确宽度整型库 (C99)}}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{类型/宏} & \textbf{说明} & \textbf{典型值} \\ \midrule
+\texttt{int8\_t / uint8\_t} & 精确 8 位有符号/无符号整数 & 范围 $-128 \sim 127$ / $0 \sim 255$ \\ 
+\texttt{int16\_t / uint16\_t} & 精确 16 位有符号/无符号整数 & 范围 $-32768 \sim 32767$ \\ 
+\texttt{int32\_t / uint32\_t} & 精确 32 位有符号/无符号整数 & 范围 $\approx \pm 2\times 10^9$ \\ 
+\texttt{int64\_t / uint64\_t} & 精确 64 位有符号/无符号整数 & 范围 $\approx \pm 9\times 10^{18}$ \\ 
+\texttt{INT8\_MIN / INT8\_MAX} & 8 位整型最小/最大值 & $-128$ / $127$ \\ 
+\texttt{INT32\_MIN / INT32\_MAX} & 32 位整型最小/最大值 & $-2147483648$ / $2147483647$ \\ 
+\texttt{UINT\_C(n) / INT\_C(n)} & 生成指定宽度的整型常量 & \texttt{UINT32\_C(10)} 展开为 \texttt{10U} \\ 
+\texttt{intptr\_t / uintptr\_t} & 可容纳指针的有符号/无符号整型 & 用于指针与整数的安全转换 \\ \bottomrule
+\end{tabulary}
+\caption{stdint.h 精确宽度整型与极限值}
+\label{tab:stdint}
+\end{table}
+
+\section{\texorpdfstring{\texttt{<fenv.h>} 浮点环境库 (C99)}{<fenv.h> 浮点环境库 (C99)}}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{宏/函数} & \textbf{功能说明} & \textbf{返回值/行为} \\ \midrule
+\texttt{FE\_DIVBYZERO} & 除零异常标志 & 浮点异常类型 \\ 
+\texttt{FE\_INEXACT} & 结果不精确异常标志 & 如 $\pi$ 的近似值 \\ 
+\texttt{FE\_INVALID} & 无效操作异常标志 & 如 $\sqrt{-1}$ \\ 
+\texttt{FE\_OVERFLOW} & 上溢异常标志 & 结果超出最大值 \\ 
+\texttt{FE\_UNDERFLOW} & 下溢异常标志 & 结果低于最小正值 \\ 
+\texttt{int feclearexcept(int excepts)} & 清除指定的浮点异常标志 & 0 成功 \\ 
+\texttt{int fetestexcept(int excepts)} & 测试哪些异常标志被设置 & 被设置的标志位掩码 \\ 
+\texttt{int feraiseexcept(int excepts)} & 手动触发浮点异常 & 0 成功 \\ 
+\texttt{int fegetround(void)} & 获取当前浮点舍入模式 & 舍入模式常量 \\ 
+\texttt{int fesetround(int round)} & 设置浮点舍入模式 & 0 成功，非零失败 \\ 
+\texttt{fenv\_t} & 保存完整浮点环境的状态类型 & 供 \texttt{fegetenv}/\texttt{fesetenv} 使用 \\ \bottomrule
+\end{tabulary}
+\caption{fenv.h 浮点环境控制函数}
+\label{tab:fenv}
+\end{table}
+
+\section{\texorpdfstring{\texttt{<iso646.h>} 替代拼写宏库 (C95)}{<iso646.h> 替代拼写宏库 (C95)}}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CC}
+\toprule
+\textbf{宏} & \textbf{替代运算符} \\ \midrule
+\texttt{and} & \texttt{\&\&} \\ 
+\texttt{or} & \texttt{||} \\ 
+\texttt{not} & \texttt{!} \\ 
+\texttt{bitand} & \texttt{\&} \\ 
+\texttt{bitor} & \texttt{|} \\ 
+\texttt{xor} & \texttt{\^} \\ 
+\texttt{compl} & \texttt{\textasciitilde} \\ 
+\texttt{and\_eq} & \texttt{\&=} \\ 
+\texttt{or\_eq} & \texttt{|=} \\ 
+\texttt{xor\_eq} & \texttt{\^=} \\ 
+\texttt{not\_eq} & \texttt{!=} \\ \bottomrule
+\end{tabulary}
+\caption{iso646.h 替代拼写宏}
+\label{tab:iso646}
+\end{table}

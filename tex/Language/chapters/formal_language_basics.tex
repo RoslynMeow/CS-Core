@@ -1,0 +1,278 @@
+﻿\section{形式化语言基础}
+
+\subsection{形式语言理论概述}
+
+形式语言理论是计算机科学和语言学的交叉领域，由诺姆·乔姆斯基在1956年奠基。它提供了一套精确的数学工具来描述语言的\emph{句法}结构。这里所说的"语言"不仅指自然语言，也包括编程语言、正则表达式、DNA序列等一切由符号构成的集合。
+
+形式语言理论的核心思想：一个语言不过是某个字母表上的字符串集合，而文法(grammar)是生成这个集合的有限规则系统。它把"什么是合法的句子"这个语言学问题转化为"集合论与自动机"的数学问题：
+\begin{equation}
+    \text{语言} \subseteq \Sigma^* \quad \text{其中 } \Sigma \text{ 是字母表}
+\end{equation}
+
+\subsection{字母表与字符串}
+
+\subsubsection{基本定义}
+
+\begin{definition}[字母表]
+字母表 $\Sigma$ 是一个有限的非空符号集合。
+\end{definition}
+
+\begin{example}
+\begin{align*}
+    \Sigma_{\text{英语}} &= \{a, b, c, \ldots, z\} \\
+    \Sigma_{\text{二进制}} &= \{0, 1\} \\
+    \Sigma_{\text{DNA}} &= \{A, C, G, T\}
+\end{align*}
+\end{example}
+
+\begin{definition}[字符串]
+字符串 $w$ 是字母表 $\Sigma$ 中符号的有限序列。
+\end{definition}
+
+\subsubsection{字符串的基本运算}
+
+\begin{itemize}
+    \item $|w|$: 字符串 $w$ 的长度
+    \item $\epsilon$: 空字符串，$|\epsilon| = 0$
+    \item $uv$: 字符串 $u$ 和 $v$ 的\emph{连接}(concatenation)
+    \item $w^R$: 字符串 $w$ 的\emph{反转}(reverse)
+    \item $w^k$: 字符串 $w$ 的 $k$ 次重复
+    \item $\Sigma^*$: $\Sigma$ 上所有字符串的集合(包括 $\epsilon$)
+    \item $\Sigma^+$: $\Sigma$ 上所有非空字符串的集合
+\end{itemize}
+
+\subsubsection{语言作为集合}
+
+\begin{definition}[语言]
+$\Sigma$ 上的一个语言 $L$ 是 $\Sigma^*$ 的任意子集：$L \subseteq \Sigma^*$。
+\end{definition}
+
+语言可以非常小(空集 $\emptyset$、单个字符串 $\{ab\}$)也可以无限大(如"所有以 $a$ 开头、$b$ 结尾的字符串" $\{awb : w \in \Sigma^*\}$)。关键问题是：\emph{一个无限语言能否用有限的方式描述?} 这正是文法和自动机要回答的问题。
+
+语言之间有基本的集合运算：并、交、差、补、连接、Kleene星：
+\begin{equation}
+    L_1 \cdot L_2 = \{ uv \mid u \in L_1, v \in L_2 \}, \qquad L^* = \bigcup_{k \geq 0} L^k
+\end{equation}
+
+\subsection{文法与乔姆斯基层级}
+
+\subsubsection{形式文法定义}
+
+\begin{definition}[短语结构文法]
+文法 $G$ 是一个四元组：
+\begin{equation}
+    G = \langle V_N, V_T, P, S \rangle
+\end{equation}
+其中：
+\begin{itemize}
+    \item $V_N$: 非终结符(Non-terminal)集合，代表语法范畴(如 S、NP、VP)
+    \item $V_T$: 终结符(Terminal)集合，代表实际词/符号，$V_N \cap V_T = \emptyset$
+    \item $P$: 产生式(Production)规则集合，形如 $\alpha \rightarrow \beta$
+    \item $S \in V_N$: 起始符号(Start symbol)
+\end{itemize}
+\end{definition}
+
+文法生成语言的过程是：从起始符 $S$ 出发，反复应用产生式，直到所有非终结符都被替换为终结符。记 $\Rightarrow$ 为"一步推导"，则
+\begin{equation}
+    L(G) = \{ w \in V_T^* \mid S \Rightarrow^* w \}
+\end{equation}
+其中 $\Rightarrow^*$ 表示零步或多步推导。一个语言若存在某个文法生成它，就称该语言是\emph{递归可枚举}的(这里指0型)。
+
+\subsubsection{乔姆斯基层级}
+
+根据产生式形式的限制，文法可以分为四个层次，每一层生成的语言严格包含下一层：
+
+\begin{table}[H]
+\centering
+\caption{乔姆斯基层级}
+\begin{tabulary}{\textwidth}{@{}CCCC@{}}
+\toprule
+\textbf{类型} & \textbf{文法} & \textbf{产生式形式} & \textbf{自动机} \\
+\midrule
+0 & 无限制文法 & $\alpha \rightarrow \beta$ & 图灵机 \\
+1 & 上下文有关 & $\alpha A \beta \rightarrow \alpha \gamma \beta$ & 线性有界自动机 \\
+2 & 上下文无关 & $A \rightarrow \gamma$ & 下推自动机 \\
+3 & 正则 & $A \rightarrow aB$ 或 $A \rightarrow a$ & 有限状态自动机 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{equation}
+    \mathcal{L}_0 \supsetneq \mathcal{L}_1 \supsetneq \mathcal{L}_2 \supsetneq \mathcal{L}_3
+\end{equation}
+其中 $\mathcal{L}_i$ 表示 $i$ 型文法生成的语言类。层级关系是严格的：$\{a^n b^n\}$ 是上下文无关但非正则的；$\{a^n b^n c^n\}$ 是上下文有关但非上下文无关的。
+
+\subsection{正则语言(Type-3)}
+
+\subsubsection{正则表达式}
+
+正则表达式(Regular Expression)是最直观地描述正则语言的方式，其递归定义如下：
+\begin{equation}
+    \begin{aligned}
+    &\emptyset \text{ 是正则表达式(表示空语言)} \\
+    &\epsilon \text{ 是正则表达式(表示 } \{\epsilon\} \text{)} \\
+    &a \in \Sigma \text{ 是正则表达式(表示 } \{a\} \text{)} \\
+    &\text{若 } r, s \text{ 是正则表达式，则 } (r|s), (rs), (r^*) \text{ 也是}
+    \end{aligned}
+\end{equation}
+这里 $r|s$ 是并、$rs$ 是连接、$r^*$ 是Kleene星(零次或多次重复)。语法糖包括：$r^+ = rr^*$(一次以上)、$r? = (r|\epsilon)$(零次或一次)、$[a-z]$ 表示区间。
+
+\subsubsection{有限状态自动机(FSA)}
+
+\begin{definition}[DFA]
+确定性有限自动机 $M = \langle Q, \Sigma, \delta, q_0, F \rangle$
+\begin{itemize}
+    \item $Q$: 有限状态集合
+    \item $\Sigma$: 输入字母表
+    \item $\delta: Q \times \Sigma \rightarrow Q$: 转移函数
+    \item $q_0 \in Q$: 起始状态
+    \item $F \subseteq Q$: 接受状态集合
+\end{itemize}
+\end{definition}
+
+DFA从 $q_0$ 出发，逐个读入输入符号并转移状态。若读完整个输入后停在 $F$ 中的某个状态，则接受该字符串；否则拒绝。DFA接受的语言记作 $L(M)$。
+
+\begin{theorem}[克莱因定理]
+正则语言类 = 正则表达式可描述的语言类 = DFA/NFA可接受的语言类。
+\end{theorem}
+
+\begin{example}[识别英语复数后缀]
+\begin{equation}
+    \text{正则表达式: } [a-z]^* (s|es|ies)
+\end{equation}
+DFA能识别"字符串由小写字母组成且以 s、es 或 ies 结尾"。有限状态自动机的局限也在于此：它\emph{没有记忆}，无法统计括号匹配的嵌套层数，因此不能识别形如 $a^n b^n$ 的语言。
+\end{example}
+
+正则语言的封闭性质使其在计算上极其便利：正则语言对并、交、差、补、反转、同态都是封闭的，且可判定性(成员问题、空性、等价性)都有高效算法。这就是为什么正则表达式被广泛应用于文本搜索、词法分析(如编译器的lex)和NLP的词形还原。
+
+\subsection{上下文无关文法(Type-2)}
+
+\subsubsection{CFG定义}
+
+上下文无关文法的产生式形式为：
+\begin{equation}
+    A \rightarrow \alpha \quad \text{其中 } A \in V_N, \alpha \in (V_N \cup V_T)^*
+\end{equation}
+"上下文无关"的意思是：替换一个非终结符时，不依赖于它左右两边的上下文。这使CFG非常适合描述语言的\emph{递归嵌套结构}——自然语言和编程语言中最常见的结构。
+
+\begin{example}[回文语言]
+$L = \{ w \in \{a,b\}^* \mid w = w^R \}$ 是上下文无关的：
+\begin{equation}
+    S \rightarrow aSa \mid bSb \mid a \mid b \mid \epsilon
+\end{equation}
+这个语言不是正则的：识别它需要记住已经读入的内容，而DFA没有记忆。
+\end{example}
+
+\subsubsection{句法树}
+
+CFG的重要性质是：一个推导过程对应一棵\emph{句法树}(Parse Tree，也称推导树)，树根是 $S$，叶节点是终结符。句法树显式刻画了句子的层次结构，这正是自然语言句法分析的目标：
+
+\begin{forest}
+for tree={s sep=10mm, l sep=10mm}
+[S
+    [NP
+        [Det [The]]
+        [N [cat]]
+    ]
+    [VP
+        [V [sat]]
+        [PP
+            [P [on]]
+            [NP
+                [Det [the]]
+                [N [mat]]
+            ]
+        ]
+    ]
+]
+\end{forest}
+
+\subsubsection{歧义与二义性文法}
+
+同一个句子可以对应多棵句法树，称为\emph{结构歧义}(structural ambiguity)。经典例子：
+\begin{equation}
+    \text{"I saw the man with the telescope"}
+\end{equation}
+可以是"我用望远镜看那个人"($with$ 修饰 $saw$)，也可以是"我看见那个拿望远镜的人"($with$ 修饰 $man$)。两种解读对应两棵不同的句法树。一个文法若对某个句子能产生多棵句法树，就称为二义性文法。存在无法消除二义性的上下文无关语言，即固有歧义语言。
+
+\subsubsection{范式}
+
+\begin{itemize}
+    \item \textbf{乔姆斯基范式(CNF)}: 每条产生式形如 $A \rightarrow BC$ 或 $A \rightarrow a$。任何CFG都可以等量地(语言不变)转化为CNF，且任何不产生 $\epsilon$ 的CFG都可以。CNF的最大价值在于：它把推导树的内部节点统一为"两分叉"，使得\emph{CYK算法}(动态规划句法分析)可以直接应用。
+    \item \textbf{格雷巴赫范式(GNF)}: 产生式形如 $A \rightarrow a\alpha$，其中 $\alpha \in V_N^*$。GNF保证每一步都吃掉一个终结符，便于构造下推自动机。
+\end{itemize}
+
+\subsection{下推自动机与上下文无关语言}
+
+上下文无关语言对应\emph{下推自动机}(PDA)：在有限状态的基础上增加一个栈(stack)。栈提供了"无限记忆"，但只能以\emph{后进先出}方式访问。正是这个栈使得PDA能识别 $a^n b^n$(读 $a$ 时压栈，读 $b$ 时弹栈)。
+
+\begin{theorem}
+$L$ 是上下文无关语言当且仅当存在一个下推自动机 $M$ 使得 $L = L(M)$。
+\end{theorem}
+
+\subsection{上下文有关文法(Type-1)}
+
+产生式形式：
+\begin{equation}
+    \alpha A \beta \rightarrow \alpha \gamma \beta
+\end{equation}
+其中 $A \in V_N$，$\alpha, \beta, \gamma \in (V_N \cup V_T)^*$，且 $\gamma \neq \epsilon$。
+
+这里的限制是：$A$ 只有在左右分别是 $\alpha$ 和 $\beta$ 时才能被替换为 $\gamma$，即替换依赖上下文。这种"上下文敏感性"使上下文有关文法能表达非上下文无关的结构。
+
+\begin{example}
+语言 $\{a^n b^n c^n : n \geq 1\}$ 是上下文有关的。上下文无关文法无法识别它，因为 $a$、$b$、$c$ 的个数需要同步约束；而上下文有关文法可以让每个 $a$ 在与某个 $b$、某个 $c$ 配对后一起替换：
+\begin{equation}
+    S \rightarrow aSBC \mid aBC, \qquad CB \rightarrow BC, \qquad aB \rightarrow ab, \quad bB \rightarrow bb, \quad bC \rightarrow bc, \quad cC \rightarrow cc
+\end{equation}
+上下文有关文法对应\emph{线性有界自动机}(LBA)，即使用量受限的图灵机(磁带长度与输入长度成正比)。
+\end{example}
+
+\subsection{形式语言与自然语言}
+
+\subsubsection{自然语言的复杂度}
+
+自然语言的句法结构位于乔姆斯基层级的哪一层？这是形式语言学的基本问题之一。答案是：自然语言超出上下文无关文法的能力，但通常只需\emph{温和上下文有关}(Mildly context-sensitive)的层级：
+
+\begin{itemize}
+    \item \textbf{跨串依赖(Cross-serial dependencies)}: 瑞士德语和荷兰语中的交叉依赖结构。在"我让他叫约翰帮忙打扫房间"这类结构中，动词与宾语交叉对应，无法用CFG表达。
+    \item \textbf{温和上下文有关(Mildly context-sensitive)}: 介于CFG与上下文有关文法之间的层级，能表达交叉依赖但保持可解析性。
+    \item \textbf{树邻接文法(TAG)}、\textbf{组合范畴文法(CCG)}: 是温和上下文有关的代表性形式体系，被广泛用于计算句法学。
+\end{itemize}
+
+\begin{equation}
+    \mathcal{L}_{\text{CFG}} \subsetneq \mathcal{L}_{\text{TAG}} \subsetneq \mathcal{L}_{\text{MCS}} \subseteq \mathcal{L}_1
+\end{equation}
+
+\subsubsection{依存语法}
+
+短语结构文法描述的是"成分层级"，而依存语法(Dependency Grammar)描述\emph{词与词之间的二元关系}：
+\begin{equation}
+    \text{依存关系} = \{(h, d, r) \mid h, d \in W, r \in R\}
+\end{equation}
+其中 $h$ 是中心词，$d$ 是从属词，$r$ 是关系类型(如 nsubj、dobj)。依存结构更接近语义关系，且与语序相对独立，因此跨语言的适用性很强——这也为最后一章"不同语言的差异"提供了统一的比较工具：不同语言在依存关系上高度相似，差异主要体现在语序和形态。
+
+\subsection{形式语义基础}
+
+\subsubsection{Lambda演算}
+
+形式语言理论主要关心句法(什么是合法句子)，而\emph{形式语义学}要回答"句子是什么意思"。Lambda演算提供了组合意义的形式工具：
+\begin{equation}
+    \begin{aligned}
+    &\text{变量: } x, y, z, \ldots \\
+    &\text{抽象: } \lambda x.M \quad (\text{函数，把 } x \text{ 映射到 } M) \\
+    &\text{应用: } (M \ N) \quad (\text{把函数 } M \text{ 应用到 } N)
+    \end{aligned}
+\end{equation}
+
+\begin{example}
+"runs" 的语义表示：
+\begin{equation}
+    \llbracket \text{runs} \rrbracket = \lambda x.\text{run}(x)
+\end{equation}
+它表示"谓词 run 对主体 x 成立"这个函数。组合语义的基本思想是：一个句子的意义由各成分的意义\emph{组合}而成，Lambda演算使这种组合可以机械地进行。
+\end{example}
+
+\subsection{本章小结}
+
+形式语言理论为语言学提供了精确的"标尺"：乔姆斯基层级刻画了语言结构复杂度的层级，正则语言对应最"简单"的结构(无递归记忆)，上下文无关文法对应嵌套结构(自然语言句法的核心层级)，温和上下文有关覆盖了自然语言的完整复杂度。文法则架起了"有限规则"与"无限语言"之间的桥梁——这正回答了语言习得中的核心悖论：人类如何用有限的头脑掌握无限的语言能力。下一章将从词出发，考察词的内部结构(形态学)，那里同样充满形式化的规律。

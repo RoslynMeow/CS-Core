@@ -1,0 +1,252 @@
+\chapter{C标准库函数速查手册 (数学、时间与字符)}
+
+本章汇总 C语言标准库中的数学函数、时间处理以及字符分类与转换函数。
+
+\section{\texorpdfstring{\texttt{<math.h>} 数学函数库}{<math.h> 数学函数库}}
+
+\subsection{常用数学函数}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.6}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{函数原型} & \textbf{功能说明} & \textbf{返回值} \\ \midrule
+\texttt{double sqrt(double x)} & 平方根 $\sqrt{x}$ & 平方根值 \\ 
+\texttt{double pow(double x, double y)} & 幂运算 $x^y$ & 幂值 \\ 
+\texttt{double exp(double x)} & 自然指数 $e^x$ & 指数值 \\ 
+\texttt{double log(double x)} & 自然对数 $\ln x$ & 对数值 \\ 
+\texttt{double log10(double x)} & 常用对数 $\log_{10} x$ & 对数值 \\ 
+\texttt{double fabs(double x)} & 绝对值 $|x|$ & 绝对值 \\ 
+\texttt{double ceil(double x)} & 向上取整 $\lceil x \rceil$ & 不小于 x 的最小整数 \\ 
+\texttt{double floor(double x)} & 向下取整 $\lfloor x \rfloor$ & 不大于 x 的最大整数 \\ 
+\texttt{double round(double x)} & 四舍五入 & 最接近的整数 \\ 
+\texttt{double fmod(double x, double y)} & 浮点取余 $x - n \cdot y$ & 余数 \\ \bottomrule
+\end{tabulary}
+\caption{math.h 常用数学函数}
+\label{tab:math_funcs}
+\end{table}
+
+\subsection{三角函数}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.6}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{函数原型} & \textbf{功能说明} & \textbf{返回值} \\ \midrule
+\texttt{double sin(double x)} & 正弦（x 为弧度） & $\sin x$ \\ 
+\texttt{double cos(double x)} & 余弦（x 为弧度） & $\cos x$ \\ 
+\texttt{double tan(double x)} & 正切（x 为弧度） & $\tan x$ \\ 
+\texttt{double asin(double x)} & 反正弦，定义域 $[-1, 1]$ & 弧度值 $[-\pi/2, \pi/2]$ \\ 
+\texttt{double acos(double x)} & 反余弦，定义域 $[-1, 1]$ & 弧度值 $[0, \pi]$ \\ 
+\texttt{double atan(double x)} & 反正切 & 弧度值 $(-\pi/2, \pi/2)$ \\ 
+\texttt{double atan2(double y, double x)} & 双参数反正切（判定象限） & 弧度值 $(-\pi, \pi]$ \\ \bottomrule
+\end{tabulary}
+\caption{math.h 三角函数}
+\label{tab:math_trig}
+\end{table}
+
+\subsection{双曲函数}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{函数原型} & \textbf{功能说明} & \textbf{返回值} \\ \midrule
+\texttt{double sinh(double x)} & 双曲正弦 $\frac{e^x - e^{-x}}{2}$ & 双曲正弦值 \\ 
+\texttt{double cosh(double x)} & 双曲余弦 $\frac{e^x + e^{-x}}{2}$ & 双曲余弦值 \\ 
+\texttt{double tanh(double x)} & 双曲正切 $\frac{\sinh x}{\cosh x}$ & 双曲正切值 \\ \bottomrule
+\end{tabulary}
+\caption{math.h 双曲函数}
+\label{tab:math_hyper}
+\end{table}
+
+\subsection{其他数学函数}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{函数原型} & \textbf{功能说明} & \textbf{返回值} \\ \midrule
+\texttt{double cbrt(double x)} & 立方根 $\sqrt[3]{x}$ (C99) & 立方根值 \\ 
+\texttt{double hypot(double x, double y)} & 计算 $\sqrt{x^2 + y^2}$（避免溢出） & 斜边长度 \\ 
+\texttt{double log2(double x)} & 以 2 为底的对数 (C99) & 对数值 \\ 
+\texttt{double trunc(double x)} & 截断小数部分 (C99) & 整数部分 \\ 
+\texttt{double fmax(double x, double y)} & 返回两数中的较大值 (C99) & 较大值 \\ 
+\texttt{double fmin(double x, double y)} & 返回两数中的较小值 (C99) & 较小值 \\ 
+\texttt{double fma(double x, double y, double z)} & 乘加运算 $x \times y + z$ (C99) & 单次舍入的乘加结果 \\ 
+\texttt{int isnan(double x)} & 判断是否为 NaN (C99) & 非零为真，零为假 \\ 
+\texttt{int isinf(double x)} & 判断是否为无穷大 (C99) & 非零为真，零为假 \\ 
+\texttt{int isfinite(double x)} & 判断是否为有限值 (C99) & 非零为真，零为假 \\ \bottomrule
+\end{tabulary}
+\caption{math.h 其他数学函数}
+\label{tab:math_other}
+\end{table}
+
+\vspace{0.5em}
+\noindent\textbf{常量}：\texttt{M\_PI}（$\pi \approx 3.14159$）、\texttt{M\_E}（$e \approx 2.71828$）。编译时需链接数学库：\texttt{gcc -lm}。
+
+\section{\texorpdfstring{\texttt{<ctype.h>} 字符分类与转换库}{<ctype.h> 字符分类与转换库}}
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.6}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{函数原型} & \textbf{功能说明} & \textbf{返回值} \\ \midrule
+\texttt{int isalpha(int c)} & 是否为字母（A-Z, a-z） & 非零为真，零为假 \\ 
+\texttt{int isdigit(int c)} & 是否为数字（0-9） & 非零为真，零为假 \\ 
+\texttt{int isalnum(int c)} & 是否为字母或数字 & 非零为真，零为假 \\ 
+\texttt{int isspace(int c)} & 是否为空白字符（空格、\textbackslash t、\textbackslash n 等） & 非零为真，零为假 \\ 
+\texttt{int isupper(int c)} & 是否为大写字母 & 非零为真，零为假 \\ 
+\texttt{int islower(int c)} & 是否为小写字母 & 非零为真，零为假 \\ 
+\texttt{int ispunct(int c)} & 是否为标点符号 & 非零为真，零为假 \\ 
+\texttt{int iscntrl(int c)} & 是否为控制字符 & 非零为真，零为假 \\ 
+\texttt{int isgraph(int c)} & 是否为图形字符（除空格外的可打印字符） & 非零为真，零为假 \\ 
+\texttt{int isxdigit(int c)} & 是否为十六进制数字（0-9, a-f, A-F） & 非零为真，零为假 \\ 
+\texttt{int isblank(int c)} & 是否为空白字符（空格或制表符，C99） & 非零为真，零为假 \\ 
+\texttt{int isprint(int c)} & 是否为可打印字符 & 非零为真，零为假 \\ 
+\texttt{int toupper(int c)} & 转为大写 & 大写字符 \\ 
+\texttt{int tolower(int c)} & 转为小写 & 小写字符 \\ \bottomrule
+\end{tabulary}
+\caption{ctype.h 字符分类与转换函数}
+\label{tab:ctype_funcs}
+\end{table}
+
+\section{\texorpdfstring{\texttt{<time.h>} 时间与日期库}{<time.h> 时间与日期库}}
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.6}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{函数原型} & \textbf{功能说明} & \textbf{返回值} \\ \midrule
+\texttt{time\_t time(time\_t* t)} & 获取当前日历时间（秒数） & 从 1970-01-01 起的秒数 \\ 
+\texttt{double difftime(time\_t t2, time\_t t1)} & 计算两个时间之差 & 秒数差值 \\ 
+\texttt{struct tm* localtime(const time\_t* t)} & 将时间戳转为本地时间结构体 & tm 结构体指针 \\ 
+\texttt{struct tm* gmtime(const time\_t* t)} & 将时间戳转为 UTC 时间结构体 & tm 结构体指针 \\ 
+\texttt{time\_t mktime(struct tm* tm)} & 将 tm 结构体转为时间戳 & time\_t 值 \\ 
+\texttt{char* asctime(const struct tm* tm)} & 将 tm 结构体转为可读字符串 & 字符串指针 \\ 
+\texttt{char* ctime(const time\_t* t)} & 将时间戳转为可读字符串 & 字符串指针 \\ 
+\texttt{size\_t strftime(char* s, size\_t max, const char* fmt, const struct tm* tm)} & 按格式将 tm 转为字符串 & 写入的字符数 \\ 
+\texttt{clock\_t clock(void)} & 获取程序运行至今的 CPU 时间 & clock\_t 值（除以 CLOCKS\_PER\_SEC 得秒） \\ \bottomrule
+\end{tabulary}
+\caption{time.h 时间与日期函数}
+\label{tab:time_funcs}
+\end{table}
+
+\begin{lstlisting}[caption={time.h 使用示例}]
+#include <stdio.h>
+#include <time.h>
+
+int main() {
+    time_t now = time(NULL);
+    struct tm* local = localtime(&now);
+    printf("当前时间: %d-%02d-%02d %02d:%02d:%02d\n",
+           local->tm_year + 1900, local->tm_mon + 1, local->tm_mday,
+           local->tm_hour, local->tm_min, local->tm_sec);
+    return 0;
+}
+\end{lstlisting}
+
+\vspace{0.5em}
+\noindent\textbf{结构体说明}：\texttt{struct timespec} 包含 \texttt{tv\_sec}（秒数）和 \texttt{tv\_nsec}（纳秒数），\\用于高精度时间表示（POSIX/C11）。
+
+\section{\texorpdfstring{\texttt{<complex.h>} 复数运算库 (C99)}{<complex.h> 复数运算库 (C99)}}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{宏/函数} & \textbf{功能说明} & \textbf{返回值} \\ \midrule
+\texttt{complex / \_Complex} & 复数类型关键字 & 支持 float/double/long double \\ 
+\texttt{I} & 虚数单位 $\sqrt{-1}$ & 复数常量 \\ 
+\texttt{double creal(double complex z)} & 获取复数的实部 & 实部值 \\ 
+\texttt{double cimag(double complex z)} & 获取复数的虚部 & 虚部值 \\ 
+\texttt{double cabs(double complex z)} & 计算复数的模 $|z|$ & 模值 \\ 
+\texttt{double carg(double complex z)} & 计算复数的辐角（相位） & 弧度值 $(-\pi, \pi]$ \\ 
+\texttt{double complex conj(double complex z)} & 计算复共轭 & 共轭复数 \\ 
+\texttt{double complex csqrt(double complex z)} & 复数平方根 & 平方根复数 \\ 
+\texttt{double complex cexp(double complex z)} & 复数指数 $e^z$ & 复数值 \\ 
+\texttt{double complex clog(double complex z)} & 复数自然对数 & 复数值 \\ 
+\texttt{double complex cpow(double complex x, double complex y)} & 复数幂运算 $x^y$ & 复数值 \\ \bottomrule
+\end{tabulary}
+\caption{complex.h 复数运算函数}
+\label{tab:complex}
+\end{table}
+
+\section{\texorpdfstring{\texttt{<tgmath.h>} 泛型数学宏库 (C99)}{<tgmath.h> 泛型数学宏库 (C99)}}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{泛型宏} & \textbf{功能说明} & \textbf{行为} \\ \midrule
+\texttt{sin(x), cos(x), tan(x)} & 根据参数类型自动选择 float/double/long double 版本 & 传入 float 调用 \texttt{sinf}，传入 double 调用 \texttt{sin} \\ 
+\texttt{sqrt(x), pow(x, y)} & 自动匹配数学函数变体 & 避免手动类型转换 \\ 
+\texttt{fabs(x), ceil(x), floor(x)} & 自动选择绝对值、取整函数 & 支持整型与浮点型参数 \\ 
+\texttt{atan2(y, x), hypot(x, y)} & 自动选择双参数函数版本 & 参数类型不同时提升为精度更高者 \\ \bottomrule
+\end{tabulary}
+\caption{tgmath.h 泛型数学宏}
+\label{tab:tgmath}
+\end{table}
+
+\section{\texorpdfstring{\texttt{<wchar.h>} 宽字符 I/O 库 (C95)}{<wchar.h> 宽字符 I/O 库 (C95)}}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{函数原型} & \textbf{功能说明} & \textbf{返回值} \\ \midrule
+\texttt{wint\_t fgetwc(FILE* fp)} & 从文件流读取一个宽字符 & 读取的宽字符（WEOF 表示结束） \\ 
+\texttt{wint\_t fputwc(wchar\_t wc, FILE* fp)} & 向文件流写入一个宽字符 & 写入的宽字符（WEOF 表示失败） \\ 
+\texttt{wchar\_t* fgetws(wchar\_t* s, int n, FILE* fp)} & 从文件流读取宽字符串 & s 指针（NULL 表示失败） \\ 
+\texttt{int fputws(const wchar\_t* s, FILE* fp)} & 向文件流写入宽字符串 & 非负值成功，EOF 失败 \\ 
+\texttt{wint\_t getwchar(void)} & 从 stdin 读取一个宽字符 & 读取的宽字符 \\ 
+\texttt{wint\_t putwchar(wchar\_t wc)} & 向 stdout 输出一个宽字符 & 输出的宽字符 \\ 
+\texttt{size\_t wcslen(const wchar\_t* s)} & 计算宽字符串长度 & 宽字符个数 \\ 
+\texttt{wchar\_t* wcscpy(wchar\_t* dst, const wchar\_t* src)} & 复制宽字符串 & dst 指针 \\ 
+\texttt{int wcscmp(const wchar\_t* s1, const wchar\_t* s2)} & 比较宽字符串 & $<0, =0, >0$ \\ 
+\texttt{wint\_t btowc(int c)} & 单字节字符转宽字符 & 宽字符值 \\ 
+\texttt{int wctob(wint\_t wc)} & 宽字符转单字节字符 & 单字节值（EOF 表示无法转换） \\ \bottomrule
+\end{tabulary}
+\caption{wchar.h 宽字符 I/O 与操作函数}
+\label{tab:wchar}
+\end{table}
+
+\section{\texorpdfstring{\texttt{<wctype.h>} 宽字符分类库 (C95)}{<wctype.h> 宽字符分类库 (C95)}}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{函数原型} & \textbf{功能说明} & \textbf{返回值} \\ \midrule
+\texttt{int iswalnum(wint\_t wc)} & 是否为宽字母或数字 & 非零为真，零为假 \\ 
+\texttt{int iswalpha(wint\_t wc)} & 是否为宽字母 & 非零为真，零为假 \\ 
+\texttt{int iswdigit(wint\_t wc)} & 是否为宽数字 & 非零为真，零为假 \\ 
+\texttt{int iswspace(wint\_t wc)} & 是否为宽空白字符 & 非零为真，零为假 \\ 
+\texttt{int iswlower(wint\_t wc)} & 是否为宽小写字母 & 非零为真，零为假 \\ 
+\texttt{int iswupper(wint\_t wc)} & 是否为宽大写字母 & 非零为真，零为假 \\ 
+\texttt{wint\_t towlower(wint\_t wc)} & 宽字符转小写 & 小写宽字符 \\ 
+\texttt{wint\_t towupper(wint\_t wc)} & 宽字符转大写 & 大写宽字符 \\ 
+\texttt{wctype\_t wctype(const char* property)} & 获取字符属性描述符 & 属性类型 \\ 
+\texttt{int iswctype(wint\_t wc, wctype\_t desc)} & 根据描述符检查宽字符属性 & 非零为真，零为假 \\ \bottomrule
+\end{tabulary}
+\caption{wctype.h 宽字符分类与转换函数}
+\label{tab:wctype}
+\end{table}

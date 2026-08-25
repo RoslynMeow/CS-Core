@@ -1,0 +1,93 @@
+
+\documentclass[12pt,a4paper]{ctexrep}
+\usepackage{amsmath,amssymb}
+\usepackage{fontspec}
+\xeCJKsetup{AutoFallBack = true}
+\setCJKfallbackfamilyfont\CJKrmdefault{Malgun Gothic}[Scale=MatchLowercase]
+\setCJKfallbackfamilyfont\CJKsfdefault{Malgun Gothic}[Scale=MatchLowercase]
+\setCJKfallbackfamilyfont\CJKttdefault{Malgun Gothic}[Scale=MatchLowercase]
+\usepackage[top=1.5cm,bottom=1.5cm,left=1cm,right=1cm,headheight=15pt]{geometry}
+\usepackage{pdflscape}
+
+
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{shapes.multipart, decorations.pathreplacing, arrows.meta, positioning, matrix, calc}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{tabulary}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{setspace}
+\usepackage{fancyhdr}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+\onehalfspacing
+\pagestyle{fancy}
+\fancyhf{}
+% \fancyhead[C]{数据结构}
+% \fancyfoot[C]{\small \thepage}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    citecolor=black,
+    urlcolor=blue
+}
+
+\title{\textbf{\huge 数据结构}}
+\author{}
+\date{}
+
+\begin{document}
+
+\clearpage
+\thispagestyle{empty}
+\vspace*{\fill}
+
+\begin{center}
+{\huge 数据结构}\\[0.8em]
+{\large Data Structures \& Algorithms}\\[2.5em]
+{\large MS Roslyn}\\[0.6em]
+{\large \today}
+\end{center}
+
+\vspace{2.5em}
+
+\begin{center}
+{\bfseries 摘要}
+\end{center}
+
+\vspace{1em}
+
+\begin{center}
+本教程系统介绍数据结构的核心概念与经典算法，涵盖位置记数系统、数据系统与物理存储、线性结构与抽象数据类型、树与二叉树、图论，以及算法定义与渐近分析、经典算法与核心运算，并通过不同算法的对比帮助读者理解时间与空间复杂度之间的权衡。教程将抽象数据类型与具体实现相结合，为程序设计提供坚实的数据组织基础。
+\end{center}
+
+\vspace*{\fill}
+\clearpage
+
+\tableofcontents
+\newpage
+
+\clearpage
+\input{Chapters/PositionalNumeralSystem}
+\clearpage
+\input{Chapters/DataSystemAndStorage}
+\clearpage
+\input{Chapters/LinearStructureAndADT}
+\clearpage
+\input{Chapters/TreeAndBinaryTree}
+\clearpage
+\input{Chapters/GraphTheory}
+\clearpage
+\input{Chapters/AlgorithmAnalysis}
+\clearpage
+\input{Chapters/ClassicAlgorithms}
+\clearpage
+\input{Chapters/AlgorithmComparison}
+
+\end{document}

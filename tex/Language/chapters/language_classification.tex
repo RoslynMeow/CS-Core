@@ -1,0 +1,219 @@
+﻿\section{语言的分类}
+
+\subsection{分类的两条路径}
+
+对人类语言进行分类，主要有两条互补的路径：
+\begin{itemize}
+    \item \textbf{谱系分类(Genetic classification)}: 依据语言的\emph{历史亲缘关系}，把有共同祖先的语言归入同一个语系。
+    \item \textbf{类型学分类(Typological classification)}: 依据语言的\emph{结构特征}，把语法特征相似的语言归为一类，不论它们是否有亲缘关系。
+\end{itemize}
+
+这两条路径回答了不同的问题：谱系分类回答"语言从哪里来"，类型学分类回答"语言是什么样"。它们互补：同语系的语言通常共享类型特征(如印欧语多属屈折语)，但类型上相似的语言可以分属不同语系(如汉语、越南语、泰语都是孤立语却分属不同语系)。
+
+\subsection{谱系分类}
+
+\subsubsection{比较法与同源词}
+
+谱系分类的基础是\emph{历史比较语言学}。通过比较不同语言中的同源词(cognates)，发现系统性的语音对应规律，可以证明它们同源并重建祖语。同源词的判定标准是"系统的语音对应"，而不是表面相似。例如英语 \emph{father}、德语 \emph{Vater}、拉丁语 \emph{pater}、梵语 \emph{pit\=r} 表面差异很大，但呈现出系统的对应(p-f-p-p)，由此证明同源。
+
+\begin{equation}
+    \text{Proto-Language} \xrightarrow{\text{分化}} \{L_1, L_2, \ldots, L_n\}
+\end{equation}
+
+\subsubsection{谱系树模型与波浪模型}
+
+谱系树模型(树状图)假设语言从一个祖语"树状"地分化。但语言接触会使分化后的语言重新趋同，因此历史语言学还提出了波浪模型(Wave Model)：语言变化像波浪一样从创新中心向四周扩散，相邻语言共享某些变化。现代计算语言学用系统发生树(Phylogenetic tree)方法，基于词汇、语音、语法数据自动重建语言家族树。
+
+\subsubsection{世界主要语系}
+
+\begin{table}[H]
+\centering
+\caption{世界主要语系(使用人口为约数)}
+\begin{tabulary}{\textwidth}{@{}CCC@{}}
+\toprule
+\textbf{语系} & \textbf{代表语言} & \textbf{使用人口(亿)} \\
+\midrule
+印欧语系 & 英语、西班牙语、印地语、俄语 & 32 \\
+汉藏语系 & 汉语、藏语、缅甸语 & 14 \\
+尼日尔-刚果语系 & 斯瓦希里语、约鲁巴语 & 7 \\
+亚非语系 & 阿拉伯语、希伯来语、豪萨语 & 5 \\
+南岛语系 & 马来语、他加禄语、马达加斯加语 & 3.8 \\
+达罗毗荼语系 & 泰米尔语、泰卢固语 & 2.5 \\
+突厥语系 & 土耳其语、哈萨克语、维吾尔语 & 2 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsubsection{语系的层次结构}
+
+语系的内部有层次结构，从大到小依次为：语系(Family)→ 语族(Subfamily)→ 语支(Branch)→ 语言(Language)→ 方言(Dialect)。以印欧语系为例：
+\begin{itemize}
+    \item \textbf{日耳曼语族}: 西日耳曼语支(英语、德语、荷兰语)、北日耳曼语支(瑞典语、挪威语、丹麦语)
+    \item \textbf{罗曼语族}: 法语、西班牙语、意大利语、葡萄牙语、罗马尼亚语
+    \item \textbf{斯拉夫语族}: 俄语、波兰语、捷克语、塞尔维亚语
+    \item \textbf{印度-伊朗语族}: 印地语、乌尔都语、波斯语、孟加拉语
+\end{itemize}
+
+值得注意的是，语言与方言的界限往往是社会政治的而非纯语言学的："一种语言就是拥有一支军队的方言"这一说法形象地说明了这一点。汉语的各个"方言"(如粤语、闽南语、吴语)彼此不能通话，差异程度堪比欧洲的不同语言，但因共享统一的文字与民族认同而被归为"汉语的方言"。
+
+\subsection{类型学分类:按词法类型}
+
+语言按构词方式可分为四大类型，这是最经典的类型学分类：
+
+\subsubsection{孤立语(Isolating)}
+
+孤立语中，词几乎没有形态变化，语法关系主要靠\emph{语序}和\emph{虚词}表达。词、语素、音节之间基本一一对应：
+\begin{equation}
+    \text{例: 汉语 "我吃饭"} \quad \text{每个字 = 一个语素 = 一个词}
+\end{equation}
+汉语、越南语、泰语、约鲁巴语都是典型的孤立语。孤立语没有"复数词缀""格词缀"这类屈折变化："我吃饭"和"他吃饭"中"吃"不因主语的人称而变形。
+
+\subsubsection{黏着语(Agglutinative)}
+
+黏着语的词干后逐个添加词缀，每个词缀只表达一种语法信息，词缀边界清晰，可以机械地堆叠：
+\begin{equation}
+    \text{例: 土耳其语 ev-ler-im-den} = \text{房子-复数-我的-从}
+\end{equation}
+\textit{ev-ler-im-den} 可以拆解为词干 \textit{ev}(房子)、复数词缀 \textit{-ler}、第一人称属有词缀 \textit{-im}(我的)、离格词缀 \textit{-den}(从)。每个词缀只有一个意义，边界一目了然。日语、韩语、土耳其语、斯瓦希里语、匈牙利语都是黏着语。
+
+\subsubsection{屈折语(Fusional)}
+
+屈折语中，一个词缀可能同时携带多种语法信息，词缀与意义之间是多对多的融合关系：
+\begin{equation}
+    \text{例: 拉丁语 amo} = \text{我爱(一个词尾 -o 同时表示第一人称、单数、现在时、陈述语气)}
+\end{equation}
+屈折语的形态与语序有"冗余"：拉丁语中 \textit{puella amat puerum}(女孩爱男孩)即使换语序也基本可解，因为格词尾标明了谁爱谁。俄语、德语、西班牙语、阿拉伯语、古典希腊语都是典型的屈折语。
+
+\subsubsection{多式综合语(Polysynthetic)}
+
+多式综合语(也称复综语)的一个动词词中可以包含主语、宾语、副词、时态等几乎所有成分，一个词就可以表达一个完整的句子：
+\begin{equation}
+    \text{例: 因纽特语 tusaatsiarunnanngittualuujunga} = \text{我听不太清}
+\end{equation}
+北美原住民语言(如莫霍克语)、西伯利亚的楚科奇语、澳大利亚的许多原住民语言都是多式综合语。
+
+\begin{table}[H]
+\centering
+\caption{形态类型对比}
+\begin{tabulary}{\textwidth}{@{}CCCCC@{}}
+\toprule
+\textbf{特征} & \textbf{孤立语} & \textbf{黏着语} & \textbf{屈折语} & \textbf{多式综合语} \\
+\midrule
+语素/词比 & 约1:1 & 高 & 中 & 极高 \\
+词缀边界 & 无词缀 & 清晰 & 融合 & 高度融合 \\
+代表语言 & 汉语、越南语 & 日语、土耳其语 & 德语、俄语 & 因纽特语、莫霍克语 \\
+语法手段 & 语序、虚词 & 词缀堆叠 & 词尾变化 & 词内整合 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+需要强调的是，这四类只是\emph{理想类型}。真实语言几乎都混合了多种类型：英语在形态上是孤立的(几乎没有格变化)，但保留了屈折遗迹(\emph{-s}复数、\emph{-ed}过去时、不规则动词 \emph{go/went})。因此类型学分类描述的是语言的\emph{主导倾向}，而不是非此即彼的标签。
+
+\subsection{类型学分类:按句法类型}
+
+\subsubsection{基本语序}
+
+按句中主语(S)、动词(V)、宾语(O)的相对顺序，世界语言可分为若干类型：
+
+\begin{table}[H]
+\centering
+\caption{基本语序类型及其分布(基于WALS数据库)}
+\begin{tabulary}{\textwidth}{@{}CCC@{}}
+\toprule
+\textbf{语序} & \textbf{比例} & \textbf{代表语言} \\
+\midrule
+SVO & 42\% & 英语、汉语、法语、俄语 \\
+SOV & 45\% & 日语、土耳其语、藏语、印地语 \\
+VSO & 9\% & 阿拉伯语、威尔士语、爱尔兰语 \\
+VOS & 3\% & 马尔加什语、菲吉语 \\
+OVS / OSV & $<1\%$ & 罕见(如希克斯卡亚纳语) \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+值得注意的是，SOV(主语-宾语-动词)和SVO(主语-动词-宾语)合计占87\%，而OVS/OSV几乎不存在。这不是巧合，而是反映了语言对人类最自然的信息组织方式(施事在前)。
+
+\subsubsection{类型学相关性:头参数}
+
+语序不是孤立的，它与介词类型、名词-形容词顺序等"打包"出现，形成类型学上的相关性(相关词序共性)。核心规律是\emph{中心词(head)参数}：
+\begin{itemize}
+    \item \textbf{中心词在前(Head-initial)}: 使用前置词(\textit{in the house})，SVO语序
+    \item \textbf{中心词在后(Head-final)}: 使用后置词(\textit{家の中} = 家之中)，SOV语序
+\end{itemize}
+
+\begin{equation}
+    \forall L: \text{Head-initial}(L) \leftrightarrow \text{Prep}(L)
+\end{equation}
+
+日语"家の中"(house-of-in)中，属格标记"の"位于名词之后，是典型的中心词在后(后置词)类型；英语 \textit{in the house} 则反之。汉语是少见的例外：基本语序为SVO(中心词在前)，却使用后置词式的结构("桌子上")，同时拥有前置词("在桌上")。这种"混合"说明类型学相关是统计规律而非铁律。
+
+\subsection{形式化类型学特征}
+
+语言类型学可以形式化地表述为\emph{语言共性}(Universals)。格林伯格(Greenberg)提出了大量蕴含式共性，可用一阶逻辑表示：
+
+\begin{equation}
+    \forall L \in \text{Languages}: \text{VSO}(L) \rightarrow \text{Prep}(L)
+\end{equation}
+
+格林伯格的经典共性包括：
+\begin{itemize}
+    \item 若语言以VSO为基本语序，则使用前置词(格林伯格共性3)
+    \item 若语言以SOV为基本语序，则几乎所有属格都位于名词之前
+    \item 若语言是主格-宾格语言，则宾语在动词之后或之前与语序相关
+\end{itemize}
+
+形式化的共性刻画允许我们定义类型空间：
+\begin{equation}
+    \text{语言类型} = \prod_{i} \{\text{特征 } F_i \text{ 的取值}\}
+\end{equation}
+每一种自然语言都可以表示成一组特征取值构成的"向量"，类型学的研究就是在该空间中寻找聚类与规律。
+
+\subsubsection{蕴含层级与标记性}
+
+格林伯格共性常常构成\emph{蕴含层级}(implicational hierarchy)。以格系统为例：
+\begin{equation}
+    \text{主格} \prec \text{宾格/通格} \prec \text{与格} \prec \text{属格} \prec \text{方位格} \prec \ldots
+\end{equation}
+层级意味着：一种语言若具有层级中靠后的格，则必然也具有其前面的所有格。这种蕴含关系与\emph{标记性}(markedness)理论一致：层级靠后的格是"有标记"(更特殊)的范畴。
+
+\subsection{语言接触与混合}
+
+\subsubsection{语言联盟(Sprachbund)}
+
+地理上相邻但无亲缘关系的语言，长期接触后会在结构上趋同，形成语言联盟。最著名的例子是\emph{巴尔干语言联盟}：保加利亚语、罗马尼亚语、阿尔巴尼亚语、马其顿语分属不同语族，却共享"后置定冠词""复合将来时""属格/与格合并"等特征。语言联盟可以形式化为：
+\begin{equation}
+    L_1, L_2 \xrightarrow{\text{长期接触}} \text{共享特征集合 } F
+\end{equation}
+
+汉语与周边语言的接触(如日语、朝鲜语、越南语借入大量汉语词汇，粤语、闽南语向东南亚语言传播)是语言接触影响类型面貌的又一例证。
+
+\subsubsection{皮钦语与克里奥尔语}
+
+\begin{itemize}
+    \item \textbf{皮钦语(Pidgin)}: 在没有共同语言的人群交流中产生的简化混合语，语法简单、词汇有限，\emph{没有母语者}。
+    \item \textbf{克里奥尔语(Creole)}: 皮钦语成为下一代儿童的母语后，语法迅速复杂化，形成完整的自然语言。
+\end{itemize}
+
+\begin{equation}
+    \text{Pidgin}(L_1, L_2) \xrightarrow{\text{母语化}} \text{Creole}
+\end{equation}
+
+克里奥尔语的形成过程是"语言的出生"，在语言学上意义重大：它证明人类儿童在输入极不充分的条件下(皮钦语语法高度简化)仍能生成出语法完整的语言——这成为刺激贫乏论与普遍语法的天然证据。海地克里奥尔语(以法语为基础)是有数百万使用者的克里奥尔语。
+
+\subsection{语言演化模型}
+
+语言的演化和生物进化类似，可以用数学模型刻画。语言特征的使用比例随世代变化，最简单的模型是逻辑斯蒂增长模型：
+\begin{equation}
+    \frac{dP}{dt} = \mu \cdot P \cdot (1 - P)
+\end{equation}
+其中 $P$ 是某语言特征的使用比例，$\mu$ 是变化速率参数。
+
+更完整的模型把语言变化看作\emph{复制者动态}(Replicator dynamics)：说话者学习语言时以一定概率复制母语者的特征，同时存在创新与选择压力。词汇替代率可以用斯瓦德什核心词表(Swadesh list)和词汇统计年代学(Glottochronology)来估计：
+\begin{equation}
+    t = \frac{\ln (c/C)}{\ln (\lambda)}
+\end{equation}
+其中 $c$ 是同源词保留比例，$C$ 是初始比例，$\lambda$ 是词汇保留率常数。现代计算类型学则直接用贝叶斯系统发生学方法，在语系树与时间尺度上同时估计音变、词变与类型演化的速率。
+
+\subsection{本章小结}
+
+语言分类的两条路径——谱系分类(历史亲缘)与类型学分类(结构特征)——分别从"源流"与"面貌"两个维度刻画语言。语系揭示语言的血缘关系，类型揭示语言的内部结构规律。类型学特征不是孤立的，而是以蕴含层级、中心词参数等方式相互关联。这些关联为最后一章"不同语言之间的差异"提供了系统的坐标：任何两种语言，都可以在语音、词法、句法、文字等维度上定位其差异。语言接触则提醒我们，语言不是封闭系统，"差异"本身也在不断演变。

@@ -1,0 +1,168 @@
+\chapter{存储类别与内存模型}
+
+\section{存储类别 (Storage Classes)}
+
+\begin{itemize}
+    \item \textbf{\texttt{auto}（自动）}：默认类别。变量进入作用域时创建，离开时自动销毁。
+    \item \textbf{\texttt{register}（寄存器）}：建议编译器将变量放入 CPU 寄存器以极大提升读取速度。限制为一个字长（如 4字节），且\textbf{无法对寄存器变量使用 \texttt{\&} 取地址符}。
+    \item \textbf{\texttt{static}（静态）}：具有隐藏和保持数据的作用。
+    \item \textbf{\texttt{extern}（外部声明）}：用于告诉编译器，该变量或函数的定义在别的文件中。
+\end{itemize}
+
+\section{内存四区模型}
+
+C程序运行时，操作系统将进程的虚拟地址空间划分为四个主要区域，每个区域承担不同的存储职责。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    zone/.style={draw, minimum width=5cm, minimum height=1.2cm, align=center, font=\small},
+    arrow/.style={->, >=latex, thick},
+    lbl/.style={font=\small}
+]
+    % 高地址
+    \node[lbl, anchor=west] at (3.5, 3.0) {$\uparrow$ 高地址};
+    
+    % 代码区
+    \node[zone, fill=green!15] (code) at (0, 2.2) {代码区 (Text)};
+    \node[lbl, anchor=west] at (3, 2.2) {存放编译后的机器指令，只读};
+    
+    % 全局/静态区
+    \node[zone, fill=yellow!20] (global) at (0, 0.8) {全局/静态区 (Data/BSS)};
+    \node[lbl, anchor=west] at (3, 0.8) {全局变量、static 变量};
+    
+    % 堆区
+    \node[zone, fill=orange!15] (heap) at (0, -0.6) {堆区 (Heap)};
+    \node[lbl, anchor=west] at (3, -0.6) {malloc/calloc/realloc 动态分配};
+    
+    % 增长箭头
+    \draw[arrow, blue, thick] (2.8, -0.2) -- node[lbl, right] {向上增长} (2.8, -1.2);
+    
+    % 栈区
+    \node[zone, fill=red!15] (stack) at (0, -2.0) {栈区 (Stack)};
+    \node[lbl, anchor=west] at (3, -2.0) {局部变量、函数调用帧};
+    
+    % 增长箭头
+    \draw[arrow, blue, thick] (2.8, -1.6) -- node[lbl, right] {向下增长} (2.8, -2.6);
+    
+    % 低地址
+    \node[lbl, anchor=west] at (3.5, -3.0) {$\downarrow$ 低地址};
+\end{tikzpicture}
+\caption{C程序运行时内存四区布局}
+\label{fig:memory_zones}
+\end{figure}
+
+\begin{enumerate}
+    \item \textbf{代码区 (Text Segment)}：存放编译后的机器指令。该区域在物理上被标记为只读，任何尝试修改代码区内容的操作都会触发段错误（Segmentation Fault）。
+    \item \textbf{全局/静态区 (Data/BSS Segment)}：
+    \begin{itemize}
+        \item \textbf{Data 段}：存放已初始化的全局变量和静态变量。
+        \item \textbf{BSS 段}：存放未初始化或初始化为 0 的全局变量和静态变量，程序加载时由系统自动清零。
+    \end{itemize}
+    \item \textbf{堆区 (Heap)}：由程序员通过 \texttt{malloc}、\texttt{calloc}、\texttt{realloc} 手动申请和 \texttt{free} 手动释放。堆区向高地址方向增长。若只申请不释放，将导致内存泄漏。
+    \item \textbf{栈区 (Stack)}：由编译器自动管理。函数调用时在栈上压入栈帧（Stack Frame），包含局部变量、参数和返回地址。函数返回时栈帧自动弹出。栈区向低地址方向增长。栈空间有限（通常几 MB），递归过深会导致栈溢出。
+\end{enumerate}
+
+\section{\texorpdfstring{\texttt{static} 关键字的"双重人格"}{static 关键字的双重人格}}
+
+\texttt{static} 在 C语言中修饰局部变量和修饰全局变量/函数时的作用完全不同：
+
+\begin{enumerate}
+    \item \textbf{修饰局部变量（延长生命周期）}：函数调用结束后，该变量不会被销毁，其值会保留供下一次调用使用。它被存储在静态存储区（而非栈区），只在初次运行时初始化一次。
+    \item \textbf{修饰全局变量/函数（隐藏可见性）}：限制该全局变量或函数只能在当前 \texttt{.c} 文件内部被访问，其他文件即使使用 \texttt{extern} 也无法引用它，从而避免了跨文件命名的冲突。
+\end{enumerate}
+
+\begin{lstlisting}[caption={static 修饰局部变量}]
+void counter() {
+    static int count = 0;  // 仅首次调用时初始化为 0
+    count++;
+    printf("%d ", count);
+}
+
+int main() {
+    counter(); // 输出 1
+    counter(); // 输出 2
+    counter(); // 输出 3
+    return 0;
+}
+\end{lstlisting}
+
+\section{类型导出定义 (typedef)}
+
+\begin{itemize}
+    \item \textbf{作用}：为已有数据类型定义一个新的易读别名。
+\end{itemize}
+
+\begin{lstlisting}[caption={typedef 使用示例}]
+typedef unsigned char byte; // 将 unsigned char 取别名为 byte
+byte b1, b2;               // 声明变量，等价于 unsigned char b1, b2;
+\end{lstlisting}
+
+\section{位域 (Bit Fields)}
+
+允许在结构体中以"位（Bit）"为单位分配内存，常用于底层寄存器配置或网络协议解析：
+
+\begin{lstlisting}[caption={位域示例}]
+struct Register {
+    unsigned int low_bit  : 1;  // 仅占 1 位
+    unsigned int mid_bits : 3;  // 占用 3 位
+};
+\end{lstlisting}
+
+\section{共用体 (Union)}
+
+所有成员共享同一块内存，总大小等于其最大成员的大小。
+
+\subsection{利用 \texttt{union} 检测系统大端序和小端序 (Endianness)}
+
+大端序指高位字节存放在低地址，小端序指低位字节存放在低地址。我们可以用一段精简的共用体代码轻松检测当前计算机架构：
+
+\begin{lstlisting}[caption={端序检测示例}]
+#include <stdio.h>
+union EndianCheck {
+    int i;
+    char c;
+};
+
+int main() {
+    union EndianCheck ec;
+    ec.i = 1; // 十六进制为 0x00000001
+    
+    // 如果 c == 1，说明低地址存储的是低位数据（0x01），为小端序（大部分现代 PC 架构）
+    if (ec.c == 1) {
+        printf("当前系统为：小端序 (Little Endian)\n");
+    } else {
+        printf("当前系统为：大端序 (Big Endian)\n");
+    }
+    return 0;
+}
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    box/.style={draw, minimum width=1.2cm, minimum height=0.6cm, font=\ttfamily\small, align=center},
+    lbl/.style={font=\small},
+    arrow/.style={->, >=latex, thick}
+]
+    % 小端序
+    \node[lbl] at (0, 1.5) {小端序 (Little Endian)};
+    \node[box] (le0) at (-2, 0.8) {0x01};
+    \node[box] (le1) at (-0.7, 0.8) {0x00};
+    \node[box] (le2) at (0.6, 0.8) {0x00};
+    \node[box] (le3) at (1.9, 0.8) {0x00};
+    \node[lbl] at (-2, 0.2) {低地址};
+    \node[lbl] at (1.9, 0.2) {高地址};
+    
+    % 大端序
+    \node[lbl] at (0, -0.8) {大端序 (Big Endian)};
+    \node[box] (be0) at (-2, -1.5) {0x00};
+    \node[box] (be1) at (-0.7, -1.5) {0x00};
+    \node[box] (be2) at (0.6, -1.5) {0x00};
+    \node[box] (be3) at (1.9, -1.5) {0x01};
+    \node[lbl] at (-2, -2.1) {低地址};
+    \node[lbl] at (1.9, -2.1) {高地址};
+\end{tikzpicture}
+\caption{大端序与小端序的内存字节排列对比}
+\label{fig:endianness}
+\end{figure}

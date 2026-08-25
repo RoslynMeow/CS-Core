@@ -1,0 +1,29 @@
+\chapter{C语言简介}
+
+\section{诞生背景}
+
+\begin{itemize}
+    \item \textbf{编程范式}：面向过程的（Procedure-Oriented）编程语言。
+    \item \textbf{创始人}：丹尼斯·里奇（Dennis Ritchie）。
+    \item \textbf{诞生地点}：美国贝尔实验室（Bell Laboratories）。
+    \item \textbf{诞生时间}：1972年。
+\end{itemize}
+
+\section{标准与编译器}
+
+\begin{itemize}
+    \item \textbf{ANSI C}：由美国国家标准学会（ANSI）制定的 C语言标准，是经典的国际标准。
+    \item \textbf{GNU C / gcc}：GNU 计划发展的 C语言扩展标准及其配套的编译器（GCC）。
+    \item \textbf{VC}：微软开发的 Visual C++ 编译器（常用于 Windows 平台）。
+\end{itemize}
+
+\section{C语言的编译四步骤详解}
+
+在 VS Code 中运行 C 程序时，从点击运行到生成 \texttt{.exe}，编译器在底层默默执行了四个步骤：
+
+\begin{enumerate}
+    \item \textbf{预处理 (Preprocessing)}：处理所有以 \texttt{\#} 开头的指令。展开头文件、替换宏定义、删除注释。生成 \texttt{.i} 文件。
+    \item \textbf{编译 (Compilation)}：将预处理后的文本文件翻译成汇编语言。生成 \texttt{.s} 文件。
+    \item \textbf{汇编 (Assembly)}：将汇编语言翻译成机器能够识别的二进制机器指令。生成 \texttt{.o} 或 \texttt{.obj} 目标文件。
+    \item \textbf{链接 (Linking)}：将多个目标文件以及系统库文件打包合并，最终生成可在操作系统上运行的可执行文件（\texttt{.exe} 或 \texttt{.out}）。
+\end{enumerate}

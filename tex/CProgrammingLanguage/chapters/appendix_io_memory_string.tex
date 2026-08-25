@@ -1,0 +1,312 @@
+\chapter{C标准库函数速查手册 (I/O、内存与字符串)}
+
+本章汇总 C语言标准库中最常用的输入输出、内存管理与字符串处理函数。
+
+\section{C标准库头文件总览}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CC}
+\toprule
+\textbf{头文件} & \textbf{主要功能} \\ \midrule
+\texttt{<stdio.h>} & 标准输入输出、文件操作、格式化 I/O \\ 
+\texttt{<stdlib.h>} & 内存管理、数值转换、随机数、程序控制、排序查找 \\ 
+\texttt{<string.h>} & 字符串操作、内存操作 \\ 
+\texttt{<math.h>} & 数学函数（三角、指数、对数、取整等） \\ 
+\texttt{<ctype.h>} & 字符分类与大小写转换 \\ 
+\texttt{<time.h>} & 时间与日期处理 \\ 
+\texttt{<assert.h>} & 运行时断言调试 \\ 
+\texttt{<errno.h>} & 错误码定义 \\ 
+\texttt{<stdarg.h>} & 可变参数处理 \\ 
+\texttt{<limits.h>} & 整型类型取值范围常量 \\ 
+\texttt{<float.h>} & 浮点型精度与范围常量 \\ 
+\texttt{<stddef.h>} & 常用类型定义（size\_t, ptrdiff\_t, NULL 等） \\ 
+\texttt{<setjmp.h>} & 非局部跳转（setjmp/longjmp） \\ 
+\texttt{<signal.h>} & 信号处理 \\ 
+\texttt{<locale.h>} & 本地化设置 \\ 
+\texttt{<stdbool.h>} & 布尔类型支持（C99） \\ 
+\texttt{<inttypes.h>} & 固定宽度整型与格式化宏（C99） \\ 
+\texttt{<stdint.h>} & 精确宽度整型与极限值（C99） \\ 
+\texttt{<complex.h>} & 复数运算支持（C99） \\ 
+\texttt{<tgmath.h>} & 泛型数学宏（C99） \\ 
+\texttt{<wchar.h>} & 宽字符 I/O 与操作（C95） \\ 
+\texttt{<wctype.h>} & 宽字符分类与转换（C95） \\ 
+\texttt{<fenv.h>} & 浮点环境控制（C99） \\ 
+\texttt{<iso646.h>} & 替代拼写宏（C95） \\ \bottomrule
+\end{tabulary}
+\caption{C标准库头文件一览}
+\label{tab:stdlib_overview}
+\end{table}
+
+\section{\texorpdfstring{\texttt{<stdio.h>} 标准输入输出库}{<stdio.h> 标准输入输出库}}
+
+\subsection{格式化输入输出}
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.6}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{函数原型} & \textbf{功能说明} & \textbf{返回值} \\ \midrule
+\texttt{int printf(const char* fmt, ...)} & 格式化输出到 stdout & 成功输出的字符数 \\ 
+\texttt{int scanf(const char* fmt, ...)} & 从 stdin 格式化输入 & 成功赋值的参数个数 \\ 
+\texttt{int fprintf(FILE* fp, const char* fmt, ...)} & 格式化输出到文件 & 成功输出的字符数 \\ 
+\texttt{int fscanf(FILE* fp, const char* fmt, ...)} & 从文件格式化输入 & 成功赋值的参数个数 \\ 
+\texttt{int sprintf(char* buf, const char* fmt, ...)} & 格式化输出到字符串缓冲区 & 写入的字符数（不含 \textbackslash 0） \\ 
+\texttt{int snprintf(char* buf, size\_t n, const char* fmt, ...)} & 安全版 sprintf，限制最大写入 n 字节 & 应写入的字符数 \\ 
+\texttt{int sscanf(const char* str, const char* fmt, ...)} & 从字符串格式化输入 & 成功赋值的参数个数 \\ \bottomrule
+\end{tabulary}
+\caption{stdio.h 格式化输入输出函数}
+\label{tab:stdio_format}
+\end{table}
+
+\subsection{字符与字符串 I/O}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.6}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{函数原型} & \textbf{功能说明} & \textbf{返回值} \\ \midrule
+\texttt{int getchar(void)} & 从 stdin 读取一个字符 & 读取的字符（EOF 表示结束） \\ 
+\texttt{int putchar(int c)} & 向 stdout 输出一个字符 & 输出的字符（EOF 表示失败） \\ 
+\texttt{int fgetc(FILE* fp)} & 从文件流读取一个字符 & 读取的字符（EOF 表示结束） \\ 
+\texttt{int fputc(int c, FILE* fp)} & 向文件流写入一个字符 & 写入的字符（EOF 表示失败） \\ 
+\texttt{char* fgets(char* s, int n, FILE* fp)} & 从文件流读取最多 n-1 个字符 & s 指针（NULL 表示失败/结束） \\ 
+\texttt{int fputs(const char* s, FILE* fp)} & 向文件流写入字符串（不含 \textbackslash 0） & 非负值成功，EOF 失败 \\ 
+\texttt{char* gets(char* s)} & \textbf{已废弃}：从 stdin 读取一行，无长度限制 & s 指针（\textbf{存在缓冲区溢出风险}） \\ \bottomrule
+\end{tabulary}
+\caption{stdio.h 字符与字符串 I/O 函数}
+\label{tab:stdio_char}
+\end{table}
+
+\subsection{文件操作}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{函数原型} & \textbf{功能说明} & \textbf{返回值} \\ \midrule
+\texttt{FILE* fopen(const char* path, const char* mode)} & 以指定模式打开文件 & FILE 指针（NULL 表示失败） \\ 
+\texttt{int fclose(FILE* fp)} & 关闭文件并刷新缓冲区 & 0 成功，EOF 失败 \\ 
+\texttt{size\_t fread(void* ptr, size\_t sz, size\_t n, FILE* fp)} & 从文件读取 n 个大小为 sz 的数据块 & 实际读取的块数 \\ 
+\texttt{size\_t fwrite(const void* ptr, size\_t sz, size\_t n, FILE* fp)} & 向文件写入 n 个大小为 sz 的数据块 & 实际写入的块数 \\ 
+\texttt{int fseek(FILE* fp, long off, int whence)} & 移动文件位置指针 & 0 成功，非零失败 \\ 
+\texttt{long ftell(FILE* fp)} & 获取当前文件位置偏移量 & 偏移量（-1L 表示失败） \\ 
+\texttt{void rewind(FILE* fp)} & 将文件位置指针重置到开头 & 无 \\ 
+\texttt{int feof(FILE* fp)} & 检测是否到达文件末尾 & 非零表示已到末尾 \\ 
+\texttt{int ferror(FILE* fp)} & 检测文件流是否发生错误 & 非零表示有错误 \\ 
+\texttt{int remove(const char* path)} & 删除指定文件 & 0 成功，非零失败 \\ 
+\texttt{int rename(const char* old, const char* new)} & 重命名文件 & 0 成功，非零失败 \\ 
+\texttt{void clearerr(FILE* fp)} & 清除文件流的错误和 EOF 标志 & 无 \\ 
+\texttt{void setbuf(FILE* fp, char* buf)} & 设置文件流的缓冲区 & 无 \\ 
+\texttt{int fflush(FILE* fp)} & 刷新输出缓冲区，将数据写入文件 & 0 成功，EOF 失败 \\ \bottomrule
+\end{tabulary}
+\caption{stdio.h 文件操作函数}
+\label{tab:stdio_file}
+\end{table}
+
+\subsection{其他 I/O 与错误处理}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{函数原型} & \textbf{功能说明} & \textbf{返回值} \\ \midrule
+\texttt{int ungetc(int c, FILE* fp)} & 将字符 c 推回流中 & 推入的字符（EOF 表示失败） \\ 
+\texttt{void perror(const char* msg)} & 将错误信息输出到 stderr & 格式为 \texttt{msg: strerror(errno)} \\ 
+\texttt{int setvbuf(FILE* fp, char* buf, int mode, size\_t size)} & 设置流的缓冲模式与缓冲区 & 0 成功，非零失败 \\ 
+\texttt{FILE* tmpfile(void)} & 创建临时二进制文件（关闭自动删除） & FILE 指针（NULL 表示失败） \\ 
+\texttt{char* tmpnam(char* s)} & 生成唯一的临时文件名 & 指向文件名的指针 \\ \bottomrule
+\end{tabulary}
+\caption{stdio.h 其他 I/O 与错误处理函数}
+\label{tab:stdio_other}
+\end{table}
+
+\section{\texorpdfstring{\texttt{<stdlib.h>} 标准通用工具库}{<stdlib.h> 标准通用工具库}}
+
+\subsection{内存管理}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.6}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{函数原型} & \textbf{功能说明} & \textbf{返回值} \\ \midrule
+\texttt{void* malloc(size\_t size)} & 分配 size 字节的未初始化内存 & 指向分配内存的指针（NULL 失败） \\ 
+\texttt{void* calloc(size\_t n, size\_t sz)} & 分配 n*sz 字节并初始化为 0 & 指向分配内存的指针（NULL 失败） \\ 
+\texttt{void* realloc(void* ptr, size\_t sz)} & 重新调整已分配内存的大小 & 新指针（NULL 失败，原内存不变） \\ 
+\texttt{void free(void* ptr)} & 释放之前分配的内存 & 无 \\ \bottomrule
+\end{tabulary}
+\caption{stdlib.h 内存管理函数}
+\label{tab:stdlib_mem}
+\end{table}
+
+\subsection{数值转换}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.6}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{函数原型} & \textbf{功能说明} & \textbf{返回值} \\ \midrule
+\texttt{int atoi(const char* str)} & 字符串转 int & 转换后的整数值 \\ 
+\texttt{long atol(const char* str)} & 字符串转 long & 转换后的长整数值 \\ 
+\texttt{long long atoll(const char* str)} & 字符串转 long long & 转换后的 long long 值 \\ 
+\texttt{double atof(const char* str)} & 字符串转 double & 转换后的浮点值 \\ 
+\texttt{long strtol(const char* s, char** end, int base)} & 字符串转 long，支持指定进制 & 转换结果，end 指向首个无效字符 \\ 
+\texttt{double strtod(const char* s, char** end)} & 字符串转 double & 转换结果，end 指向首个无效字符 \\ \bottomrule
+\end{tabulary}
+\caption{stdlib.h 数值转换函数}
+\label{tab:stdlib_conv}
+\end{table}
+
+\subsection{绝对值与除法}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{函数原型} & \textbf{功能说明} & \textbf{返回值} \\ \midrule
+\texttt{int abs(int n)} & 计算整数的绝对值 & 绝对值 \\ 
+\texttt{long labs(long n)} & 计算 long 的绝对值 & 绝对值 \\ 
+\texttt{long long llabs(long long n)} & 计算 long long 的绝对值 (C99) & 绝对值 \\ 
+\texttt{div\_t div(int num, int den)} & 整数除法（返回商和余数） & \texttt{div\_t} 结构体 \{quot, rem\} \\ 
+\texttt{ldiv\_t ldiv(long num, long den)} & long 整数除法 & \texttt{ldiv\_t} 结构体 \\ \bottomrule
+\end{tabulary}
+\caption{stdlib.h 绝对值与除法函数}
+\label{tab:stdlib_math}
+\end{table}
+
+\subsection{随机数与程序控制}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.6}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{函数原型} & \textbf{功能说明} & \textbf{返回值} \\ \midrule
+\texttt{int rand(void)} & 生成 $[0, \text{RAND\_MAX}]$ 范围内的伪随机数 & 随机整数值 \\ 
+\texttt{void srand(unsigned int seed)} & 设置随机数种子 & 无 \\ 
+\texttt{void exit(int status)} & 立即终止程序，刷新并关闭所有流 & 不返回 \\ 
+\texttt{void abort(void)} & 异常终止程序，生成 SIGABRT 信号 & 不返回 \\ 
+\texttt{int atexit(void (*func)(void))} & 注册程序正常终止时调用的函数 & 0 成功，非零失败 \\ 
+\texttt{int system(const char* cmd)} & 执行系统命令 & 命令返回值 \\ \bottomrule
+\end{tabulary}
+\caption{stdlib.h 随机数与程序控制函数}
+\label{tab:stdlib_ctrl}
+\end{table}
+
+\subsection{查找与排序}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.6}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{函数原型} & \textbf{功能说明} & \textbf{返回值} \\ \midrule
+\texttt{void qsort(void* base, size\_t n, size\_t sz, int (*cmp)(const void*, const void*))} & 对数组进行快速排序 & 无（原地排序） \\ 
+\texttt{void* bsearch(const void* key, const void* base, size\_t n, size\_t sz, int (*cmp)(const void*, const void*))} & 在已排序数组中二分查找 & 指向匹配元素的指针（NULL 未找到） \\ \bottomrule
+\end{tabulary}
+\caption{stdlib.h 查找与排序函数}
+\label{tab:stdlib_search}
+\end{table}
+
+\subsection{多字节与宽字符转换}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{函数原型} & \textbf{功能说明} & \textbf{返回值} \\ \midrule
+\texttt{int mblen(const char* s, size\_t n)} & 获取多字节字符的字节数 & 字节数（-1 表示无效） \\ 
+\texttt{int mbtowc(wchar\_t* wc, const char* s, size\_t n)} & 多字节字符转宽字符 & 字节数 \\ 
+\texttt{int wctomb(char* s, wchar\_t wc)} & 宽字符转多字节字符 & 字节数 \\ 
+\texttt{size\_t mbstowcs(wchar\_t* dest, const char* src, size\_t n)} & 多字节字符串转宽字符串 & 转换的宽字符数 \\ 
+\texttt{size\_t wcstombs(char* dest, const wchar\_t* src, size\_t n)} & 宽字符串转多字节字符串 & 转换的字节数 \\ \bottomrule
+\end{tabulary}
+\caption{stdlib.h 多字节与宽字符转换函数}
+\label{tab:stdlib_mb}
+\end{table}
+
+\section{\texorpdfstring{\texttt{<string.h>} 字符串处理库}{<string.h> 字符串处理库}}
+
+\subsection{字符串操作}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.6}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{函数原型} & \textbf{功能说明} & \textbf{返回值} \\ \midrule
+\texttt{size\_t strlen(const char* s)} & 计算字符串长度（不含 \textbackslash 0） & 字符个数 \\ 
+\texttt{char* strcpy(char* dst, const char* src)} & 复制字符串（含 \textbackslash 0） & dst 指针 \\ 
+\texttt{char* strncpy(char* dst, const char* src, size\_t n)} & 最多复制 n 个字符 & dst 指针 \\ 
+\texttt{char* strcat(char* dst, const char* src)} & 拼接字符串到 dst 末尾 & dst 指针 \\ 
+\texttt{char* strncat(char* dst, const char* src, size\_t n)} & 最多拼接 n 个字符 & dst 指针 \\ 
+\texttt{int strcmp(const char* s1, const char* s2)} & 字典序比较两个字符串 & $<0$ s1小，$=0$ 相等，$>0$ s1大 \\ 
+\texttt{int strncmp(const char* s1, const char* s2, size\_t n)} & 最多比较前 n 个字符 & 同上 \\ 
+\texttt{char* strchr(const char* s, int c)} & 查找字符 c 首次出现的位置 & 指向该位置的指针（NULL 未找到） \\ 
+\texttt{char* strrchr(const char* s, int c)} & 查找字符 c 最后一次出现的位置 & 指向该位置的指针（NULL 未找到） \\ 
+\texttt{char* strstr(const char* haystack, const char* needle)} & 查找子串首次出现的位置 & 指向子串起始位置的指针（NULL 未找到） \\ 
+\texttt{char* strtok(char* str, const char* delim)} & 按分隔符拆分字符串（内部维护状态） & 下一个 token 指针（NULL 表示结束） \\ 
+\texttt{char* strdup(const char* s)} & 复制字符串（内部调用 malloc） & 新分配的字符串指针 \\ \bottomrule
+\end{tabulary}
+\caption{string.h 字符串操作函数}
+\label{tab:string_ops}
+\end{table}
+
+\subsection{内存操作}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.6}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{函数原型} & \textbf{功能说明} & \textbf{返回值} \\ \midrule
+\texttt{void* memcpy(void* dst, const void* src, size\_t n)} & 复制 n 字节（\textbf{不可重叠}） & dst 指针 \\ 
+\texttt{void* memmove(void* dst, const void* src, size\_t n)} & 复制 n 字节（\textbf{可安全重叠}） & dst 指针 \\ 
+\texttt{void* memset(void* ptr, int val, size\_t n)} & 将前 n 字节设置为 val & ptr 指针 \\ 
+\texttt{int memcmp(const void* s1, const void* s2, size\_t n)} & 比较前 n 个字节 & $<0, =0, >0$ \\ 
+\texttt{void* memchr(const void* s, int c, size\_t n)} & 在前 n 字节中查找值 c & 指向该位置的指针（NULL 未找到） \\ \bottomrule
+\end{tabulary}
+\caption{string.h 内存操作函数}
+\label{tab:string_mem}
+\end{table}
+
+\subsection{其他字符串操作}
+
+\begin{table}[H]
+\centering
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\linewidth}{CCC}
+\toprule
+\textbf{函数原型} & \textbf{功能说明} & \textbf{返回值} \\ \midrule
+\texttt{char* strerror(int errnum)} & 获取错误码对应的错误描述字符串 & 指向错误信息的指针 \\ 
+\texttt{size\_t strspn(const char* s, const char* accept)} & 计算 s 开头完全由 accept 中字符组成的长度 & 匹配的字符数 \\ 
+\texttt{size\_t strcspn(const char* s, const char* reject)} & 计算 s 开头不包含 reject 中字符的长度 & 匹配的字符数 \\ 
+\texttt{char* strpbrk(const char* s, const char* accept)} & 查找 s 中首次出现 accept 中任意字符的位置 & 指向该位置的指针（NULL 未找到） \\ 
+\texttt{int strcoll(const char* s1, const char* s2)} & 根据当前 locale 比较字符串 & $<0, =0, >0$ \\ 
+\texttt{size\_t strxfrm(char* dst, const char* src, size\_t n)} & 将字符串转换为 locale 相关的比较格式 & 转换后的长度 \\ \bottomrule
+\end{tabulary}
+\caption{string.h 其他字符串操作函数}
+\label{tab:string_other}
+\end{table}

@@ -1,0 +1,88 @@
+% ============================================================
+% 标准首页模板：标题 + 副标题 + 作者 + 日期 + 摘要，垂直居中
+% 目录单独一页。复制本文件到新项目并替换标记处的文字即可。
+%
+% 约定(新建章节/文档时遵守)：
+%   1. 章节引入统一用 \input{...}，不要用 \include{...}。
+%      \input 直接平铺进主文件。注意:一旦出现 \include，
+%      LaTeX 会为每个被包含文件单独生成 *.aux（交叉引用/书签，
+%      却没有主文书签逻辑,管理混乱）。
+%   2. 三线表一律 tabulary 全 C 列(见 main.tex 对应章节)，
+%      不用手动 l/p/X 列。
+%   3. 摘要不要用 abstract 环境！report/book(ctexrep/ctexbook)
+%      强制 titlepage=true，会使摘要独立成页。请用下面
+%      center 居中块替代。
+%   4. 韩文/其它 CJK 区字体回退：SimSun 无谚文字形，若正文含
+%      韩文等字符,启用下面 fontspec 的 fallback 配置，否则
+%      输出空白并报 Missing character 警告。
+%   5. IPA 音标用 \ipa{}，西里尔/阿拉伯/韩文等用 \cyr{}
+%      （统一用 Segoe UI 字体，见下方定义）。\textsc 已重定
+%      义为正体小大写，避免缺 scit 字体警告。
+% ============================================================
+
+\documentclass[12pt,a4paper]{ctexart}
+\usepackage{amsmath,amssymb,amsfonts,amsthm,mathtools,stmaryrd}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{tikz}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tabulary}
+\usepackage{fontspec}
+
+% ---- 字体兜底(韩文/Durig等 CJK 字符，避免 SimSun 缺字 ----
+\xeCJKsetup{AutoFallBack = true}
+\setCJKfallbackfamilyfont\CJKrmdefault{Malgun Gothic}[Scale=MatchLowercase]
+\setCJKfallbackfamilyfont\CJKsfdefault{Malgun Gothic}[Scale=MatchLowercase]
+\setCJKfallbackfamilyfont\CJKttdefault{Malgun Gothic}[Scale=MatchLowercase]
+
+\newfontfamily\ipafont{Segoe UI}[Scale=MatchLowercase]
+\newcommand{\ipa}[1]{\text{\ipafont #1}}
+\newfontfamily\cyrfont{Segoe UI}[Scale=MatchLowercase]
+\newcommand{\cyr}[1]{\text{\cyrfont #1}}
+\renewcommand{\textsc}[1]{{\upshape\scshape #1}}
+
+\geometry{left=2.5cm,right=2.5cm,top=3cm,bottom=3cm}
+
+\title{\huge 这里是主标题\\ \large 这里是副标题}
+\author{作者名}
+\date{\today}
+
+\begin{document}
+
+\clearpage
+\vspace*{\fill}
+
+\begin{center}
+{\huge 这里是主标题}\\[0.8em]
+{\large 这里是副标题}\\[2.5em]
+{\large 作者名}\\[0.6em]
+{\large \today}
+\end{center}
+
+\vspace{2.5em}
+
+\begin{center}
+{\bfseries 摘要}
+\end{center}
+
+\vspace{1em}
+
+\begin{center}
+这里是摘要内容。简介本教程/文档的主题、涵盖范围与目标读者。
+\end{center}
+
+\vspace*{\fill}
+\clearpage
+
+\tableofcontents
+\clearpage
+
+\input{chapters/chapter1}
+\newpage
+\input{chapters/chapter2}
+
+\end{document}

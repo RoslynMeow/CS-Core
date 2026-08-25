@@ -1,0 +1,99 @@
+﻿\section{处理器：控制器}
+
+\subsection{控制器的功能}
+
+控制器（Control Unit）是 CPU 的"大脑"——根据当前指令的操作码和状态标志，生成所有数据通路组件的控制信号。
+
+\begin{equation}
+\text{控制信号} = f(\text{opcode}, \text{funct}, \text{状态标志})
+\end{equation}
+
+\subsection{控制信号定义}
+
+每种指令类型需要的控制信号组合：
+
+\begin{table}[H]
+\centering
+\caption{MIPS 主要控制信号}
+\label{tab:control_signals}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+\textbf{信号} & \textbf{作用} & \textbf{受影响的指令} \\
+\midrule
+RegDst & 选择写回目标寄存器（rt / rd） & R-type $\to$ 1, I-type $\to$ 0 \\
+RegWrite & 写使能寄存器堆 & R-type, lw \\
+ALUSrc & ALU 第二个操作数来源（寄存器/立即数） & R-type $\to$ 0, I-type $\to$ 1 \\
+MemRead & 读数据存储器 & lw \\
+MemWrite & 写数据存储器 & sw \\
+MemtoReg & 写回数据来源（ALU/存储器） & R-type $\to$ 0, lw $\to$ 1 \\
+Branch & 条件分支使能 & beq \\
+ALUOp & ALU 操作选择 & 00=加, 01=减, 10=funct码决定 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{ALU 控制}
+
+ALU 控制接收 ALUOp（来自主控制器）和 funct 字段（仅 R 型），产生 ALU 操作选择。
+
+\begin{table}[H]
+\centering
+\caption{ALU 操作编码}
+\label{tab:alu_control}
+\begin{tabulary}{\textwidth}{CCCC}
+\toprule
+\textbf{ALUOp} & \textbf{funct} & \textbf{ALU 操作} & \textbf{指令} \\
+\midrule
+00 & — & 加 & lw, sw \\
+01 & — & 减 & beq \\
+10 & 100000 & 加 & add \\
+10 & 100010 & 减 & sub \\
+10 & 100100 & 与 & and \\
+10 & 100101 & 或 & or \\
+10 & 101010 & 小于置位 & slt \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{控制器实现方式}
+
+\subsubsection{硬布线控制器（Hardwired Control）}
+
+直接用组合逻辑门实现控制信号的真值表。速度快，但灵活性差——修改指令集需重新设计电路。常用于 RISC 架构。
+
+\begin{equation}
+\text{各控制信号} = \text{布尔函数（opcode, funct, 状态）}
+\end{equation}
+
+\subsubsection{微程序控制器（Microprogrammed Control）}
+
+将每条机器指令分解为若干条"微指令"序列，存于控制存储器（ROM）中。每步微指令产生一组控制信号。
+
+\begin{itemize}
+    \item \textbf{优点}：灵活、易于修改、支持复杂指令
+    \item \textbf{缺点}：速度较慢（需从控制存储器读取微指令）
+    \item \textbf{适用}：CISC 架构（如 x86）
+\end{itemize}
+
+\subsection{单周期 vs 多周期 CPU}
+
+单周期 CPU 所有指令在一个周期内完成。多周期 CPU 每条指令划分为多个阶段，每阶段占用不同周期，不同指令可用不同周期数。
+
+\begin{table}[H]
+\centering
+\caption{单周期与多周期对比}
+\label{tab:single_vs_multi}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+\textbf{特征} & \textbf{单周期} & \textbf{多周期} \\
+\midrule
+CPI & 1 & 3–5（视指令而定） \\
+时钟周期 & 由最慢指令决定 & 由最慢阶段决定 \\
+硬件重复 & 有（多个加法器等） & 少（组件可复用） \\
+性能 & 差 & 好于单周期 \\
+复杂度 & 低 & 中 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+多周期 CPU 是单周期到流水线的中间过渡设计：组件复用、不同指令不同周期，但仍有功能单元闲置问题。

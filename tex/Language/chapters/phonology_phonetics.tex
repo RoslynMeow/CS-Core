@@ -1,0 +1,255 @@
+﻿\section{音系学与语音学}
+
+\subsection{语音学 vs 音系学}
+
+\begin{itemize}
+    \item \textbf{语音学(Phonetics)}: 研究语音的物理与生理属性(发音、声学、感知)，处理的是\emph{连续的声音}
+    \item \textbf{音系学(Phonology)}: 研究语音在特定语言系统中的功能和模式，处理的是\emph{离散的单位}(音位)
+\end{itemize}
+
+语音学回答"声音是什么"(物理现实)，音系学回答"声音在一个语言中起什么作用"(系统功能)。同一物理声音在不同语言中可能有不同地位：送气塞音 [p\textsuperscript{h}] 在英语中是 /p/ 的音位变体(不区分意义)，在印地语中却与 /p/ 对立(区分意义)。这是跨语言差异的起点——\emph{每种语言从语音的连续空间中选取自己的离散系统}。
+
+\subsection{国际音标(IPA)}
+
+IPA提供语音的标准化符号系统，一个符号对应一个音位/音素，避免"拼写与发音不一致"的问题(英语拼写 world 中有 o 但发音没有)。
+
+\begin{table}[H]
+\centering
+\caption{辅音示例}
+\begin{tabulary}{\textwidth}{@{}CCCC@{}}
+\toprule
+\textbf{IPA} & \textbf{描述} & \textbf{例词} & \textbf{特征} \\
+\midrule
+/p/ & 清双唇塞音 & pat & [-voice, +bilabial, +stop] \\
+/b/ & 浊双唇塞音 & bat & [+voice, +bilabial, +stop] \\
+/t/ & 清齿龈塞音 & top & [-voice, +alveolar, +stop] \\
+/k/ & 清软腭塞音 & cat & [-voice, +velar, +stop] \\
+/s/ & 清齿龈擦音 & sit & [-voice, +alveolar, +fricative] \\
+/m/ & 双唇鼻音 & mat & [+voice, +bilabial, +nasal] \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsubsection{元音系统}
+
+元音按舌位(高/低、前/后)和圆唇度定位。英语有12-15个元音，日语只有5个(/a i u e o/)，这是跨语言音位库存差异的典型。汉语普通话约有6个元音音位(连同声调形成声调音位)。
+
+\subsection{区别特征}
+
+音位可用二元特征矩阵表示，这就是\emph{区别特征理论}(雅柯布森/乔姆斯基-哈雷SPE)。特征把语音描述为"开关"的组合：
+\begin{equation}
+    \text{/p/} = 
+    \begin{bmatrix}
+    +\text{consonantal} \\
+    -\text{sonorant} \\
+    -\text{voice} \\
+    +\text{bilabial} \\
+    -\text{continuant}
+    \end{bmatrix}
+\end{equation}
+
+区别特征的价值：
+\begin{itemize}
+    \item 用最少的特征区分一种语言的全部音位(分类的简约性)
+    \item 自然类(Natural class)：共享特征集的音位在规则中表现一致
+    \item 解释规则：音系规则写在一组特征上而非单个音位上
+\end{itemize}
+
+\begin{example}
+英语复数规则的三种变体(/s/ /z/ /\ipa{ɪ}z/)正是由[-voice]、[+sibilant]等特征类决定的(见形态学一章)。规则"清辅音后读清音"实际上是特征[voice]的语音同化。
+\end{example}
+
+\subsection{音系规则}
+
+\subsubsection{SPE规则格式}
+
+音系规则的标准格式(源自《音系学模式》SPE)：
+\begin{equation}
+    A \rightarrow B \ / \ C \ \_ \ D
+\end{equation}
+读作：A在C和D之间变为B。其中 $C \_ D$ 是触发环境。
+
+\subsubsection{英语复数规则}
+
+\begin{equation}
+    \begin{aligned}
+    &\text{规则1: } \emptyset \rightarrow [\ipa{ɪ}z] \ / \ [\text{+sibilant}] \ \_ \\
+    &\text{规则2: } [z] \rightarrow [s] \ / \ [\text{-voice}] \ \_ \\
+    &\text{规则3: } \emptyset \rightarrow [z] \ / \ \text{elsewhere}
+    \end{aligned}
+\end{equation}
+
+应用顺序(规则有序性)：
+\begin{equation}
+    \begin{aligned}
+    &\text{/b\ipa{ʌ}s/ + Pl} \xrightarrow{R1} \text{b\ipa{ʌ}s\ipa{ɪ}z} \quad \text{(buses)} \\
+    &\text{/k\ipa{æ}t/ + Pl} \xrightarrow{R3} \text{k\ipa{æ}ts} \quad \text{(cats)} \\
+    &\text{/d\ipa{ɒ}\ipa{ɡ}/ + Pl} \xrightarrow{R3} \text{d\ipa{ɒ}\ipa{ɡ}z} \quad \text{(dogs)}
+    \end{aligned}
+\end{equation}
+
+注意复数语素的深层形式统一取 /z/(浊音)，规则2在清辅音后把/z/清化为/s/。这种"底层形式 + 规则推导"的思路是生成音系学的核心：\emph{底层形式}存储于词库，\emph{表层形式}是规则应用的输出。
+
+\subsection{音位与音位变体}
+
+\begin{definition}[音位]
+音位(Phoneme)是能区分意义的最小语音单位。两个音若出现在相同的环境中且能区分意义，就是不同的音位(最小对立体测试)。
+\end{definition}
+
+\begin{equation}
+    \text{/p/ vs /b/} \Rightarrow \text{pat vs bat} \quad \text{(最小对立体)}
+\end{equation}
+
+\begin{definition}[音位变体]
+音位变体(Allophone)是音位的条件变体，不区分意义，其分布由语音环境决定。
+\end{definition}
+
+\begin{equation}
+    \text{/p/} \rightarrow 
+    \begin{cases}
+        [p^h] & \text{词首 (pin)} \\
+        [p] & \text{/s/后 (spin)}
+    \end{cases}
+\end{equation}
+
+英语中 [p\textsuperscript{h}] 和 [p] 属于同一个音位 /p/(互补分布)，说英语的人甚至察觉不到区别。而泰语、印地语中 [p\textsuperscript{h}] 和 [p] 是不同音位。\emph{音位对立/变体分布}正是跨语言音系差异的集中体现：
+\begin{itemize}
+    \item 英语：送气与不送气不对立(同一音位)
+    \item 印地语、泰语、汉语吴语：送气与不送气对立(不同音位)
+\end{itemize}
+
+\subsection{音节结构}
+
+音节组织规则因语言而异。音节结构：
+\begin{equation}
+    \text{音节} = \text{Onset} + \text{Rhyme}
+\end{equation}
+\begin{equation}
+    \text{Rhyme} = \text{Nucleus} + \text{Coda}
+\end{equation}
+
+\begin{forest}
+for tree={s sep=8mm, l sep=8mm}
+[$\sigma$
+    [Onset
+        [/p/]
+    ]
+    [Rhyme
+        [Nucleus
+            [/\ipa{ɪ}/]
+        ]
+        [Coda
+            [/n/]
+        ]
+    ]
+]
+\end{forest}
+
+\subsubsection{音节模板的跨语言差异}
+
+\begin{itemize}
+    \item 汉语普通话：音节结构非常受限，最大为(C)V(N)或(C)V(\ipa{ŋ})，没有辅音丛
+    \item 日语：最大为(C)(y)V(N/Q)，N是拨音、Q是促音，禁止辅音丛
+    \item 英语：允许复杂辅音丛，如 \emph{strengths} /str\ipa{e}\ipa{ŋ}\ipa{θ}s/ 有连续辅音
+    \item 波兰语：允许极复杂的辅音丛，如 \emph{bezwzględy}(无情的)
+\end{itemize}
+
+这些差异决定了"听感"和"拼读"上的巨大区别：日本人学英语会在辅音丛中插入元音(eskuriputo)，中国人把英语音节套进普通话模板。音系学的目标之一就是精确刻画每种语言的音节模板。
+
+\subsection{声调与重音}
+
+\subsubsection{声调语言}
+
+声调(音高模式)在声调语言中区分词义。汉语普通话四声：
+\begin{equation}
+    \begin{aligned}
+    &\text{妈 } \ipa{mā} \ [55] \quad \text{高平} \\
+    &\text{麻 } \ipa{má} \ [35] \quad \text{高升} \\
+    &\text{马 } \ipa{mǎ} \ [214] \quad \text{降升} \\
+    &\text{骂 } \ipa{mà} \ [51] \quad \text{全降}
+    \end{aligned}
+\end{equation}
+
+声调语言在世界上相当常见：汉藏语系、东南亚语言(泰语5个声调、越南语6个声调)、撒哈拉以南非洲的很多语言(约鲁巴语用声调区分词义)，都是声调语言。普通话四声可以用五度制([55]、[35]、[214]、[51])精确表示——这是\emph{调值}的离散编码。
+
+\subsubsection{重音语言}
+
+重音(响度/音高/时长的强调)在重音语言中起组织作用。重音可以是：
+\begin{itemize}
+    \item \textbf{固定重音}: 重音位置由规则固定(如波兰语几乎总是倒数第二音节)
+    \item \textbf{自由重音}: 重音位置区分词义(如俄语 \cyr{м\'ука面粉 vs мук\'а痛苦})
+    \item \textbf{音高重音}: 每个词只有一个高音调(日语、瑞典语)
+\end{itemize}
+
+英语名词重音规则(简化)：
+\begin{equation}
+    \text{重音落在倒数第三个音节，若倒数第二音节为重音节}
+\end{equation}
+
+\subsubsection{日语是声调还是重音语言?}
+
+日语属于\emph{音高重音}(pitch accent)语言：每个词最多一个高调峰，单词之间通过调峰位置区分：\textit{はし}(chopsticks，头高型) vs \textit{はし}(bridge，尾高型)。这是介于声调语言与重音语言之间的类型，也是跨语言音系差异的极好案例。
+
+\subsection{韵律与语调}
+
+\begin{itemize}
+    \item \textbf{音节/节拍等时性}: 英语是重音计时(stress-timed)，汉语、日语是音节/莫拉计时(syllable-timed / mora-timed)
+    \item \textbf{语调(Intonation)}: 句子的整体音高曲线表达语气(陈述降调、疑问升调)。语调在所有语言中都存在，但功能有别：汉语中语调与字调叠加
+\end{itemize}
+
+\begin{equation}
+    \text{普通话: 字调(词内) + 语调(句内) 叠加，语调只改变音高基线}
+\end{equation}
+
+\subsection{优选论(Optimality Theory)}
+
+\subsubsection{OT框架}
+
+优选论(Prince \& Smolensky, 1993)用\emph{约束排序 + 并行评估}取代串行规则：
+\begin{definition}[OT框架]
+OT由以下三部分组成：
+\begin{itemize}
+    \item GEN: 生成候选输出集合(所有可能的表层形式)
+    \item CON: 普遍约束集合(标记性约束、忠实性约束)
+    \item EVAL: 根据约束排序评估候选，选出违反最少(违反最高层级约束最少)的候选
+\end{itemize}
+\end{definition}
+
+\begin{equation}
+    \text{最优输出} = \arg\min_{c \in \text{GEN}} \sum_{i} w_i \cdot \text{Violations}(c, C_i)
+\end{equation}
+
+\subsubsection{约束的类型}
+
+\begin{itemize}
+    \item \textbf{标记性约束(Markedness)}: 禁制复杂/难发音的结构(如 \textsc{No-Coda} 禁止音节尾辅音、\textsc{Onset} 要求音节有起音)
+    \item \textbf{忠实性约束(Faithfulness)}: 要求输出与输入一致(如 \textsc{Max} 禁止删音、\textsc{Dep} 禁止插音)
+\end{itemize}
+
+语言差异在OT中表现为\emph{约束排序的不同}：每种语言是普遍约束集合的一种排序。
+
+\begin{example}
+英语允许音节尾辅音(\emph{cat})，因为忠实性约束 \textsc{Max} 排序高于标记性约束 \textsc{No-Coda}；而部分语言(如某些波利尼西亚语)禁止音节尾辅音，是因为 \textsc{No-Coda} 排序更高。同一个普遍约束集合，不同的排序 = 不同的语言音系。这为"跨语言差异的形式化"提供了最优雅的范例：\emph{差异 = 参数(排序)选择}。
+\end{example}
+
+\subsubsection{OT与跨语言差异}
+
+OT的意义在于把语言差异归约为\emph{排序}：假定所有语言共享同一个约束集合(普遍语法)，不同语言只是对约束的相对优先级排列不同。这与原则与参数理论(语法参数的二进制取值)异曲同工，共同体现了"普遍原则 + 参数化差异"的跨语言比较纲领。
+
+\subsection{语音变化与历时音系学}
+
+\subsubsection{常见的音变}
+
+\begin{itemize}
+    \item \textbf{同化(Assimilation)}: 音素变得与邻近音相似(英语复数清浊同化)
+    \item \textbf{元音大转移}: 英语15-17世纪的元音系统性移位(现代英语拼写与发音不一致的原因)
+    \item \textbf{音位化/去音位化}: 音位变体分裂为新音位，或音位对合并
+\end{itemize}
+
+\subsubsection{汉语语音史}
+
+中古汉语到现代普通话发生了系统的辅音、元音、声调演变，音韵学用等韵图精确记录了这种演变。汉语的声调正是从早期无声调、经过声母清浊消失而"补偿"产生的。
+
+\subsection{本章小结}
+
+语音学测量声音，音系学组织声音。区别特征、音系规则、音位与音位变体、音节模板、声调与重音、优选论共同构成了研究"语音如何系统化"的完整工具箱。跨语言在音系上的差异极为显著且容易感知：音位库存、送气对立、音节结构、声调有无，都让不同语言"听起来"截然不同。而优选论等理论告诉我们：这些差异仍然来自共享原则的参数化排列。下一章进入计算语言学，看看语言知识如何变成可计算的系统。

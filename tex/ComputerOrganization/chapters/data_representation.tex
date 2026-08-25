@@ -1,0 +1,132 @@
+﻿\section{数据表示与运算}
+
+\subsection{数制与编码}
+
+计算机中所有信息都以二进制（0/1）存储。本章讨论如何用二进制表示整数、浮点数、字符。
+
+\begin{table}[H]
+\centering
+\caption{常用数制对比}
+\label{tab:number_systems}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+\textbf{进制} & \textbf{基数} & \textbf{数字符号} \\
+\midrule
+二进制（Binary） & 2 & 0, 1 \\
+八进制（Octal） & 8 & 0–7 \\
+十进制（Decimal） & 10 & 0–9 \\
+十六进制（Hex） & 16 & 0–9, A–F \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{equation}
+(N)_r = \sum_{i=-m}^{n-1} d_i \cdot r^i
+\end{equation}
+
+\subsection{整数表示}
+
+\subsubsection{无符号整数}
+
+\begin{equation}
+U(X) = \sum_{i=0}^{n-1} x_i \cdot 2^i, \quad \text{范围: } [0, 2^n - 1]
+\end{equation}
+
+\subsubsection{原码（Sign-Magnitude）}
+
+最高位为符号位（0 正 / 1 负），其余位表示绝对值。存在 $+0$（0000）和 $-0$（1000）两个零。
+
+\subsubsection{补码（Two's Complement）}
+
+现代计算机统一采用补码表示有符号整数——优势是加减法统一，不存在双零。
+
+\begin{definition}[补码]
+$n$ 位有符号整数 $X$ 的补码值为：
+\[
+T(X) = -x_{n-1} \cdot 2^{n-1} + \sum_{i=0}^{n-2} x_i \cdot 2^i
+\]
+范围：$[-2^{n-1}, 2^{n-1}-1]$（如 8 位为 $[-128, 127]$）。
+\end{definition}
+
+\begin{example}[补码转换]
+8 位补码 \texttt{1000 0001} 的值：
+\[
+-1 \cdot 2^7 + 1 \cdot 2^0 = -128 + 1 = -127
+\]
+取反加一法（快速转换）：原码 $\to$ 逐位取反 $\to$ 末位加一。
+\end{example}
+
+\subsubsection{移码（Biased Notation）}
+
+用于浮点数阶码。$E_{\text{biased}} = E + \text{Bias}$，单精度 Bias = 127，双精度 Bias = 1023。
+
+\subsection{整数运算}
+
+\subsubsection{加法器}
+
+\[
+\text{全加器: } S = A \oplus B \oplus C_{\text{in}}, \quad C_{\text{out}} = AB + (A \oplus B)C_{\text{in}}
+\]
+
+行波进位加法器（Ripple Carry Adder）：$n$ 个全加器串联，延迟 $O(n)$。超前进位加法器（Carry Lookahead Adder）：并行计算进位，延迟 $O(\log n)$。
+
+\subsubsection{溢出检测}
+
+\begin{itemize}
+    \item 同号相加得异号 $\to$ 溢出
+    \item 补码：$A_{n-1}=B_{n-1}=0$ 且 $S_{n-1}=1$；或 $A_{n-1}=B_{n-1}=1$ 且 $S_{n-1}=0$
+    \item 硬件判断：$O = C_n \oplus C_{n-1}$
+\end{itemize}
+
+\subsection{浮点数表示：IEEE 754}
+
+\begin{definition}[IEEE 754 单精度浮点数]
+32 位：1 位符号 $S$ + 8 位移码阶码 $E$ + 23 位尾数 $M$（隐含 1）：
+\[
+(-1)^S \times (1.M) \times 2^{E - 127}
+\]
+\end{definition}
+
+\begin{table}[H]
+\centering
+\caption{IEEE 754 格式参数}
+\label{tab:ieee754}
+\begin{tabulary}{\textwidth}{CCCC}
+\toprule
+\textbf{精度} & \textbf{总位数} & \textbf{阶码位} & \textbf{尾数位} \\
+\midrule
+单精度（float） & 32 & 8 & 23 \\
+双精度（double） & 64 & 11 & 52 \\
+扩展双精度 & 80 & 15 & 64 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{itemize}
+    \item 规格化数：$E \neq 0$ 且 $E \neq 255$，尾数隐含 1
+    \item 非规格化数（denormal）：$E = 0$，尾数隐含 0，用于表示极小数
+    \item 无穷大：$E = 255$，$M = 0$
+    \item NaN：$E = 255$，$M \neq 0$
+\end{itemize}
+
+\begin{equation}
+\text{舍入模式: 向偶数舍入（Round to Nearest Even）}
+\end{equation}
+
+\subsection{浮点运算}
+
+\begin{equation}
+\begin{aligned}
+\text{加法: } & \text{对阶} \rightarrow \text{尾数相加} \rightarrow \text{规格化} \rightarrow \text{舍入} \\
+\text{乘法: } & \text{阶码相加} \times \text{尾数相乘} \rightarrow \text{规格化} \rightarrow \text{舍入}
+\end{aligned}
+\end{equation}
+
+\subsection{字符编码}
+
+\begin{itemize}
+    \item \textbf{ASCII}：7 位（0–127），扩展 ASCII 为 8 位
+    \item \textbf{Unicode}：统一的全球字符集
+    \item \textbf{UTF-8}：变长编码，ASCII 兼容（1–4 字节），互联网标准
+    \item \textbf{GBK / GB 2312}：中文编码标准
+\end{itemize}

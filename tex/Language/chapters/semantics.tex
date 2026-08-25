@@ -1,0 +1,245 @@
+﻿\section{语义学}
+
+\subsection{语义学概述}
+
+语义学(Semantics)研究语言单位——词、短语、句子——的意义。形式语义学的基本信念是：\emph{意义可以用数学对象刻画}，句子的意义可以用真值条件(在什么条件下为真)来把握。
+
+\begin{equation}
+    \text{知道一个句子的意义} = \text{知道它在什么条件下为真}
+\end{equation}
+
+语义学与语用学(Pragmatics)的分界：语义学研究"句子说了什么"(不依赖语境的字面意义)，语用学研究"说话人想表达什么"(依赖语境的含义)。例如"你能把盐递过来吗"字面意义是疑问，语用意义是请求。
+
+\subsection{词义关系}
+
+\subsubsection{基本关系}
+
+\begin{itemize}
+    \item \textbf{同义(Synonymy)}: 意义相同或几乎相同，big $\approx$ large
+    \item \textbf{反义(Antonymy)}: 意义相反。分互补反义(hot/cold 非此即彼式不严格)与程度反义，还有方向反义(buy/sell)
+    \item \textbf{上下义(Hyponymy)}: 从属关系，dog $\subset$ animal，dog是animal的下义词
+    \item \textbf{整体部分(Meronymy)}: 部分-整体关系，wheel $\subset$ car
+    \item \textbf{多义(Polysemy)}: 一词多义且意义相关，bank(银行/河岸)
+    \item \textbf{同音(Homophony)}: 发音相同意义无关，flower/flour
+\end{itemize}
+
+这些关系可以形式化为集合之间的包含、相交、矛盾关系：
+\begin{equation}
+    \llbracket \text{dog} \rrbracket \subseteq \llbracket \text{animal} \rrbracket \quad (\text{上下义=集合包含})
+\end{equation}
+
+\subsection{形式语义学}
+
+\subsubsection{模型论语义}
+
+\begin{definition}[模型]
+模型 $M = \langle D, I \rangle$
+\begin{itemize}
+    \item $D$: 论域(Domain of discourse)——语境中的实体集合
+    \item $I$: 解释函数(Interpretation function)——把专名映射到实体、把谓词映射到性质(集合)
+\end{itemize}
+\end{definition}
+
+\begin{example}
+模型 $M$: $D = \{ \text{猫1, 猫2, 狗1} \}$，$I(\text{cat}) = \{ \text{猫1, 猫2} \}$，$I(\text{Fluffy}) = \text{猫1}$。于是"Fluffy is a cat"在$M$中为真，因为 $I(\text{Fluffy}) \in I(\text{cat})$。
+\end{example}
+
+\subsubsection{真值条件语义}
+
+句子意义的真值条件定义：
+\begin{equation}
+    \llbracket \phi \rrbracket^M = 
+    \begin{cases}
+        1 & \text{若 } \phi \text{ 在模型 } M \text{ 中为真} \\
+        0 & \text{若 } \phi \text{ 在模型 } M \text{ 中为假}
+    \end{cases}
+\end{equation}
+
+\begin{example}
+\begin{align*}
+    \llbracket \text{Snow is white} \rrbracket &= 1 \quad \text{当且仅当雪是白的} \\
+    \llbracket \text{Cats are dogs} \rrbracket &= 0
+\end{align*}
+\end{example}
+
+\subsubsection{谓词逻辑翻译}
+
+句子翻译为一阶逻辑公式，谓词的语义即论域的子集：
+\begin{equation}
+    \llbracket \text{cat}(x) \rrbracket^M = 1 \iff I(x) \in I(\text{cat}) \subseteq D
+\end{equation}
+
+\begin{example}
+\begin{equation}
+    \text{"Every dog barks"} \Longrightarrow \forall x[\text{dog}(x) \rightarrow \text{bark}(x)]
+\end{equation}
+\end{example}
+
+\subsection{Lambda演算与组合语义}
+
+\subsubsection{Lambda演算基础}
+
+\begin{equation}
+    \begin{aligned}
+    &\text{项: } M, N ::= x \mid \lambda x.M \mid (M \ N) \\
+    &\beta\text{-归约: } (\lambda x.M)(N) \rightarrow M[x := N]
+    \end{aligned}
+\end{equation}
+
+$\beta$-归约是计算规则：把函数应用到参数，用参数替换函数体内的绑定变量。这为语义组合提供了机械的计算手段。
+
+\subsubsection{词项语义}
+
+\begin{equation}
+    \begin{aligned}
+    \llbracket \text{cat} \rrbracket &= \lambda x.\text{cat}(x) \\
+    \llbracket \text{sleep} \rrbracket &= \lambda x.\text{sleep}(x) \\
+    \llbracket \text{love} \rrbracket &= \lambda y.\lambda x.\text{love}(x,y)
+    \end{aligned}
+\end{equation}
+
+注意及物动词 love 是"先取宾语再取主语"的柯里化函数。语义类型与句法范畴严格对应：$N$ 对应个体($e$)，$S$ 对应真值($t$)，$NP/N$ 对应函数类型等——这就是\emph{类型-句法同构}(对应CCG的范畴系统)。
+
+\subsubsection{组合示例}
+
+"The cat sleeps":
+\begin{equation}
+    \begin{aligned}
+    \llbracket \text{the} \rrbracket &= \lambda P.\iota x.P(x) \quad (\iota \text{ 是唯一性算子}) \\
+    \llbracket \text{cat} \rrbracket &= \lambda x.\text{cat}(x) \\
+    \llbracket \text{the cat} \rrbracket &= \iota x.\text{cat}(x) \\
+    \llbracket \text{sleeps} \rrbracket &= \lambda x.\text{sleep}(x) \\
+    \llbracket \text{The cat sleeps} \rrbracket &= \text{sleep}(\iota x.\text{cat}(x))
+    \end{aligned}
+\end{equation}
+
+整个推导完全由句法结构(树)驱动：每个成分的意义是子成分意义按组合规则的机械应用。这是弗雷格组合原则(Compositionality)的形式实现：\emph{整体意义是部分意义+组合方式的函数}。
+
+\subsection{量词语义}
+
+\subsubsection{广义量词}
+
+普通名词短语如 "every dog" 不能简单地翻译为个体，需要广义量词理论。量词是"名词谓词与动词短语谓词之间关系的函数"：
+\begin{equation}
+    \begin{aligned}
+    \llbracket \text{every} \rrbracket &= \lambda P.\lambda Q.\forall x[P(x) \rightarrow Q(x)] \\
+    \llbracket \text{some} \rrbracket &= \lambda P.\lambda Q.\exists x[P(x) \land Q(x)] \\
+    \llbracket \text{no} \rrbracket &= \lambda P.\lambda Q.\neg\exists x[P(x) \land Q(x)] \\
+    \llbracket \text{most} \rrbracket &= \lambda P.\lambda Q.|P \cap Q| > |P \setminus Q|
+    \end{aligned}
+\end{equation}
+
+广义量词是"集合之间的关系"，因此可以统一地表示 "most dogs" 这种一阶逻辑难以直接表达的量词。
+
+\subsubsection{量词作用域}
+
+量词之间的相对顺序产生不同的解读，导致歧义：
+\begin{equation}
+    \begin{aligned}
+    &\text{Every student read a book} \\
+    &\text{解读1 (每一>存在): } \forall x[\text{student}(x) \rightarrow \exists y[\text{book}(y) \land \text{read}(x,y)]] \\
+    &\text{解读2 (存在>每一): } \exists y[\text{book}(y) \land \forall x[\text{student}(x) \rightarrow \text{read}(x,y)]]
+    \end{aligned}
+\end{equation}
+
+解读1:"每个学生读了一本书(可能是不同的书)"；解读2:"有一本书，每个学生都读了它(同一本书)"。形式语义学用作用域(scope)解释这种歧义，量词作作用域越广(越靠左的算子)，辖域越大。
+
+\subsection{内涵语义}
+
+\subsubsection{可能世界语义}
+
+外延语义无法处理"相信""可能"等内涵语境。可能世界语义学(Kripke, 1963)引入可能世界的概念：
+\begin{equation}
+    \llbracket \phi \rrbracket^{M,w,g} \in \{0, 1\}
+\end{equation}
+其中 $w$ 是可能世界，$g$ 是赋值函数。
+
+\subsubsection{模态算子}
+
+\begin{equation}
+    \begin{aligned}
+    \llbracket \Box \phi \rrbracket^{M,w} &= 1 \text{ 当且仅当 } \forall w' \in R(w): \llbracket \phi \rrbracket^{M,w'} = 1 \\
+    \llbracket \Diamond \phi \rrbracket^{M,w} &= 1 \text{ 当且仅当 } \exists w' \in R(w): \llbracket \phi \rrbracket^{M,w'} = 1
+    \end{aligned}
+\end{equation}
+
+$\Box$(必然)要求 $\phi$ 在所有可达世界中为真，$\Diamond$(可能)要求 $\phi$ 在某个可达世界中为真。可达关系 $R$ 可以取不同的性质(自反、传递等)，对应不同的模态逻辑系统(T、S4、S5等)。
+
+\subsubsection{命题态度}
+
+\begin{equation}
+    \text{"John believes that p"} = \text{John与命题 } \lambda w.\llbracket p \rrbracket^w \text{ 处于"相信"关系}
+\end{equation}
+内涵语境(相信、希望、知道)中的从句指涉的不是真值而是命题(从世界到真值的函数)。这解释了为什么 "John believes that the morning star is the evening star" 中两个名称不能随便互换——它们的外延相同(金星)但内涵(命题角色)不同。
+
+\subsection{时间与体态语义}
+
+\subsubsection{时态与时间论域}
+
+时态把时间引入语义。用时间参数化的模型：
+\begin{equation}
+    \llbracket \text{walked} \rrbracket^{M,g,t} = 1 \iff \text{主体在 } t' \text{ 行走，且 } t' < t
+\end{equation}
+
+\subsubsection{体态(Aspect)}
+
+体态刻画动作的内部时间结构：
+\begin{itemize}
+    \item \textbf{完成体(Perfective)}: 把事件看作完整整体，"他读了那本书"
+    \item \textbf{进行体(Imperfective)}: 从内部看事件进行中，"他正在读那本书"
+\end{itemize}
+汉语通过助词"了/着/过"表达体貌，英语用形态(-ed/-ing)表达时体，斯拉夫语(俄语)把完成/未完成固化为动词的语法对(perfective/imperfective)。这是跨语言差异在语义层面的体现。
+
+\subsection{词汇语义表示}
+
+\subsubsection{框架语义}
+
+Fillmore的框架语义学用"语义框架"描述词义：一个词激活一个包含参与者角色(槽位)的场景。
+\begin{equation}
+    \text{Buy: } \langle \text{Buyer}, \text{Seller}, \text{Goods}, \text{Money} \rangle
+\end{equation}
+
+\begin{example}
+\begin{align}
+    &\text{John bought the car from Mary for \$500} \\
+    &\text{Buyer=John, Goods=the car, Seller=Mary, Money=\$500}
+\end{align}
+同一场景可以用不同动词的视角表述：\emph{buy}(买者视角)、\emph{sell}(卖者视角)、\emph{pay}(价钱视角)。框架语义把词汇语义与句法论元结构连接起来，是FrameNet等资源的理论基础。
+\end{example}
+
+\subsubsection{论元结构(Theta角色)}
+
+动词的语义论元映射到句法位置：
+\begin{equation}
+    \text{give}: \langle \text{施事(Agent)}, \text{受事(Theme)}, \text{接受者(Recipient)} \rangle
+\end{equation}
+
+\begin{equation}
+    \text{John} \xrightarrow{Agent} \text{gave} \quad \text{a book} \xrightarrow{Theme} \text{to Mary} \xrightarrow{Recipient}
+\end{equation}
+
+论元结构在不同语言中体现为格系统或语序：俄语用与格(dative)标记接受者，汉语用"给"介宾结构，日语用助词"に"标记。动词的论元结构是"语义与句法的接口"。
+
+\subsubsection{语用与语义的边界:预设与含义}
+
+\begin{itemize}
+    \item \textbf{蕴含(Entailment)}: 逻辑必然，A蕴含B指只要A真B必真
+    \item \textbf{预设(Presupposition)}: 隐含前提，"他的哥哥来了"预设"他有哥哥"
+    \item \textbf{会话含义(Implicature)}: 格里斯的语用推理，"有些学生来了"常暗示"不是全部"
+\end{itemize}
+
+\subsection{跨语言的语义共性}
+
+形式语义学揭示了一个重要事实：\emph{语义结构高度跨语言一致}。无论英语、汉语还是日语，都区分施事与受事、都有量词、都区分必然与可能。语言之间的差异主要不在"意义本身"，而在"意义的表层编码方式"：
+\begin{itemize}
+    \item 英语用量词化的名词短语 + 语序表达"谁对谁做了什么"
+    \item 汉语用语序 + 话题结构表达信息结构
+    \item 日语用助词 + 形态表达论元角色
+    \item 俄语用格标记表达论元角色
+\end{itemize}
+
+这个洞见是最后一章的核心主题之一：普遍语义 + 参数化编码 = 语言差异。
+
+\subsection{本章小结}
+
+语义学研究意义，形式语义学用模型、真值条件、Lambda演算、可能世界和广义量词把意义精确化。组合原则告诉我们意义如何由部分组合，内涵语义处理相信与模态，框架语义连接词汇与论元结构。最重要的收获是：不同语言在语义层面高度共享(论元角色、量词、时态语义是普遍的)，差异集中在编码策略。接下来我们进入语音层面，看看语言在"声音"上如何不同。

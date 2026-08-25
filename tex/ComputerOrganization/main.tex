@@ -1,0 +1,92 @@
+\documentclass[12pt,a4paper]{ctexart}
+\usepackage{amsmath,amssymb,amsfonts,amsthm,mathtools,stmaryrd}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{tikz}
+\usepackage[siunitx]{circuitikz}
+\usetikzlibrary{arrows.meta, positioning, calc, shapes.geometric}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{tabulary}
+\usepackage{fontspec}
+
+% ---- 字体兜底(韩文等CJK字符，避免SimSun缺字) ----
+\xeCJKsetup{AutoFallBack = true}
+\setCJKfallbackfamilyfont\CJKrmdefault{Malgun Gothic}[Scale=MatchLowercase]
+\setCJKfallbackfamilyfont\CJKsfdefault{Malgun Gothic}[Scale=MatchLowercase]
+\setCJKfallbackfamilyfont\CJKttdefault{Malgun Gothic}[Scale=MatchLowercase]
+
+\newfontfamily\ipafont{Segoe UI}[Scale=MatchLowercase]
+\newcommand{\ipa}[1]{\text{\ipafont #1}}
+\newfontfamily\cyrfont{Segoe UI}[Scale=MatchLowercase]
+\newcommand{\cyr}[1]{\text{\cyrfont #1}}
+\renewcommand{\textsc}[1]{{\upshape\scshape #1}}
+
+\geometry{left=2.5cm,right=2.5cm,top=3cm,bottom=3cm}
+
+\newtheorem{definition}{定义}[section]
+\newtheorem{theorem}{定理}[section]
+\newtheorem{example}{示例}[section]
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    numbers=left,
+    numberstyle=\tiny,
+    frame=single,
+    breaklines=true,
+    showstringspaces=false,
+    tabsize=4
+}
+
+\begin{document}
+
+\clearpage
+\vspace*{\fill}
+
+\begin{center}
+{\huge 计算机组成原理}\\[0.8em]
+{\large Computer Organization \& Architecture}\\[2.5em]
+{\large MS Roslyn}\\[0.6em]
+{\large \today}
+\end{center}
+
+\vspace{2.5em}
+
+\begin{center}
+{\bfseries 摘要}
+\end{center}
+
+\vspace{1em}
+
+\begin{center}
+本教程系统讲解计算机组成原理的核心概念，从底层硬件到上层接口逐层展开：数据在机器中的表示与运算、数字逻辑基础、指令系统设计、处理器数据通路与控制器、流水线与指令级并行、存储层次与缓存、I/O系统与总线架构。面向计算机科学专业学生及自学者，兼顾理论基础与工程直觉。
+\end{center}
+
+\vspace*{\fill}
+\clearpage
+
+\tableofcontents
+\clearpage
+
+\input{chapters/intro}
+\clearpage
+\input{chapters/data_representation}
+\clearpage
+\input{chapters/digital_logic}
+\clearpage
+\input{chapters/instruction_set}
+\clearpage
+\input{chapters/cpu_datapath}
+\clearpage
+\input{chapters/cpu_control}
+\clearpage
+\input{chapters/pipeline}
+\clearpage
+\input{chapters/memory}
+\clearpage
+\input{chapters/io_bus}
+
+\end{document}

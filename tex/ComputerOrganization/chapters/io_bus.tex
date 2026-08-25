@@ -1,0 +1,121 @@
+﻿\section{I/O 系统与总线}
+
+\subsection{I/O 系统的层次}
+
+输入/输出（I/O）系统负责 CPU 与外部世界的通信：
+
+\begin{itemize}
+    \item \textbf{设备层}：键盘、鼠标、显示器、硬盘、网卡、GPU
+    \item \textbf{设备控制器}：硬件接口，连接设备和总线
+    \item \textbf{设备驱动}：操作系统软件，向 OS 提供统一接口
+    \item \textbf{I/O 指令 / 内存映射 I/O}：CPU 如何与控制器交互
+\end{itemize}
+
+\subsection{内存映射 I/O vs 独立 I/O}
+
+\begin{table}[H]
+\centering
+\caption{两种 I/O 模型}
+\label{tab:io_models}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+\textbf{特征} & \textbf{内存映射 I/O} & \textbf{独立 I/O} \\
+\midrule
+地址空间 & I/O 设备与内存共用地址 & I/O 有独立地址空间 \\
+访问方式 & $\texttt{lw/sw}$ 指令 & 专用 $\texttt{IN/OUT}$ 指令 \\
+代表 & MIPS、ARM、RISC-V & x86（in / out） \\
+设计 & 简单，无需额外指令 & 地址不冲突，但增加复杂度 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{I/O 同步方式}
+
+\subsubsection{轮询（Polling）}
+
+CPU 反复读取设备状态寄存器，直到设备就绪。简单但浪费 CPU 时间。
+
+\[
+\text{while (status\_reg != READY) \{ /* 等待 */ \};}
+\]
+
+\subsubsection{中断（Interrupt）}
+
+设备就绪时向 CPU 发出中断信号。CPU 暂停当前执行，跳转到中断服务程序（ISR），处理完毕后恢复。
+
+\begin{itemize}
+    \item \textbf{中断向量表}：存储各中断号对应的 ISR 地址
+    \item \textbf{中断优先级}：高优先级中断可打断低优先级
+    \item \textbf{可屏蔽中断 vs 不可屏蔽中断（NMI）}
+\end{itemize}
+
+\subsubsection{直接存储器访问（DMA）}
+
+DMA 控制器直接控制总线，在设备和内存之间搬移数据，不经过 CPU。适用于大批量数据传输（如磁盘读写、网络包）。
+
+\begin{itemize}
+    \item CPU 配置 DMA 控制器（源地址、目标地址、传输大小）
+    \item DMA 独立完成传输
+    \item 完成后向 CPU 发中断通知
+\end{itemize}
+
+\subsection{总线}
+
+总线（Bus）是连接 CPU、内存和 I/O 设备的共享通信通道。
+
+\subsubsection{总线分类}
+
+\begin{table}[H]
+\centering
+\caption{总线类型}
+\label{tab:bus_types}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+\textbf{总线} & \textbf{连接对象} & \textbf{代表} \\
+\midrule
+处理器-内存总线 & CPU $\leftrightarrow$ 内存 & 前-总线（FSB）、QPI、Infinity Fabric \\
+I/O 总线 & CPU $\leftrightarrow$ 外围设备 & PCI、PCIe、USB \\
+背板总线 & 模块间互连 & VME、CompactPCI \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsubsection{现代总线：PCIe}
+
+PCI Express（PCIe）取代了传统并行总线（PCI），采用高速串行点对点连接：
+
+\begin{itemize}
+    \item \textbf{Lane}：每 Lane 由一对差分信号（发送+接收）组成
+    \item \textbf{带宽}：PCIe 3.0 $\times 1 \approx 1$ GB/s，$\times 16 \approx 16$ GB/s
+    \item \textbf{拓扑}：Root Complex $\to$ Switch $\to$ Endpoint，树形结构
+    \item \textbf{热插拔、链路协商、错误检测与重传}
+\end{itemize}
+
+\subsection{磁盘与固态存储}
+
+\begin{itemize}
+    \item \textbf{HDD（机械硬盘）}：旋转盘片+磁头臂，寻道时间 + 旋转延迟 + 传输时间
+    \item \textbf{SSD（固态硬盘）}：NAND Flash，无机械部件，随机读快、顺序读写快
+    \item \textbf{NVMe}：基于 PCIe 的快速存储协议（取代 SATA/AHCI），延迟 < $10~\mu s$
+\end{itemize}
+
+\subsection{多核与并行 I/O}
+
+现代多核系统面临 I/O 瓶颈：
+
+\begin{itemize}
+    \item \textbf{DMA 竞争}：多个核心共享 DMA 通道和内存带宽
+    \item \textbf{IOMMU}：用类似 MMU 的机制保护设备对内存的访问
+    \item \textbf{RDMA}：远程直接内存访问，跨网络访问远端内存（InfiniBand、RoCE）
+    \item \textbf{DPDK / SPDK}：绕过内核，用户态直接操作 I/O，降低延迟
+\end{itemize}
+
+\subsection{系统总线架构总结}
+
+现代计算机的总线结构已经从"共享总线"演变为"互联网络"：
+
+\[
+\text{CPU} \stackrel{\text{QPI / UPI / IF}}{\longleftrightarrow} \text{内存控制器} \to \text{DDR5} \quad ; \quad \text{CPU} \stackrel{\text{PCIe}}{\longleftrightarrow} \text{GPU / NVMe / NIC}
+\]
+
+这种点对点互联取代了传统共享总线，提供了更好的带宽隔离和可扩展性。

@@ -1,0 +1,440 @@
+﻿\section{跨语言比较:不同语言的差异}
+
+这是本书的总结章，也是核心关注的焦点。前面各章从不同层面建立了语言学的工具，本章把它们整合起来，系统地回答一个问题：\emph{不同的语言到底差在哪里?} 我们会看到，语言的差异是多维度、系统性的，但同时受到强烈约束——语言在\emph{共享深层结构}的前提下，以\emph{有限的方式参数化}地彼此不同。
+
+\subsection{比较语言的维度}
+
+\begin{table}[H]
+\centering
+\caption{语言差异的比较维度}
+\begin{tabulary}{\textwidth}{@{}CCC@{}}
+\toprule
+\textbf{维度} & \textbf{内容} & \textbf{相关章节} \\
+\midrule
+语音/音系 & 音位库存、声调、音节结构 & 音系学与语音学 \\
+词法 & 形态类型、格/数/性/时体系统 & 词法 \\
+句法 & 语序、头参数、话题/主语结构 & 句法 \\
+语义-词汇 & 词义切分、语法化、敬语 & 语义学 \\
+文字 & 文字类型、正字法 & (本章) \\
+语用 & 话题结构、信息结构、间接言语行为 & (本章) \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+比较方法上，除了定性描述，现代类型学用\emph{量化指标}比较语言：语素密度、基本语序分布、音位库存大小、依存距离等，都可以从语料库中自动计算。语言之间的"差异距离"也因此可以定义为一个多维向量空间中的距离。
+
+\subsection{语音层面的差异}
+
+\subsubsection{音位库存的规模差异}
+
+不同语言的音位数量差异巨大。根据UPSID数据库：
+\begin{itemize}
+    \item \textbf{音位少的语言}: 夏威夷语(约13个音位)、皮拉罕语
+    \item \textbf{音位中等的语言}: 英语(约44个音位)、汉语普通话(约21辅音+6元音+4声调)
+    \item \textbf{音位多的语言}: !Xóõ语(非洲，辅音音位数百个，含复杂的搭嘴音)、高加索语言(辅音密集)
+\end{itemize}
+
+元音系统差异尤其直观：日语5个元音、英语15个左右、越南语11个、某些德语方言有20个以上。
+
+\subsubsection{送气对立:一音两用 vs 两音对立}
+
+\begin{itemize}
+    \item 英语: 送气与不送气同属一个音位(变体分布，不区分意义)
+    \item 印地语、泰语: 送气与不送气是不同音位(\emph{p}al vs \emph{p}hal 区分词义)
+    \item 汉语普通话: /p/ /p\textsuperscript{h}/ 送气对立区分词义("爸" vs "怕")
+\end{itemize}
+
+\begin{equation}
+    \text{英语: } [p] \sim [p^h] = /p/\ (\text{同一音位}) \qquad \text{汉语: } /p/ \neq /p^h/
+\end{equation}
+
+\subsubsection{声调的有无}
+
+\begin{itemize}
+    \item \textbf{声调语言}: 汉语(4调)、泰语(5调)、越南语(6调)、约鲁巴语(3调)
+    \item \textbf{音高重音语言}: 日语、瑞典语(词内调峰位置区分词义)
+    \item \textbf{重音语言}: 英语、俄语、德语、西班牙语(重音位置或固定或自由)
+\end{itemize}
+
+英语母语者听汉语"妈/麻/马/骂"觉得是同一音节的不同"语气"，而汉语母语者听英语重音差异如 "REcord"(名词) / "reCORD"(动词) 也难以掌握——两种语言的韵律系统结构不同。
+
+\subsubsection{音节结构差异}
+
+\begin{table}[H]
+\centering
+\caption{音节结构对比}
+\begin{tabulary}{\textwidth}{@{}CCCC@{}}
+\toprule
+\textbf{语言} & \textbf{最大音节} & \textbf{允许辅音丛} & \textbf{例} \\
+\midrule
+汉语普通话 & (C)V(N) & 否 & 天 tiān \\
+日语 & (C)(y)V(N/Q) & 否 & 東京 tōkyō \\
+英语 & CCCVCCCC & 是 & strengths \\
+波兰语 & CCCCVCCCC & 是(极复杂) & bezwzględy \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+音节模板决定了"外来词改造"的方式：英语单词进入日语被拆成开音节(computer → コンピューター)，进入汉语被套进(C)V(N)模板并加上声调。
+
+\subsection{词法层面的差异}
+
+\subsubsection{形态类型谱系}
+
+语言在"一个词携带多少语法信息"上差异极大，构成一个连续谱：
+\begin{equation}
+    \text{孤立(汉语)} \xrightarrow{} \text{黏着(日语、土耳其语)} \xrightarrow{} \text{屈折(俄语、德语)} \xrightarrow{} \text{复综(因纽特语)}
+\end{equation}
+
+\begin{example}[同一句"我吃"在不同语言的形态差异]
+\begin{align}
+    \text{汉语: } & \text{我吃} \quad (\text{零形态，靠语序和代词}) \\
+    \text{英语: } & \text{I eat} \quad (\text{少数屈折: 第三人称-s}) \\
+    \text{日语: } & \text{食べる} \quad (\text{黏着词缀堆叠: 食べ-る}) \\
+    \text{俄语: } & \text{\cyr{Я ем}} \quad (\text{动词变位融合人称-数-时}) \\
+    \text{拉丁语: } & \text{ed\=o} \quad (\text{一个词尾融合所有语法信息})
+\end{align}
+\end{example}
+
+\subsubsection{名词的性:语义 vs 语法}
+
+\begin{itemize}
+    \item \textbf{无语法性}: 汉语、日语、土耳其语、英语(基本没有)
+    \item \textbf{两性}: 法语、西班牙语、意大利语(阴阳)
+    \item \textbf{三性}: 德语、俄语、拉丁语(阴阳中)
+    \item \textbf{多类}: 斯瓦希里语(名词类别系统，约10类)、班图语言
+\end{itemize}
+
+语法性(grammatical gender)与自然性别不一定对应：德语 \emph{Mädchen}(女孩)是中性的。跨语言比较中，同一个物体可以有不同的性：月亮在拉丁语、俄语是阴性，在德语是阳性。
+
+\subsubsection{格的系统:从语序到词形}
+
+\begin{table}[H]
+\centering
+\caption{格系统对比}
+\begin{tabulary}{\textwidth}{@{}CCCC@{}}
+\toprule
+\textbf{语言} & \textbf{名词格} & \textbf{表达方式} & \textbf{例(宾格)} \\
+\midrule
+汉语 & 无 & 语序 & 猫吃鱼 / 鱼吃猫 \\
+英语 & 仅代词保留 & 语序+残存代词格 & him \\
+日语 & 有(助词) & 后置助词 & 魚を食べる \\
+德语 & 4格 & 冠词+名词词尾 & den Fisch \\
+俄语 & 6格 & 名词词尾 & \cyr{р\'ыбу} \\
+芬兰语 & 15格 & 名词词尾 & kalaa \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+格与语序的关系是类型学的经典发现：\emph{格标记越丰富，语序越自由}。俄语、拉丁语格标记完备，语序可以相当自由(靠格判断谁吃谁)；汉语无语标记，语序成为唯一手段("猫吃鱼"不能换序为"鱼吃猫")。
+
+\begin{equation}
+    \text{形态格标记强度} \propto \text{语序自由度}
+\end{equation}
+
+\subsubsection{动词的时体系统}
+
+\begin{itemize}
+    \item \textbf{英语}: 时态(现在/过去)+ 体态(进行/完成)通过形态组合，将来时用助动词
+    \item \textbf{汉语}: 无时态形态，用时间词和体助词"了/着/过"表达
+    \item \textbf{俄语}: 完成/未完成体是词汇-语法对(\cyr{читать读/прочитать读完})，过去时用词形
+    \item \textbf{日语}: 时态(-た过去)+ 体态(-ている进行/持续)
+\end{itemize}
+
+\begin{example}["我读了书"的跨语言编码]
+\begin{align}
+    \text{英语: } & \text{I read the book} \quad (\text{时态形态}) \\
+    \text{汉语: } & \text{我读了书} \quad (\text{体助词 "了"}) \\
+    \text{日语: } & \text{本を読んだ} \quad (\text{时态词尾 -だ}) \\
+    \text{俄语: } & \text{\cyr{Я прочитал книгу}} \quad (\text{完成体前缀 \cyr{про-}})
+\end{align}
+\end{example}
+
+\subsection{句法层面的差异}
+
+\subsubsection{基本语序}
+
+\begin{table}[H]
+\centering
+\caption{语序差异及代表语言}
+\begin{tabulary}{\textwidth}{@{}CCCC@{}}
+\toprule
+\textbf{语序} & \textbf{代表语言} & \textbf{例句(我吃苹果)} \\
+\midrule
+SVO & 英语、汉语、法语、俄语 & I eat an apple \\
+SOV & 日语、土耳其语、印地语 & 私はりんごを食べる \\
+VSO & 阿拉伯语、威尔士语 & \cyr{(书面阿拉伯语)أكُلُ تفاحة} \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsubsection{头参数:语序的系统性}
+
+中心词的位置是"一把钥匙"，一次决定多种结构的语序。比较英语(中心词在前)与日语(中心词在后)：
+
+\begin{table}[H]
+\centering
+\caption{头参数的连锁效应}
+\begin{tabulary}{\textwidth}{@{}CCC@{}}
+\toprule
+\textbf{结构} & \textbf{英语(中心词前)} & \textbf{日语(中心词后)} \\
+\midrule
+动词+宾语 & eat an apple & りんごを 食べる \\
+介词+名词 & in the house & 家の 中(名词+助词) \\
+名词+属格 & the book of John & ジョンの 本 \\
+名词+关系从句 & the book that I read & 私が読んだ 本 \\
+形容词+名词 & red car & 赤い 車 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+注意头参数不是铁律：汉语是SVO(中心词前)却用后置结构("桌子上")，属于"混合型"。但作为一个统计规律，头参数解释了英语与日语、土耳其语在几乎所有结构上的镜像语序。
+
+\subsubsection{主语优先 vs 话题优先}
+
+\begin{itemize}
+    \item \textbf{主语优先(Subject-prominent)}: 句子以"主语-谓语"为骨架。英语、日语、印欧语系语言
+    \item \textbf{话题优先(Topic-prominent)}: 句子以"话题-说明"为骨架。汉语、朝鲜语、日语
+\end{itemize}
+
+汉语的"话题"可以不是动词的施事：
+\begin{equation}
+    \text{这本书，我已经读完了} \quad (\text{话题 "这本书" 是受事})
+\end{equation}
+
+英语必须把它改为被动或补出受事："I have already read this book" / "This book has been read"。话题优先语言允许大量"无主语句"，且话题可以直接接评论，这在主语优先语言中不合语法。
+
+\subsubsection{Pro-省略(主语省略)}
+
+\begin{itemize}
+    \item \textbf{可省略主语语言(pro-drop)}: 西班牙语、意大利语、日语、汉语
+    \item \textbf{不可省略主语语言(non-pro-drop)}: 英语、法语、德语
+\end{itemize}
+
+\begin{example}
+\begin{align}
+    \text{意大利语: } & \text{Vado. (我)去。} \\
+    \text{日语: } & \text{行く。(我/你/他…)去。} \\
+    \text{英语: } & \text{*Go. (不合语法，必须说 I go / You go)}
+\end{align}
+\end{example}
+
+pro-drop源于丰富的动词屈折(意大利语动词变位已标明主语人称)或话题结构(日语、汉语靠语境确定主语)。英语动词形态简化(几乎只有-s)，失去省略主语的条件。
+
+\subsubsection{疑问句的形成}
+
+\begin{table}[H]
+\centering
+\caption{是非疑问句的形成方式}
+\begin{tabulary}{\textwidth}{@{}CCC@{}}
+\toprule
+\textbf{方式} & \textbf{代表语言} & \textbf{例} \\
+\midrule
+助动词移位 & 英语 & Are you ready? \\
+句末语气词 & 汉语、日语 & 你准备好了吗? \\
+动词前置 & 波兰语(部分) & Czy jesteś gotowy? \\
+词尾形态 & 日语 & 行きますか \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsubsection{Wh-疑问词的位置}
+
+\begin{itemize}
+    \item \textbf{疑问词移动}: 英语(What did you buy \_?)、德语、法语
+    \item \textbf{疑问词原位(Wh-in-situ)}: 汉语(你买了什么?)、日语、韩语
+\end{itemize}
+
+虽然表层差异大，但深层一致：英语的 \_ 位置和汉语的"什么"位置在逻辑上完全相同(都是宾语)，区别只在"是否把疑问词提前"。这就是"普遍结构 + 参数"的典范。
+
+\subsubsection{关系从句}
+
+\begin{itemize}
+    \item \textbf{后置关系从句}: 英语、法语、德语(the book that I read)
+    \item \textbf{前置关系从句}: 日语、汉语、朝鲜语(私が読んだ本、"我读的书")
+\end{itemize}
+
+关系从句位置与头参数一致：中心词在后语言把关系从句放在名词前。这也产生著名的处理难点——前置关系从句的中心名词在从句之后才出现，读者需要"悬置"信息。
+
+\subsection{代词、敬语与礼貌系统}
+
+\subsubsection{第二人称的复杂性差异}
+
+\begin{itemize}
+    \item \textbf{英语}: 只有一个 you(不分单复、不分敬俗，600年前有 thou/you 区分)
+    \item \textbf{法语/西班牙语}: tu/vous, tú/usted(亲昵/礼貌二分)
+    \item \textbf{汉语}: 你/您(礼貌)，普通话无复数区分(口语"你们/您们")
+    \item \textbf{日语}: 多个代词 + 敬语系统(见下)
+\end{itemize}
+
+\subsubsection{敬语系统:日语的极端例子}
+
+日语敬语(敬語)分为三种，是跨语言差异中最复杂的礼貌系统之一：
+\begin{itemize}
+    \item \textbf{尊敬語(そんけいご)}: 抬高对方(いらっしゃる = いる/行く/来る的尊敬形)
+    \item \textbf{謙譲語(けんじょうご)}: 贬低自己(参る = 行く/来る的自谦形)
+    \item \textbf{丁寧語(ていねいご)}: 礼貌体(です/ます)
+\end{itemize}
+
+\begin{equation}
+    \text{先生が来る} \xrightarrow{\text{尊敬}} \text{先生がいらっしゃる}
+\end{equation}
+
+朝鲜语也有复杂的敬语阶系统(等级由说话双方的社会关系决定)，英语则几乎完全依赖词汇选择(polite/please)。敬语系统反映的是语言背后的社会结构——语言差异不只是结构差异，也是文化差异。
+
+\subsection{文字系统的差异}
+
+\subsubsection{文字类型学}
+
+\begin{table}[H]
+\centering
+\caption{文字类型}
+\begin{tabulary}{\textwidth}{@{}CCC@{}}
+\toprule
+\textbf{文字类型} & \textbf{表示单位} & \textbf{代表} \\
+\midrule
+字母文字(Alphabet) & 音素 & 拉丁字母、西里尔字母 \\
+元音附标文字(Abjad/Abugida) & 辅音(+元音附标) & 阿拉伯文、希伯来文、天城文 \\
+音节文字(Syllabary) & 音节 & 日文假名、切罗基文 \\
+语素文字(Logographic) & 词/语素 & 汉字 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsubsection{汉字与拼音文字的结构差异}
+
+\begin{itemize}
+    \item \textbf{汉字}: 语素-音节文字，一字对应一个音节+一个语素；形声字占多数(意符+声符，如"清"= 水+青)
+    \item \textbf{假名}: 日语音节文字(五十音)，与汉字混用(汉字表实义词、假名表语法词缀)
+    \item \textbf{谚文}: 韩语字母文字，把音素拼成方块字(\cyr{ㄱ+ㅏ+ㅁ=감})
+    \item \textbf{拉丁字母}: 音素文字，拼写与发音的关系因语言而异(意大利语几乎一一对应，英语拼写与发音严重脱节)
+\end{itemize}
+
+\subsubsection{文字与语言结构的互动}
+
+文字类型并非随机：孤立语(汉语)用一字一语的语素文字效率高；形态丰富的语言(俄语)用音素文字便于表达词形变化(同一词根的不同变格直接可见)。日语混合使用汉字(实词)与假名(词缀)来应付黏着形态，是文字与语言类型"适配"的典型案例。
+
+\subsection{词汇与语法化的差异}
+
+\subsubsection{词义切分的不同}
+
+语言以不同的方式切分概念世界：
+\begin{equation}
+    \text{英语: } \text{hand} \quad \text{arm} \qquad \text{日语: } \text{手(て)} \quad \text{腕(うで)} \quad \text{同域}
+\end{equation}
+
+颜色、亲属、时间、空间等领域都是词义切分差异的经典例子(颜色词的普遍进化层级)。
+
+\subsubsection{语法化的差异}
+
+实词虚化为语法成分的过程(语法化)在不同语言中路径不同：
+\begin{equation}
+    \text{汉语: } \text{"把"(手抓)} \rightarrow \text{处置介词(把书放)} \qquad \text{英语: } \text{"have"} \rightarrow \text{完成助动词}
+\end{equation}
+
+汉语"了"从"完结"义动词语法化为体助词，英语 be going to 从"移动"语法化为将来时标记——同样的语法化倾向，不同语言的实现路径不同。
+
+\subsection{形式化:原则与参数理论}
+
+\subsubsection{语言差异 = 参数取值}
+
+乔姆斯基的原则与参数理论(P\&P)为语言差异提供形式化框架：普遍语法提供原则(各语言共享)，语言之间的差异是少量\emph{参数}的取值不同。
+
+\begin{equation}
+    \text{语言 } L = \langle \text{普遍原则 } P, \text{参数向量 } \Theta(L) \rangle
+\end{equation}
+
+\begin{table}[H]
+\centering
+\caption{参数化差异(示例)}
+\begin{tabulary}{\textwidth}{@{}CCCCC@{}}
+\toprule
+\textbf{参数} & \textbf{英语} & \textbf{汉语} & \textbf{日语} & \textbf{西班牙语} \\
+\midrule
+头参数 & 中心词前 & (混合) & 中心词后 & 中心词前 \\
+主语省略 & 否 & 是(话题) & 是 & 是 \\
+疑问词 & 移动 & 原位 & 原位 & 移动 \\
+格标记 & 弱 & 无 & 助词 & 中 \\
+声调 & 无 & 有(4调) & 音高重音 & 无 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+这个框架的意义在于：儿童习得语言时，不需要学习"整套语法"，只需要根据输入\emph{设定参数值}。语言差异被压缩为少数二进制开关——这是对"语言为何既相似又不同"最简洁的解释。
+
+\subsubsection{跨语言共性与蕴含层级}
+
+语言差异不是任意的，普遍共性约束着差异。格林伯格共性和蕴含层级在差异中建立秩序：
+\begin{equation}
+    \text{若 } VSO \Rightarrow \text{前置词}; \qquad \text{格系统按层级} \quad \text{主格} \prec \text{宾格} \prec \text{与格} \prec \ldots
+\end{equation}
+
+统计上，语言有强烈的"默认设置"倾向：SOV和SVO占绝大多数、绝大多数语言动词紧跟主语或宾语、依存距离普遍保持最短。差异被强烈约束在少数"参数空间"中。
+
+\subsection{语言相对性:差异是否影响思维?}
+
+\subsubsection{萨丕尔-沃尔夫假说}
+
+语言差异是否影响说话者的思维方式？萨丕尔-沃尔夫假说(Sapir-Whorf Hypothesis)有强(语言决定思维)与弱(语言影响思维)两个版本。
+
+\begin{itemize}
+    \item \textbf{强版(语言决定论)}: 已被广泛否定——人类普遍可以表达任意概念，任何语言都能表达新观念
+    \item \textbf{弱版(语言相对论)}: 有实验支持——语言习惯影响注意与记忆的方式
+\end{itemize}
+
+\subsubsection{相对论的实验证据}
+
+\begin{itemize}
+    \item 颜色: 有基本颜色词的语言，说话者对颜色范畴的辨别更快
+    \item 空间: 某些原住民语言用绝对方向(东西南北)而非相对方向(左右)描述空间，说话者的空间记忆方式随之不同
+    \item 性别: 语法性影响说话者对无生命物的联想(德语桥是阴性、西班牙语桥是阳性)
+\end{itemize}
+
+\subsubsection{现代计算的视角}
+
+大语言模型的多语言能力表明：不同语言可以表达完全相同的语义内容(可互相翻译)，支持"意义共享"立场。语言差异主要影响\emph{编码的效率与习惯}，而非表达能力本身。
+
+\subsection{语言差异的量化比较}
+
+现代计算类型学把差异转化为可测量指标，用距离度量语言：
+
+\begin{equation}
+    \text{语言距离} \; d(L_1, L_2) = \sqrt{\sum_{i} w_i \cdot (F_i(L_1) - F_i(L_2))^2}
+\end{equation}
+
+其中 $F_i$ 是类型学特征(语序、格标记、声调有无等)，$w_i$ 是权重。语系距离(词汇相似度)、语音距离(音位对应)、类型距离(结构特征)共同刻画两种语言的"差异度"。例如英语与德语距离小(同族同类型)，英语与日语距离大(不同族、类型迥异：SVO/孤屈折 vs SOV/黏着)。
+
+\begin{table}[H]
+\centering
+\caption{英日对比:差异的维度总览}
+\begin{tabulary}{\textwidth}{@{}CCC@{}}
+\toprule
+\textbf{维度} & \textbf{英语} & \textbf{日语} \\
+\midrule
+语系 & 印欧-日耳曼 & (独立/争议) \\
+形态 & 弱屈折 & 黏着 \\
+语序 & SVO & SOV \\
+介词 & 前置词 & 后置助词 \\
+格标记 & 弱(语序) & 强(助词) \\
+声调 & 无 & 音高重音 \\
+主语省略 & 否 & 是 \\
+疑问词 & 移动 & 原位 \\
+敬语 & 无系统 & 复杂系统 \\
+文字 & 拉丁字母 & 汉字+假名 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{本章小结}
+
+不同语言之间的差异是多维度的，但也是系统性的、受约束的：
+\begin{itemize}
+    \item \textbf{差异在表层}: 语音、词法、语序、文字——语言在最直观的层面差异巨大
+    \item \textbf{共藏在深层}: 论元结构、组合语义、递归句法、普遍约束——所有语言共享
+    \item \textbf{差异可参数化}: 原则与参数理论把差异压缩为参数向量，优选论把音系差异归约为约束排序
+    \item \textbf{差异可量化}: 计算类型学让"语言距离"成为可测量的数量
+\end{itemize}
+
+因此，"语言的差异"与"语言的共性"是同一枚硬币的两面：差异是表层参数的选择，共性是深层结构的约束。理解了这一点，就掌握了语言学的精髓——从汉语的孤立语形态、英语的SVO语序、日语的黏着与敬语、俄语的格系统、阿拉伯语的VSO与声调，到所有语言共享的递归性与组合原则。
+
+本书到此结束。我们从语言学的历史出发，历经形式语言、形态、句法、语义、音系与计算语言学，最终回到语言学的根本问题：语言是什么，以及语言如何既丰富多彩又和谐统一。

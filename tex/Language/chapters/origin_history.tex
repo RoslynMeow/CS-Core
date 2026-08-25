@@ -1,0 +1,147 @@
+﻿\section{语言学的起源与历史}
+
+\subsection{语言学的定义与研究对象}
+
+语言学(Linguistics)是系统研究人类语言的学科，其研究对象涵盖语言的多个层面：
+\begin{itemize}
+    \item \textbf{语音(Phonetics)}: 语音的物理与生理属性
+    \item \textbf{音系(Phonology)}: 语音在特定语言系统中的组织方式
+    \item \textbf{词法(Morphology)}: 词的内部结构与构词规则
+    \item \textbf{句法(Syntax)}: 词组合成短语和句子的规则
+    \item \textbf{语义(Semantics)}: 语言单位的意义
+    \item \textbf{语用(Pragmatics)}: 语言在语境中的使用
+\end{itemize}
+
+语言学不仅是人文学科，更是一门交叉科学。它与数学共享形式化方法(集合论、自动机理论、逻辑演算)，与计算机科学共同构成自然语言处理(NLP)的理论基础，与心理学、神经科学共同研究语言的认知与神经基础。正是这种形式化的追求，使语言学区别于一般的人文研究：它试图用精确的符号系统描述语言规律，正如数学描述自然规律。
+
+\subsection{古代语言研究}
+
+\subsubsection{印度传统:波你尼与梵语语法}
+
+公元前4世纪，印度语法学家波你尼(Pāṇini)在《八章书》(Aṣṭādhyāyī)中建立了梵语语法的3,959条规则。这是人类历史上最早的、堪称完整的形式化语法体系。其特点包括：
+\begin{itemize}
+    \item 采用类似\emph{生成}的方式：从有限规则推导出一切合法形式
+    \item 规则间有明确的优先级和相互作用机制
+    \item 定义了语素、词干、词缀的操作系统(类似现代的形态音位学)
+\end{itemize}
+
+波你尼的规则系统可以用现代形式语言理论的方式表述：
+\begin{equation}
+    \text{规则: } X \rightarrow Y \quad \text{在条件 } C \text{ 下}
+\end{equation}
+其规则网络与乔姆斯基层级中上下文敏感的文法规则(见形式语言一章)在思想上有深刻的一致性，因此波你尼被一些学者称为"生成语法的鼻祖"。
+
+\subsubsection{希腊传统:词类与逻辑}
+
+古希腊学者最早将语言与逻辑联系起来。亚里士多德区分了名词(ónoma)和动词(rhēma)，并注意到"真与假"只有通过命题(句子)才能表达，从而将语言研究与逻辑学结合。斯多葛学派进一步区分了"被说出的声音""被表达的内容"与"外部事物"，初步萌芽了后来\emph{能指/所指}的区分。
+
+\subsubsection{中国训诂学:小学传统}
+
+中国古代的"小学"包含文字学、音韵学、训诂学三个分支：
+\begin{itemize}
+    \item \textbf{文字学}: 分析汉字的构造。许慎《说文解字》(约公元100年)创立了540部首体系，并总结出象形、指事、会意、形声、转注、假借"六书"理论，是第一部分析汉字结构的系统著作。
+    \item \textbf{音韵学}: 研究汉语的语音系统，以"反切"注音法、《切韵》《广韵》等韵书为代表。
+    \item \textbf{训诂学}: 解释古语词义，《尔雅》是其鼻祖。
+\end{itemize}
+
+\subsubsection{阿拉伯传统:西伯维与早期音系学}
+
+公元8世纪，波斯学者西伯维(Sībawayh)在《书》(Al-Kitāb)中对阿拉伯语进行了详尽的描述性分析，尤其是对辅音的音位对立、发音部位和语音环境做了系统的分类。他的工作被公认为早期音系学的典范，比欧洲的类似研究早了一千多年。
+
+\subsection{现代语言学的诞生}
+
+\subsubsection{历史比较语言学(19世纪)}
+
+19世纪的历史比较语言学标志着语言学成为一门独立的经验科学。其核心方法是\emph{比较法}(Comparative Method)：通过比较亲属语言中规律对应的同源词(cognates)，重建它们的祖语。
+
+格里姆定律(Grimm's Law)描述了从原始印欧语(PIE)到日耳曼语族的系统性辅音转移：
+\begin{align}
+    \text{PIE } *p &\rightarrow \text{Gmc } f \\
+    \text{PIE } *t &\rightarrow \text{Gmc } \theta \\
+    \text{PIE } *k &\rightarrow \text{Gmc } h
+\end{align}
+
+维尔纳定律(Verner's Law)后来解释了格里姆定律的例外(清音变浊擦音取决于原始重音位置)，体现了"规律无例外，例外有规律"的科学原则。由此，历史语言学确立了音变的规律性假设：
+\begin{equation}
+    \text{如果语言 } L_1, L_2 \text{ 同源，则存在系统的语音对应: } f: \Sigma_{L_1} \rightarrow \Sigma_{L_2}
+\end{equation}
+
+\subsubsection{结构主义语言学(20世纪初)}
+
+瑞士语言学家费迪南·德·索绪尔(Ferdinand de Saussure)在《普通语言学教程》中奠定了结构主义的基础：
+\begin{itemize}
+    \item \textbf{能指(Signifier)}与\textbf{所指(Signified)}: 语音形象与概念之间是任意、约定俗成的关系
+    \item \textbf{语言(Langue)}与\textbf{言语(Parole)}: 语言系统 vs. 具体的话语行为
+    \item \textbf{共时(Synchronic)}与\textbf{历时(Diachronic)}研究: 系统状态的描写 vs. 历史演变
+\end{itemize}
+
+索绪尔的核心洞见是：语言是一个\emph{系统}，其中每个单位的价值由它在系统中的对立关系决定。这一思想后来被形式化为"结构即关系之网络"。
+
+结构主义在布拉格学派(特鲁别茨柯伊、雅柯布森)手中发展为功能结构主义。特鲁别茨柯伊(Trubetzkoy)提出了\emph{音位}(phoneme)概念：一个语言系统中能区分意义的最小语音单位。音位正是通过\emph{对立}(opposition)来定义的：
+\begin{equation}
+    \text{音位} = \frac{\text{语音特征}}{\text{区别意义的最小对立}}
+\end{equation}
+
+美国结构主义(布龙菲尔德 Bloomfield)则强调描写主义与分布分析，主张基于语料对语言进行严格的、可操作的分析。
+
+\subsection{生成语法的革命}
+
+诺姆·乔姆斯基(Noam Chomsky)在1957年《句法结构》中发起了生成语法革命，其核心理念：
+\begin{itemize}
+    \item 语言具有\textbf{普遍语法}(Universal Grammar, UG)：人类天生的语言官能
+    \item 句法是\textbf{生成性}的：有限的规则系统可以生成无限的合法句子
+    \item 区分\textbf{能力}(Competence)与\textbf{表现}(Performance)：内在的语言知识 vs. 实际的使用行为
+    \item \textbf{刺激贫乏论}(Poverty of the Stimulus)：儿童从有限的输入中习得复杂的语法，说明语言知识有先天基础
+\end{itemize}
+
+生成语法把语言学研究从"收集语料、分类描写"转向"建立可以生成一切合法句子、排除一切非法句子的规则系统"。这一目标与形式语言理论完全一致：
+
+\begin{equation}
+    G = \langle V_N, V_T, P, S \rangle
+\end{equation}
+其中 $V_N$ 是非终结符集合，$V_T$ 是终结符集合，$P$ 是产生式规则集合，$S$ 是起始符号。生成语法所生成的语言就是
+\begin{equation}
+    L(G) = \{ w \in V_T^* \mid S \Rightarrow^* w \}
+\end{equation}
+
+\subsubsection{从规则到原则与参数}
+
+生成语法自身也在不断演进：从早期规则系统(短语结构规则+转换规则)，到原则与参数理论(Principles and Parameters)，再到最简方案(Minimal Program)。原则与参数理论认为：人类语言共享一组普遍原则(原则)，而语言之间的差异只是少数\emph{参数}(parameters)取值不同。这为"语言之间的差异"提供了形式化的解释框架，我们将在最后一章详细展开。
+
+\subsection{认知语言学与功能学派}
+
+20世纪后期，学界出现了对"纯形式句法"的反拨：
+
+\subsubsection{认知语言学}
+
+认知语言学强调语言与一般认知能力密不可分：
+\begin{itemize}
+    \item 语言是\textbf{认知能力}的一部分，而非独立模块
+    \item \textbf{隐喻}是思维的基本机制(Lakoff \& Johnson, 1980)：概念隐喻(如"争论是战争")塑造语言表达
+    \item 语法是\textbf{用法为基础}(Usage-based)的：语法结构是从具体语言使用中抽象出来的
+    \item \textbf{构式语法}(Construction Grammar)：把"词素-词-短语-句式"都看作"形式-意义"配对体
+\end{itemize}
+
+\subsubsection{功能语言学}
+
+功能学派(韩礼德 Halliday 的系统功能语法等)强调语言的功能：
+\begin{itemize}
+    \item 概念功能：语言如何表征世界
+    \item 人际功能：语言如何建立社会关系
+    \item 语篇功能：语言如何组织信息
+\end{itemize}
+
+\subsection{计算语言学时代}
+
+21世纪以来，语言学与计算机科学深度融合：
+\begin{itemize}
+    \item 统计方法(n-gram, HMM)使语言处理变得可计算
+    \item 神经网络方法(Word2Vec, Transformer)让机器自动学习语言结构
+    \item 大语言模型(LLMs)在几乎全部语言任务上达到接近人类的水平
+\end{itemize}
+
+语言的描写从定性走向定量，从手工规则走向数据驱动。形式化程度不断提高，而语言学理论(类型学、形态音位学、依存语法)也在现代NLP系统中找到了落地的形态。语言学至此完成了一次螺旋上升：古代的形式化直觉、19世纪的经验实证、20世纪的结构与生成理论、21世纪的计算实现。
+
+\subsection{本章小结}
+
+语言学的发展经历了"形式化直觉(古代)→ 系统描写(19世纪)→ 结构分析(20世纪初)→ 生成理论(20世纪中)→ 认知与功能并重(20世纪后期)→ 计算实现(21世纪)"的历程。贯穿其中的主线，是对"语言规律能否被精确、形式化地刻画"这一问题的不断探索。理解了这段历史，也就理解了为什么语言学可以用数学公式、自动机理论和逻辑演算来表述——这正是本书的出发点。

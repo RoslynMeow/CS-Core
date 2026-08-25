@@ -1,0 +1,230 @@
+\chapter{Non-linear Structures I: Trees and Binary Trees}
+
+树是一种一对多的非线性层次逻辑结构。在图论中，树被严密定义为：任意两个顶点间有且仅有一条路径的无环连通图。
+
+\section{通用树的基础属性}
+
+\begin{itemize}
+    \item \textbf{形式化定义}：树 $T = (V, E)$，其中 $V$ 为有限顶点集，$E \subseteq V \times V$ 为边集，满足 $|E| = |V| - 1$ 且连通。
+    \item \textbf{节点分类}：
+    \begin{itemize}
+        \item 根节点 (Root)：唯一入度为 0 的节点 $r \in V$。
+        \item 叶子节点 (Leaf)：出度为 0 的节点集合 $L = \{ v \in V \mid \text{out-degree}(v) = 0 \}$。
+        \item 分支节点 (Internal)：$I = V \setminus (L \cup \{r\})$。
+    \end{itemize}
+    \item \textbf{形态指标}：
+    \begin{itemize}
+        \item 度数 (Degree)：$\text{deg}(v) = |\{ u \mid (v, u) \in E \}|$。树的度 $D = \max_{v \in V} \text{deg}(v)$。
+        \item 高度 (Height)：$H(T) = \max_{v \in V} \text{depth}(v)$。
+    \end{itemize}
+\end{itemize}
+
+\section{二叉树 (Binary Tree) 及其形态特征}
+
+\begin{itemize}
+    \item \textbf{递归定义}：二叉树 $B$ 要么是空集 $\emptyset$，要么是一个三元组 $\langle d, L, R \rangle$，其中 $d$ 为根节点数据，$L$ 和 $R$ 为互不相交的二叉树（左子树与右子树）。
+    \item \textbf{节点约束}：$\forall v \in V, \text{deg}(v) \in \{0, 1, 2\}$，且严格区分左右子树。
+\end{itemize}
+
+根据形态与平衡度，二叉树有以下经典状态：
+\begin{enumerate}
+    \item \textbf{偏斜树 (Skewed Tree)}：$\forall v, \text{deg}(v) \le 1$。退化为线性结构，检索复杂度 $O(n)$。
+    \item \textbf{完全二叉树 (Complete Tree)}：节点按层序编号 $1 \dots n$，与满二叉树前 $n$ 个节点一一对应。
+    \item \textbf{满二叉树 (Full Tree)}：$\forall v, \text{deg}(v) \in \{0, 2\}$，且所有叶子节点深度相同。
+    \item \textbf{二叉搜索树 (BST)}：满足偏序关系 $\forall x \in L, x.val < d.val \land \forall y \in R, y.val > d.val$。
+    \item \textbf{平衡二叉树 (AVL)}：$\forall v \in V, |H(L_v) - H(R_v)| \le 1$。
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    treenode/.style={circle, draw, minimum size=0.62cm, font=\ttfamily, inner sep=1pt},
+    edge/.style={draw, thick},
+    lbl/.style={font=\small\bfseries}
+]
+    \node[treenode] (sa) at (0,0) {A};
+    \node[treenode] (sb) at (-0.55,-0.95) {B};
+    \node[treenode] (sc) at (-1.1,-1.9) {C};
+    \draw[edge] (sa) -- (sb);
+    \draw[edge] (sb) -- (sc);
+    \node[lbl] at (-0.55,-2.6) {偏斜退化树};
+
+    \node[treenode] (ca) at (3.4,0) {A};
+    \node[treenode] (cb) at (2.6,-0.95) {B};
+    \node[treenode] (cc) at (4.2,-0.95) {C};
+    \node[treenode] (cd) at (2.2,-1.9) {D};
+    \node[treenode] (ce) at (3.0,-1.9) {E};
+    \node[treenode] (cf) at (3.8,-1.9) {F};
+    \draw[edge] (ca) -- (cb);
+    \draw[edge] (ca) -- (cc);
+    \draw[edge] (cb) -- (cd);
+    \draw[edge] (cb) -- (ce);
+    \draw[edge] (cc) -- (cf);
+    \node[lbl] at (3.2,-2.6) {完全二叉树};
+
+    \node[treenode] (fa) at (7.6,0) {A};
+    \node[treenode] (fb) at (6.6,-0.95) {B};
+    \node[treenode] (fc) at (8.6,-0.95) {C};
+    \node[treenode] (fd) at (6.0,-1.9) {D};
+    \node[treenode] (fe) at (7.2,-1.9) {E};
+    \node[treenode] (ff) at (8.0,-1.9) {F};
+    \node[treenode] (fg) at (9.2,-1.9) {G};
+    \draw[edge] (fa) -- (fb);
+    \draw[edge] (fa) -- (fc);
+    \draw[edge] (fb) -- (fd);
+    \draw[edge] (fb) -- (fe);
+    \draw[edge] (fc) -- (ff);
+    \draw[edge] (fc) -- (fg);
+    \node[lbl] at (7.6,-2.6) {满二叉树};
+\end{tikzpicture}
+\caption{二叉树核心形态对比}
+\label{fig:binary_tree_forms}
+\end{figure}
+
+\section{树的物理存储}
+
+\begin{enumerate}
+    \item \textbf{顺序存储法（完全二叉树）}
+    \begin{itemize}
+        \item 映射到数组 $A[0..n-1]$。
+        \item 隐式纽带：$\forall i \in \{0, \dots, n-1\}$，
+        \begin{itemize}
+            \item 左子节点索引：$l(i) = 2i + 1$（若 $< n$）
+            \item 右子节点索引：$r(i) = 2i + 2$（若 $< n$）
+            \item 父节点索引：$p(i) = \lfloor (i-1)/2 \rfloor$（若 $i > 0$）
+        \end{itemize}
+    \end{itemize}
+    \item \textbf{链式存储法（二叉链表）}
+    \begin{itemize}
+        \item 节点结构：$n = \langle lc, d, rc \rangle$，其中 $lc, rc \in \text{Node} \cup \{\emptyset\}$。
+        \item 通用树转换（孩子兄弟表示法）：$n = \langle \text{firstChild}, d, \text{nextSibling} \rangle$。
+    \end{itemize}
+\end{enumerate}
+
+\section{树的遍历 (Tree Traversal)}
+
+将非线性结构 $T$ 映射为线性序列 $\sigma \in V^*$。
+
+\subsection{递归遍历 (Recursive Traversal)}
+
+\begin{algorithm}[H]
+\caption{二叉树递归遍历伪代码 (Binary Tree Traversal)}
+\begin{algorithmic}[1]
+\Procedure{Preorder}{$u$} \Comment{前序遍历}
+    \If{$u = \emptyset$} \State \Return \EndIf
+    \State \textbf{Visit}($u$)
+    \State \text{Preorder}($u.\text{left}$)
+    \State \text{Preorder}($u.\text{right}$)
+\EndProcedure
+\Procedure{Inorder}{$u$} \Comment{中序遍历}
+    \If{$u = \emptyset$} \State \Return \EndIf
+    \State \text{Inorder}($u.\text{left}$)
+    \State \textbf{Visit}($u$)
+    \State \text{Inorder}($u.\text{right}$)
+\EndProcedure
+\Procedure{Postorder}{$u$} \Comment{后序遍历}
+    \If{$u = \emptyset$} \State \Return \EndIf
+    \State \text{Postorder}($u.\text{left}$)
+    \State \text{Postorder}($u.\text{right}$)
+    \State \textbf{Visit}($u$)
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{非递归遍历 (Iterative Traversal)}
+
+利用显式栈 $S$ 模拟系统调用栈，消除递归开销。
+
+\begin{algorithm}[H]
+\caption{中序遍历迭代伪代码 (Iterative Inorder)}
+\begin{algorithmic}[1]
+\Procedure{InorderIterative}{$root$}
+    \State $S \gets \emptyset$ \Comment{初始化空栈}
+    \State $curr \gets root$
+    \While{$curr \neq \emptyset$ \textbf{or} $S \neq \emptyset$}
+        \While{$curr \neq \emptyset$}
+            \State $\text{Push}(S, curr)$
+            \State $curr \gets curr.\text{left}$
+        \EndWhile
+        \State $curr \gets \text{Pop}(S)$
+        \State \textbf{Visit}($curr$)
+        \State $curr \gets curr.\text{right}$
+    \EndWhile
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{线索二叉树 (Threaded Binary Tree)}
+
+为消除遍历时的栈空间开销 $O(H)$，利用空指针域存储遍历序中的前驱与后继。
+
+\begin{itemize}
+    \item \textbf{数学定义}：对于节点 $u$，定义标记位 $LTag, RTag \in \{0, 1\}$：
+    \begin{itemize}
+        \item 若 $u.\text{left} = \emptyset$，则 $u.\text{left} \gets \text{pre}(u)$（中序前驱），且 $LTag(u) = 1$。
+        \item 若 $u.\text{right} = \emptyset$，则 $u.\text{right} \gets \text{succ}(u)$（中序后继），且 $RTag(u) = 1$。
+    \end{itemize}
+    \item \textbf{性质}：线索化后，遍历操作退化为线性扫描，空间复杂度降至 $O(1)$。
+\end{itemize}
+
+\subsection{遍历序列与树的唯一性}
+
+\begin{enumerate}
+    \item \textbf{唯一确定性定理}：
+    \begin{itemize}
+        \item \textbf{前序 + 中序} $\implies$ 唯一确定二叉树。
+        \item \textbf{后序 + 中序} $\implies$ 唯一确定二叉树。
+        \item \textbf{前序 + 后序} $\implies$ 仅当树为满二叉树时唯一确定，否则存在歧义（无法区分左右子树边界）。
+    \end{itemize}
+    \item \textbf{构造算法}：
+\end{enumerate}
+
+\begin{algorithm}[H]
+\caption{由前序与中序序列构造二叉树}
+\begin{algorithmic}[1]
+\State \textbf{输入}: 前序序列 $P$, 中序序列 $I$
+\Procedure{BuildTree}{$P, I$}
+    \If{$P = \emptyset$ \textbf{or} $I = \emptyset$}
+        \State \Return $\emptyset$
+    \EndIf
+    \State $root \gets P[0]$ \Comment{前序首元素为根}
+    \State $k \gets \text{Index}(I, root)$ \Comment{在中序中定位根}
+    \State $I_L \gets I[0..k-1]$, $I_R \gets I[k+1..|I|-1]$
+    \State $P_L \gets P[1..|I_L|]$, $P_R \gets P[|I_L|+1..|P|-1]$
+    \State $root.\text{left} \gets \text{BuildTree}(P_L, I_L)$
+    \State $root.\text{right} \gets \text{BuildTree}(P_R, I_R)$
+    \State \Return $root$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\section{堆体系 (Heap)}
+
+\begin{itemize}
+    \item \textbf{定义}：完全二叉树 $T$ 满足堆序性质。
+    \item \textbf{大顶堆 (Max Heap)}：$\forall v \in V, v.val \ge \text{leftChild}(v).val \land v.val \ge \text{rightChild}(v).val$。
+    \item \textbf{小顶堆 (Min Heap)}：$\forall v \in V, v.val \le \text{leftChild}(v).val \land v.val \le \text{rightChild}(v).val$。
+    \item \textbf{功能}：提供 $O(1)$ 的最值访问与 $O(\log n)$ 的动态插入/删除，是优先队列的物理实现。
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{堆下滤操作伪代码 (Sift-Down for Max Heap)}
+\begin{algorithmic}[1]
+\State \textbf{输入}: 数组 $A$, 节点索引 $i$, 堆大小 $n$
+\Procedure{SiftDown}{$i, n$}
+    \State $largest \gets i$
+    \State $l \gets 2i + 1$ \Comment{左孩子}
+    \State $r \gets 2i + 2$ \Comment{右孩子}
+    \If{$l < n$ \textbf{and} $A[l] > A[largest]$}
+        \State $largest \gets l$
+    \EndIf
+    \If{$r < n$ \textbf{and} $A[r] > A[largest]$}
+        \State $largest \gets r$
+    \EndIf
+    \If{$largest \neq i$}
+        \State \textbf{Swap}($A[i], A[largest]$)
+        \State \text{SiftDown}($largest, n$) \Comment{递归下滤}
+    \EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}

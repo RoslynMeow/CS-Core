@@ -1,0 +1,186 @@
+\chapter{运算符与位运算}
+
+\section{运算符分类}
+
+C语言提供了丰富的运算符，主要分为以下六大类：
+
+\subsection{算术运算符}
+
+\texttt{+}, \texttt{-}, \texttt{*}, \texttt{/}, \texttt{\%}（取余）, \texttt{++}（自增）, \texttt{--}（自减）。
+
+\subsection{关系运算符}
+
+\texttt{==}, \texttt{!=}, \texttt{>}, \texttt{>=}, \texttt{<}, \texttt{<=}.
+
+\subsection{逻辑运算符}
+
+\texttt{\&\&}（与）, \texttt{||}（或）, \texttt{!}（非）。
+
+\textbf{注：逻辑运算符的"短路求值"特性}：在逻辑表达式中，一旦前面的部分已经能够决定整个表达式的结果，编译器就会\textbf{停止执行}后面的表达式。
+
+\begin{lstlisting}[caption={短路求值示例}]
+int a = 0, b = 5;
+// 因为 a == 0 为假，逻辑与 && 的最终结果注定为假，所以后面的 ++b 根本不会被执行！
+if (a && (++b > 0)) { /* 不执行 */ }
+printf("%d", b); // 输出仍为 5，而不是 6！
+\end{lstlisting}
+
+\subsection{位运算符}
+
+\begin{itemize}
+    \item \texttt{\&}（按位与）：有 0 则 0，全 1 才 1。
+    \item \texttt{|}（按位或）：有 1 则 1，全 0 才 0。
+    \item \texttt{\^{}}（按位异或）：不同为 1，相同为 0。
+    \item \texttt{\textasciitilde}（按位取反）。
+    \item \texttt{<<}（左移）、\texttt{>>}（右移）。
+\end{itemize}
+
+\textbf{移位运算的数学本质}：在不溢出的前提下，一个无符号整数\textbf{左移 n 位} \texttt{<< n} 相当于该数 $\times 2^n$；\textbf{右移 n 位} \texttt{>> n} 相当于该数 $\div 2^n$（向下取整）。这比直接用乘除法指令执行速度更快。
+
+\subsection{赋值运算符}
+
+\texttt{=}, \texttt{+=}, \texttt{-=} 等（包含存取/复合赋值）。
+
+\subsection{杂项运算符}
+
+\begin{itemize}
+    \item \texttt{sizeof()}：返回类型或变量所占用的字节数（Byte）。
+    \item \texttt{\&}：取地址符（获取变量的内存地址）。
+    \item \texttt{*}：解引用符/间接寻址符（通过地址获取值）。
+    \item \texttt{? :}：三目运算符（条件表达式，等价于 \texttt{if-else} 简写）。
+    \item \texttt{()}, \texttt{[]}, \texttt{.}, \texttt{->}：括号、数组下标及结构体成员访问符。
+\end{itemize}
+
+\section{运算符优先级可视化}
+
+从高到低的优先级顺序如下表所示。同一行内的运算符优先级相同，结合性决定求值方向。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    box/.style={draw, minimum width=11cm, minimum height=0.55cm, font=\ttfamily\small, align=left},
+    lvl/.style={font=\bfseries\small, text=blue},
+    arrow/.style={->, >=latex, thick}
+]
+    \node[lvl, anchor=east] (l1) at (-1.2, 0) {1 (最高)};
+    \node[box] (b1) at (5, 0) {\texttt{()} \quad \texttt{[]} \quad \texttt{->} \quad \texttt{.}};
+    
+    \node[lvl, anchor=east] (l2) at (-1.2, -0.7) {2};
+    \node[box] (b2) at (5, -0.7) {\texttt{++} \texttt{--} \texttt{!} \texttt{\textasciitilde} \texttt{sizeof} \texttt{\&} \texttt{*} \quad (单目/一元)};
+    
+    \node[lvl, anchor=east] (l3) at (-1.2, -1.4) {3};
+    \node[box] (b3) at (5, -1.4) {\texttt{*} \texttt{/} \texttt{\%} \quad (乘、除、取余)};
+    
+    \node[lvl, anchor=east] (l4) at (-1.2, -2.1) {4};
+    \node[box] (b4) at (5, -2.1) {\texttt{+} \texttt{-} \quad (加、减)};
+    
+    \node[lvl, anchor=east] (l5) at (-1.2, -2.8) {5};
+    \node[box] (b5) at (5, -2.8) {\texttt{<<} \texttt{>>} \quad (移位)};
+    
+    \node[lvl, anchor=east] (l6) at (-1.2, -3.5) {6};
+    \node[box] (b6) at (5, -3.5) {\texttt{<} \texttt{>} \texttt{<=} \texttt{>=} \quad (关系比较：大小)};
+    
+    \node[lvl, anchor=east] (l7) at (-1.2, -4.2) {7};
+    \node[box] (b7) at (5, -4.2) {\texttt{==} \texttt{!=} \quad (关系比较：相等)};
+    
+    \node[lvl, anchor=east] (l8) at (-1.2, -4.9) {8};
+    \node[box] (b8) at (5, -4.9) {\texttt{\&} \quad (按位与)};
+    
+    \node[lvl, anchor=east] (l9) at (-1.2, -5.6) {9};
+    \node[box] (b9) at (5, -5.6) {\texttt{\^{}} \quad (按位异或)};
+    
+    \node[lvl, anchor=east] (l10) at (-1.2, -6.3) {10};
+    \node[box] (b10) at (5, -6.3) {\texttt{|} \quad (按位或)};
+    
+    \node[lvl, anchor=east] (l11) at (-1.2, -7.0) {11};
+    \node[box] (b11) at (5, -7.0) {\texttt{\&\&} \quad (逻辑与)};
+    
+    \node[lvl, anchor=east] (l12) at (-1.2, -7.7) {12};
+    \node[box] (b12) at (5, -7.7) {\texttt{||} \quad (逻辑或)};
+    
+    \node[lvl, anchor=east] (l13) at (-1.2, -8.4) {13};
+    \node[box] (b13) at (5, -8.4) {\texttt{?:} \quad (三目/条件)};
+    
+    \node[lvl, anchor=east] (l14) at (-1.2, -9.1) {14 (最低)};
+    \node[box] (b14) at (5, -9.1) {\texttt{=} \texttt{+=} \texttt{-=} \dots \quad \texttt{,} \quad (赋值与逗号)};
+    
+    % 结合性标注
+    \node[font=\small, anchor=west] at (11, 0) {$\leftarrow$ 左结合};
+    \node[font=\small, anchor=west] at (11, -0.7) {$\leftarrow$ 右结合};
+    \node[font=\small, anchor=west] at (11, -4.9) {$\leftarrow$ 左结合};
+    \node[font=\small, anchor=west] at (11, -8.4) {$\leftarrow$ 右结合};
+    \node[font=\small, anchor=west] at (11, -9.1) {$\leftarrow$ 右结合};
+\end{tikzpicture}
+\caption{C语言运算符优先级全图（从上到下优先级递减）}
+\label{fig:operator_priority}
+\end{figure}
+
+\textbf{工程建议}：当表达式涉及多种运算符混合时，不要依赖记忆优先级，而是\textbf{显式使用括号}来明确意图。
+
+\section{位运算高级技巧}
+
+\subsection{异或（XOR）原地值交换算法（无需临时变量）}
+
+利用 \texttt{A \textasciicircum{} B} 相同为0、不同为1以及自反的特性，可以不借助临时变量交换两个整数：
+
+\begin{lstlisting}[caption={XOR 交换算法}]
+// 假设 int a = 60 (0011 1100), b = 13 (0000 1101)
+a = a ^ b; // 得到中间值 0011 0001
+b = a ^ b; // 此时 b 变为了原 a 的值 (0011 1100)
+a = a ^ b; // 此时 a 变为了原 b 的值 (0000 1101)
+\end{lstlisting}
+
+\subsection{判断一个数是否为 2 的幂次 ($2^k$)}
+
+利用 \texttt{n \& (n - 1)} 能够完美消除二进制中最低位 1 的数学特性：
+
+\begin{lstlisting}[caption={2 的幂次判定}]
+// 若成立，说明 n 的二进制表示中仅含有一个 1，即它是 2 的整数次幂
+if ((n > 0) && (n & (n - 1)) == 0) { /* 是 2 的幂次 */ }
+\end{lstlisting}
+
+\subsection{常用位运算操作}
+
+\begin{itemize}
+    \item \textbf{置位（Set Bit）}：\texttt{n |= (1 << k)}，将第 $k$ 位置为 1。
+    \item \textbf{清零（Clear Bit）}：\texttt{n \&= \textasciitilde(1 << k)}，将第 $k$ 位置为 0。
+    \item \textbf{取反位（Toggle Bit）}：\texttt{n \textasciicircum{}= (1 << k)}，翻转第 $k$ 位。
+    \item \textbf{检测位（Test Bit）}：\texttt{(n >> k) \& 1}，获取第 $k$ 位的值。
+\end{itemize}
+
+\section{原码、反码与补码}
+
+计算机内部一律使用\textbf{补码}来存储和计算整数：
+
+\begin{itemize}
+    \item \textbf{原码}：最高位为符号位（0表示正，1表示负），其余位表示数值绝对值。
+    \item \textbf{反码}：正数的反码与原码相同；负数的反码为原码除符号位外，其余各位按位取反（0变1，1变0）。
+    \item \textbf{补码}：正数的补码与原码相同；负数的补码为\textbf{反码 + 1}。
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    box/.style={draw, minimum width=1.8cm, minimum height=0.6cm, font=\ttfamily\small, align=center},
+    arrow/.style={->, >=latex, thick},
+    lbl/.style={font=\small}
+]
+    \node[lbl, anchor=east] at (-2, 0.5) {+5};
+    \node[box] (a1) at (0, 0.5) {0000 0101};
+    \node[box] (a2) at (2.5, 0.5) {0000 0101};
+    \node[box] (a3) at (5, 0.5) {0000 0101};
+    \node[lbl] at (0, 1.1) {原码};
+    \node[lbl] at (2.5, 1.1) {反码};
+    \node[lbl] at (5, 1.1) {补码};
+    
+    \node[lbl, anchor=east] at (-2, -0.5) {-5};
+    \node[box] (b1) at (0, -0.5) {1000 0101};
+    \node[box] (b2) at (2.5, -0.5) {1111 1010};
+    \node[box] (b3) at (5, -0.5) {1111 1011};
+    
+    \draw[arrow] (b1.east) -- node[lbl, above] {符号位外取反} (b2.west);
+    \draw[arrow] (b2.east) -- node[lbl, above] {+1} (b3.west);
+\end{tikzpicture}
+\caption{原码、反码、补码转换关系（以 8 位为例）}
+\label{fig:complement}
+\end{figure}

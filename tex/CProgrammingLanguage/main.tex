@@ -1,0 +1,114 @@
+\documentclass[12pt,a4paper]{ctexrep}
+\usepackage{amsmath,amssymb}
+\usepackage{fontspec}
+\xeCJKsetup{AutoFallBack = true}
+\setCJKfallbackfamilyfont\CJKrmdefault{Malgun Gothic}[Scale=MatchLowercase]
+\setCJKfallbackfamilyfont\CJKsfdefault{Malgun Gothic}[Scale=MatchLowercase]
+\setCJKfallbackfamilyfont\CJKttdefault{Malgun Gothic}[Scale=MatchLowercase]
+\usepackage[top=1.5cm,bottom=1.5cm,left=1cm,right=1cm,headheight=15pt]{geometry}
+\usepackage{pdflscape}
+
+
+\usepackage[bookmarks=false]{hyperref}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{shapes.multipart, decorations.pathreplacing, arrows.meta, positioning, matrix, calc}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{tabulary}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{setspace}
+\usepackage{fancyhdr}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\lstset{
+    language=C,
+    basicstyle=\ttfamily\footnotesize,
+    keywordstyle=\color{blue}\bfseries,
+    commentstyle=\color{gray},
+    stringstyle=\color{red},
+    numbers=none,
+    numberstyle=\tiny\color{gray},
+    frame=single,
+    breaklines=true,
+    breakatwhitespace=true,
+    captionpos=b,
+    showstringspaces=false,
+    columns=flexible,
+    float=H,
+    literate={\#}{{\#}}1 {\$}{{\$}}1 {\%}{{\%}}1 {\&}{{\&}}1 {\_}{{\_}}1,
+    keepspaces=true
+}
+
+\onehalfspacing
+
+\setlength{\hbadness}{10000}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    citecolor=black,
+    urlcolor=blue
+}
+
+\title{\textbf{\huge The C Programming Language}}
+\author{}
+\date{}
+
+\begin{document}
+
+\clearpage
+\thispagestyle{empty}
+\vspace*{\fill}
+
+\begin{center}
+{\huge The C Programming Language}\\[0.8em]
+{\large From Syntax to Pointers}\\[2.5em]
+{\large MS Roslyn}\\[0.6em]
+{\large \today}
+\end{center}
+
+\vspace{2.5em}
+
+\begin{center}
+{\bfseries 摘要}
+\end{center}
+
+\vspace{1em}
+
+\begin{center}
+本教程系统介绍 C 语言的语法与程序设计实践，涵盖程序结构与词法基础、数据类型、指针与地址、运算符与位运算、存储类别与内存模型、输入输出与文件操作，以及预处理与工程实践，并在附录中提供 C 标准库常用函数的速查手册。教程以简洁直观的方式组织知识，适合希望扎实掌握 C 语言原理与底层机制的读者。
+\end{center}
+
+\vspace*{\fill}
+\clearpage
+
+\tableofcontents
+\newpage
+
+\pagestyle{fancy}
+\fancyhf{}
+
+\clearpage
+\input{chapters/intro}
+\clearpage
+\input{chapters/structure_lexical}
+\clearpage
+\input{chapters/data_types}
+\clearpage
+\input{chapters/pointers_addresses}
+\clearpage
+\input{chapters/operators_bitwise}
+\clearpage
+\input{chapters/storage_memory}
+\clearpage
+\input{chapters/io_files}
+\clearpage
+\input{chapters/preprocessor_engineering}
+\clearpage
+\input{chapters/stdlib_overview}
+
+\end{document}

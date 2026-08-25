@@ -1,0 +1,124 @@
+\chapter{Non-linear Structures II: Graph Theory}
+
+图是一种多对多的网状逻辑结构，用于建模现实世界中复杂的关联网络。
+
+\section{图的形式化定义}
+
+图 $G$ 定义为二元组 $G = (V, E)$：
+\begin{itemize}
+    \item $V = \{v_1, v_2, \dots, v_n\}$ 为有限顶点集合。
+    \item $E \subseteq V \times V$ 为边集合。
+    \item 若 $E$ 为无序对集合 $\{\{u, v\} \mid u, v \in V\}$，则为无向图; 若为有序对集合 $\{(u, v) \mid u, v \in V\}$，则为有向图。
+\end{itemize}
+
+\textbf{扩展属性}：
+\begin{itemize}
+    \item \textbf{权重函数}：$w: E \to \mathbb{R}$，赋予每条边实数值。
+    \item \textbf{邻接映射}：$N: V \to \mathcal{P}(V)$，其中 $N(u) = \{ v \mid (u, v) \in E \}$。
+\end{itemize}
+
+\section{边的拓扑分类}
+
+\begin{enumerate}
+    \item \textbf{有向无环图 (DAG)}：有向图且不存在序列 $\langle v_1, v_2, \dots, v_k \rangle$ 使得 $(v_i, v_{i+1}) \in E$ 且 $v_1 = v_k$。
+    \item \textbf{连通图 (Connected Graph)}：无向图中 $\forall u, v \in V$，存在路径 $P = \langle u=x_0, x_1, \dots, x_k=v \rangle$ 使得 $(x_i, x_{i+1}) \in E$。
+\end{enumerate}
+
+\section{连通性深度分析}
+
+\begin{itemize}
+    \item \textbf{强连通 (Strongly Connected)}：有向图中 $\forall u, v \in V$，存在 $u \to v$ 路径且存在 $v \to u$ 路径。
+    \item \textbf{弱连通 (Weakly Connected)}：忽略边方向后形成的无向图是连通的。
+    \item \textbf{桥 (Bridge)}：边 $e \in E$ 为桥 $\iff$ 移除 $e$ 后图的连通分量数增加，即 $G' = (V, E \setminus \{e\})$ 不连通。
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    gnode/.style={circle, draw, minimum size=0.62cm, font=\ttfamily, inner sep=1pt},
+    dedge/.style={->, >=latex, thick},
+    uedge/.style={draw, thick},
+    lbl/.style={font=\small\bfseries}
+]
+    \node[gnode] (a) at (0,0) {A};
+    \node[gnode] (b) at (2.2,0) {B};
+    \node[gnode] (c) at (0,-2.2) {C};
+    \node[gnode] (d) at (2.2,-2.2) {D};
+    \draw[dedge] ($(a.east)+(0,0.12)$) -- ($(b.west)+(0,0.12)$);
+    \draw[dedge] ($(b.west)-(0,0.12)$) -- ($(a.east)-(0,0.12)$);
+    \draw[dedge] (a) -- (c);
+    \draw[dedge] (c) -- (d);
+    \draw[dedge] (d) -- (b);
+    \node[lbl] at (1.1,-3.0) {强连通有向图};
+
+    \node[gnode] (a2) at (5.5,0) {A};
+    \node[gnode] (b2) at (7.5,0) {B};
+    \node[gnode] (c2) at (6.5,-1.7) {C};
+    \draw[uedge] (a2) -- (b2);
+    \draw[uedge] (a2) -- (c2);
+    \draw[uedge] (b2) -- (c2);
+    \node[gnode] (x2) at (10.5,0) {X};
+    \node[gnode] (y2) at (12.5,0) {Y};
+    \node[gnode] (z2) at (11.5,-1.7) {Z};
+    \draw[uedge] (x2) -- (y2);
+    \draw[uedge] (x2) -- (z2);
+    \draw[uedge] (y2) -- (z2);
+    \draw[uedge, double, thick] (c2) -- (z2)
+        node[midway, below=2pt, font=\small] {桥 $e$：$G-e$ 不连通};
+    \node[lbl] at (9,-3.0) {包含``桥''的断连风险图};
+\end{tikzpicture}
+\caption{图的位置连通性形态与``桥''}
+\label{fig:graph_connectivity}
+\end{figure}
+
+\section{图的降维与拓扑排序}
+
+\begin{algorithm}[H]
+\caption{图遍历伪代码 (Graph Traversal)}
+\begin{algorithmic}[1]
+\State \textbf{全局变量}: $\text{Visited} \subseteq V$ (初始为 $\emptyset$)
+\Procedure{BFS}{$s$} \Comment{广度优先搜索}
+    \State $Q \gets \{s\}$
+    \State $\text{Visited} \gets \text{Visited} \cup \{s\}$
+    \While{$Q \neq \emptyset$}
+        \State $u \gets \text{Dequeue}(Q)$
+        \State \textbf{Visit}($u$)
+        \ForAll{$v \in N(u) \setminus \text{Visited}$}
+            \State $\text{Visited} \gets \text{Visited} \cup \{v\}$
+            \State $\text{Enqueue}(Q, v)$
+        \EndFor
+    \EndWhile
+\EndProcedure
+\Procedure{DFS}{$u$} \Comment{深度优先搜索}
+    \State $\text{Visited} \gets \text{Visited} \cup \{u\}$
+    \State \textbf{Visit}($u$)
+    \ForAll{$v \in N(u) \setminus \text{Visited}$}
+        \State \text{DFS}($v$)
+    \EndFor
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\begin{itemize}
+    \item \textbf{拓扑排序 (Topological Sort)}：
+    \begin{itemize}
+        \item 对象：DAG。
+        \item 目标：构造线性序列 $\sigma = \langle v_1, \dots, v_n \rangle$ 使得 $\forall (u, v) \in E$，若 $u=v_i, v=v_j$，则 $i < j$。
+    \end{itemize}
+\end{itemize}
+
+\section{图的物理存储实现}
+
+\begin{enumerate}
+    \item \textbf{邻接矩阵 (Adjacency Matrix)}
+    \begin{itemize}
+        \item 定义：$A \in \{0, 1\}^{n \times n}$，其中 $A_{ij} = 1 \iff (v_i, v_j) \in E$。
+        \item 带权图：$A_{ij} = w(v_i, v_j)$ 或 $\infty$。
+        \item 空间复杂度：$O(|V|^2)$，适合稠密图。
+    \end{itemize}
+    \item \textbf{邻接表 (Adjacency List)}
+    \begin{itemize}
+        \item 定义：数组 $\text{Adj}[1..n]$，其中 $\text{Adj}[i] = \{ v \mid (v_i, v) \in E \}$ 以链表形式存储。
+        \item 空间复杂度：$O(|V| + |E|)$，适合稀疏图。
+    \end{itemize}
+\end{enumerate}

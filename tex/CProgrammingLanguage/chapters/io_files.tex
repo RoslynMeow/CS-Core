@@ -1,0 +1,241 @@
+\chapter{输入输出与文件}
+
+\section{C语言输入输出核心概念}
+
+\begin{itemize}
+    \item \textbf{所有的设备都是文件（标准文件）}：\texttt{stdin}（键盘）、\texttt{stdout}（屏幕）、\texttt{stderr}（标准错误输出）。
+    \item \textbf{封装形式}：以上文件及I/O函数都统一封装在标准库 \texttt{<stdio.h>} 中。
+\end{itemize}
+
+\section{\texorpdfstring{\texttt{stdio.h} 的函数管理}{stdio.h 的函数管理}}
+
+\subsection{格式化输出：\texttt{printf}}
+
+\begin{itemize}
+    \item \textbf{原型}：\texttt{printf(const char* format, ...);}
+    \item \textbf{作用}：格式化输出字符到屏幕。
+\end{itemize}
+
+\subsection{格式化输入：\texttt{scanf}}
+
+\begin{itemize}
+    \item \textbf{原型}：\texttt{scanf(const char* format, ...);}
+    \item \textbf{作用}：从屏幕按某个格式获取一个值。
+    \item \textbf{参数说明}：
+    \begin{itemize}
+        \item \texttt{format}：是一个格式字符串，用于指定输出/输入的格式。
+        \item \texttt{...}：是一个可变长的参数列表，对应每一个前方的格式说明符的数据。
+        \item \textbf{格式说明符}：如 \texttt{\%d}（整型）、\texttt{\%ld}（长整型）、\texttt{\%.3f} 等，代表这个占位的区域存放什么类型的数据。
+        \item \textbf{转义字符}：一个既定的组合，表示一个特殊的意义。例如：\texttt{\textbackslash n}（换行）、\texttt{\textbackslash r}（回车）、\texttt{\textbackslash t}（制表符）、\texttt{\textbackslash b}（退格）。
+    \end{itemize}
+\end{itemize}
+
+\subsection{字符级 I/O}
+
+\begin{itemize}
+    \item \textbf{\texttt{int getchar()}}：从屏幕读取下一个可用的字符（从当前字符集）。
+    \item \textbf{\texttt{int putchar(int c)}}：输出到屏幕某一个字符（从当前字符集）。
+\end{itemize}
+
+\subsection{字符串级 I/O}
+
+\begin{itemize}
+    \item \textbf{\texttt{char* fgets(char* str, int n, FILE* stream);}}：从某个标准流中读取一些字符串。\texttt{n} 是从流中读取字符的个数。
+    \item \textbf{\texttt{int fputs(const char* str, FILE* stream);}}：朝某个标准流注入字符串。\texttt{str} 是一个用于存放字符串的数组；\texttt{stream} 是一个标准流的指针。
+\end{itemize}
+
+\subsection{\texorpdfstring{现代 C语言中 \texttt{gets()} 的重大安全隐患}{gets() 的安全隐患}}
+
+老课本常提到的 \texttt{gets(str)} 因为\textbf{无法限制读取输入的长度}，极易导致缓冲区溢出（Buffer Overflow）甚至导致系统崩溃或被黑客攻击。\textbf{在现代 C 标准（C11及以后）中已经被完全废弃}。
+
+\textbf{标准替代方案}：请一律使用 \texttt{fgets} 代替。
+
+\begin{lstlisting}[caption={安全的字符串读取}]
+char buf[100];
+// 最多只读取 99 个字符，并在末尾自动补 '\0'，绝对不会发生内存越界溢出
+fgets(buf, sizeof(buf), stdin); 
+\end{lstlisting}
+
+\section{文件操作}
+
+\subsection{打开与关闭文件}
+
+\begin{itemize}
+    \item \textbf{\texttt{FILE* fopen(const char* filename, const char* mode);}}：以流形式的某种模式打开文件。
+    \begin{itemize}
+        \item \texttt{filename}：是一个文件路径。
+        \item \texttt{mode}：是一个访问模式符号，如 \texttt{r}/\texttt{w}/\texttt{a}（读/写/添），加上 \texttt{+} 表示拓展写模式。如果在后面追加 \texttt{"b"}（如 \texttt{"rb"}, \texttt{"wb"}）则代表以二进制流模式访问。
+    \end{itemize}
+    \item \textbf{\texttt{int fclose(FILE* fp);}}：关闭文件。正常关闭返回 \texttt{0}，发生错误返回 \texttt{EOF} (-1)。
+\end{itemize}
+
+\textbf{注：忘记 \texttt{fclose} 导致的资源泄漏}：每次 \texttt{fopen} 打开文件都会占用操作系统的文件描述符及内存缓冲区。如果写程序忘记执行 \texttt{fclose}，会导致系统资源耗尽。
+
+\subsection{字符级文件 I/O}
+
+\begin{itemize}
+    \item \textbf{\texttt{int fputc(int c, FILE* fp);}}：向指定文件流中写入一个字符。
+    \item \textbf{\texttt{int fgetc(FILE* fp);}}：从指定文件流中读取一个字符。
+\end{itemize}
+
+\section{二进制文件读写与块操作}
+
+访问二进制文件时，访问模式必须添加一个 \texttt{b}，如 \texttt{rb} / \texttt{wb} / \texttt{ab} / \texttt{rb+} / \texttt{wb+} / \texttt{ab+}。
+
+\begin{itemize}
+    \item \textbf{\texttt{size\_t fread(void* ptr, size\_t size, size\_t count, FILE* stream);}}
+    \item \textbf{\texttt{size\_t fwrite(const void* ptr, size\_t size, size\_t count, FILE* stream);}}
+\end{itemize}
+
+\subsection{特点与应用场景}
+
+\begin{itemize}
+    \item \textbf{特点}：1. 读写快；2. 无精度损失。
+    \item \textbf{适用场景}：结构体、数组、图像、音频、视频。
+    \item \textbf{高级特性}：具备一级加密的效果（由于非文本格式，无法直接通过常规文本编辑器直观查看，会显示为乱码）。
+\end{itemize}
+
+\section{完整文件操作示例}
+
+\subsection{文本文件读写完整示例}
+
+\begin{lstlisting}[caption={文本文件写入与读取}]
+#include <stdio.h>
+
+int main() {
+    // 写入文件
+    FILE *fp = fopen("data.txt", "w");
+    if (fp == NULL) {
+        printf("打开文件失败\n");
+        return 1;
+    }
+    fprintf(fp, "姓名: %s\n", "张三");
+    fprintf(fp, "成绩: %d\n", 95);
+    fclose(fp);
+    
+    // 读取文件
+    fp = fopen("data.txt", "r");
+    if (fp == NULL) {
+        printf("打开文件失败\n");
+        return 1;
+    }
+    char buf[256];
+    while (fgets(buf, sizeof(buf), fp) != NULL) {
+        printf("%s", buf);
+    }
+    fclose(fp);
+    return 0;
+}
+\end{lstlisting}
+
+\subsection{二进制文件读写结构体完整示例}
+
+\begin{lstlisting}[caption={二进制文件读写结构体数组}]
+#include <stdio.h>
+
+struct Student {
+    char name[20];
+    int age;
+    float score;
+};
+
+int main() {
+    struct Student students[3] = {
+        {"Alice", 20, 95.5},
+        {"Bob", 21, 88.0},
+        {"Charlie", 19, 92.3}
+    };
+    
+    // 写入二进制文件
+    FILE *fp = fopen("students.dat", "wb");
+    if (fp == NULL) return 1;
+    fwrite(students, sizeof(struct Student), 3, fp);
+    fclose(fp);
+    
+    // 读取二进制文件
+    struct Student buffer[3];
+    fp = fopen("students.dat", "rb");
+    if (fp == NULL) return 1;
+    fread(buffer, sizeof(struct Student), 3, fp);
+    fclose(fp);
+    
+    for (int i = 0; i < 3; i++) {
+        printf("姓名: %s, 年龄: %d, 成绩: %.1f\n",
+               buffer[i].name, buffer[i].age, buffer[i].score);
+    }
+    return 0;
+}
+\end{lstlisting}
+
+\subsection{文件位置指针操作}
+
+\begin{itemize}
+    \item \textbf{\texttt{long ftell(FILE* fp)}}：返回当前文件位置指针相对于文件开头的偏移量（字节数）。
+    \item \textbf{\texttt{int fseek(FILE* fp, long offset, int whence)}}：将文件位置指针移动到指定位置。\texttt{whence} 可取 \texttt{SEEK\_SET}（文件开头）、\texttt{SEEK\_CUR}（当前位置）、\texttt{SEEK\_END}（文件末尾）。
+    \item \textbf{\texttt{void rewind(FILE* fp)}}：将文件位置指针重置到文件开头，等价于 \texttt{fseek(fp, 0, SEEK\_SET)}。
+\end{itemize}
+
+\begin{lstlisting}[caption={fseek 随机访问示例}]
+FILE *fp = fopen("data.bin", "rb");
+// 跳过前 2 个结构体，直接读取第 3 个
+fseek(fp, 2 * sizeof(struct Student), SEEK_SET);
+struct Student third;
+fread(&third, sizeof(struct Student), 1, fp);
+fclose(fp);
+\end{lstlisting}
+
+\section{输入缓冲区陷阱与解决方案}
+
+初学者最常遇到的 I/O Bug 是：在使用 \texttt{scanf} 读取数字后，紧接着使用 \texttt{fgets} 读取字符串，结果 \texttt{fgets} 直接跳过，读取到一个空行。
+
+\subsection{问题根源}
+
+\texttt{scanf} 在读取数字时，遇到非数字字符（如换行符 \texttt{\textbackslash n}）会停止读取，但会将该换行符留在输入缓冲区中。随后的 \texttt{fgets} 会立即读取到这个残留的换行符，认为已经读取了一行，从而跳过用户输入。
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.95\textwidth}
+\begin{lstlisting}[caption={输入缓冲区陷阱演示}]
+int age;
+char name[50];
+
+printf("请输入年龄: ");
+scanf("%d", &age);  // 用户输入 "20<回车>"，scanf 读取 20，留下 \n
+
+printf("请输入姓名: ");
+fgets(name, sizeof(name), stdin); 
+// fgets 立即读到残留的 \n，直接返回，导致 name 为空字符串！
+
+printf("年龄: %d, 姓名: %s\n", age, name);
+\end{lstlisting}
+\end{minipage}
+\end{figure}
+
+\subsection{标准解决方案}
+
+\begin{enumerate}
+    \item \textbf{清空输入缓冲区}：在 \texttt{scanf} 后手动消耗掉残留字符，直到遇到换行符或 EOF。
+    \item \textbf{统一使用 \texttt{fgets}}：放弃 \texttt{scanf}，全部使用 \texttt{fgets} 读取整行，再用 \texttt{sscanf} 或 \texttt{strtol} 解析。这是最安全、最推荐的做法。
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\begin{minipage}{0.95\textwidth}
+\begin{lstlisting}[caption={清空缓冲区与统一 fgets 方案}]
+// 方法 1：手动清空缓冲区
+int c;
+while ((c = getchar()) != '\n' && c != EOF);
+
+// 方法 2（推荐）：统一使用 fgets + sscanf
+char buf[100];
+int age;
+
+printf("请输入年龄: ");
+fgets(buf, sizeof(buf), stdin);
+sscanf(buf, "%d", &age);  // 从缓冲区解析数字，安全且不会残留
+
+printf("请输入姓名: ");
+fgets(name, sizeof(name), stdin); // 正常等待用户输入
+\end{lstlisting}
+\end{minipage}
+\end{figure}
