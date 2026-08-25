@@ -131,10 +131,12 @@ function gen(cfg: Cfg): Frame<Scene>[] {
     const ok = orig.length > 0;
     const after = hasPrev ? cur : ok ? orig.slice(1) : orig;
     if (!ok) { const s0 = buildScene(cfg, 'idle', orig); return [{ line: 0, caption: T('空队列：$r=f$，Dequeue 失败', 'empty dequeue (r=f)'), scene: s0 }]; }
-    const nextFront = (cfg.front + 1) % cap;
-    const afterScene = buildScene({ ...cfg, front: nextFront, dataStr: after.join(',') }, 'dequeue', after);
+    // exec 已把 front 推到 dequeue 后值；操作前 = front-1（循环模）
+    const frontAfter = ((cfg.front | 0) % cap + cap) % cap;
+    const frontBefore = (frontAfter - 1 + cap) % cap;
+    const afterScene = buildScene(cfg, 'dequeue', after); // front = cfg.front（操作后）
     return [
-      { line: 0, caption: T(`Dequeue：队首 $x=${orig[0]}$ 出列（$Q[f]\gets x$）`, `dequeue ${orig[0]}`), scene: buildScene(cfg, 'dequeue', orig) },
+      { line: 0, caption: T(`Dequeue：队首 $x=${orig[0]}$ 出列（$Q[f]\gets x$）`, `dequeue ${orig[0]}`), scene: buildScene({ ...cfg, front: frontBefore }, 'dequeue', orig) },
       { line: 1, caption: T(`游标：$f\gets (f+1)\bmod ${cap} = ${afterScene.front}$ → 0x${(afterScene.frontAddr ?? 0).toString(16) || 'null'}`, `f→${afterScene.front}`), scene: afterScene },
       { line: 2, caption: T(`完成：$[${after.join(',')||'∅'}]$`, `done`), scene: { ...afterScene, phase: 'dequeue', val: v } },
     ];

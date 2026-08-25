@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { T } from '../../i18n/lang';
 import type { Frame, ModuleDef } from '../../engine/types';
 import { buildMemoryUrl, hexFromBytes, toHexByte } from '../../lib/memoryDump';
+import { MathText } from '../../lib/tex';
 /**
  * 字符串 · 定界与运算
  * 基于 tex/DataStructure/LinearStructureAndADT「字符串 (String)」与
@@ -74,7 +75,7 @@ function buildScene(cfg: Cfg, phase: Scene['phase'], focus1: number | null, focu
   // strcat：dst=s1 末尾的 \0 被覆盖，把 src 逐字符复制（含 src 的 \0）
   const concat: Cell[] = [...s1.slice(0, -1), ...s2];
   let caption = '';
-  if (phase === 'idle') caption = T(`$s_1="${cfg.s1}"$，$s_2="${cfg.s2}"$ · 选中运算查看`, `s1/s2 ready`).zh;
+  if (phase === 'idle') caption = T(`$s_1="${cfg.s1}"$ · 选中运算查看`, 's1 ready').zh;
   return { mode: cfg.mode, s1, s2, base1: baseFor(0), base2: baseFor(1), focus1, focus2, phase, len1, diff, concat, caption };
 }
 
@@ -86,7 +87,6 @@ function gen(cfg: Cfg): Frame<Scene>[] {
     return [
       { line: 0, caption: T(`物理存储：$s \\in \\Sigma^*$ 映为字符数组，尾加终结符 $\\#\\notin\\Sigma$（0x00）界定边界`, 'layout'), scene: buildScene(cfg, 'idle', null, null) },
       { line: 1, caption: T(`$s_1="${cfg.s1}"$：字符 ${s1.length - 1} 个 + 哨兵 $\\#=0x00$ @$0x${baseFor(0).toString(16)}$`, 's1 layout'), scene: buildScene(cfg, 'idle', s1.length - 1, null) },
-      { line: 2, caption: T(`$s_2="${cfg.s2}"$：同样以 $\\#=0x00$ 界定，长度 $|s_2|=${Math.max(0, s2.length - 1)}$`, 's2 layout'), scene: buildScene(cfg, 'idle', null, s2.length - 1) },
     ];
   }
   if (cfg.mode === 'strlen') {
@@ -176,9 +176,9 @@ export const stringOpsModule: ModuleDef<Scene, Cfg> = {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, fontWeight: 800, color: '#475569' }}>{isZh ? '参数' : 'PARAMS'}</span>
-          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>$s_1$</span>
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span><MathText text="$s_1$" /></span>
             <input className="txt" value={draft.s1} onChange={e => set({ s1: sanitize(e.target.value, 12) })} style={{ width: 90 }} placeholder="Hi" /></label>
-          {(draft.mode === 'layout' || draft.mode === 'strcmp' || draft.mode === 'strcat') && <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>$s_2$</span>
+          {(draft.mode === 'strcmp' || draft.mode === 'strcat') && <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span><MathText text="$s_2$" /></span>
             <input className="txt" value={draft.s2} onChange={e => set({ s2: sanitize(e.target.value, 8) })} style={{ width: 70 }} placeholder="!" /></label>}
           <button className="ghost" onClick={() => onChange(stringOpsModule.randomize!(draft))}>↻ {t(T('重新生成', 'Regenerate'))}</button>
           <button className="ghost" onClick={() => onChange({ ...stringOpsModule.defaultConfig } as Cfg)}>{t(T('清空', 'Clear'))}</button>
@@ -192,7 +192,7 @@ export const stringOpsModule: ModuleDef<Scene, Cfg> = {
   Render({ scene }) {
     const row = (label: string, cells: Cell[], base: number, focus: number | null, tag: string) => (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        <div style={{ fontSize: 11, fontWeight: 800, color: '#475569' }}>{label} · @0x{base.toString(16)}</div>
+        <div style={{ fontSize: 11, fontWeight: 800, color: '#475569' }}><MathText text={label} /> · @0x{base.toString(16)}</div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {cells.map((c, i) => {
             const isTerm = c.byte === 0;
@@ -213,7 +213,7 @@ export const stringOpsModule: ModuleDef<Scene, Cfg> = {
         <div style={{ border: '1px solid #c7d2fe', borderRadius: 12, overflow: 'hidden', background: '#eef2ff' }}>
           <div style={{ padding: '8px 10px', fontSize: 11, fontWeight: 800, color: '#4338ca', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
             <span>逻辑视图 · 字符串</span>
-            <span style={{ fontWeight: 400, color: '#64748b' }}>字符数组 + $\\#$（0x00）终结 · 1 字符 = 1 字节</span>
+            <span style={{ fontWeight: 400, color: '#64748b' }}><MathText text={'字符数组 + $\\#$（0x00）终结 · 1 字符 = 1 字节'} /></span>
           </div>
           <div style={{ padding: 12, display: 'grid', gap: 12 }}>
             <div style={{ textAlign: 'center', fontSize: 12, color: '#475569', fontWeight: 700 }}>
@@ -226,7 +226,7 @@ export const stringOpsModule: ModuleDef<Scene, Cfg> = {
             ) : (
               row(`$s_1="${scene.s1.slice(0, -1).map(c => c.ch).join('')}"$ · 长度 ${scene.len1}`, scene.s1, scene.base1, scene.focus1, 's1')
             )}
-            {(scene.mode === 'layout' || scene.mode === 'strcmp' || (scene.mode === 'strcat' && scene.phase !== 'result')) && (
+            {(scene.mode === 'strcmp' || (scene.mode === 'strcat' && scene.phase !== 'result')) && (
               row(`$s_2="${scene.s2.slice(0, -1).map(c => c.ch).join('')}"$`, scene.s2, scene.base2, scene.focus2, 's2')
             )}
             <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#64748b', textAlign: 'center' }}>
