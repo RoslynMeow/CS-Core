@@ -395,18 +395,23 @@ export function GraphStudio() {
           setLabels(Array.isArray(snap.labels) ? snap.labels : Array.from({ length: snap.n }, (_, i) => String(i)));
           setManual(snap.manual ?? {});
           if (['adjlist', 'adjmat', 'array', 'edges'].includes(snap.repr)) setRepr(snap.repr);
+          if (['tree', 'circle', 'force', 'free'].includes(snap.layout)) setLayout(snap.layout);
+          if (typeof snap.root === 'number') setRoot(Math.max(0, Math.min(snap.n - 1, snap.root)));
         }
       }
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 自动保存：图构造或表示变化即写 localStorage（无需手动保存/载入）
+  // 自动保存：图构造或表示变化即写 localStorage（首次挂载跳过，避免覆盖恢复值）
+  const autoSaveReady = useRef(false);
   useEffect(() => {
+    if (!autoSaveReady.current) { autoSaveReady.current = true; return; }
     try {
-      localStorage.setItem('graph-studio:last', JSON.stringify({ n, directed, edgeSpec, labels, manual, repr }));
+      localStorage.setItem('graph-studio:last', JSON.stringify({ n, directed, edgeSpec, labels, manual, repr, layout, root }));
     } catch {}
-  }, [n, directed, edgeSpec, labels, manual, repr]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [n, directed, edgeSpec, labels, manual, repr, layout, root]);
 
   // 快捷键：Delete/Esc / Ctrl+Z 撤销 / Ctrl+Shift+Z·Ctrl+Y 重做
   useEffect(() => {
