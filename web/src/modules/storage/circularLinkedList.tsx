@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { T } from '../../i18n/lang';
 import type { Frame, ModuleDef } from '../../engine/types';
 import { MathText } from '../../lib/tex';
 import { buildMemoryUrl, encodeIntLE, hexFromBytes } from '../../lib/memoryDump';
-import { Heap, realisticUserBase } from '../../lib/heap';
+import { ChainSession, ChainWriter, processBaseOnce } from '../../lib/sessionHeap';
+
 
 type ElemType = 'i32' | 'i16' | 'u8';
 type Op = 'idle' | 'get' | 'insert' | 'delete';
@@ -18,46 +19,52 @@ const COLORS = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'
 function elemSizeOf(t: ElemType): number { return t === 'i32' ? 4 : t === 'i16' ? 2 : 1; }
 function parseVals(s: string): number[] { return s.split(/[,，\s]+/).map(x => x.trim()).filter(Boolean).map(v => Number(v)).filter(Number.isFinite).map(v => Math.trunc(v)); }
 
-function buildNodesWithHeap(cfg: Cfg, values: number[]): { nodes: NodeInfo[]; heap: Heap; heapBase: number } {
-  const elemSize = elemSizeOf(cfg.elemType);
-  const heap = new Heap(TOTAL, realisticUserBase(cfg.execTick));
-  heap.allocate('__os__', 8 + (cfg.execTick % 3) * 8);
-  const nodes: NodeInfo[] = [];
-  const addrs: number[] = [];
-  const nodeSize = elemSize + cfg.ptrSize;
-  for (let i = 0; i < values.length; i++) {
-    // 循环链无需散播空隙演示即可，为维持真实离散仍加小间隔占位
-    if (i > 0) heap.allocate(`__pad_${i}__`, 4);
-    const addr = heap.allocate(`node${i}`, nodeSize) ?? heap.base;
-    addrs.push(addr);
-  }
-  for (let i = 0; i < values.length; i++) {
-    const v = values[i];
-    // 循环：尾节点 next 指回头节点；单节点指回自身
-    const next = values.length > 1 ? addrs[(i + 1) % values.length] : values.length === 1 ? addrs[0] : null;
-    const dataBytes = cfg.endian === 'little' ? encodeIntLE(v, elemSize) : encodeIntLE(v, elemSize).reverse();
-    const nextBytes = (() => { const n = next ?? 0; const le = encodeIntLE(n, cfg.ptrSize); return cfg.endian === 'little' ? le : le.reverse(); })();
-    const bytes = [...dataBytes, ...nextBytes];
-    heap.writeBytes(addrs[i], bytes);
-    nodes.push({ idx: i, addr: addrs[i], data: v, next, size: nodeSize, hex: hexFromBytes(bytes), bytes });
-  }
-  return { nodes, heap, heapBase: heap.base };
+let chainS: ChainSession | null = null;
+const mkWriter = (elemSize: number, endian: 'little' | 'big', ptrSize: number): ChainWriter => (h, addr, data, nextAddr) => {
+  const d = endian === 'little' ? encodeIntLE(data, elemSize) : encodeIntLE(data, elemSize).reverse();
+  const nx = (() => { const n = nextAddr ?? 0; const le = encodeIntLE(n, ptrSize); return endian === 'little' ? le : le.reverse(); })();
+  const bytes = [...d, ...nx];
+  h.writeBytes(addr, bytes);
+  return bytes;
+};
+// 循环语义：同步后把尾节点 next 指回头节点（单节点指回自身）
+function fixTail(cfg: Cfg) {
+  if (!chainS || chainS.nodes.length === 0) return;
+  const ns = chainS.nodes;
+  const headAddr = ns[0].addr;
+  const tail = ns[ns.length - 1];
+  const w = mkWriter(elemSizeOf(cfg.elemType), cfg.endian, cfg.ptrSize);
+  const bytes = w(chainS.heap, tail.addr, tail.data, headAddr);
+  tail.bytes = bytes; tail.next = headAddr;
+  tail.hex = hexFromBytes(bytes);
 }
 function buildScene(cfg: Cfg, focus: number | null, phase: Scene['phase'], valuesOverride?: number[]): Scene {
   const vals = valuesOverride ?? parseVals(cfg.valuesStr);
-  const { nodes, heapBase } = buildNodesWithHeap(cfg, vals);
-  return { heapBase, total: TOTAL, elemSize: elemSizeOf(cfg.elemType), ptrSize: cfg.ptrSize, nodeSize: elemSizeOf(cfg.elemType) + cfg.ptrSize, nodes, head: nodes.length ? nodes[0].addr : null, focus, phase, op: cfg.op };
+  const elemSize = elemSizeOf(cfg.elemType);
+  const nodeSize = elemSize + cfg.ptrSize;
+  const layoutKey = `${nodeSize}|${cfg.endian}`;
+  if (!chainS || chainS.nodeSize !== nodeSize || chainS.layoutKey !== layoutKey) chainS = new ChainSession(nodeSize, mkWriter(elemSize, cfg.endian, cfg.ptrSize), layoutKey);
+  const tag = cfg.valuesStr;
+  const prev = cfg.prevValuesStr ?? null;
+  const prevVals = prev !== null && prev !== tag && cfg.execTick > 0 && (cfg.op === 'insert' || cfg.op === 'delete') ? parseVals(prev) : null;
+  const key = `${prev}>${tag}`;
+  if (prevVals !== null) {
+    if (!chainS.delta(prevVals, vals, key)) chainS.boot(vals);
+  } else if (chainS.nodes.length !== vals.length || chainS.nodes.some((n, i) => n.data !== vals[i])) {
+    chainS.boot(vals);
+  }
+  fixTail(cfg);
+  const nodes = chainS.nodes;
+  return { heapBase: chainS.getHeapBase(), total: 256, elemSize, ptrSize: cfg.ptrSize, nodeSize, nodes, head: nodes.length ? nodes[0].addr : null, focus, phase, op: cfg.op };
 }
 function buildDump(cfg: Cfg) {
-  const vals = parseVals(cfg.valuesStr);
-  const { nodes, heapBase } = buildNodesWithHeap(cfg, vals);
-  const elemSize = elemSizeOf(cfg.elemType);
-  const allocs = nodes.map(n => ({
+  const s = buildScene(cfg, null, 'idle');
+  const allocs = s.nodes.map(n => ({
     key: `node${n.idx}`, addr: `0x${n.addr.toString(16)}`, size: n.size, hex: n.hex, label: `L[${n.idx}]`,
     color: COLORS[n.idx % COLORS.length],
-    fields: [{ name: 'data', offset: 0, size: elemSize, type: cfg.elemType, color: COLORS[n.idx % COLORS.length] }, { name: 'next', offset: elemSize, size: cfg.ptrSize, type: `ptr${cfg.ptrSize * 8}`, color: '#64748b' }],
+    fields: [{ name: 'data', offset: 0, size: s.elemSize, type: cfg.elemType, color: COLORS[n.idx % COLORS.length] }, { name: 'next', offset: s.elemSize, size: s.ptrSize, type: `ptr${s.ptrSize * 8}`, color: '#64748b' }],
   }));
-  return { base: `0x${heapBase.toString(16)}`, total: TOTAL, endian: cfg.endian, allocations: allocs };
+  return { base: `0x${s.heapBase.toString(16)}`, total: 256, endian: cfg.endian, allocations: allocs };
 }
 function gen(cfg: Cfg): Frame<Scene>[] {
   const hasPrev = typeof cfg.prevValuesStr === 'string' && cfg.execTick > 0 && (cfg.op === 'insert' || cfg.op === 'delete');
@@ -124,6 +131,8 @@ export const circularLinkedListModule: ModuleDef<Scene, Cfg> = {
     const isZh = t(T('中文', 'en')) !== 'en';
     const [draft, setDraft] = useState<Cfg>(config);
     const set = (p: Partial<Cfg>) => setDraft(s => ({ ...s, ...p }));
+    // 外部 config 变化（随机/示例/清空/语言切换）时同步本地 draft
+    useEffect(() => { if (draft.valuesStr !== config.valuesStr || draft.execTick !== config.execTick) setDraft(config); }, [config]);
     const loadExample = () => { const ns: Cfg = { ...draft, valuesStr: '10,20,30,40', prevValuesStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
     const clearAll = () => { const ns: Cfg = { ...draft, valuesStr: '', prevValuesStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
     const exec = () => {
@@ -159,6 +168,7 @@ export const circularLinkedListModule: ModuleDef<Scene, Cfg> = {
           {needPos && <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('位置', 'Pos'))}</span><input className="txt" type="number" min={0} max={16} value={draft.pos} onChange={e => set({ pos: Number(e.target.value) || 0 })} style={{ width: 56 }} /></label>}
           {needVal && <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('值', 'Val'))}</span><input className="txt" type="number" value={draft.insVal} onChange={e => set({ insVal: Number(e.target.value) || 0 })} style={{ width: 64 }} /></label>}
           <button className="pill active" onClick={exec} disabled={draft.op === 'idle'} style={invalid ? { opacity: 0.6 } : undefined}>执行</button>
+          <button className="ghost" onClick={() => onChange(circularLinkedListModule.randomize!(draft))}>↻ {t(T('重新生成', 'Regenerate'))}</button>
           <button className="ghost" onClick={loadExample}>示例</button>
           <button className="ghost" onClick={clearAll}>{t(T('清空', 'Clear'))}</button>
           <button className="pill" onClick={onView}>查看内存 ↗</button>

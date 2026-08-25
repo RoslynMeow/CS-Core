@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { T } from '../../i18n/lang';
 import type { Frame, ModuleDef } from '../../engine/types';
 import { buildMemoryUrl, encodeIntLE, hexFromBytes } from '../../lib/memoryDump';
-import { Heap, realisticUserBase } from '../../lib/heap';
+import { Heap } from '../../lib/heap';
+import { processBaseOnce } from '../../lib/sessionHeap';
+
 
 type ElemType = 'i32' | 'i16' | 'u8';
 type HashMethod = 'division' | 'multiplication' | 'midsquare';
@@ -10,16 +12,27 @@ type HashMethod = 'division' | 'multiplication' | 'midsquare';
 const DUP_METHODS = ['reject', 'update', 'append'] as const;
 type Dup = (typeof DUP_METHODS)[number];
 type Op = 'idle' | 'search' | 'insert' | 'delete';
-type Cfg = { elemType: ElemType; endian: 'little' | 'big'; ptrSize: 4 | 8; bucketM: number; method: HashMethod; dup: Dup; keysStr: string; prevKeysStr?: string; op: Op; key: number; execTick: number; };
+type Cfg = { elemType: ElemType; endian: 'little' | 'big'; ptrSize: 4 | 8; bucketM: number; method: HashMethod; dup: Dup; inited: boolean; keysStr: string; prevKeysStr?: string; op: Op; key: number; execTick: number; };
 
 type NodeInfo = { idx: number; addr: number; key: number; next: number | null; size: number; hex: string; bytes: number[] };
 type Scene = { method: HashMethod; heapBase: number; total: number; elemSize: number; ptrSize: number; nodeSize: number; bucketM: number; nodes: NodeInfo[]; buckets: number[][]; // 每个桶的节点 idx 顺序
   bucketHeads: number[]; tableAddr: number; tableBytes: Uint8Array; tableHex: string;
-  focusH: number | null; focusKey: number | null; phase: 'idle' | 'alloc' | 'link' | 'traverse' | 'delete'; op: Op; key: number };
+  focusH: number | null; focusKey: number | null; phase: 'idle' | 'alloc' | 'link' | 'traverse' | 'delete'; inited: boolean; op: Op; key: number };
 type Build = { nodes: NodeInfo[]; buckets: number[][]; bucketHeads: number[]; tableAddr: number; tableBytes: Uint8Array; tableHex: string; heapBase: number };
 
 const TOTAL = 256;
 const COLORS = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4'];
+// 会话级哈希堆：进程内固定基址；table/节点地址只随键集一次重建（ASLR 仅刷新时一次）
+let htHeap: Heap | null = null;
+let htKey = '';
+function sessionHeap(cfg: Cfg): Heap {
+  const key = `${cfg.inited}|${cfg.ptrSize}|${Math.max(2, Math.min(16, cfg.bucketM | 0))}|${elemSizeOf(cfg.elemType)}`;
+  if (!htHeap || htKey !== key) {
+    htHeap = new Heap(TOTAL, processBaseOnce());
+    htKey = key;
+  }
+  return htHeap;
+}
 
 function elemSizeOf(t: ElemType): number { return t === 'i32' ? 4 : t === 'i16' ? 2 : 1; }
 function parseKeys(s: string): number[] { return s.split(/[,，\s]+/).map(x => x.trim()).filter(Boolean).map(v => Number(v)).filter(Number.isFinite).map(v => Math.trunc(v)); }
@@ -53,8 +66,12 @@ function buildWithHeap(cfg: Cfg, keys: number[]): Build {
   const ptrSize = cfg.ptrSize;
   const nodeSize = elemSize + ptrSize;
   const m = Math.max(2, Math.min(16, cfg.bucketM | 0));
-  const heap = new Heap(TOTAL, realisticUserBase(cfg.execTick));
-  heap.allocate('__os__', 8 + (cfg.execTick % 3) * 8);
+  if (!cfg.inited) {
+    return { nodes: [], buckets: Array.from({ length: m }, () => []), bucketHeads: Array(m).fill(0), tableAddr: 0, tableBytes: new Uint8Array(0), tableHex: '', heapBase: processBaseOnce() };
+  }
+  const heap = sessionHeap(cfg);
+  heap.resetAll();
+  heap.allocate('__os__', 16);
   const tableAddr = heap.allocate('table', m * ptrSize) ?? heap.base;
   // 分配每个 key 节点（真实地址）
   const nodes: NodeInfo[] = [];
@@ -92,7 +109,7 @@ function buildWithHeap(cfg: Cfg, keys: number[]): Build {
 function buildScene(cfg: Cfg, focusH: number | null, focusKey: number | null, phase: Scene['phase'], keysOverride?: number[]): Scene {
   const keys = keysOverride ?? parseKeys(cfg.keysStr);
   const b = buildWithHeap(cfg, keys);
-  return { ...b, method: cfg.method, total: TOTAL, elemSize: elemSizeOf(cfg.elemType), ptrSize: cfg.ptrSize, nodeSize: elemSizeOf(cfg.elemType) + cfg.ptrSize, bucketM: Math.max(2, Math.min(16, cfg.bucketM | 0)), focusH, focusKey, phase, op: cfg.op, key: cfg.key };
+  return { ...b, method: cfg.method, total: TOTAL, elemSize: elemSizeOf(cfg.elemType), ptrSize: cfg.ptrSize, nodeSize: elemSizeOf(cfg.elemType) + cfg.ptrSize, bucketM: Math.max(2, Math.min(16, cfg.bucketM | 0)), focusH, focusKey, phase, inited: cfg.inited, op: cfg.op, key: cfg.key };
 }
 function buildDump(cfg: Cfg) {
   const keys = parseKeys(cfg.keysStr);
@@ -120,10 +137,15 @@ function gen(cfg: Cfg): Frame<Scene>[] {
   const keys = hasPrev ? origKeys : curKeys;
   if (cfg.execTick === 0 || cfg.op === 'idle') {
     const idle = buildScene({ ...cfg, op: 'idle' }, null, null, 'idle', keys);
+    if (!cfg.inited) return [{ line: 0, caption: T(`未初始化：设置桶数 ${m} 并点「初始化」（节点仍自动增长）`, 'Not initialized'), scene: idle }];
     const empty = keys.length === 0;
     return [
       { line: 0, caption: T(empty ? `就绪：$table[0..${m - 1}]$ 空，点“示例”构造或执行插入` : `就绪：$table[0..${m - 1}]$，已有 ${keys.length} 个键，$load\\;factor=${(keys.length / m).toFixed(2)}$`, empty ? 'empty' : `ready`), scene: idle },
     ];
+  }
+  if (!cfg.inited) {
+    const idle = buildScene({ ...cfg, op: 'idle' }, null, null, 'idle', keys);
+    return [{ line: 0, caption: T('未初始化：请先点「初始化」', 'Not initialized'), scene: idle }];
   }
   const k = cfg.key | 0;
   const mt = cfg.method; const h = hashFn(k, m, mt);
@@ -191,14 +213,17 @@ export const hashTableModule: ModuleDef<Scene, Cfg> = {
   id: 'hash-table', title: T('哈希表 · 散列寻址', 'Hash Table'),
   desc: T('固定桶数组 $table[0..m-1]$（每个桶存链表头指针），子 $hash$ 定归属：除法 $k\\bmod m$ / 乘法 $\\lfloor m(kA\\bmod 1)\\rfloor$ / 平方取中；冲突用链地址法。', 'Bucket array + chained hash (division/multiplication/mid-square).'),
   tags: ['data-structures', 'computer-organization'],
-  defaultConfig: { elemType: 'i32', endian: 'little', ptrSize: 4, bucketM: 10, method: 'division' as HashMethod, dup: 'reject' as Dup, keysStr: '', op: 'idle', key: 4, execTick: 0 },
+  defaultConfig: { elemType: 'i32', endian: 'little', ptrSize: 4, bucketM: 10, method: 'division' as HashMethod, dup: 'reject' as Dup, inited: false, keysStr: '', op: 'idle', key: 4, execTick: 0 },
   randomize(c) { return { ...c, keysStr: '', op: 'idle', execTick: 0 } as Cfg; },
   Controls({ config, onChange, t, onPlay }: any) {
     const isZh = t(T('中文', 'en')) !== 'en';
     const [draft, setDraft] = useState<Cfg>(config);
     const set = (p: Partial<Cfg>) => setDraft(s => ({ ...s, ...p }));
+    // 外部 config 变化（随机/示例/清空/语言切换）时同步本地 draft
+    useEffect(() => { if (draft.keysStr !== config.keysStr || draft.execTick !== config.execTick) setDraft(config); }, [config]);
     const loadExample = () => { const ns: Cfg = { ...draft, keysStr: '3,8,13,18,1', prevKeysStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
-    const clearAll = () => { const ns: Cfg = { ...draft, keysStr: '', prevKeysStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
+    const clearAll = () => { const ns: Cfg = { ...draft, inited: false, keysStr: '', prevKeysStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
+    const init = () => { const ns: Cfg = { ...draft, inited: true, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
     const exec = () => {
       const op = (['search', 'insert', 'delete'] as Op[]).includes(draft.op) ? draft.op : 'search';
       const cur = parseKeys(draft.keysStr);
@@ -222,10 +247,10 @@ export const hashTableModule: ModuleDef<Scene, Cfg> = {
       <div style={{ display: 'grid', gap: 8, width: '100%' }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 12, background: '#eef2ff', border: '1px solid #c7d2fe', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, fontWeight: 800, color: '#4338ca' }}>{isZh ? '模式' : 'MODE'}</span>
-          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('元素', 'Elem'))}</span><select className="txt" value={draft.elemType} onChange={e => set({ elemType: e.target.value as ElemType })}><option value="i32">i32 (4B)</option><option value="i16">i16 (2B)</option><option value="u8">u8 (1B)</option></select></label>
-          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>Ptr</span><select className="txt" value={draft.ptrSize} onChange={e => set({ ptrSize: Number(e.target.value) as any })}><option value={4}>32-bit</option><option value={8}>64-bit</option></select></label>
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('元素', 'Elem'))}</span><select className="txt" value={draft.elemType} disabled={draft.inited} onChange={e => set({ elemType: e.target.value as ElemType })}><option value="i32">i32 (4B)</option><option value="i16">i16 (2B)</option><option value="u8">u8 (1B)</option></select></label>
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>Ptr</span><select className="txt" value={draft.ptrSize} disabled={draft.inited} onChange={e => set({ ptrSize: Number(e.target.value) as any })}><option value={4}>32-bit</option><option value={8}>64-bit</option></select></label>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>Endian</span><select className="txt" value={draft.endian} onChange={e => set({ endian: e.target.value as any })}><option value="little">little</option><option value="big">big</option></select></label>
-          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('桶数', 'Buckets'))}</span><input className="txt" type="number" min={2} max={16} value={draft.bucketM} onChange={e => set({ bucketM: Math.max(2, Math.min(16, Number(e.target.value) || 10)) })} style={{ width: 56 }} /></label>
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('桶数', 'Buckets'))}</span><input className="txt" type="number" min={2} max={16} value={draft.bucketM} disabled={draft.inited} onChange={e => set({ bucketM: Math.max(2, Math.min(16, Number(e.target.value) || 10)) })} style={{ width: 56 }} /></label>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('散列', 'Hash'))}</span><select className="txt" value={draft.method} onChange={e => set({ method: e.target.value as HashMethod })}>
             <option value="division">{t(T('除法 k mod m', 'Division k mod m'))}</option>
             <option value="multiplication">{t(T('乘法 ⌊m(kA mod 1)⌋', 'Multiplication'))}</option>
@@ -236,17 +261,20 @@ export const hashTableModule: ModuleDef<Scene, Cfg> = {
             <option value="update">{t(T('覆盖', 'Update'))}</option>
             <option value="append">{t(T('允许重复', 'Append'))}</option>
           </select></label>
+          {!draft.inited && <button className="pill active" onClick={init}>{t(T('初始化', 'Init'))}</button>}
+          <button className="ghost" onClick={clearAll}>{t(T('清空', 'Clear'))}</button>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0', flexWrap: 'wrap', opacity: draft.inited ? 1 : 0.5, pointerEvents: draft.inited ? 'auto' : 'none' }}>
           <span style={{ fontSize: 11, fontWeight: 800, color: '#475569' }}>{isZh ? '参数' : 'PARAMS'}</span>
+          <button className="ghost" onClick={() => onChange(hashTableModule.randomize!(draft))}>↻ {t(T('重新生成', 'Regenerate'))}</button>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('操作', 'Op'))}</span><select className="txt" value={draft.op} onChange={e => set({ op: e.target.value as Op })}>
             <option value="idle">{t(T('— 选择操作 —', '— pick —'))}</option><option value="search">{t(T('查找', 'Search'))}</option><option value="insert">{t(T('插入', 'Insert'))}</option><option value="delete">{t(T('删除', 'Delete'))}</option>
           </select></label>
           {draft.op !== 'idle' && <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('键', 'Key'))}</span><input className="txt" type="number" value={draft.key} onChange={e => set({ key: Number(e.target.value) || 0 })} style={{ width: 64 }} /></label>}
-          <button className="pill active" onClick={exec} disabled={draft.op === 'idle'}>执行</button>
-          <button className="ghost" onClick={loadExample}>示例</button>
-          <button className="ghost" onClick={clearAll}>{t(T('清空', 'Clear'))}</button>
-          <button className="pill" onClick={onView}>查看内存 ↗</button>
+                    <button className="pill active" onClick={exec} disabled={draft.op === 'idle' || !draft.inited}>执行</button>
+          <button className="ghost" onClick={loadExample} disabled={!draft.inited}>示例</button>
+          <button className="pill" onClick={onView} disabled={!draft.inited}>查看内存 ↗</button>
+          {!draft.inited && <span style={{ fontSize: 11, fontFamily: 'monospace', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 999, padding: '3px 8px' }}>{isZh ? '未初始化' : 'not inited'}</span>}
           <span style={{ fontSize: 11, fontFamily: 'monospace', background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 999, padding: '3px 8px' }}>
             {isZh ? `${cur.length} 键 / ${m} 桶` : `${cur.length} keys / ${m} buckets`}{draft.op !== 'idle' && ` · h(${draft.key}) = ${hashFn(draft.key | 0, m, draft.method)} (${HASH_METHOD_LABEL[draft.method].zh})`}
           </span>
@@ -257,6 +285,9 @@ export const hashTableModule: ModuleDef<Scene, Cfg> = {
   codeFor(cfg) { return CODE[cfg.op] as never; },
   generate: gen,
   Render({ scene }) {
+    if (!scene.inited) {
+      return <div style={{ padding: '10px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, fontSize: 13, color: '#b91c1c', textAlign: 'center' }}>未初始化 — 设置桶数与散列方法后点「初始化」；节点随后自动增长，只有清空后才能改桶数。</div> as unknown as never;
+    }
     return (
       <div style={{ display: 'grid', gap: 10 }}>
         <div style={{ border: '1px solid #c7d2fe', borderRadius: 12, overflow: 'hidden', background: '#eef2ff' }}>

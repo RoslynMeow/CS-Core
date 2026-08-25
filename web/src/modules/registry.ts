@@ -11,6 +11,8 @@ import { circularLinkedListModule } from './storage/circularLinkedList';
 import { doublyLinkedListModule } from './storage/doublyLinkedList';
 import { hashTableModule } from './storage/hashTable';
 import { matrixModule } from './storage/matrix';
+import { stackModule } from './storage/stack';
+import { queueModule } from './storage/queue';
 
 export const KNOWLEDGE: Record<string, ModuleDef> = {
   [positionalCoreModule.id]: positionalCoreModule as unknown as ModuleDef,
@@ -25,6 +27,8 @@ export const KNOWLEDGE: Record<string, ModuleDef> = {
   [doublyLinkedListModule.id]: doublyLinkedListModule as unknown as ModuleDef,
   [hashTableModule.id]: hashTableModule as unknown as ModuleDef,
   [matrixModule.id]: matrixModule as unknown as ModuleDef,
+  [stackModule.id]: stackModule as unknown as ModuleDef,
+  [queueModule.id]: queueModule as unknown as ModuleDef,
 };
 
 export const allModules = Object.values(KNOWLEDGE);

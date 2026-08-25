@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Frame, FramesOrInfinite } from './types';
 
+const SPEED_KEY = 'playback:speed';
+function loadGlobalSpeed(): number {
+  try {
+    const v = Number(localStorage.getItem(SPEED_KEY));
+    if (Number.isFinite(v) && v >= 0.25 && v <= 3) return v;
+  } catch {}
+  return 1;
+}
+
 export function usePlayback(framesOr: FramesOrInfinite, opts: { interval?: number; autoPlay?: boolean; autoPlayOnMount?: boolean } = {}) {
   const interval = opts.interval ?? 800;
   const autoPlay = opts.autoPlay ?? true;
@@ -14,7 +23,13 @@ export function usePlayback(framesOr: FramesOrInfinite, opts: { interval?: numbe
   const [frames, setFrames] = useState<Frame[]>(initial);
   const [index, setIndex] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(1);
+  const [speed, setSpeedState] = useState(loadGlobalSpeed);
+  // 全局同步：写回 localStorage，其它卡片读取同一值
+  const setSpeed = useCallback((v: number) => {
+    const s = Math.min(3, Math.max(0.25, v));
+    setSpeedState(s);
+    try { localStorage.setItem(SPEED_KEY, String(s)); } catch {}
+  }, []);
 
   const idxRef = useRef(index); idxRef.current = index;
   const framesRef = useRef(frames); framesRef.current = frames;

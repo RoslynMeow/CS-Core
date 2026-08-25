@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { T } from '../../i18n/lang';
 import type { Frame, ModuleDef } from '../../engine/types';
 import { MathText } from '../../lib/tex';
-import { buildMemoryUrl, encodeIntLE, hexFromBytes } from '../../lib/memoryDump';
-import { Heap, realisticUserBase } from '../../lib/heap';
+import { buildMemoryUrl, encodeIntBE, encodeIntLE, hexFromBytes } from '../../lib/memoryDump';
+import { ChainSession, ChainWriter, processBaseOnce } from '../../lib/sessionHeap';
+
 
 type ElemType = 'i32' | 'i16' | 'u8';
 type Op = 'idle' | 'get' | 'insert' | 'delete';
@@ -18,51 +19,73 @@ const COLORS = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'
 function elemSizeOf(t: ElemType): number { return t === 'i32' ? 4 : t === 'i16' ? 2 : 1; }
 function parseVals(s: string): number[] { return s.split(/[,，\s]+/).map(x => x.trim()).filter(Boolean).map(v => Number(v)).filter(Number.isFinite).map(v => Math.trunc(v)); }
 // 双向布局：offset0=prev(ptr), offset ptr=data(elem), offset ptr+elem=next(ptr)
-function buildNodesWithHeap(cfg: Cfg, values: number[]): { nodes: NodeInfo[]; heap: Heap; heapBase: number } {
-  const elemSize = elemSizeOf(cfg.elemType);
+let chainS: ChainSession | null = null;
+// 双向布局：offset0=prev(ptr) offset ptr=data(elem) offset ptr+elem=next(ptr)
+const mkWriter = (elemSize: number, endian: 'little' | 'big', ptrSize: number): ChainWriter => (h, addr, data, nextAddr) => {
+  const d1 = endian === 'little' ? encodeIntLE(data, elemSize) : encodeIntBE(data, elemSize);
+  const nx = (() => { const n = nextAddr ?? 0; const le = encodeIntLE(n, ptrSize); return endian === 'little' ? le : le.reverse(); })();
+  const bytes = new Uint8Array(ptrSize * 2 + elemSize);
+  d1.forEach((b, i) => { bytes[ptrSize + i] = b; });
+  nx.forEach((b, i) => { bytes[ptrSize + elemSize + i] = b; });
+  const out = Array.from(bytes);
+  h.writeBytes(addr, out);
+  return out;
+};
+function fixPrev(cfg: Cfg) {
+  if (!chainS) return;
+  const ns = chainS.nodes;
   const ptrSize = cfg.ptrSize;
-  const nodeSize = ptrSize * 2 + elemSize;
-  const heap = new Heap(TOTAL, realisticUserBase(cfg.execTick));
-  heap.allocate('__os__', 8 + (cfg.execTick % 3) * 8);
-  const nodes: NodeInfo[] = [];
-  const addrs: number[] = [];
-  for (let i = 0; i < values.length; i++) {
-    if (i > 0) heap.allocate(`__pad_${i}__`, 4);
-    const addr = heap.allocate(`node${i}`, nodeSize) ?? heap.base;
-    addrs.push(addr);
+  const elemSize = elemSizeOf(cfg.elemType);
+  const w = mkWriter(elemSize, cfg.endian, ptrSize);
+  for (let i = 0; i < ns.length; i++) {
+    const prevAddr = i > 0 ? ns[i - 1].addr : null;
+    const nextAddr = i + 1 < ns.length ? ns[i + 1].addr : null;
+    const raw = w(chainS.heap, ns[i].addr, ns[i].data, nextAddr);
+    // 写 prev 字节到 offset0
+    const pe = endianOfPrev(cfg, prevAddr);
+    pe.forEach((b, k) => { raw[k] = b; });
+    chainS.heap.writeBytes(ns[i].addr, raw);
+    ns[i].bytes = raw; ns[i].next = nextAddr;
+    ns[i].hex = hexFromBytes(raw);
   }
-  for (let i = 0; i < values.length; i++) {
-    const prev = i - 1 >= 0 ? addrs[i - 1] : null;
-    const next = i + 1 < values.length ? addrs[i + 1] : null;
-    const prevBytes = (() => { const n = prev ?? 0; const le = encodeIntLE(n, ptrSize); return cfg.endian === 'little' ? le : le.reverse(); })();
-    const dataBytes = cfg.endian === 'little' ? encodeIntLE(values[i], elemSize) : encodeIntLE(values[i], elemSize).reverse();
-    const nextBytes = (() => { const n = next ?? 0; const le = encodeIntLE(n, ptrSize); return cfg.endian === 'little' ? le : le.reverse(); })();
-    const bytes = [...prevBytes, ...dataBytes, ...nextBytes];
-    heap.writeBytes(addrs[i], bytes);
-    nodes.push({ idx: i, addr: addrs[i], prev, data: values[i], next, size: nodeSize, hex: hexFromBytes(bytes), bytes, elemSize, ptrSize });
-  }
-  return { nodes, heap, heapBase: heap.base };
+}
+function endianOfPrev(cfg: Cfg, prevAddr: number | null): number[] {
+  const le = encodeIntLE(prevAddr ?? 0, cfg.ptrSize);
+  return cfg.endian === 'little' ? le : le.reverse();
 }
 function buildScene(cfg: Cfg, focus: number | null, phase: Scene['phase'], valuesOverride?: number[]): Scene {
   const vals = valuesOverride ?? parseVals(cfg.valuesStr);
-  const { nodes, heapBase } = buildNodesWithHeap(cfg, vals);
-  return { heapBase, total: TOTAL, elemSize: elemSizeOf(cfg.elemType), ptrSize: cfg.ptrSize, nodeSize: cfg.ptrSize * 2 + elemSizeOf(cfg.elemType), nodes, head: nodes.length ? nodes[0].addr : null, focus, phase, op: cfg.op };
+  const elemSize = elemSizeOf(cfg.elemType);
+  const nodeSize = cfg.ptrSize * 2 + elemSize;
+  const layoutKey = `${nodeSize}|${cfg.endian}`;
+  if (!chainS || chainS.nodeSize !== nodeSize || chainS.layoutKey !== layoutKey) chainS = new ChainSession(nodeSize, mkWriter(elemSize, cfg.endian, cfg.ptrSize), layoutKey);
+  const tag = cfg.valuesStr;
+  const prev = cfg.prevValuesStr ?? null;
+  const prevVals = prev !== null && prev !== tag && cfg.execTick > 0 && (cfg.op === 'insert' || cfg.op === 'delete') ? parseVals(prev) : null;
+  const key = `${prev}>${tag}`;
+  if (prevVals !== null) {
+    if (!chainS.delta(prevVals, vals, key)) chainS.boot(vals);
+  } else if (chainS.nodes.length !== vals.length || chainS.nodes.some((n, i) => n.data !== vals[i])) {
+    chainS.boot(vals);
+  }
+  fixPrev(cfg);
+  const nodes = chainS.nodes;
+  // NodeInfo 兼容：prev 由逻辑序推导
+  const info: NodeInfo[] = nodes.map((n, i) => ({ ...n, prev: i > 0 ? nodes[i - 1].addr : null, elemSize, ptrSize: cfg.ptrSize }));
+  return { heapBase: chainS.getHeapBase(), total: 256, elemSize, ptrSize: cfg.ptrSize, nodeSize, nodes: info, head: nodes.length ? nodes[0].addr : null, focus, phase, op: cfg.op };
 }
 function buildDump(cfg: Cfg) {
-  const vals = parseVals(cfg.valuesStr);
-  const { nodes, heapBase } = buildNodesWithHeap(cfg, vals);
-  const elemSize = elemSizeOf(cfg.elemType);
-  const ptrSize = cfg.ptrSize;
-  const allocs = nodes.map(n => ({
+  const s = buildScene(cfg, null, 'idle');
+  const allocs = s.nodes.map(n => ({
     key: `node${n.idx}`, addr: `0x${n.addr.toString(16)}`, size: n.size, hex: n.hex, label: `L[${n.idx}]`,
     color: COLORS[n.idx % COLORS.length],
     fields: [
-      { name: 'prev', offset: 0, size: ptrSize, type: `ptr${ptrSize * 8}`, color: '#8b5cf6' },
-      { name: 'data', offset: ptrSize, size: elemSize, type: cfg.elemType, color: COLORS[n.idx % COLORS.length] },
-      { name: 'next', offset: ptrSize + elemSize, size: ptrSize, type: `ptr${ptrSize * 8}`, color: '#64748b' },
+      { name: 'prev', offset: 0, size: s.ptrSize, type: `ptr${s.ptrSize * 8}`, color: '#8b5cf6' },
+      { name: 'data', offset: s.ptrSize, size: s.elemSize, type: cfg.elemType, color: COLORS[n.idx % COLORS.length] },
+      { name: 'next', offset: s.ptrSize + s.elemSize, size: s.ptrSize, type: `ptr${s.ptrSize * 8}`, color: '#64748b' },
     ],
   }));
-  return { base: `0x${heapBase.toString(16)}`, total: TOTAL, endian: cfg.endian, allocations: allocs };
+  return { base: `0x${s.heapBase.toString(16)}`, total: 256, endian: cfg.endian, allocations: allocs };
 }
 function gen(cfg: Cfg): Frame<Scene>[] {
   const hasPrev = typeof cfg.prevValuesStr === 'string' && cfg.execTick > 0 && (cfg.op === 'insert' || cfg.op === 'delete');
@@ -130,6 +153,8 @@ export const doublyLinkedListModule: ModuleDef<Scene, Cfg> = {
     const isZh = t(T('中文', 'en')) !== 'en';
     const [draft, setDraft] = useState<Cfg>(config);
     const set = (p: Partial<Cfg>) => setDraft(s => ({ ...s, ...p }));
+    // 外部 config 变化（随机/示例/清空/语言切换）时同步本地 draft
+    useEffect(() => { if (draft.valuesStr !== config.valuesStr || draft.execTick !== config.execTick) setDraft(config); }, [config]);
     const loadExample = () => { const ns: Cfg = { ...draft, valuesStr: '10,20,30,40', prevValuesStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
     const clearAll = () => { const ns: Cfg = { ...draft, valuesStr: '', prevValuesStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
     const exec = () => {
@@ -165,6 +190,7 @@ export const doublyLinkedListModule: ModuleDef<Scene, Cfg> = {
           {needPos && <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('位置', 'Pos'))}</span><input className="txt" type="number" min={0} max={16} value={draft.pos} onChange={e => set({ pos: Number(e.target.value) || 0 })} style={{ width: 56 }} /></label>}
           {needVal && <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('值', 'Val'))}</span><input className="txt" type="number" value={draft.insVal} onChange={e => set({ insVal: Number(e.target.value) || 0 })} style={{ width: 64 }} /></label>}
           <button className="pill active" onClick={exec} disabled={draft.op === 'idle'} style={invalid ? { opacity: 0.6 } : undefined}>执行</button>
+          <button className="ghost" onClick={() => onChange(doublyLinkedListModule.randomize!(draft))}>↻ {t(T('重新生成', 'Regenerate'))}</button>
           <button className="ghost" onClick={loadExample}>示例</button>
           <button className="ghost" onClick={clearAll}>{t(T('清空', 'Clear'))}</button>
           <button className="pill" onClick={onView}>查看内存 ↗</button>

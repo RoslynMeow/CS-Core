@@ -62,6 +62,13 @@ export class Heap {
   }
   // 预占 OS 保留块，用于让首个程序分配不再是 0x1000，模拟真实堆
   reserveOs(bytes = 16, key = '__os__') { this.allocate(key, bytes); }
+  // 复位：保留同进程的基址，清空所有分配（供“同一进程生命周期”内重建/增量复用）
+  resetAll() {
+    this.freeList = [{ addr: this.base, size: this.total }];
+    this.allocs = new Map();
+    this.buffer = new ArrayBuffer(this.total);
+    this.view = new DataView(this.buffer);
+  }
 }
 // 真实用户堆基址：模拟 Linux x86-64 ASLR 后的 mmap/brk 区域（0x5555… 主堆 / 0x7f… mmap），4K 对齐
 const REAL_USER_BASES = [

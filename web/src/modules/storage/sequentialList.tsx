@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { T } from '../../i18n/lang';
 import type { Frame, ModuleDef } from '../../engine/types';
 import { MathText } from '../../lib/tex';
 import { buildMemoryUrl, encodeIntBE, encodeIntLE, hexFromBytes } from '../../lib/memoryDump';
-import { Heap, realisticUserBase } from '../../lib/heap';
+import { Heap } from '../../lib/heap';
+import { processBaseOnce } from '../../lib/sessionHeap';
+
 
 type ElemType = 'i32' | 'i16' | 'u8';
 type Op = 'idle' | 'get' | 'insert' | 'delete';
@@ -11,6 +13,7 @@ type Cfg = {
   elemType: ElemType;
   endian: 'little' | 'big';
   capacity: number;
+  inited: boolean; // 固定容量：初始化后锁定，仅清空后重新初始化
   valuesStr: string; // 逗号分段，空段 = 空槽 ∅，用于持久化
   prevValuesStr?: string; // 上一次执行前的快照
   op: Op;
@@ -34,12 +37,16 @@ type Scene = {
   hex: string;
   focus: number | null;
   phase: 'idle' | 'alloc' | 'shift' | 'write' | 'access' | 'delete';
+  inited: boolean;
   op: Op;
   pos: number;
 };
 
 const COLORS = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4'];
 const HEAP_TOTAL = 256;
+// 方案 B：进程内固定基址，仅容量/元素宽变化时 realloc（reset 后同基址重新分配），操作只写字节
+let arrS: { heap: Heap; base: number; cap: number; elemSize: number } | null = null;
+
 
 function elemSizeOf(t: ElemType): number { return t === 'i32' ? 4 : t === 'i16' ? 2 : 1; }
 
@@ -92,10 +99,16 @@ function buildHeapScene(cfg: Cfg, focus: number | null, phase: Scene['phase'], c
   const cells = cellsOverride ?? cur.cells;
   const used = cells.reduce<number>((n, c) => n + (c === null ? 0 : 1), 0);
   const total = capacity * elemSize;
-  const heap = new Heap(HEAP_TOTAL, realisticUserBase(cfg.execTick));
-  const osSize = 8 + (cfg.execTick % 3) * 8;
-  heap.allocate('__os__', osSize);
-  const base = heap.allocate('seq', total) ?? heap.base + osSize;
+  if (arrS === null || arrS.cap !== capacity || arrS.elemSize !== elemSize) {
+    if (arrS === null) arrS = { heap: new Heap(HEAP_TOTAL, processBaseOnce()), base: 0, cap: 0, elemSize: 0 };
+    arrS.heap.resetAll();
+    const osSize = 16; // 固定 OS 预占，进程内 realloc 后地址仍稳定
+    arrS.heap.allocate('__os__', osSize);
+    arrS.base = arrS.heap.allocate('seq', total) ?? arrS.heap.base + osSize;
+    arrS.cap = capacity; arrS.elemSize = elemSize;
+  }
+  const heap = arrS.heap;
+  const base = arrS.base;
   const bytes = new Uint8Array(total);
   for (let i = 0; i < capacity; i++) {
     if (cells[i] === null) continue;
@@ -104,7 +117,7 @@ function buildHeapScene(cfg: Cfg, focus: number | null, phase: Scene['phase'], c
   }
   heap.writeBytes(base, Array.from(bytes));
   const hex = hexFromBytes(Array.from(bytes));
-  return { base, heapBase: heap.base, total, elemSize, elemType: cfg.elemType, endian: cfg.endian, capacity, cells, used, origCells: cells, bytes, hex, focus, phase, op: cfg.op, pos: cfg.pos };
+  return { base, heapBase: heap.base, total, elemSize, elemType: cfg.elemType, endian: cfg.endian, capacity, cells, used, origCells: cells, bytes, hex, focus, phase, inited: cfg.inited, op: cfg.op, pos: cfg.pos };
 }
 function buildDump(cfg: Cfg) {
   const s = buildHeapScene(cfg, null, 'idle');
@@ -129,10 +142,15 @@ function gen(cfg: Cfg): Frame<Scene>[] {
   const cur = parseTable(cfg.valuesStr, capacity);
   if (cfg.execTick === 0 || cfg.op === 'idle') {
     const idle = buildHeapScene({ ...cfg, op: 'idle' }, null, 'idle');
+    if (!cfg.inited) return [{ line: 0, caption: T(`未初始化：请先设置容量（${capacity}）并点「初始化」分配连续空间`, 'Not initialized — press Init'), scene: idle }];
     const hint = orig.used === 0 ? '空表' : `L=[${fmtList(orig.cells)}]`;
     return [
       { line: 0, caption: T(`待执行：${hint} · capacity=${capacity}, elemSize=${elemSize}B，位置可用 $0..${capacity - 1}$`, `Pending ${hint}`), scene: idle },
     ];
+  }
+  if (!cfg.inited) {
+    const idle = buildHeapScene({ ...cfg, op: 'idle' }, null, 'idle');
+    return [{ line: 0, caption: T('未初始化：请先点「初始化」再执行操作', 'Not initialized'), scene: idle }];
   }
   const pos = cfg.pos | 0;
   if (cfg.op === 'get') {
@@ -193,16 +211,17 @@ export const sequentialListModule: ModuleDef<Scene, Cfg> = {
   title: T('顺序表 · 连续存储', 'Sequential List'),
   desc: T('预分配 $capacity$ 槽，$L[i]$ 映到 $malloc$ 返回的真实连续地址 $base+i\\cdot elemSize$；位置可用 $0..capacity-1$。', 'Fixed capacity via real malloc.'),
   tags: ['data-structures', 'computer-organization'],
-  defaultConfig: { elemType: 'i32', endian: 'little', capacity: 8, valuesStr: '', op: 'idle', pos: 0, insVal: 99, execTick: 0 },
+  defaultConfig: { elemType: 'i32', endian: 'little', capacity: 8, inited: false, valuesStr: '', op: 'idle', pos: 0, insVal: 99, execTick: 0 },
   randomize(c) { return { ...c, valuesStr: '', op: 'idle', execTick: 0 } as Cfg; },
   Controls({ config, onChange, t, onPlay }: any) {
     const isZh = t(T('中文', 'en')) !== 'en';
     const [draft, setDraft] = useState<Cfg>(config);
-    const sync = draft.execTick !== config.execTick || draft.valuesStr !== config.valuesStr;
-    if (sync && config.execTick === 0 && draft.execTick !== 0) setDraft(config);
+    // 外部 config 变化（随机/示例/清空/语言切换）时同步本地 draft
+    useEffect(() => { if (draft.execTick !== config.execTick || draft.valuesStr !== config.valuesStr) setDraft(config); }, [config]);
     const set = (p: Partial<Cfg>) => setDraft(s => ({ ...s, ...p }));
     const loadExample = () => { const ns: Cfg = { ...draft, valuesStr: '10,20,30,40', prevValuesStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
-    const clearAll = () => { const ns: Cfg = { ...draft, valuesStr: '', prevValuesStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
+    const clearAll = () => { const ns: Cfg = { ...draft, inited: false, valuesStr: '', prevValuesStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
+    const init = () => { const ns: Cfg = { ...draft, inited: true, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
     const exec = () => {
       const validOps: Op[] = ['get', 'insert', 'delete'];
       const op = validOps.includes(draft.op as any) ? draft.op : 'get';
@@ -247,14 +266,17 @@ export const sequentialListModule: ModuleDef<Scene, Cfg> = {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 12, background: '#eef2ff', border: '1px solid #c7d2fe', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, fontWeight: 800, color: '#4338ca' }}>{isZh ? '模式' : 'MODE'}</span>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('元素', 'Elem'))}</span>
-            <select className="txt" value={draft.elemType} onChange={e => set({ elemType: e.target.value as ElemType })}><option value="i32">i32 (4B)</option><option value="i16">i16 (2B)</option><option value="u8">u8 (1B)</option></select></label>
+            <select className="txt" value={draft.elemType} disabled={draft.inited} onChange={e => set({ elemType: e.target.value as ElemType })}><option value="i32">i32 (4B)</option><option value="i16">i16 (2B)</option><option value="u8">u8 (1B)</option></select></label>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>Endian</span>
-            <select className="txt" value={draft.endian} onChange={e => set({ endian: e.target.value as any })}><option value="little">little</option><option value="big">big</option></select></label>
+            <select className="txt" value={draft.endian} disabled={draft.inited} onChange={e => set({ endian: e.target.value as any })}><option value="little">little</option><option value="big">big</option></select></label>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('容量', 'Capacity'))}</span>
-            <input className="txt" type="number" min={1} max={16} value={draft.capacity} onChange={e => set({ capacity: Math.max(1, Math.min(16, Number(e.target.value) || 8)) })} style={{ width: 64 }} /></label>
+            <input className="txt" type="number" min={1} max={16} value={draft.capacity} disabled={draft.inited} onChange={e => set({ capacity: Math.max(1, Math.min(16, Number(e.target.value) || 8)) })} style={{ width: 64 }} /></label>
+          {!draft.inited && <button className="pill active" onClick={init}>{t(T('初始化', 'Init'))}</button>}
+          <button className="ghost" onClick={clearAll}>{t(T('清空', 'Clear'))}</button>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0', flexWrap: 'wrap', opacity: draft.inited ? 1 : 0.5, pointerEvents: draft.inited ? 'auto' : 'none' }}>
           <span style={{ fontSize: 11, fontWeight: 800, color: '#475569' }}>{isZh ? '参数' : 'PARAMS'}</span>
+          <button className="ghost" onClick={() => onChange(sequentialListModule.randomize!(draft))}>↻ {t(T('重新生成', 'Regenerate'))}</button>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('操作', 'Op'))}</span>
             <select className="txt" value={draft.op} onChange={e => set({ op: e.target.value as Op })}>
               <option value="idle">{t(T('— 选择操作 —', '— pick —'))}</option>
@@ -264,10 +286,10 @@ export const sequentialListModule: ModuleDef<Scene, Cfg> = {
             </select></label>
           {needPos && <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('位置', 'Pos'))}</span><input className="txt" type="number" min={0} max={Math.max(0, cap - 1)} value={draft.pos} onChange={e => set({ pos: Number(e.target.value) || 0 })} style={{ width: 56 }} /></label>}
           {needVal && <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('值', 'Val'))}</span><input className="txt" type="number" value={draft.insVal} onChange={e => set({ insVal: Number(e.target.value) || 0 })} style={{ width: 64 }} /></label>}
-          <button className="pill active" onClick={exec} disabled={draft.op === 'idle'} style={invalid ? { opacity: 0.6 } : undefined}>执行</button>
-          <button className="ghost" onClick={loadExample}>示例</button>
-          <button className="ghost" onClick={clearAll}>{t(T('清空', 'Clear'))}</button>
-          <button className="pill" onClick={onView}>查看内存 ↗</button>
+          <button className="pill active" onClick={exec} disabled={draft.op === 'idle' || !draft.inited} style={invalid ? { opacity: 0.6 } : undefined}>执行</button>
+          <button className="ghost" onClick={loadExample} disabled={!draft.inited}>示例</button>
+          <button className="pill" onClick={onView} disabled={!draft.inited}>查看内存 ↗</button>
+          {!draft.inited && <span style={{ fontSize: 11, fontFamily: 'monospace', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 999, padding: '3px 8px' }}>{isZh ? '未初始化' : 'not inited'}</span>}
           {draft.op !== 'idle' && (
             <span style={{ fontSize: 11, fontFamily: 'monospace', background: invalid ? '#fef2f2' : '#f1f5f9', color: invalid ? '#dc2626' : '#64748b', border: `1px solid ${invalid ? '#fecaca' : '#e2e8f0'}`, borderRadius: 999, padding: '3px 8px' }}>
               {isZh ? `用 ${cur.used}/${cap}` : `${cur.used}/${cap}`}{invalid && ` · ${pos}${isZh ? ' 不可' : ' invalid'}`}
@@ -280,6 +302,15 @@ export const sequentialListModule: ModuleDef<Scene, Cfg> = {
   codeFor(cfg) { return CODE[cfg.op] as never; },
   generate: gen,
   Render({ scene }) {
+    if (!scene.inited) {
+      return (
+        <div style={{ display: 'grid', gap: 10 }}>
+          <div style={{ padding: '10px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, fontSize: 13, color: '#b91c1c', textAlign: 'center' }}>
+            未初始化 — 请先设置容量并点「初始化」分配连续空间；只有清空后才能重新初始化大小。
+          </div>
+        </div>
+      ) as unknown as never;
+    }
     return (
       <div style={{ display: 'grid', gap: 10 }}>
         <div style={{ border: '1px solid #c7d2fe', borderRadius: 12, overflow: 'hidden', background: '#eef2ff' }}>

@@ -1,19 +1,23 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { T } from '../../i18n/lang';
 import { MathText } from '../../lib/tex';
 import type { Frame, ModuleDef } from '../../engine/types';
 import { buildMemoryUrl, encodeIntBE, encodeIntLE, hexFromBytes } from '../../lib/memoryDump';
-import { Heap, realisticUserBase } from '../../lib/heap';
+import { Heap } from '../../lib/heap';
+import { processBaseOnce } from '../../lib/sessionHeap';
+
 
 type ElemType = 'i32' | 'i16' | 'u8';
 type Order = 'row' | 'col';
 type Op = 'idle' | 'get' | 'set';
-type Cfg = { elemType: ElemType; endian: 'little' | 'big'; rows: number; cols: number; order: Order; dataStr: string; prevDataStr?: string; op: Op; i: number; j: number; val: number; execTick: number; };
+type Cfg = { elemType: ElemType; endian: 'little' | 'big'; rows: number; cols: number; order: Order; inited: boolean; dataStr: string; prevDataStr?: string; op: Op; i: number; j: number; val: number; execTick: number; };
 
-type Scene = { base: number; heapBase: number; total: number; elemSize: number; elemType: ElemType; endian: 'little' | 'big'; rows: number; cols: number; order: Order; cells: (number | null)[]; used: number; bytes: Uint8Array; hex: string; focus: { i: number; j: number } | null; phase: 'idle' | 'addr' | 'write' | 'access'; op: Op; i: number; j: number; val: number };
+type Scene = { base: number; heapBase: number; total: number; elemSize: number; elemType: ElemType; endian: 'little' | 'big'; rows: number; cols: number; order: Order; inited: boolean; cells: (number | null)[]; used: number; bytes: Uint8Array; hex: string; focus: { i: number; j: number } | null; phase: 'idle' | 'addr' | 'write' | 'access'; op: Op; i: number; j: number; val: number };
 
 const COLORS = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f97316'];
 const HEAP_TOTAL = 384;
+let arrS: { heap: Heap; base: number; total: number; rows: number; cols: number; elemSize: number } | null = null;
+
 
 function elemSizeOf(t: ElemType): number { return t === 'i32' ? 4 : t === 'i16' ? 2 : 1; }
 function parseCells(s: string, n: number): (number | null)[] {
@@ -39,9 +43,19 @@ function buildHeapScene(cfg: Cfg, focus: { i: number; j: number } | null, phase:
   const n = R * C;
   const cells = cellsOverride ?? parseCells(cfg.dataStr, n);
   const total = n * elemSize;
-  const heap = new Heap(HEAP_TOTAL, realisticUserBase(cfg.execTick));
-  heap.allocate('__os__', 8 + (cfg.execTick % 3) * 8);
-  const base = heap.allocate('mat', total) ?? heap.base;
+  if (!cfg.inited) {
+    return { base: 0, heapBase: 0, total: 0, elemSize, elemType: cfg.elemType, endian: cfg.endian, rows: R, cols: C, order: cfg.order, inited: false, cells: new Array<number | null>(n).fill(null), used: 0, bytes: new Uint8Array(0), hex: '', focus, phase, op: cfg.op, i: cfg.i, j: cfg.j, val: cfg.val };
+  }
+  if (arrS === null || arrS.total !== total || arrS.rows !== R || arrS.cols !== C || arrS.elemSize !== elemSize) {
+    if (arrS === null) arrS = { heap: new Heap(HEAP_TOTAL, processBaseOnce()), base: 0, total: 0, rows: 0, cols: 0, elemSize: 0 };
+    arrS.heap.resetAll();
+    const osSize = 16; // 固定 OS 预占，进程内 realloc 后地址仍稳定
+    arrS.heap.allocate('__os__', osSize);
+    arrS.base = arrS.heap.allocate('mat', total) ?? arrS.heap.base + osSize;
+    arrS.total = total; arrS.rows = R; arrS.cols = C; arrS.elemSize = elemSize;
+  }
+  const heap = arrS.heap;
+  const base = arrS.base;
   const bytes = new Uint8Array(total);
   for (let i = 0; i < n; i++) {
     if (cells[i] === null) continue;
@@ -50,7 +64,7 @@ function buildHeapScene(cfg: Cfg, focus: { i: number; j: number } | null, phase:
   }
   heap.writeBytes(base, Array.from(bytes));
   const hex = hexFromBytes(Array.from(bytes));
-  return { base, heapBase: heap.base, total, elemSize, elemType: cfg.elemType, endian: cfg.endian, rows: R, cols: C, order: cfg.order, cells, used: cells.reduce<number>((k, c) => k + (c === null ? 0 : 1), 0), bytes, hex, focus, phase, op: cfg.op, i: cfg.i, j: cfg.j, val: cfg.val };
+  return { base, heapBase: heap.base, total, elemSize, elemType: cfg.elemType, endian: cfg.endian, rows: R, cols: C, order: cfg.order, inited: true, cells, used: cells.reduce<number>((k, c) => k + (c === null ? 0 : 1), 0), bytes, hex, focus, phase, op: cfg.op, i: cfg.i, j: cfg.j, val: cfg.val };
 }
 function buildDump(cfg: Cfg) {
   const s = buildHeapScene(cfg, null, 'idle');
@@ -76,11 +90,16 @@ function gen(cfg: Cfg): Frame<Scene>[] {
   const cur = parseCells(cfg.dataStr, R * C);
   if (cfg.execTick === 0 || cfg.op === 'idle') {
     const idle = buildHeapScene({ ...cfg, op: 'idle' }, null, 'idle');
+    if (!cfg.inited) return [{ line: 0, caption: T(`未初始化：设置 $M[${R}\\times${C}]$ 并点「初始化」分配连续空间`, 'Not initialized'), scene: idle }];
     const used = idle.used;
     const empty = used === 0;
     return [
       { line: 0, caption: T(empty ? `就绪：$M[${R}\\times${C}]$ 空，点“示例”构造` : `就绪：$M[${R}\\times${C}]$，×${used} 元素，${cfg.order === 'row' ? '行优先' : '列优先'} $idx=i\\cdot C+j$`, empty ? 'empty ready' : 'ready'), scene: idle },
     ];
+  }
+  if (!cfg.inited) {
+    const idle = buildHeapScene({ ...cfg, op: 'idle' }, null, 'idle');
+    return [{ line: 0, caption: T('未初始化：请先点「初始化」再执行操作', 'Not initialized'), scene: idle }];
   }
   const i = cfg.i | 0; const j = cfg.j | 0;
   const okIdx = i >= 0 && i < R && j >= 0 && j < C;
@@ -121,14 +140,17 @@ export const matrixModule: ModuleDef<Scene, Cfg> = {
   id: 'matrix', title: T('矩阵 · 二维线性化', 'Matrix (2D Addressing)'),
   desc: T('$M[i][j]$ 按行优先 $idx=i\\cdot C+j$ 或列优先 $idx=j\\cdot R+i$ 线性化到连续内存，$addr=base+idx\\cdot elemSize$。', 'Row/column-major linearization to contiguous memory.'),
   tags: ['data-structures', 'computer-organization'],
-  defaultConfig: { elemType: 'i32', endian: 'little', rows: 3, cols: 4, order: 'row' as Order, dataStr: '', op: 'idle', i: 0, j: 0, val: 0, execTick: 0 },
+  defaultConfig: { elemType: 'i32', endian: 'little', rows: 3, cols: 4, order: 'row' as Order, inited: false, dataStr: '', op: 'idle', i: 0, j: 0, val: 0, execTick: 0 },
   randomize(c) { return { ...c, dataStr: '', op: 'idle', execTick: 0 } as Cfg; },
   Controls({ config, onChange, t, onPlay }: any) {
     const isZh = t(T('中文', 'en')) !== 'en';
     const [draft, setDraft] = useState<Cfg>(config);
     const set = (p: Partial<Cfg>) => setDraft(s => ({ ...s, ...p }));
+    // 外部 config 变化（随机/示例/清空/语言切换）时同步本地 draft
+    useEffect(() => { if (draft.dataStr !== config.dataStr || draft.execTick !== config.execTick) setDraft(config); }, [config]);
     const loadExample = () => { const ns: Cfg = { ...draft, dataStr: '1,2,3,4,5,6,7,8,9,10,11,12', prevDataStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
-    const clearAll = () => { const ns: Cfg = { ...draft, dataStr: '', prevDataStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
+    const clearAll = () => { const ns: Cfg = { ...draft, inited: false, dataStr: '', prevDataStr: undefined, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
+    const init = () => { const ns: Cfg = { ...draft, inited: true, op: 'idle', execTick: 0 }; setDraft(ns); onChange(ns); };
     const exec = () => {
       const op = (['get', 'set'] as Op[]).includes(draft.op) ? draft.op : 'get';
       const R = Math.max(1, Math.min(8, draft.rows | 0)); const C = Math.max(1, Math.min(8, draft.cols | 0));
@@ -156,27 +178,30 @@ export const matrixModule: ModuleDef<Scene, Cfg> = {
       <div style={{ display: 'grid', gap: 8, width: '100%' }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 12, background: '#eef2ff', border: '1px solid #c7d2fe', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, fontWeight: 800, color: '#4338ca' }}>{isZh ? '模式' : 'MODE'}</span>
-          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('元素', 'Elem'))}</span><select className="txt" value={draft.elemType} onChange={e => set({ elemType: e.target.value as ElemType })}><option value="i32">i32 (4B)</option><option value="i16">i16 (2B)</option><option value="u8">u8 (1B)</option></select></label>
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('元素', 'Elem'))}</span><select className="txt" value={draft.elemType} disabled={draft.inited} onChange={e => set({ elemType: e.target.value as ElemType })}><option value="i32">i32 (4B)</option><option value="i16">i16 (2B)</option><option value="u8">u8 (1B)</option></select></label>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>Endian</span><select className="txt" value={draft.endian} onChange={e => set({ endian: e.target.value as any })}><option value="little">little</option><option value="big">big</option></select></label>
-          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>行 R</span><input className="txt" type="number" min={1} max={8} value={draft.rows} onChange={e => { const v = Math.max(1, Math.min(8, Number(e.target.value) || 3)); set({ rows: v }); onChange({ ...draft, rows: v, op: 'idle' as Op, execTick: 0 }); }} style={{ width: 52 }} /></label>
-          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>列 C</span><input className="txt" type="number" min={1} max={8} value={draft.cols} onChange={e => { const v = Math.max(1, Math.min(8, Number(e.target.value) || 4)); set({ cols: v }); onChange({ ...draft, cols: v, op: 'idle' as Op, execTick: 0 }); }} style={{ width: 52 }} /></label>
-          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('存储', 'Order'))}</span><select className="txt" value={draft.order} onChange={e => { const v = e.target.value as Order; set({ order: v }); onChange({ ...draft, order: v, op: 'idle' as Op, execTick: 0 }); }}>
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>行 R</span><input className="txt" type="number" min={1} max={8} value={draft.rows} disabled={draft.inited} onChange={e => { const v = Math.max(1, Math.min(8, Number(e.target.value) || 3)); set({ rows: v }); onChange({ ...draft, rows: v, op: 'idle' as Op, execTick: 0 }); }} style={{ width: 52 }} /></label>
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>列 C</span><input className="txt" type="number" min={1} max={8} value={draft.cols} disabled={draft.inited} onChange={e => { const v = Math.max(1, Math.min(8, Number(e.target.value) || 4)); set({ cols: v }); onChange({ ...draft, cols: v, op: 'idle' as Op, execTick: 0 }); }} style={{ width: 52 }} /></label>
+          <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('存储', 'Order'))}</span><select className="txt" value={draft.order} disabled={draft.inited} onChange={e => { const v = e.target.value as Order; set({ order: v }); onChange({ ...draft, order: v, op: 'idle' as Op, execTick: 0 }); }}>
             <option value="row">{t(T('行优先 i·C+j', 'Row-major'))}</option>
             <option value="col">{t(T('列优先 j·R+i', 'Column-major'))}</option>
           </select></label>
+          {!draft.inited && <button className="pill active" onClick={init}>{t(T('初始化', 'Init'))}</button>}
+          <button className="ghost" onClick={clearAll}>{t(T('清空', 'Clear'))}</button>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0', flexWrap: 'wrap', opacity: draft.inited ? 1 : 0.5, pointerEvents: draft.inited ? 'auto' : 'none' }}>
           <span style={{ fontSize: 11, fontWeight: 800, color: '#475569' }}>{isZh ? '参数' : 'PARAMS'}</span>
+          <button className="ghost" onClick={() => onChange(matrixModule.randomize!(draft))}>↻ {t(T('重新生成', 'Regenerate'))}</button>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('操作', 'Op'))}</span><select className="txt" value={draft.op} onChange={e => set({ op: e.target.value as Op })}>
             <option value="idle">{t(T('— 选择操作 —', '— pick —'))}</option><option value="get">{t(T('访问', 'Get'))}</option><option value="set">{t(T('写入', 'Set'))}</option>
           </select></label>
           {needIJ && <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>i</span><input className="txt" type="number" min={0} max={Math.max(0, R - 1)} value={draft.i} onChange={e => set({ i: Number(e.target.value) || 0 })} style={{ width: 48 }} /></label>}
           {needIJ && <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>j</span><input className="txt" type="number" min={0} max={Math.max(0, C - 1)} value={draft.j} onChange={e => set({ j: Number(e.target.value) || 0 })} style={{ width: 48 }} /></label>}
           {needVal && <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('值', 'Val'))}</span><input className="txt" type="number" value={draft.val} onChange={e => set({ val: Number(e.target.value) || 0 })} style={{ width: 64 }} /></label>}
-          <button className="pill active" onClick={exec} disabled={draft.op === 'idle'}>执行</button>
-          <button className="ghost" onClick={loadExample}>示例</button>
-          <button className="ghost" onClick={clearAll}>{t(T('清空', 'Clear'))}</button>
-          <button className="pill" onClick={onView}>查看内存 ↗</button>
+                    <button className="pill active" onClick={exec} disabled={draft.op === 'idle' || !draft.inited}>执行</button>
+          <button className="ghost" onClick={loadExample} disabled={!draft.inited}>示例</button>
+          <button className="pill" onClick={onView} disabled={!draft.inited}>查看内存 ↗</button>
+          {!draft.inited && <span style={{ fontSize: 11, fontFamily: 'monospace', background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: 999, padding: '3px 8px' }}>{isZh ? '未初始化' : 'not inited'}</span>}
           <span style={{ fontSize: 11, fontFamily: 'monospace', background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0', borderRadius: 999, padding: '3px 8px' }}>
             {isZh ? `已用 ${cur.filter(x => x !== null).length}/${R * C}` : `${cur.filter(x => x !== null).length}/${R * C}`}
           </span>
@@ -188,6 +213,15 @@ export const matrixModule: ModuleDef<Scene, Cfg> = {
   generate: gen,
   Render({ scene }) {
     const { rows: R, cols: C, order } = scene;
+    if (!scene.inited) {
+      return (
+        <div style={{ display: 'grid', gap: 10 }}>
+          <div style={{ padding: '10px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, fontSize: 13, color: '#b91c1c', textAlign: 'center' }}>
+            未初始化 — 设置行列与存储顺序后点「初始化」；只有清空后才能重新初始化大小。
+          </div>
+        </div>
+      ) as unknown as never;
+    }
     return (
       <div style={{ display: 'grid', gap: 10 }}>
         <div style={{ border: '1px solid #c7d2fe', borderRadius: 12, overflow: 'hidden', background: '#eef2ff' }}>
