@@ -5,12 +5,14 @@ import { findModule, searchModules } from './modules/registry';
 import { MathText } from './lib/tex';
 import { Settings } from './pages/Settings';
 import { MemoryVisualizer } from './pages/MemoryVisualizer';
+import { GraphStudio } from './pages/GraphStudio';
 
-type Route = { kind: 'home' } | { kind: 'module'; id: string } | { kind: 'settings' } | { kind: 'memory' };
+type Route = { kind: 'home' } | { kind: 'module'; id: string } | { kind: 'settings' } | { kind: 'memory' } | { kind: 'graph' };
 function getRoute(): Route {
   const h = location.hash;
   if (h.startsWith('#/settings') || h.startsWith('#/alphabet')) return { kind: 'settings' };
   if (h.startsWith('#/memory')) return { kind: 'memory' };
+  if (h.startsWith('#/graph')) return { kind: 'graph' };
   const m = h.match(/^#\/module\/(.+)/);
   if (m) return { kind: 'module', id: m[1] };
   return { kind: 'home' };
@@ -44,6 +46,9 @@ export function App() {
         <button className={`pill ${route.kind === 'memory' ? 'active' : ''}`} onClick={() => (location.hash = '#/memory')} title="HEX 内存可视化 — 支持 URL Base64 或手动输入">
           内存可视化
         </button>
+        <button className={`pill ${route.kind === 'graph' ? 'active' : ''}`} onClick={() => (location.hash = '#/graph')} title="通用图自由创建与探索（开发期测试页，后期删除）">
+          图测试
+        </button>
         <button className={`pill ${route.kind === 'settings' ? 'active' : ''}`} onClick={() => (location.hash = '#/settings')}>设置</button>
       </header>
       <main className="main">
@@ -51,6 +56,8 @@ export function App() {
           <Settings />
         ) : route.kind === 'memory' ? (
           <MemoryVisualizer />
+        ) : route.kind === 'graph' ? (
+          <GraphStudio />
         ) : mod ? (
           <>
             <button className="ghost" onClick={() => (location.hash = '')} style={{ marginBottom: 12 }}>
