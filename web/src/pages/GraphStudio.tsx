@@ -161,7 +161,11 @@ export function GraphStudio() {
       topoSteps(g);
     return raw.map(s => ({ line: s.line, scene: { current: s.current, exploring: s.exploring, visited: s.visited, frontier: s.frontier, order: s.order, edge: s.edge }, caption: s.msg }));
   }, [algo, g, root]);
-  const pb = usePlayback(algoFrames, { autoPlay: false, autoPlayOnMount: false, interval: 750 });
+  // 引用稳定：播放期间 framesOr 不变 → usePlayback 不会因重渲染 reset 到首帧
+  const algoFramesRef = useRef(algoFrames);
+  if (algo !== 'none' && algoFramesRef.current !== algoFrames) algoFramesRef.current = algoFrames;
+  const playbackFrames = algo === 'none' ? [] : algoFramesRef.current;
+  const pb = usePlayback(playbackFrames, { autoPlay: false, autoPlayOnMount: false, interval: 750 });
   const frame = pb.frame as (AlgoFrame & { caption: { zh: string; en: string } }) | undefined;
   // 画布高亮快照：无算法时为空，有算法时取当前帧
   const hl = frame?.scene ?? null;
@@ -619,11 +623,6 @@ export function GraphStudio() {
               <option value="free">自由</option>
             </select>
           </label>
-          {layout === 'tree' && (
-            <label style={{ fontSize: 12 }}>根
-              <input className="txt" type="number" min={0} max={Math.max(0, n - 1)} value={root} onChange={e => setRoot(Math.max(0, Math.min(n - 1, Number(e.target.value) || 0)))} style={{ width: 44, marginLeft: 4, padding: '3px 6px', fontSize: 12 }} />
-            </label>
-          )}
           <button className="ghost" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => { pushHistory(); setEdgeSpec(''); setMsg('已清空全部边'); }}>清空</button>
           <button className="ghost" style={{ padding: '4px 10px', fontSize: 12 }} onClick={menuReset}>重置布局</button>
           <span style={{ marginLeft: 'auto', fontSize: 12, color: '#475569' }}>
@@ -759,6 +758,7 @@ export function GraphStudio() {
                 <>
                   <MenuHead label={`顶点 ${g.labels[menuVtx]}`} />
                   <MenuItem label="✏️ 重命名" onClick={() => { setEditing(menuVtx); setEditVal(g.labels[menuVtx] ?? String(menuVtx)); setMenu(null); }} />
+                  <MenuItem label="⭐ 设为根（树形布局/遍历起点）" onClick={() => { setRoot(menuVtx!); setLayout(l => (l === 'tree' || l === 'free' ? 'tree' : l)); setMsg(`根设为 ${g.labels[menuVtx]}`); setMenu(null); }} />
                   <MenuItem label="🔗 从此连线" onClick={() => { setPending(menuVtx); setSelected(menuVtx); setTool('addEdge'); setMsg(`起点 ${g.labels[menuVtx]}，再点第二个顶点`); setMenu(null); }} />
                   <MenuItem label="删除顶点（含其边）" danger onClick={() => { removeVertex(menuVtx!); setMenu(null); }} />
                 </>
