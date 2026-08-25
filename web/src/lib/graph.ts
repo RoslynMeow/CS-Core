@@ -489,17 +489,19 @@ export function bfsSteps(g: Graph, start = 0, labels: string[] = g.labels): Algo
 
   let head = 0;
   while (head < q.length) {
+    steps.push({ line: 2, current: null, exploring: null, visited: visitedList(), frontier: [...q], order: [...order], edge: null, msg: { zh: `while 条件成立：$Q \\neq \\emptyset$（队列 ${q.map(S).join(',')}）`, en: `while Q≠∅ (${q.map(S).join(',')})` } });
     const u = q[head++];
     order.push(u);
-    steps.push({ line: 2, current: u, exploring: null, visited: visitedList(), frontier: [...q], order: [...order], edge: null, msg: { zh: `出队：$u \\gets ${S(u)}$ → 访问顺序 ${order.length}`, en: `dequeue ${S(u)}` } });
+    steps.push({ line: 3, current: u, exploring: null, visited: visitedList(), frontier: [...q], order: [...order], edge: null, msg: { zh: `出队：$u \\gets ${S(u)}$ → 访问顺序 ${order.length}`, en: `dequeue ${S(u)}` } });
     for (const [v] of adj[u]) {
-      steps.push({ line: 3, current: u, exploring: u, visited: visitedList(), frontier: [...q], order: [...order], edge: [u, v], msg: { zh: `看邻边 $(${S(u)},${S(v)})$：$visited[${S(v)}]=${visited[v] ? 'true' : 'false'}$（${visited[v] ? '已访问，跳过' : '未访问'}）`, en: `check (${S(u)},${S(v)})` } });
+      steps.push({ line: 4, current: u, exploring: u, visited: visitedList(), frontier: [...q], order: [...order], edge: [u, v], msg: { zh: `看邻边 $(${S(u)},${S(v)})$：$visited[${S(v)}]=${visited[v] ? 'true' : 'false'}$（${visited[v] ? '已访问，跳过' : '未访问'}）`, en: `check (${S(u)},${S(v)})` } });
       if (!visited[v]) {
         visited[v] = true; q.push(v);
-        steps.push({ line: 4, current: u, exploring: u, visited: visitedList(), frontier: [...q], order: [...order], edge: [u, v], msg: { zh: `发现 $v=${S(v)}$：入队 $Q$，$visited\\gets true$`, en: `found ${S(v)}` } });
+        steps.push({ line: 5, current: u, exploring: u, visited: visitedList(), frontier: [...q], order: [...order], edge: [u, v], msg: { zh: `发现 $v=${S(v)}$：入队 $Q$，$visited\\gets true$`, en: `found ${S(v)}` } });
       }
     }
   }
+  steps.push({ line: 6, current: null, exploring: null, visited: visitedList(), frontier: [], order: [...order], edge: null, msg: { zh: `完成：BFS 访问全部可达顶点，共 ${order.length} 个`, en: `BFS done (${order.length})` } });
   return steps;
 }
 
@@ -518,20 +520,22 @@ export function dfsSteps(g: Graph, start = 0, labels: string[] = g.labels): Algo
   steps.push({ line: 1, current: null, exploring: null, visited: visitedList(), frontier: [...stack], order: [], edge: null, msg: { zh: `栈 $S \\gets {${stack.map(S).join(',')}}$`, en: `push ${S(start)}` } });
 
   while (stack.length) {
+    steps.push({ line: 2, current: null, exploring: null, visited: visitedList(), frontier: [...stack], order: [...order], edge: null, msg: { zh: `while 条件成立：$S \\neq \\emptyset$（栈 ${stack.map(S).join(',')}）`, en: `while S≠∅ (${stack.map(S).join(',')})` } });
     const u = stack.pop()!;
-    steps.push({ line: 2, current: u, exploring: null, visited: visitedList(), frontier: [...stack], order: [...order], edge: null, msg: { zh: `弹出：$u \\gets ${S(u)}$`, en: `pop ${S(u)}` } });
+    steps.push({ line: 3, current: u, exploring: null, visited: visitedList(), frontier: [...stack], order: [...order], edge: null, msg: { zh: `弹出：$u \\gets ${S(u)}$`, en: `pop ${S(u)}` } });
     if (visited[u]) continue;
     visited[u] = true;
     order.push(u);
-    steps.push({ line: 3, current: u, exploring: null, visited: visitedList(), frontier: [...stack], order: [...order], edge: null, msg: { zh: `访问 $v=${S(u)}$：访问顺序第 ${order.length} 位`, en: `visit ${S(u)}` } });
+    steps.push({ line: 4, current: u, exploring: null, visited: visitedList(), frontier: [...stack], order: [...order], edge: null, msg: { zh: `访问 $v=${S(u)}$：访问顺序第 ${order.length} 位`, en: `visit ${S(u)}` } });
     // 压入所有未访问邻接（倒序压栈保持自然序）
     const neighbors = adj[u].map(([v]) => v).filter(v => !visited[v]).reverse();
     if (neighbors.length === 0) continue;
     for (const v of neighbors) {
-      steps.push({ line: 4, current: u, exploring: u, visited: visitedList(), frontier: [...stack], order: [...order], edge: [u, v], msg: { zh: `压栈：$v=${S(v)}$（$!visited$）$\\to S$`, en: `push ${S(v)}` } });
+      steps.push({ line: 5, current: u, exploring: u, visited: visitedList(), frontier: [...stack], order: [...order], edge: [u, v], msg: { zh: `压栈：$v=${S(v)}$（$!visited$）$\\to S$`, en: `push ${S(v)}` } });
       stack.push(v);
     }
   }
+  steps.push({ line: 6, current: null, exploring: null, visited: visitedList(), frontier: [], order: [...order], edge: null, msg: { zh: `完成：DFS 访问全部可达顶点，共 ${order.length} 个`, en: `DFS done (${order.length})` } });
   return steps;
 }
 
@@ -551,17 +555,18 @@ export function topoSteps(g: Graph, labels: string[] = g.labels): AlgoStep[] {
 
   let head = 0;
   while (head < q.length) {
+    steps.push({ line: 2, current: null, exploring: null, visited: [...order], frontier: fr(), order: [...order], edge: null, msg: { zh: 'while 条件成立：$Q \\neq \\emptyset$', en: 'while Q≠∅' } });
     const u = q[head++];
-    steps.push({ line: 2, current: u, exploring: null, visited: [...order], frontier: fr(), order: [...order], edge: null, msg: { zh: `弹出 $u=${S(u)}$ → 拓扑序`, en: `pop ${S(u)}` } });
+    steps.push({ line: 3, current: u, exploring: null, visited: [...order], frontier: fr(), order: [...order], edge: null, msg: { zh: `弹出 $u=${S(u)}$ → 拓扑序`, en: `pop ${S(u)}` } });
     order.push(u);
-    steps.push({ line: 3, current: u, exploring: u, visited: [...order], frontier: fr(), order: [...order], edge: null, msg: { zh: `邻接 $in\\gets in{-}1$`, en: `decrement indeg` } });
+    steps.push({ line: 4, current: u, exploring: u, visited: [...order], frontier: fr(), order: [...order], edge: null, msg: { zh: `邻接 $in\\gets in{-}1$`, en: `decrement indeg` } });
     for (const [v] of adj[u]) {
       indeg[v]--;
-      steps.push({ line: 4, current: u, exploring: u, visited: [...order], frontier: fr(), order: [...order], edge: [u, v], msg: { zh: `$in[${S(v)}]=${indeg[v]}$，为 0 入队`, en: `indeg[${S(v)}]=${indeg[v]}` } });
+      steps.push({ line: 5, current: u, exploring: u, visited: [...order], frontier: fr(), order: [...order], edge: [u, v], msg: { zh: `$in[${S(v)}]=${indeg[v]}$，为 0 入队`, en: `indeg[${S(v)}]=${indeg[v]}` } });
       if (indeg[v] === 0) q.push(v);
     }
   }
-  steps.push({ line: 5, current: null, exploring: null, visited: [...order], frontier: [], order: [...order], edge: null, msg: { zh: order.length === n ? `拓扑序：$[${order.map(S).join(', ')}]$（无环）` : `检测到环：仅输出 ${order.length}/${n} 个顶点`, en: order.length === n ? 'topo done' : 'cycle!' } });
+  steps.push({ line: 6, current: null, exploring: null, visited: [...order], frontier: [], order: [...order], edge: null, msg: { zh: order.length === n ? `完成：拓扑序 $[${order.map(S).join(', ')}]$（${order.length} 顶点，无环）` : `检测到环：仅输出 ${order.length}/${n} 个顶点`, en: order.length === n ? `topo done (${order.length})` : 'cycle!' } });
   return steps;
 }
 

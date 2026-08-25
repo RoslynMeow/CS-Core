@@ -514,7 +514,7 @@ export function GraphStudio() {
               </div>
             ))}
           </div>
-          <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>邻接矩阵 · $M[i][j]=1/权重$（无向对称；行高亮=选中顶点）</div>
+          <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}><MathText text={'邻接矩阵 · $M[i][j]=1/权重$（无向对称；行高亮选中顶点）'} /></div>
         </div>
       );
     }
@@ -576,7 +576,7 @@ export function GraphStudio() {
   // 统计顶点着色：树=分层、图=按度
   const vertexColor = (i: number): string => {
     if (selected === i) return '#4f46e5';
-    if (layout === 'tree' && i === root) return '#4f46e5';
+    if (i === root) return '#dc2626'; // 根 = 红色（不限布局）
     const deg = analysis?.deg[i] ?? 0;
     if (deg >= 3) return '#f59e0b';
     if (deg === 2) return '#10b981';
@@ -701,19 +701,24 @@ export function GraphStudio() {
               const isFrontier = hl ? hl.frontier.includes(i) : false;
               const isExploring = hl ? hl.exploring === i : false;
               // 算法高亮优先级：current > exploring > visited > frontier > 普通 > 选中
+              const isRoot = i === root;
               const fill = isAlgoActive
                 ? isCurrent ? '#4f46e5' : isExploring ? '#f59e0b' : isVisited ? '#10b981' : isFrontier ? '#38bdf8' : '#eef2ff'
                 : isHoverV ? '#ddd6fe' : vertexColor(i);
               const stroke = isAlgoActive
                 ? isCurrent ? '#312e81' : isExploring ? '#b45309' : isVisited ? '#059669' : isFrontier ? '#0284c7' : '#6366f1'
-                : isSel ? '#312e81' : isHoverV ? '#7c3aed' : '#6366f1';
-              const sw = isAlgoActive ? (isCurrent || isExploring ? 3 : 1.6) : (isSel ? 2.6 : isPending ? 2.2 : isHoverV ? 2.4 : 1.4);
-              const labelColor = isAlgoActive ? (isCurrent || isVisited || isFrontier || isExploring ? '#fff' : '#1e293b') : (isSel || (layout === 'tree' && i === root) ? '#fff' : '#1e293b');
+                : isSel ? '#312e81' : isRoot ? '#b91c1c' : isHoverV ? '#7c3aed' : '#6366f1';
+              const sw = isAlgoActive ? (isCurrent || isExploring ? 3 : 1.6) : (isSel ? 2.6 : isRoot ? 2.4 : isPending ? 2.2 : isHoverV ? 2.4 : 1.4);
+              const labelColor = isAlgoActive ? (isCurrent || isVisited || isFrontier || isExploring ? '#fff' : '#1e293b') : (isSel || isRoot ? '#fff' : '#1e293b');
               const orderIdx = hl ? hl.order.indexOf(i) : -1;
               return (
                 <g key={i}>
                   <circle cx={p.x} cy={p.y} r={V_R} fill={fill} stroke={stroke} strokeWidth={sw} />
                   <text x={p.x} y={p.y + 4} textAnchor="middle" fontSize={11} fontWeight={700} fill={labelColor}>{g.labels[i]}</text>
+                  {/* 根标注 */}
+                  {!isAlgoActive && isRoot && (
+                    <text x={p.x} y={p.y - V_R - 3} textAnchor="middle" fontSize={9} fontWeight={800} fill="#dc2626">根</text>
+                  )}
                   {/* 访问序角标 */}
                   {isAlgoActive && orderIdx >= 0 && (
                     <text x={p.x + V_R - 2} y={p.y - V_R + 2} fontSize={9} fontWeight={800} fill={isCurrent ? '#e0e7ff' : '#475569'}>{orderIdx + 1}</text>
