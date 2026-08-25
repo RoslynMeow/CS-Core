@@ -789,8 +789,8 @@ export function GraphStudio() {
           )}
           {/* 算法当前步骤 caption */}
           {isAlgoActive && frame && (
-            <div style={{ position: 'absolute', bottom: 8, left: 12, right: 12, background: 'rgba(15,23,42,.85)', color: '#e2e8f0', borderRadius: 10, padding: '8px 12px', fontSize: 13, fontFamily: 'monospace' }}>
-              {frame.caption.zh}
+            <div style={{ position: 'absolute', bottom: 8, left: 12, right: 12, background: 'rgba(15,23,42,.85)', color: '#e2e8f0', borderRadius: 10, padding: '8px 12px', fontSize: 13 }}>
+              <MathText text={frame.caption.zh} />
             </div>
           )}
         </div>
