@@ -4,7 +4,6 @@ import type { Frame, ModuleDef } from '../../engine/types';
 import { Graph, buildGraphDump, treeTraverseSteps, bfsSteps, type AlgoStep } from '../../lib/graph';
 import { MathText } from '../../lib/tex';
 import { buildMemoryUrl } from '../../lib/memoryDump';
-import { usePlayback } from '../../engine/usePlayback';
 
 /**
  * 树 · 可交互创建 + 遍历算法
