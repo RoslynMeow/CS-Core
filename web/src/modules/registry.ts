@@ -6,9 +6,6 @@ import { twosComplementModule } from './numeric/twosComplement';
 import { ieee754Module } from './numeric/ieee754';
 import { characterEncodingModule } from './text/characterEncoding';
 import { stringOpsModule } from './text/stringOps';
-import { treeModule } from './tree/basics';
-import { binaryTreeModule } from './tree/binary';
-import { heapModule } from './tree/heap';
 import { sequentialListModule } from './storage/sequentialList';
 import { linkedListModule } from './storage/linkedList';
 import { circularLinkedListModule } from './storage/circularLinkedList';
@@ -34,9 +31,6 @@ export const KNOWLEDGE: Record<string, ModuleDef> = {
   [matrixModule.id]: matrixModule as unknown as ModuleDef,
   [stackModule.id]: stackModule as unknown as ModuleDef,
   [queueModule.id]: queueModule as unknown as ModuleDef,
-  [treeModule.id]: treeModule as unknown as ModuleDef,
-  [binaryTreeModule.id]: binaryTreeModule as unknown as ModuleDef,
-  [heapModule.id]: heapModule as unknown as ModuleDef,
 };
 
 export const allModules = Object.values(KNOWLEDGE);

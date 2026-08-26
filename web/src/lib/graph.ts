@@ -703,3 +703,104 @@ export function treeTraverseSteps(
   for (const rt of roots) rec(rt);
   return steps;
 }
+
+// ============================================================
+// 树形态/统计（二叉树判定、子树大小、高度、平衡因子等）
+// ============================================================
+
+export type TreeStats = {
+  isTree: boolean; isForest: boolean; isBinary: boolean;
+  skew: boolean; full: boolean; complete: boolean;
+  bst: boolean; avl: boolean;           // 仅二叉且有数字标签时有意义
+  height: number; width: number;
+  size: number[];                        // size[i] = 以 i 为根的子树节点数
+  nodeHeight: number[];                  // nodeHeight[i] = 以 i 为根的子树高度
+  depth: number[];                       // depth[i] = 根到 i 的深度
+  parent: number[];
+  children: number[][];
+  n0: number; n2: number;                // 叶数 / 双子女节点数（二叉）
+  bf: number[];                          // 平衡因子 H(L)-H(R)（二叉）
+};
+
+/** 以 root 为根统计树（含森林多根的完整统计：parent/children 覆盖全部顶点） */
+export function treeStats(g: Graph, root = 0): TreeStats {
+  const n = g.n;
+  const comps = g.connectedComponents();
+  const isTree = g.isTree();
+  const isForest = !g.hasCycle();
+  // 逐连通分量独立 BFS → 每棵树的 parent/children（无向图内无环，天然森林）
+  const seen = new Set<number>();
+  const parent = Array(n).fill(-1);
+  const children: number[][] = Array.from({ length: n }, () => []);
+  const roots: number[] = [];
+  for (const c of comps) {
+    if (c.length === 0) continue;
+    const r = c[0];
+    roots.push(r);
+    const { parent: pp } = g.bfs(r);
+    for (const v of c) {
+      if (v === r) continue;
+      parent[v] = pp[v];
+      if (pp[v] !== -1 && pp[v] !== v) children[pp[v]].push(v);
+    }
+    for (const c2 of c) seen.add(c2);
+  }
+  // depth/post 序（每树根深 0）
+  const depth = Array(n).fill(0);
+  const post: number[] = [];
+  const dfs = (u: number, d: number, par: number) => {
+    depth[u] = d;
+    for (const c of children[u]) if (c !== par) dfs(c, d + 1, u);
+    post.push(u);
+  };
+  for (const r of roots) dfs(r, 0, -1);
+  // size/nodeHeight（后序，子先父后）
+  const size = Array(n).fill(0);
+  const nodeHeight = Array(n).fill(0);
+  for (const u of post) {
+    size[u] = 1 + children[u].reduce((s2, c) => s2 + size[c], 0);
+    nodeHeight[u] = children[u].length ? 1 + Math.max(...children[u].map(c => nodeHeight[c])) : 0;
+  }
+  const height = Math.max(0, ...depth);
+  const width = Math.max(0, ...Array.from({ length: n }, (_, v) => (roots.includes(v) ? children[v].length : children[v].length + 1)));
+  // 二叉/形态（仅当单一连通分量，即真树）
+  const isBinary = comps.length === 1 && children.every(c => c.length <= 2);
+  const skew = isBinary && n > 1 && children.every(c => c.length <= 1);
+  const full = isBinary && n > 1 && children.every(c => c.length === 0 || c.length === 2) && (() => {
+    const ds: number[] = [];
+    const walk = (u: number, d: number) => { if (children[u].length === 0) ds.push(d); for (const c of children[u]) walk(c, d + 1); };
+    walk(root, 0); return new Set(ds).size === 1;
+  })() || (n === 1 ? true : false);
+  const bfs = g.bfs(root).order;
+  const bfsPos = new Map(bfs.map((v, i) => [v, i]));
+  const complete = isBinary && (() => {
+    for (let i = 0; i < bfs.length; i++) {
+      const u = bfs[i], cs = children[u];
+      if (cs[0] !== undefined && bfsPos.get(cs[0]) !== 2 * i + 1) return false;
+      if (cs[1] !== undefined && cs[0] === undefined) return false;
+      if (cs[1] !== undefined && bfsPos.get(cs[1]) !== 2 * i + 2) return false;
+    }
+    return true;
+  })();
+  // BST（数字标签中序递增）/ AVL（平衡因子）
+  const numeric = g.labels.every(l => /^-?\d+$/.test(l));
+  const labelsNum = g.labels.map(Number);
+  let bst = isBinary && numeric;
+  if (isBinary && numeric) {
+    const inorder: number[] = [];
+    const recIn = (u: number) => { if (children[u][0] !== undefined) recIn(children[u][0]); inorder.push(u); if (children[u][1] !== undefined) recIn(children[u][1]); };
+    recIn(root);
+    for (let i = 1; i < inorder.length; i++) if (labelsNum[inorder[i-1]] > labelsNum[inorder[i]]) bst = false;
+  }
+  const bf = Array(n).fill(0);
+  for (let u = 0; u < n; u++) {
+    const cs = children[u];
+    const lh = cs[0] !== undefined ? nodeHeight[cs[0]] + 1 : 0;
+    const rh = cs[1] !== undefined ? nodeHeight[cs[1]] + 1 : 0;
+    bf[u] = lh - rh;
+  }
+  const avl = isBinary && bf.every(x => Math.abs(x) <= 1);
+  const n0 = isBinary ? Array.from({ length: n }, (_, i) => i).filter(i => children[i].length === 0).length : 0;
+  const n2 = isBinary ? Array.from({ length: n }, (_, i) => i).filter(i => children[i].length === 2).length : 0;
+  return { isTree, isForest, isBinary, skew, full, complete, bst, avl, height, width, size, nodeHeight, depth, parent, children, n0, n2, bf };
+}
