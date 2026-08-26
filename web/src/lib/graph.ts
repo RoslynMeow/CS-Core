@@ -571,6 +571,8 @@ export function topoSteps(g: Graph, labels: string[] = g.labels): AlgoStep[] {
 }
 
 // ============================================================
+
+// ============================================================
 // 内存布局 dump（供 #/memory 可视化；与 hashTable 等链式风格一致）
 // ============================================================
 
@@ -598,7 +600,6 @@ export function buildGraphDump(g: Graph, repr: GraphRepr, opts: { ptrSize?: numb
   const allocs: DumpAlloc[] = [];
 
   if (repr === 'adjmat') {
-    // 邻接矩阵：连续 n*n 块，fields 逐格
     const mat = g.mat();
     const bytes: number[] = [];
     for (const row of mat) for (const w of row) bytes.push(...bytesOf(w ?? 0, elemSize));
@@ -607,17 +608,14 @@ export function buildGraphDump(g: Graph, repr: GraphRepr, opts: { ptrSize?: numb
     })));
     allocs.push({ key: 'mat', addr: `0x${cursor.toString(16)}`, size: g.n * g.n * elemSize, hex: hexFromBytes(bytes), label: `邻接矩阵 M[${g.n}][${g.n}] · ${g.n * g.n} 格 × ${elemSize}B`, color: '#4f46e5', fields });
   } else if (repr === 'array') {
-    // parent 数组：连续 n 块，每槽存父下标（根 -1）
     const bfs = g.bfs(opts.root ?? 0);
     const rootIdx = opts.root ?? 0;
-    // 根自身 parent=自身 → 显示 -1；其余正常
     const parent = bfs.parent.map((p, i) => (i === rootIdx ? -1 : p));
     const bytes: number[] = [];
     for (const p of parent) bytes.push(...bytesOf(p === -1 ? -1 : p, elemSize));
     const fields = parent.map((p, i) => ({ name: `${lb[i]}${p === -1 ? '(根)' : ''}`, offset: i * elemSize, size: elemSize, type: 'i32', color: p === -1 ? '#dc2626' : '#10b981' }));
     allocs.push({ key: 'parent', addr: `0x${cursor.toString(16)}`, size: g.n * elemSize, hex: hexFromBytes(bytes), label: `parent[] 压缩表示 · 根=−1 · ${g.n} 槽 × ${elemSize}B`, color: '#10b981', fields });
   } else if (repr === 'edges') {
-    // 边集数组：每边 u,v 两个连续槽
     const bytes: number[] = [];
     const fields: DumpField[] = [];
     g.edges.forEach((e, k) => {
@@ -628,15 +626,11 @@ export function buildGraphDump(g: Graph, repr: GraphRepr, opts: { ptrSize?: numb
     });
     allocs.push({ key: 'edges', addr: `0x${cursor.toString(16)}`, size: g.edges.length * 2 * elemSize, hex: hexFromBytes(bytes), label: `边集数组 · ${g.edges.length} 边 × (u,v)`, color: '#6366f1', fields });
   } else {
-    // 邻接表（链式）：顶点表 head[] 连续存首邻居指针；每邻居一个节点 (v, next)
     const adj = g.adj();
-    // 先规划地址：head 表占 n*ptrSize，节点紧随
     const headTableSize = g.n * ptrSize;
     const headTableAddr = cursor;
     const nodeBase = cursor + headTableSize;
-    // 按序给每个邻居节点分配地址
     const nodeAddrs: number[][][] = adj.map(nbrs => { let off = 0; return nbrs.map(() => { const a = nodeBase + off; off += elemSize + ptrSize; return [a]; }); });
-    // 顶点表字节：head[u] = 首邻居地址或 0
     const headDumpBytes: number[] = [];
     for (let u = 0; u < g.n; u++) {
       const first = nodeAddrs[u][0]?.[0] ?? 0;
@@ -647,7 +641,6 @@ export function buildGraphDump(g: Graph, repr: GraphRepr, opts: { ptrSize?: numb
       label: `顶点表 head[0..${g.n - 1}]（首邻居指针）`, color: '#6366f1',
       fields: g.labels.map((l, u) => ({ name: l, offset: u * ptrSize, size: ptrSize, type: 'u32', color: '#6366f1' })),
     });
-    // 每个邻居节点：v + next 指针
     adj.forEach((nbrs, u) => {
       nbrs.forEach(([v], k) => {
         const a = nodeAddrs[u][k][0];
@@ -665,4 +658,48 @@ export function buildGraphDump(g: Graph, repr: GraphRepr, opts: { ptrSize?: numb
     });
   }
   return { base: `0x${base.toString(16)}`, total: cursor - base + 0x100, endian: 'little', allocations: allocs };
+}
+
+// ============================================================
+// 树遍历步骤（前序/中序/后序；以 root 为根）
+// ============================================================
+
+/** 树的前序/中序/后序遍历步骤 */
+export function treeTraverseSteps(
+  g: Graph,
+  mode: 'pre' | 'in' | 'post',
+  root = 0,
+  labels: string[] = g.labels
+): AlgoStep[] {
+  const n = g.n, adj = g.adj();
+  const { parent } = g.bfs(root);
+  const children: number[][] = Array.from({ length: n }, () => []);
+  for (let v = 0; v < n; v++) if (v !== root && parent[v] !== -1) children[parent[v]].push(v);
+  const extraRoots = Array.from({ length: n }, (_, i) => i).filter(v => v !== root && parent[v] === -1);
+  const roots = [root, ...extraRoots];
+
+  const steps: AlgoStep[] = [];
+  const visited: number[] = [];
+  const S = (i: number) => labels[i];
+  const push = (line: number, current: number | null, exploring: number | null, conn: [number, number] | null, zh: string, en: string) =>
+    steps.push({ line, current, exploring, visited: [...visited], frontier: [], order: [...visited], edge: conn, msg: { zh, en } });
+
+  // 递归（树小，安全）：先入帧记录路径，访问时 push
+  const visit = (u: number, line: number, zh: string, en: string) => { visited.push(u); push(line, u, null, null, zh, en); };
+  const rec = (u: number) => {
+    const kids = children[u];
+    if (mode === 'pre') {
+      visit(u, 1, `Visit(${S(u)}) ← 前序`, `pre visit ${S(u)}`);
+      for (const k of kids) { push(2, u, k, [u, k], `Preorder(${S(k)})`, `into ${S(k)}`); rec(k); }
+    } else if (mode === 'in') {
+      if (kids.length > 0) { push(0, u, kids[0], null, `进入 ${S(u)}（左先）`, `enter ${S(u)}`); rec(kids[0]); }
+      visit(u, 3, `Visit(${S(u)}) ← 中序`, `in visit ${S(u)}`);
+      for (let i = 1; i < kids.length; i++) { push(2, u, kids[i], [u, kids[i]], `Inorder(${S(kids[i])})`, `into ${S(kids[i])}`); rec(kids[i]); }
+    } else {
+      for (const k of kids) { push(0, u, k, [u, k], `Postorder(${S(k)})`, `into ${S(k)}`); rec(k); }
+      visit(u, 4, `Visit(${S(u)}) ← 后序`, `post visit ${S(u)}`);
+    }
+  };
+  for (const rt of roots) rec(rt);
+  return steps;
 }

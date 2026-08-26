@@ -615,14 +615,10 @@ export function GraphStudio() {
           <label style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
             <input type="checkbox" checked={directed} onChange={e => setDirected(e.target.checked)} /> 有向
           </label>
-          <label style={{ fontSize: 12 }}>布局
-            <select className="txt" value={layout} onChange={e => { setLayout(e.target.value as Layout); setMsg(''); }} style={{ marginLeft: 4, padding: '3px 6px', fontSize: 12 }}>
-              <option value="tree">树形</option>
-              <option value="circle">环形</option>
-              <option value="force">力导向</option>
-              <option value="free">自由</option>
-            </select>
-          </label>
+          <span style={{ fontSize: 12 }}>布局</span>
+          {([['tree', '树形'], ['circle', '环形'], ['force', '力导向'], ['free', '自由']] as Array<[Layout, string]>).map(([v, lb]) => (
+            <button key={v} className={`pill ${layout === v ? 'active' : ''}`} style={{ padding: '3px 10px', fontSize: 12 }} onClick={() => { setLayout(v); setMsg(''); }}>{lb}</button>
+          ))}
           <button className="ghost" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => { pushHistory(); setEdgeSpec(''); setMsg('已清空全部边'); }}>清空</button>
           <button className="ghost" style={{ padding: '4px 10px', fontSize: 12 }} onClick={menuReset}>重置布局</button>
           <span style={{ marginLeft: 'auto', fontSize: 12, color: '#475569' }}>
@@ -812,14 +808,11 @@ export function GraphStudio() {
             </div>
           ) : (
             <>
-              <div style={{ padding: '8px 10px', fontSize: 11, fontWeight: 800, color: '#4338ca', display: 'flex', gap: 8, alignItems: 'center', borderBottom: '1px solid #c7d2fe' }}>
+              <div style={{ padding: '8px 10px', fontSize: 11, fontWeight: 800, color: '#4338ca', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', borderBottom: '1px solid #c7d2fe' }}>
                 <span>内存表示</span>
-                <select className="txt" value={repr} onChange={e => setRepr(e.target.value as typeof repr)} style={{ marginLeft: 4, padding: '3px 6px', fontSize: 11 }}>
-                  <option value="adjlist">邻接表（链式）</option>
-                  <option value="adjmat">邻接矩阵</option>
-                  <option value="array">parent 数组（树）</option>
-                  <option value="edges">边集数组</option>
-                </select>
+                {([['adjlist', '邻接表'], ['adjmat', '矩阵'], ['array', 'parent'], ['edges', '边集']] as Array<[typeof repr, string]>).map(([v, lb]) => (
+                  <button key={v} className={`pill ${repr === v ? 'active' : ''}`} style={{ padding: '2px 8px', fontSize: 11 }} onClick={() => setRepr(v)}>{lb}</button>
+                ))}
                 <button
                   className="pill"
                   style={{ marginLeft: 'auto', padding: '2px 8px', fontSize: 11 }}

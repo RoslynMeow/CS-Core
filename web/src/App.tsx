@@ -46,8 +46,8 @@ export function App() {
         <button className={`pill ${route.kind === 'memory' ? 'active' : ''}`} onClick={() => (location.hash = '#/memory')} title="HEX 内存可视化 — 支持 URL Base64 或手动输入">
           内存可视化
         </button>
-        <button className={`pill ${route.kind === 'graph' ? 'active' : ''}`} onClick={() => (location.hash = '#/graph')} title="通用图自由创建与探索（开发期测试页，后期删除）">
-          图测试
+        <button className={`pill ${route.kind === 'graph' ? 'active' : ''}`} onClick={() => (location.hash = '#/graph')} title="通用图/树自由创建与探索">
+          图创建
         </button>
         <button className={`pill ${route.kind === 'settings' ? 'active' : ''}`} onClick={() => (location.hash = '#/settings')}>设置</button>
       </header>

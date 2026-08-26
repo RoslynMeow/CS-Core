@@ -22,7 +22,7 @@ export interface ModuleDef<S = unknown, C = unknown> {
   Controls?: ComponentType<{ config: C; onChange: (c: C) => void; t: (x: Text) => string }>;
   randomize?: (c: C) => C;
   generate: (config: C) => FramesOrInfinite<S>;
-  Render: ComponentType<{ scene: S; t: (x: Text) => string }>;
+  Render: ComponentType<{ scene: S; t: (x: Text) => string; config?: C; onChange?: (c: C) => void }>;
   code?: Text[];
   codeFor?: (config: C) => Text[];
 }

@@ -78,7 +78,7 @@ export function Stage({ mod }: { mod: ModuleDef }) {
       <PlaybackBar pb={pb} />
       <div className="stage-body">
         <div className="canvas">
-          {pb.frame && <mod.Render scene={pb.frame.scene} t={t} />}
+          {pb.frame && <mod.Render scene={pb.frame.scene} t={t} config={config as never} onChange={handleChange as never} />}
           {pb.frame && (
             <div className="caption">
               <MathText text={t(pb.frame.caption)} />
