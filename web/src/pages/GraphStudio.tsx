@@ -1,6 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faClipboard,
+  faCompass,
+  faCopy,
+  faDice,
+  faLink,
+  faPen,
+  faPlus,
+  faStar,
+} from "@fortawesome/free-solid-svg-icons";
 import {
   Graph,
+  alphaLabels,
   bfsSteps,
   dfsSteps,
   topoSteps,
@@ -43,24 +55,73 @@ type AlgoFrame = {
   };
   caption: { zh: string; en: string };
 };
+// 无算法时的空帧：固定引用。若每次渲染新建 []，usePlayback 的
+// useEffect 依赖 framesOr 会在每帧变化 → setState → 重渲染 → 无限循环
+// （React “Maximum update depth exceeded”）。
+const EMPTY_FRAMES: AlgoFrame[] = [];
 // 伪代码：统一从 lib/graph 取（BFS_CODE / DFS_CODE / TOPO_CODE），不再本地复制
 const SVG_W = 760,
   SVG_H = 440;
 const V_R = 17;
 
+// ---- 随机生成模态框类型 ----------------
+type GenType =
+  | "tree"
+  | "binary"
+  | "complete"
+  | "skew"
+  | "graph"
+  | "dcyclic"
+  | "dag"
+  | "ucyclic"
+  | "uacyclic";
+type WeightMode = "none" | "random";
+type CopyFormat = "spec" | "adjlist" | "json";
+type GenCfg = {
+  type: GenType;
+  n: number;
+  p: number; // 边密度
+  directed: boolean; // 图（通用）的方向
+  alpha: boolean; // 标签：字母 vs 数字
+  weighted: WeightMode;
+  skewRandom: boolean; // 偏斜树：随机排列 vs 自然序
+  connected: boolean; // 无向无环图：保证连通（单棵树）
+  k: number; // 无向无环图（不连通时）的树数
+};
+const GEN_TYPES: Array<{ k: GenType; label: string; desc: string }> = [
+  { k: "tree", label: "树（通用）", desc: "连通无向树 · n−1 条边" },
+  { k: "binary", label: "二叉树", desc: "每个节点至多 2 个子" },
+  { k: "complete", label: "完全二叉树", desc: "严格层序填补（堆结构）" },
+  { k: "skew", label: "偏二叉树", desc: "退化链：每个节点至多 1 个子" },
+  { k: "graph", label: "图（通用）", desc: "随机边 · 概率 p" },
+  { k: "dcyclic", label: "有向有环图", desc: "先构造环保证有环" },
+  { k: "dag", label: "有向无环图", desc: "随机拓扑序 + 前向边（保证无环）" },
+  { k: "ucyclic", label: "无向有环图", desc: "先构造环保证有环" },
+  { k: "uacyclic", label: "无向无环图", desc: "森林（可勾选连通成树）" },
+];
+const GEN_TYPE_LABEL: Record<GenType, string> = {
+  tree: "树",
+  binary: "二叉树",
+  complete: "完全二叉树",
+  skew: "偏二叉树",
+  graph: "图",
+  dcyclic: "有向有环图",
+  dag: "有向无环图",
+  ucyclic: "无向有环图",
+  uacyclic: "无向无环图",
+};
+const COPY_FMT_DESC: Record<CopyFormat, string> = {
+  spec: "紧凑边集：0-1,1-2:5（含权重）",
+  adjlist: "邻接表：每行 u: v1(权重), v2",
+  json: "完整图数据：顶点数 / 有向 / 标签 / 边",
+};
+
 export function GraphStudio() {
-  const [n, setN] = useState(7);
+  // 默认空图：无顶点、无边（有本地保存时挂载后恢复）
+  const [n, setN] = useState(0);
   const [directed, setDirected] = useState(false);
-  const [edgeSpec, setEdgeSpec] = useState("0-1,1-2,2-3,3-4,2-5,5-6");
-  const [labels, setLabels] = useState<string[]>([
-    "0",
-    "1",
-    "2",
-    "3",
-    "4",
-    "5",
-    "6",
-  ]);
+  const [edgeSpec, setEdgeSpec] = useState("");
+  const [labels, setLabels] = useState<string[]>([]);
   const [layout, setLayout] = useState<Layout>("tree");
   const [repr, setRepr] = useState<"adjlist" | "adjmat" | "array" | "edges">(
     "adjlist",
@@ -118,7 +179,7 @@ export function GraphStudio() {
     setManual({ ...snap.manual });
   };
   const undo = () => {
-    const { hist: h, redo: rs } = histRef.current;
+    const { hist: h } = histRef.current;
     if (h.length === 0) return;
     const prev = h[h.length - 1]; // 最近一次操作的「操作前」态
     setRedoStack((r) => [
@@ -222,7 +283,7 @@ export function GraphStudio() {
   const algoFramesRef = useRef(algoFrames);
   if (algo !== "none" && algoFramesRef.current !== algoFrames)
     algoFramesRef.current = algoFrames;
-  const playbackFrames = algo === "none" ? [] : algoFramesRef.current;
+  const playbackFrames = algo === "none" ? EMPTY_FRAMES : algoFramesRef.current;
   const pb = usePlayback(playbackFrames, {
     autoPlay: false,
     autoPlayOnMount: false,
@@ -408,6 +469,8 @@ export function GraphStudio() {
     target: number | null;
     edge: { u: number; v: number; weight?: number } | null;
   } | null>(null);
+  const [genModal, setGenModal] = useState(false); // 随机生成模态框
+  const [copyModal, setCopyModal] = useState(false); // 复制边属性模态框
 
   // ---- 画布指针事件 ----
   const onPointerDown = (e: React.PointerEvent) => {
@@ -540,6 +603,18 @@ export function GraphStudio() {
     el.addEventListener("wheel", h, { passive: false });
     return () => el.removeEventListener("wheel", h);
   }, []); // 只绑一次，handler 经 ref 取最新
+  // 顶栏高度：随窗口/内容变化实时测量，主区恰好占满剩余视口（整屏响应式，无页面级滚动条）
+  const [hdrH, setHdrH] = useState(60);
+  useEffect(() => {
+    const el = document.querySelector<HTMLElement>(".hdr");
+    if (!el) return;
+    const ro = new ResizeObserver(() =>
+      setHdrH(el.getBoundingClientRect().height),
+    );
+    setHdrH(el.getBoundingClientRect().height);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   // 挂载时恢复上次保存的图与表示（若存在；此后由自动保存维护）
   useEffect(() => {
     try {
@@ -564,7 +639,9 @@ export function GraphStudio() {
             setRoot(Math.max(0, Math.min(snap.n - 1, snap.root)));
         }
       }
-    } catch {}
+    } catch {
+      /* 忽略损坏的本地存档 */
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -589,7 +666,9 @@ export function GraphStudio() {
           root,
         }),
       );
-    } catch {}
+    } catch {
+      /* 忽略写入失败（隐私模式/满容量） */
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [n, directed, edgeSpec, labels, manual, repr, layout, root]);
 
@@ -616,71 +695,97 @@ export function GraphStudio() {
         setPending(null);
         setMenu(null);
         setEditing(null);
+        setGenModal(false);
+        setCopyModal(false);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [selected, isAlgoActive]);
 
-  // ---- 右键菜单动作 ----
-  const menuLoad = (
-    kind: "tree" | "forest" | "graph" | "cycle" | "default",
-  ) => {
-    pushHistory();
-    const num = Math.max(2, n);
-    let spec = "";
-    setDirected(kind === "graph" ? directed : false);
-    if (kind === "tree") {
-      const gg = Graph.randomTree(num);
-      spec = gg.edges.map((e) => `${e.u}-${e.v}`).join(",");
-      setLayout("tree");
-    } else if (kind === "forest") {
-      const gg = Graph.randomForest(
-        num,
-        Math.max(2, Math.min(3, Math.floor(num / 2))),
-      );
-      spec = gg.edges.map((e) => `${e.u}-${e.v}`).join(",");
-      setLayout("tree");
-    } else if (kind === "graph") {
-      const gg = Graph.randomGraph(num, 0.35, { directed });
-      spec = gg.edges.map((e) => `${e.u}-${e.v}`).join(",");
-      setLayout("force");
-    } else if (kind === "cycle") {
-      spec = Array.from(
-        { length: num },
-        (_, i) => `${i}-${(i + 1) % num}`,
-      ).join(",");
-      setLayout("circle");
-    } else {
-      spec = "0-1,1-2,2-3,3-4,2-5,5-6";
-      setLayout("tree");
+  // ---- 随机生成（覆盖当前图，可撤销） ----
+  const genGraph = (cfg: GenCfg) => {
+    const minN = cfg.type === "dcyclic" || cfg.type === "ucyclic" ? 3 : 2;
+    const n = Math.max(minN, Math.min(80, Math.floor(cfg.n) || minN));
+    const labels = cfg.alpha
+      ? alphaLabels(n)
+      : Array.from({ length: n }, (_, i) => String(i));
+    const lopts = { labels };
+    const weighted = cfg.weighted === "random";
+    let gg: Graph;
+    let ly: Layout = "tree";
+    switch (cfg.type) {
+      case "tree":
+        gg = Graph.randomTree(n, { ...lopts, weighted });
+        break;
+      case "binary":
+        gg = Graph.randomBinaryTree(n, { ...lopts, weighted });
+        break;
+      case "complete":
+        gg = Graph.randomCompleteBinaryTree(n, { ...lopts, weighted });
+        break;
+      case "skew":
+        gg = Graph.randomSkewTree(n, {
+          ...lopts,
+          weighted,
+          random: cfg.skewRandom,
+        });
+        break;
+      case "graph":
+        gg = Graph.randomGraph(n, cfg.p, {
+          directed: cfg.directed,
+          ...lopts,
+          weighted,
+        });
+        ly = "force";
+        break;
+      case "dcyclic":
+        gg = Graph.randomGraphWithCycle(n, cfg.p, {
+          directed: true,
+          ...lopts,
+          weighted,
+        });
+        ly = "force";
+        break;
+      case "dag":
+        gg = Graph.randomDAG(n, cfg.p, { ...lopts, weighted });
+        ly = "force";
+        break;
+      case "ucyclic":
+        gg = Graph.randomGraphWithCycle(n, cfg.p, {
+          directed: false,
+          ...lopts,
+          weighted,
+        });
+        ly = "force";
+        break;
+      case "uacyclic":
+        gg = cfg.connected
+          ? Graph.randomTree(n, { ...lopts, weighted })
+          : Graph.randomForest(n, Math.max(1, Math.min(cfg.k, n)), {
+              ...lopts,
+              weighted,
+            });
+        break;
     }
-    setEdgeSpec(spec);
+    pushHistory(); // 操作前快照（可撤销）
+    setN(gg.n);
+    setDirected(gg.directed);
+    setEdgeSpec(specFromEdges(gg.edges));
+    setLabels([...gg.labels]);
     setManual({});
     setRoot(0);
+    setLayout(ly);
     setSelected(null);
     setPending(null);
-    setLabels(Array.from({ length: num }, (_, i) => String(i)));
     setMsg(
-      kind === "default"
-        ? "已载入默认示例"
-        : `已载入${kind === "tree" ? "树" : kind === "forest" ? "森林" : kind === "cycle" ? "环" : "随机图"}`,
+      `已随机生成：${GEN_TYPE_LABEL[cfg.type]}（${gg.n} 顶点 · ${gg.edges.length} 边）`,
     );
   };
   const menuReset = () => {
     setManual({});
     setView({ tx: 0, ty: 0, s: 1 });
     setMsg("已回到自动布局并复位视口");
-  };
-
-  // ---- 导出工具（复制边 spec；保存已自动） ----
-  const exportSpec = () => {
-    try {
-      navigator.clipboard.writeText(edgeSpec);
-      setMsg("边 spec 已复制到剪贴板");
-    } catch {
-      setMsg("复制失败");
-    }
   };
 
   const edgePos = (u: number, v: number) => {
@@ -821,21 +926,21 @@ export function GraphStudio() {
                       fontWeight: 700,
                       fontFamily: "monospace",
                       background:
-                        w !== null
-                          ? selected === r || selected === c
+                        w === null
+                          ? "#f8fafc"
+                          : selected === r || selected === c
                             ? "#eef2ff"
-                            : "#4f46e5"
-                          : "#f8fafc",
+                            : "#4f46e5",
                       color:
-                        w !== null
-                          ? selected === r || selected === c
+                        w === null
+                          ? "#cbd5e1"
+                          : selected === r || selected === c
                             ? "#4f46e5"
-                            : "#fff"
-                          : "#cbd5e1",
-                      border: `1px solid ${w !== null ? "#c7d2fe" : "#e2e8f0"}`,
+                            : "#fff",
+                      border: `1px solid ${w === null ? "#e2e8f0" : "#c7d2fe"}`,
                     }}
                   >
-                    {w !== null ? w : "·"}
+                    {w === null ? "·" : w}
                   </div>
                 ))}
               </div>
@@ -843,7 +948,9 @@ export function GraphStudio() {
           </div>
           <div style={{ fontSize: 11, color: "#64748b", marginTop: 6 }}>
             <MathText
-              text={"邻接矩阵 · $M[i][j]=1/权重$（无向对称；行高亮选中顶点）"}
+              text={
+                "邻接矩阵 · $M[i][j]=1/w_{ij}$（权重；无向对称；行高亮选中顶点）"
+              }
             />
           </div>
         </div>
@@ -997,13 +1104,12 @@ export function GraphStudio() {
 
   return (
     <div
+      className="graph-root"
       style={{
         display: "flex",
         flexDirection: "column",
         gap: 10,
-        height: "calc(100dvh - 118px)",
-        maxWidth: 1440,
-        margin: "0 auto",
+        height: `calc(100dvh - ${hdrH}px)`,
         overflow: "hidden",
       }}
     >
@@ -1147,25 +1253,34 @@ export function GraphStudio() {
             {analysis?.n} 顶点 · {analysis?.m} 边 ·{" "}
             <b
               style={{
-                color: analysis?.isTree
-                  ? "#059669"
-                  : analysis?.isForest
-                    ? "#0ea5e9"
-                    : "#dc2626",
+                color:
+                  analysis?.n === 0
+                    ? "#94a3b8"
+                    : analysis?.isTree
+                      ? "#059669"
+                      : analysis?.isForest
+                        ? "#0ea5e9"
+                        : "#dc2626",
               }}
             >
-              {analysis?.isTree ? "树" : analysis?.isForest ? "森林" : "含环"}
+              {analysis?.n === 0
+                ? "空"
+                : analysis?.isTree
+                  ? "树"
+                  : analysis?.isForest
+                    ? "森林"
+                    : "含环"}
             </b>
           </span>
           {msg && <span style={{ fontSize: 11, color: "#059669" }}>{msg}</span>}
         </div>
       </div>
 
-      {/* 主轴：画布 | 内存表示（一行，占满剩余高度） */}
+      {/* 主轴：画布 | 内存表示（各占 50%） */}
       <div style={{ display: "flex", gap: 10, flex: 1, minHeight: 0 }}>
         <div
           style={{
-            flex: 1,
+            flex: "1 1 0",
             minWidth: 0,
             border: "1px solid #c7d2fe",
             borderRadius: 12,
@@ -1493,11 +1608,125 @@ export function GraphStudio() {
               }}
               onPointerDown={(e) => e.stopPropagation()}
             >
-              {menuVtx !== null ? (
+              {menuVtx === null ? (
+                menuEdge ? (
+                  <>
+                    <MenuHead
+                      label={`边 ${g.labels[menuEdge.u] ?? menuEdge.u} — ${g.labels[menuEdge.v] ?? menuEdge.v}`}
+                    />
+                    <MenuItem
+                      label={
+                        menuEdge.weight !== undefined && menuEdge.weight !== 1
+                          ? `权重：${menuEdge.weight}（点击修改）`
+                          : "权重：1（点击修改）"
+                      }
+                      onClick={() => {
+                        const w = prompt(
+                          "输入边权重（正整数）：",
+                          String(menuEdge!.weight ?? 1),
+                        );
+                        if (w !== null) {
+                          const nw = Number(w.trim());
+                          if (Number.isFinite(nw) && nw > 0)
+                            setEdgeWeight(
+                              menuEdge!.u,
+                              menuEdge!.v,
+                              Math.trunc(nw),
+                            );
+                          else setMsg("权重需为正整数");
+                        }
+                        setMenu(null);
+                      }}
+                    />
+                    <MenuItem
+                      label="取消此边"
+                      danger
+                      onClick={() => {
+                        removeEdge(menuEdge!.u, menuEdge!.v);
+                        setMenu(null);
+                      }}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <MenuItem
+                      label={
+                        <>
+                          <FontAwesomeIcon
+                            icon={faPlus}
+                            style={{ width: 13, marginRight: 6 }}
+                          />
+                          新建顶点
+                        </>
+                      }
+                      onClick={() => {
+                        addVertexAt({ x: menu.sx, y: menu.sy });
+                        setMenu(null);
+                      }}
+                    />
+                    <MenuDivider />
+                    <MenuItem
+                      label={
+                        <>
+                          <FontAwesomeIcon
+                            icon={faDice}
+                            style={{ width: 13, marginRight: 6 }}
+                          />
+                          随机生成…
+                        </>
+                      }
+                      onClick={() => {
+                        setMenu(null);
+                        setGenModal(true);
+                      }}
+                    />
+                    <MenuDivider />
+                    <MenuItem
+                      label={
+                        <>
+                          <FontAwesomeIcon
+                            icon={faClipboard}
+                            style={{ width: 13, marginRight: 6 }}
+                          />
+                          复制边属性…
+                        </>
+                      }
+                      onClick={() => {
+                        setMenu(null);
+                        setCopyModal(true);
+                      }}
+                    />
+                    <MenuDivider />
+                    <MenuItem
+                      label={
+                        <>
+                          <FontAwesomeIcon
+                            icon={faCompass}
+                            style={{ width: 13, marginRight: 6 }}
+                          />
+                          重置布局
+                        </>
+                      }
+                      onClick={() => {
+                        menuReset();
+                        setMenu(null);
+                      }}
+                    />
+                  </>
+                )
+              ) : (
                 <>
                   <MenuHead label={`顶点 ${g.labels[menuVtx]}`} />
                   <MenuItem
-                    label="✏️ 重命名"
+                    label={
+                      <>
+                        <FontAwesomeIcon
+                          icon={faPen}
+                          style={{ width: 13, marginRight: 6 }}
+                        />
+                        重命名
+                      </>
+                    }
                     onClick={() => {
                       setEditing(menuVtx);
                       setEditVal(g.labels[menuVtx] ?? String(menuVtx));
@@ -1505,7 +1734,15 @@ export function GraphStudio() {
                     }}
                   />
                   <MenuItem
-                    label="⭐ 设为根（树形布局/遍历起点）"
+                    label={
+                      <>
+                        <FontAwesomeIcon
+                          icon={faStar}
+                          style={{ width: 13, marginRight: 6 }}
+                        />
+                        设为根（树形布局/遍历起点）
+                      </>
+                    }
                     onClick={() => {
                       setRoot(menuVtx!);
                       setLayout((l) =>
@@ -1516,7 +1753,15 @@ export function GraphStudio() {
                     }}
                   />
                   <MenuItem
-                    label="🔗 从此连线"
+                    label={
+                      <>
+                        <FontAwesomeIcon
+                          icon={faLink}
+                          style={{ width: 13, marginRight: 6 }}
+                        />
+                        从此连线
+                      </>
+                    }
                     onClick={() => {
                       setPending(menuVtx);
                       setSelected(menuVtx);
@@ -1534,108 +1779,27 @@ export function GraphStudio() {
                     }}
                   />
                 </>
-              ) : menuEdge ? (
-                <>
-                  <MenuHead
-                    label={`边 ${g.labels[menuEdge.u] ?? menuEdge.u} — ${g.labels[menuEdge.v] ?? menuEdge.v}`}
-                  />
-                  <MenuItem
-                    label={
-                      menuEdge.weight !== undefined && menuEdge.weight !== 1
-                        ? `权重：${menuEdge.weight}（点击修改）`
-                        : "权重：1（点击修改）"
-                    }
-                    onClick={() => {
-                      const w = prompt(
-                        "输入边权重（正整数）：",
-                        String(menuEdge!.weight ?? 1),
-                      );
-                      if (w !== null) {
-                        const nw = Number(w.trim());
-                        if (Number.isFinite(nw) && nw > 0)
-                          setEdgeWeight(
-                            menuEdge!.u,
-                            menuEdge!.v,
-                            Math.trunc(nw),
-                          );
-                        else setMsg("权重需为正整数");
-                      }
-                      setMenu(null);
-                    }}
-                  />
-                  <MenuItem
-                    label="取消此边"
-                    danger
-                    onClick={() => {
-                      removeEdge(menuEdge!.u, menuEdge!.v);
-                      setMenu(null);
-                    }}
-                  />
-                </>
-              ) : (
-                <>
-                  <MenuItem
-                    label="➕ 新建顶点"
-                    onClick={() => {
-                      addVertexAt({ x: menu.sx, y: menu.sy });
-                      setMenu(null);
-                    }}
-                  />
-                  <MenuDivider />
-                  <MenuItem
-                    label="载入默认示例"
-                    onClick={() => {
-                      menuLoad("default");
-                      setMenu(null);
-                    }}
-                  />
-                  <MenuItem
-                    label="随机树"
-                    onClick={() => {
-                      menuLoad("tree");
-                      setMenu(null);
-                    }}
-                  />
-                  <MenuItem
-                    label="随机森林"
-                    onClick={() => {
-                      menuLoad("forest");
-                      setMenu(null);
-                    }}
-                  />
-                  <MenuItem
-                    label="随机环"
-                    onClick={() => {
-                      menuLoad("cycle");
-                      setMenu(null);
-                    }}
-                  />
-                  <MenuItem
-                    label="随机图"
-                    onClick={() => {
-                      menuLoad("graph");
-                      setMenu(null);
-                    }}
-                  />
-                  <MenuDivider />
-                  <MenuItem
-                    label="复制边 spec"
-                    onClick={() => {
-                      exportSpec();
-                      setMenu(null);
-                    }}
-                  />
-                  <MenuDivider />
-                  <MenuItem
-                    label="重置布局"
-                    onClick={() => {
-                      menuReset();
-                      setMenu(null);
-                    }}
-                  />
-                </>
               )}
             </div>
+          )}
+          {/* 随机生成模态框（事件冒泡隔离：不触发画布/右键菜单；Esc/点遮罩关闭） */}
+          {genModal && (
+            <GenModal
+              onCancel={() => setGenModal(false)}
+              onGenerate={(cfg) => {
+                genGraph(cfg);
+                setGenModal(false);
+              }}
+            />
+          )}
+          {/* 复制边属性模态框 */}
+          {copyModal && (
+            <CopyModal
+              g={g}
+              edgeSpec={edgeSpec}
+              onClose={() => setCopyModal(false)}
+              onToast={(s) => setMsg(s)}
+            />
           )}
           {/* 算法当前步骤 caption */}
           {isAlgoActive && frame && (
@@ -1656,13 +1820,11 @@ export function GraphStudio() {
             </div>
           )}
         </div>
-        {/* 右栏：算法时伪代码面板 / 编辑时内存表示 */}
+        {/* 右栏：算法时伪代码面板 / 编辑时内存表示（与画布各占 50%） */}
         <div
           style={{
-            minWidth: 240,
-            width: isAlgoActive ? "fit-content" : 340,
-            maxWidth: "calc(50% - 5px)",
-            flexShrink: 0,
+            flex: "1 1 0",
+            minWidth: 0,
             display: "flex",
             flexDirection: "column",
             minHeight: 0,
@@ -1777,7 +1939,7 @@ function MenuItem({
   onClick,
   danger,
 }: {
-  label: string;
+  label: React.ReactNode;
   onClick: () => void;
   danger?: boolean;
 }) {
@@ -1806,5 +1968,439 @@ function MenuItem({
 function MenuDivider() {
   return (
     <div style={{ height: 1, background: "#eef2f7", margin: "5px 6px" }} />
+  );
+}
+
+// ---- 随机生成模态框 ----
+// 事件冒泡隔离：遮罩 onPointerDown 全部 stopPropagation（不触发画布/右键菜单），
+// 遮罩上 onContextMenu preventDefault+stopPropagation（右键不会重新弹菜单）；点击遮罩/Esc 关闭。
+function ModalRow({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 8,
+        fontSize: 13,
+      }}
+    >
+      <span style={{ width: 76, flexShrink: 0, color: "#475569" }}>
+        {label}
+      </span>
+      <div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function GenModal({
+  onCancel,
+  onGenerate,
+}: {
+  onCancel: () => void;
+  onGenerate: (cfg: GenCfg) => void;
+}) {
+  const [cfg, setCfg] = useState<GenCfg>({
+    type: "tree",
+    n: 10,
+    p: 0.25,
+    directed: false,
+    alpha: false,
+    weighted: "none",
+    skewRandom: true,
+    connected: true,
+    k: 3,
+  });
+  const info = GEN_TYPES.find((t) => t.k === cfg.type)!;
+  const isCyclic = cfg.type === "dcyclic" || cfg.type === "ucyclic";
+  const hasDensity =
+    cfg.type === "graph" ||
+    cfg.type === "dcyclic" ||
+    cfg.type === "dag" ||
+    cfg.type === "ucyclic";
+  const minN = isCyclic ? 3 : 2;
+  const set = (patch: Partial<GenCfg>) => setCfg((c) => ({ ...c, ...patch }));
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(15,23,42,.45)",
+        zIndex: 60,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        if (e.target === e.currentTarget) onCancel();
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 14,
+          boxShadow: "0 20px 60px rgba(15,23,42,.3)",
+          padding: 16,
+          width: 350,
+          maxWidth: "100%",
+          maxHeight: "90vh",
+          overflow: "auto",
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 12 }}>
+          <FontAwesomeIcon
+            icon={faDice}
+            style={{ width: 15, marginRight: 8 }}
+          />
+          随机生成
+        </div>
+        <div style={{ marginBottom: 8 }}>
+          <select
+            className="txt"
+            value={cfg.type}
+            onChange={(e) => set({ type: e.target.value as GenType })}
+            style={{ width: "100%", fontSize: 13 }}
+          >
+            {GEN_TYPES.map((t) => (
+              <option key={t.k} value={t.k}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+          <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>
+            {info.desc}
+          </div>
+        </div>
+        <ModalRow label="顶点数">
+          <input
+            type="number"
+            min={minN}
+            max={80}
+            value={cfg.n}
+            onChange={(e) =>
+              set({ n: Math.floor(Number(e.target.value)) || minN })
+            }
+            className="txt"
+            style={{ width: 72, fontSize: 13 }}
+          />
+          <span style={{ fontSize: 11, color: "#94a3b8" }}>
+            {minN}–80{isCyclic ? "（有环需 ≥3）" : ""}
+          </span>
+        </ModalRow>
+        {hasDensity && (
+          <ModalRow label="边密度 p">
+            <input
+              type="range"
+              min={0.05}
+              max={1}
+              step={0.05}
+              value={cfg.p}
+              onChange={(e) => set({ p: Number(e.target.value) })}
+              style={{ flex: 1 }}
+            />
+            <span
+              style={{
+                fontSize: 12,
+                color: "#475569",
+                width: 38,
+                textAlign: "right",
+              }}
+            >
+              {cfg.p.toFixed(2)}
+            </span>
+          </ModalRow>
+        )}
+        {cfg.type === "graph" && (
+          <ModalRow label="方向">
+            <label style={{ display: "flex", gap: 4, alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={cfg.directed}
+                onChange={(e) => set({ directed: e.target.checked })}
+              />
+              有向
+            </label>
+          </ModalRow>
+        )}
+        <ModalRow label="标签">
+          <button
+            className={`pill ${cfg.alpha ? "" : "active"}`}
+            style={{ padding: "3px 10px", fontSize: 12 }}
+            onClick={() => set({ alpha: false })}
+          >
+            数字 0,1,2…
+          </button>
+          <button
+            className={`pill ${cfg.alpha ? "active" : ""}`}
+            style={{ padding: "3px 10px", fontSize: 12 }}
+            onClick={() => set({ alpha: true })}
+          >
+            字母 A,B,C…
+          </button>
+        </ModalRow>
+        <ModalRow label="权重">
+          <select
+            className="txt"
+            value={cfg.weighted}
+            onChange={(e) => set({ weighted: e.target.value as WeightMode })}
+            style={{ width: 170, fontSize: 13 }}
+          >
+            <option value="none">全 1（无权重）</option>
+            <option value="random">随机 1–10</option>
+          </select>
+        </ModalRow>
+        {cfg.type === "skew" && (
+          <ModalRow label="偏斜序">
+            <label style={{ display: "flex", gap: 4, alignItems: "center" }}>
+              <input
+                type="checkbox"
+                checked={cfg.skewRandom}
+                onChange={(e) => set({ skewRandom: e.target.checked })}
+              />
+              随机排列（否则自然序 0-1-2-…）
+            </label>
+          </ModalRow>
+        )}
+        {cfg.type === "uacyclic" && (
+          <>
+            <ModalRow label="连通">
+              <label style={{ display: "flex", gap: 4, alignItems: "center" }}>
+                <input
+                  type="checkbox"
+                  checked={cfg.connected}
+                  onChange={(e) => set({ connected: e.target.checked })}
+                />
+                保证连通（生成一棵树）
+              </label>
+            </ModalRow>
+            {!cfg.connected && (
+              <ModalRow label="树数 k">
+                <input
+                  type="number"
+                  min={1}
+                  max={Math.max(1, cfg.n)}
+                  value={cfg.k}
+                  onChange={(e) =>
+                    set({
+                      k: Math.max(1, Math.floor(Number(e.target.value)) || 1),
+                    })
+                  }
+                  className="txt"
+                  style={{ width: 72, fontSize: 13 }}
+                />
+              </ModalRow>
+            )}
+          </>
+        )}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 8,
+            marginTop: 14,
+          }}
+        >
+          <button
+            className="ghost"
+            style={{ padding: "6px 14px", fontSize: 13 }}
+            onClick={onCancel}
+          >
+            取消
+          </button>
+          <button
+            className="pill active"
+            style={{ padding: "6px 14px", fontSize: 13 }}
+            onClick={() => onGenerate(cfg)}
+          >
+            <FontAwesomeIcon
+              icon={faDice}
+              style={{ width: 13, marginRight: 6 }}
+            />
+            生成
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---- 复制边属性模态框 ----
+function CopyModal({
+  g,
+  edgeSpec,
+  onClose,
+  onToast,
+}: {
+  g: Graph;
+  edgeSpec: string;
+  onClose: () => void;
+  onToast: (s: string) => void;
+}) {
+  const [fmt, setFmt] = useState<CopyFormat>("spec");
+  const content = useMemo(() => {
+    if (fmt === "spec") return edgeSpec;
+    if (fmt === "adjlist") {
+      const rows: string[] = [];
+      for (let u = 0; u < g.n; u++) {
+        const nbs = g
+          .adj()
+          [u].map(([v, w]) => (w === 1 ? String(v) : `${v}(${w})`));
+        rows.push(nbs.length ? `${u}: ${nbs.join(", ")}` : `${u}: ∅`);
+      }
+      return rows.join("\n");
+    }
+    return JSON.stringify(
+      {
+        n: g.n,
+        directed: g.directed,
+        labels: g.labels,
+        edges: g.edges.map((e) => ({
+          u: e.u,
+          v: e.v,
+          ...(e.weight !== undefined && e.weight !== 1
+            ? { weight: e.weight }
+            : {}),
+        })),
+      },
+      null,
+      2,
+    );
+  }, [fmt, g, edgeSpec]);
+  const doCopy = () => {
+    try {
+      navigator.clipboard.writeText(content);
+      onToast("边属性已复制到剪贴板");
+      onClose();
+    } catch {
+      onToast("复制失败");
+    }
+  };
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(15,23,42,.45)",
+        zIndex: 60,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+      onPointerDown={(e) => {
+        e.stopPropagation();
+        if (e.target === e.currentTarget) onClose();
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: 14,
+          boxShadow: "0 20px 60px rgba(15,23,42,.3)",
+          padding: 16,
+          width: 380,
+          maxWidth: "100%",
+          maxHeight: "90vh",
+          overflow: "auto",
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>
+          <FontAwesomeIcon
+            icon={faClipboard}
+            style={{ width: 15, marginRight: 8 }}
+          />
+          复制边属性
+        </div>
+        <div style={{ fontSize: 11, color: "#64748b", marginBottom: 10 }}>
+          选择导出格式，复制到剪贴板（当前 {g.n} 顶点 · {g.edges.length} 边）
+        </div>
+        <div
+          style={{
+            display: "flex",
+            gap: 6,
+            marginBottom: 6,
+            flexWrap: "wrap",
+          }}
+        >
+          {(["spec", "adjlist", "json"] as CopyFormat[]).map((v) => (
+            <button
+              key={v}
+              className={`pill ${fmt === v ? "active" : ""}`}
+              style={{ padding: "3px 10px", fontSize: 12 }}
+              onClick={() => setFmt(v)}
+            >
+              {v === "spec" ? "边集 spec" : v === "adjlist" ? "邻接表" : "JSON"}
+            </button>
+          ))}
+        </div>
+        <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>
+          {COPY_FMT_DESC[fmt]}
+        </div>
+        <textarea
+          readOnly
+          value={content}
+          rows={8}
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            fontFamily: "monospace",
+            fontSize: 11,
+            padding: 8,
+            border: "1px solid #e2e8f0",
+            borderRadius: 8,
+            background: "#f8fafc",
+            color: "#1e293b",
+            resize: "vertical",
+          }}
+        />
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 8,
+            marginTop: 12,
+          }}
+        >
+          <button
+            className="ghost"
+            style={{ padding: "6px 14px", fontSize: 13 }}
+            onClick={onClose}
+          >
+            取消
+          </button>
+          <button
+            className="pill active"
+            style={{ padding: "6px 14px", fontSize: 13 }}
+            onClick={doCopy}
+          >
+            <FontAwesomeIcon
+              icon={faCopy}
+              style={{ width: 13, marginRight: 6 }}
+            />
+            复制
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

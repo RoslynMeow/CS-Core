@@ -46,7 +46,7 @@ export const additionModule: ModuleDef<Scene, Cfg> = {
     const bLSB = parseLSB(cfg.b, cfg.base);
     const frames: Frame<Scene>[] = [];
     if (!aLSB || !bLSB) {
-      frames.push({ line: 0, caption: T('⚠ 数码不合法', '⚠ Invalid digits'), scene: { aDigits: [], bDigits: [], res: [], i: null, carry: 0 } });
+      frames.push({ line: 0, caption: T('! 数码不合法', '! Invalid digits'), scene: { aDigits: [], bDigits: [], res: [], i: null, carry: 0 } });
       return frames;
     }
     const k = Math.max(aLSB.length, bLSB.length);

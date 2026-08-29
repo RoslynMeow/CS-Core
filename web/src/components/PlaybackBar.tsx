@@ -1,3 +1,5 @@
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faBackward, faBackwardStep, faForward, faForwardStep, faPause, faPlay } from '@fortawesome/free-solid-svg-icons';
 import type { Playback } from '../engine/usePlayback';
 
 export function PlaybackBar({ pb }: { pb: Playback }) {
@@ -6,19 +8,24 @@ export function PlaybackBar({ pb }: { pb: Playback }) {
   return (
     <div className="playback">
       <button disabled={atFirst} onClick={pb.first}>
-        ⏮ 首帧
+        <FontAwesomeIcon icon={faBackwardStep} style={{ width: 11, marginRight: 4 }} />
+        首帧
       </button>
       <button disabled={atFirst} onClick={pb.stepBack}>
-        ◀ 上一步
+        <FontAwesomeIcon icon={faBackward} style={{ width: 11, marginRight: 4 }} />
+        上一步
       </button>
       <button className="primary" onClick={pb.toggle}>
-        {pb.playing ? '⏸ 暂停' : '▶ 播放'}
+        <FontAwesomeIcon icon={pb.playing ? faPause : faPlay} style={{ width: 11, marginRight: 4 }} />
+        {pb.playing ? '暂停' : '播放'}
       </button>
       <button disabled={atLast} onClick={pb.stepFwd}>
-        下一步 ▶
+        下一步
+        <FontAwesomeIcon icon={faForward} style={{ width: 11, marginLeft: 4 }} />
       </button>
       <button disabled={atLast} onClick={pb.last}>
-        末帧 ⏭
+        末帧
+        <FontAwesomeIcon icon={faForwardStep} style={{ width: 11, marginLeft: 4 }} />
       </button>
       <label className="speed">
         速度 <input type="range" min={0.25} max={3} step={0.25} value={pb.speed} onChange={e => pb.setSpeed(Number(e.target.value))} /> {pb.speed.toFixed(2)}×

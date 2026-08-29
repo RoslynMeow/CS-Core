@@ -38,13 +38,13 @@ function randBits(width: number): string {
 function expandFrames(width: number, bitsStr: string): Frame<Scene>[] {
   const msb = parseBits(bitsStr);
   const frames: Frame<Scene>[] = [];
-  const max = Math.pow(2, width) - 1;
+  const max = 2 ** width - 1;
 
   if (!msb) {
-    return [{ line: 0, caption: T('⚠ 仅允许 0/1', '⚠ Only 0/1 allowed'), scene: { width, bits: [], lsb: [], value: 0, max, highlight: null, partials: [], overflow: false } }];
+    return [{ line: 0, caption: T('! 仅允许 0/1', '! Only 0/1 allowed'), scene: { width, bits: [], lsb: [], value: 0, max, highlight: null, partials: [], overflow: false } }];
   }
   // align length to width: pad or show warning but still evaluate
-  let displayBits = [...msb];
+  const displayBits = [...msb];
   let overflow = false;
   if (displayBits.length !== width) overflow = true;
   // for calculation, use actual bits padded/truncated to width (left pad 0)
@@ -76,7 +76,7 @@ function expandFrames(width: number, bitsStr: string): Frame<Scene>[] {
 
   for (let i = 0; i < k; i++) {
     const bi = lsb[i];
-    const weight = Math.pow(2, i);
+    const weight = 2 ** i;
     const term = bi * weight;
     // loop header
     frames.push({
@@ -169,7 +169,7 @@ export const unsignedIntModule: ModuleDef<Scene, Cfg> = {
     const defGlyphs = defFor(msbVals);
     const custGlyphs = custFor(msbVals);
     // weights row
-    const weights = msbVals.map((_, idx) => Math.pow(2, msbVals.length - 1 - idx));
+    const weights = msbVals.map((_, idx) => 2 ** (msbVals.length - 1 - idx));
 
     const pct = scene.max > 0 ? Math.min(100, Math.max(0, (scene.value / scene.max) * 100)) : 0;
 
@@ -224,7 +224,7 @@ export const unsignedIntModule: ModuleDef<Scene, Cfg> = {
             <div style={{ width: `${pct}%`, height: '100%', background: scene.overflow ? '#ef4444' : 'linear-gradient(90deg,#6366f1,#06b6d4)', transition: 'width .3s' }} />
           </div>
           <div style={{ textAlign: 'center', fontSize: 11, color: scene.overflow ? '#ef4444' : '#64748b', marginTop: 4 }}>
-            {scene.overflow ? '⚠ 位数与位宽不符' : <MathText text={`$y=${scene.value}$ · 占比 ${pct.toFixed(1)}\\%`} />}
+            {scene.overflow ? '! 位数与位宽不符' : <MathText text={`$y=${scene.value}$ · 占比 ${pct.toFixed(1)}\\%`} />}
           </div>
         </div>
 

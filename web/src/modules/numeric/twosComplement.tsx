@@ -34,12 +34,12 @@ function randBits(w: number): string {
 function gen(width: number, bitsStr: string): Frame<Scene>[] {
   const msb = parseBits(bitsStr);
   const frames: Frame<Scene>[] = [];
-  const min = -Math.pow(2, width - 1);
-  const max = Math.pow(2, width - 1) - 1;
-  if (!msb) return [{ line: 0, caption: T('⚠ 仅允许 0/1', '⚠ Only 0/1'), scene: { width, bits: [], lsb: [], value: 0, min, max, highlight: null, partials: [], overflow: false } }];
+  const min = -(2 ** (width - 1));
+  const max = 2 ** (width - 1) - 1;
+  if (!msb) return [{ line: 0, caption: T('! 仅允许 0/1', '! Only 0/1'), scene: { width, bits: [], lsb: [], value: 0, min, max, highlight: null, partials: [], overflow: false } }];
 
-  let display = [...msb];
-  let overflow = display.length !== width;
+  const display = [...msb];
+  const overflow = display.length !== width;
   const calcMSB = display.length > width ? display.slice(display.length - width) : Array(width - display.length).fill(0).concat(display);
   const lsb = calcMSB.slice().reverse();
 
@@ -60,7 +60,7 @@ function gen(width: number, bitsStr: string): Frame<Scene>[] {
   // low bits 0 .. n-2
   for (let i = 0; i < width - 1; i++) {
     const bi = lsb[i];
-    const w = Math.pow(2, i);
+    const w = 2 ** i;
     const term = bi * w;
     frames.push({
       line: 1,
@@ -77,7 +77,7 @@ function gen(width: number, bitsStr: string): Frame<Scene>[] {
   }
   // sign bit
   const bn = lsb[width - 1];
-  const wSign = Math.pow(2, width - 1);
+  const wSign = 2 ** (width - 1);
   frames.push({
     line: 3,
     caption: T(`符号位 $b_{${width - 1}}=${bn}$，权 $-2^{${width - 1}}=-${wSign}$`, `sign $b_{${width - 1}}=${bn}$ weight $-${wSign}$`),
@@ -156,8 +156,8 @@ export const twosComplementModule: ModuleDef<Scene, Cfg> = {
     const custGlyphs = custFor(scene.bits);
     const weights = scene.bits.map((_, idx) => {
       const i = scene.bits.length - 1 - idx;
-      if (i === scene.width - 1) return -Math.pow(2, i);
-      return Math.pow(2, i);
+      if (i === scene.width - 1) return -(2 ** i);
+      return 2 ** i;
     });
 
     // range bar: min .. max centered

@@ -3,7 +3,7 @@ import { T } from '../../i18n/lang';
 import type { Frame, ModuleDef } from '../../engine/types';
 import { buildMemoryUrl, encodeIntBE, encodeIntLE } from '../../lib/memoryDump';
 import { Heap } from '../../lib/heap';
-import { ChainSession, ChainWriter, processBaseOnce } from '../../lib/sessionHeap';
+import { ChainSession, type ChainWriter, processBaseOnce } from '../../lib/sessionHeap';
 import { hexFromBytes } from '../../lib/memoryDump';
 
 
@@ -233,7 +233,7 @@ export const stackModule: ModuleDef<Scene, Cfg> = {
                   const addr = scene.base + i * scene.elemSize;
                   return (
                     <div key={i} style={{ minWidth: 76, textAlign: 'center', padding: '6px 6px', borderRadius: 10, background: isTop ? '#4f46e5' : has ? '#fff' : '#f8fafc', color: isTop ? '#fff' : has ? '#0f172a' : '#94a3b8', border: `1.5px solid ${isTop ? '#4f46e5' : has ? '#c7d2fe' : '#e2e8f0'}` }}>
-                      <div style={{ fontSize: 9, opacity: 0.7 }}>{isTop ? 'top ⬆' : i}</div>
+                      <div style={{ fontSize: 9, opacity: 0.7 }}>{isTop ? 'top ↑' : i}</div>
                       <div style={{ fontWeight: 800, fontSize: 15 }}>{has ? String(scene.cells[i]) : '∅'}</div>
                       <div style={{ fontFamily: 'monospace', fontSize: 9, marginTop: 2, color: isTop ? '#e0e7ff' : '#64748b' }}>0x{addr.toString(16)}</div>
                     </div>

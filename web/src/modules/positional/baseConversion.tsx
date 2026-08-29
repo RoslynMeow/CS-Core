@@ -34,7 +34,7 @@ function parseNumeral(s: string, base: number): Parsed | null {
   const parts = raw.split('.');
   if (parts.length > 2) return null;
   let intStr = parts[0] ?? '';
-  let fracStr = parts[1] ?? '';
+  const fracStr = parts[1] ?? '';
   if (intStr === '' && fracStr === '') return null;
   if (intStr === '') intStr = '0';
   // validate int
@@ -53,7 +53,7 @@ function parseNumeral(s: string, base: number): Parsed | null {
   let intVal = 0;
   for (const d of intDigits) intVal = intVal * base + d;
   let fracVal = 0;
-  for (let i = 0; i < fracDigits.length; i++) fracVal += fracDigits[i] * Math.pow(base, -(i + 1));
+  for (let i = 0; i < fracDigits.length; i++) fracVal += fracDigits[i] * base ** -(i + 1);
   return { y: intVal + fracVal, intVal, fracVal, intStr, fracStr, intDigits, fracDigits };
 }
 
@@ -102,7 +102,7 @@ function generateByMode(cfg: Cfg): Frame<Scene>[] {
   });
 
   if (!parsed) {
-    frames.push({ line: 0, caption: T(`⚠ 数码不合法：需 $P_i\\in S_{${cfg.fromBase}}$`, `⚠ Invalid digits: need $P_i\\in S_{${cfg.fromBase}}$`), scene: baseScene({ phase: 'init' }) });
+    frames.push({ line: 0, caption: T(`! 数码不合法：需 $P_i\\in S_{${cfg.fromBase}}$`, `! Invalid digits: need $P_i\\in S_{${cfg.fromBase}}$`), scene: baseScene({ phase: 'init' }) });
     return frames;
   }
   const { y, intVal, fracVal, intStr, fracStr } = parsed;

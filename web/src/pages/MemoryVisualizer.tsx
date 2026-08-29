@@ -63,6 +63,9 @@ type MemoryDump = {
 const DEFAULT_BASE = 0x1000;
 const DEFAULT_TOTAL = 128;
 
+/** 预期内可忽略的浏览器限制错误（剪贴板/滚动/URL history 等） */
+function swallow() { /* 无需处理 */ }
+
 // ── helpers ──────────────────────────────────────────────────
 function parseAddr(v: number | string | undefined, fallback: number): number {
   if (v === undefined) return fallback;
@@ -167,12 +170,13 @@ function readInt(u8: Uint8Array, start: number, size: number, endian: 'little' |
   return dec;
 }
 function readFloat(u8: Uint8Array, start: number, size: number, endian: 'little' | 'big'): string {
-  if (size !== 4 && size !== 8) return '—';
+  if ((size !== 4 && size !== 8) || start < 0 || start + size > u8.length) return '—';
   const dv = new DataView(u8.buffer, u8.byteOffset + start, size);
   const v = size === 4 ? dv.getFloat32(0, endian === 'little') : dv.getFloat64(0, endian === 'little');
   return String(v);
 }
 function readPtr(u8: Uint8Array, start: number, size: number, endian: 'little' | 'big'): string {
+  if (size <= 0 || size > 8 || start < 0 || start + size > u8.length) return '—';
   const v = BigInt(readInt(u8, start, size, endian, false).split(' ')[0]);
   return '0x' + v.toString(16).toUpperCase().padStart(size * 2, '0');
 }
@@ -186,30 +190,87 @@ function readText(u8: Uint8Array, start: number, size: number): string {
   // 尾部空白压缩展示
   return `"${s}"`;
 }
-// 依据字段 type 解码；未知类型回退 ASCII
-function decodeField(u8: Uint8Array, start: number, size: number, type: string | undefined, endian: 'little' | 'big'): string {
+/** UTF-8 解码（截到首个 NUL；非法序列用 � 兜底）；前后加引号 */
+function readUtf8(u8: Uint8Array, start: number, size: number): string {
+  if (size <= 0 || start < 0 || start >= u8.length) return '—';
+  const end = Math.min(start + size, u8.length);
+  let n = start;
+  while (n < end && u8[n] !== 0) n++;
+  let s = '';
+  try {
+    s = new TextDecoder('utf-8', { fatal: false }).decode(u8.subarray(start, n));
+  } catch {
+    s = '';
+  }
+  return `"${s}"`;
+}
+
+// —— 字段值解码模式：默认 AUTO（跟随字段声明 type），点击循环切换 ——
+type DecodeMode = 'auto' | 'hex' | 'dec' | 'sdec' | 'ascii' | 'utf8' | 'ptr' | 'float';
+const DECODE_MODES: DecodeMode[] = ['auto', 'hex', 'dec', 'sdec', 'ascii', 'utf8', 'ptr', 'float'];
+const MODE_LABEL: Record<DecodeMode, string> = {
+  auto: 'AUTO',
+  hex: 'HEX',
+  dec: 'DEC',
+  sdec: 'SDEC',
+  ascii: 'ASCII',
+  utf8: 'UTF-8',
+  ptr: 'PTR',
+  float: 'FLOAT',
+};
+
+/** AUTO：依据字段 type 解码；返回 {值, 实际解析出的标签} */
+function autoDecode(u8: Uint8Array, start: number, size: number, type: string | undefined, endian: 'little' | 'big'): { text: string; label: string } {
   const t = (type ?? '').toLowerCase();
-  if (!size) return '—';
-  if (t.includes('bool')) return u8[start] ? 'true' : 'false';
-  if (t.startsWith('ptr') || t.includes('pointer') || t.includes('地址')) return readPtr(u8, start, size, endian);
-  if (t.startsWith('char') || t.startsWith('string') || t.startsWith('str') || t.includes('char[')) return readText(u8, start, size);
+  if (!size || start < 0 || start + size > u8.length) return { text: '—', label: MODE_LABEL.auto };
+  if (t.includes('bool')) return { text: u8[start] ? 'true' : 'false', label: 'BOOL' };
+  if (t.startsWith('ptr') || t.includes('pointer') || t.includes('地址')) return { text: readPtr(u8, start, size, endian), label: 'PTR' };
+  if (t.startsWith('char') || t.startsWith('string') || t.startsWith('str') || t.includes('char[')) return { text: readText(u8, start, size), label: 'ASCII' };
   const m = t.match(/^([iu])(\d+)$/);
   if (m) {
     const bits = parseInt(m[2], 10);
     const nBytes = Math.min(Math.ceil(bits / 8), 8);
-    if (nBytes === size) return readInt(u8, start, size, endian, m[1] === 'i');
+    if (nBytes === size) return { text: readInt(u8, start, size, endian, m[1] === 'i'), label: t.toUpperCase() };
   }
   if (t.startsWith('f') || t.includes('float') || t.includes('double')) {
     const bits = t.match(/(\d+)/);
     const nBytes = bits ? Math.min(parseInt(bits[1], 10) / 8, 8) : size;
-    if (nBytes === size) return readFloat(u8, start, size, endian);
+    if (nBytes === size) return { text: readFloat(u8, start, size, endian), label: size === 4 ? 'F32' : size === 8 ? 'F64' : 'FLOAT' };
   }
   // 常见 C 写法 int/uint/unsigned/long 等
   if (/^(u?int\d*|unsigned|signed|long|short|iint)/.test(t)) {
     const signed = !t.startsWith('u');
-    return readInt(u8, start, size, endian, signed);
+    return { text: readInt(u8, start, size, endian, signed), label: signed ? 'INT' : 'UINT' };
   }
-  return readText(u8, start, size);
+  return { text: readText(u8, start, size), label: 'ASCII' };
+}
+
+/** 按全局模式解码字段值；无效（字节数不够/越界）时返回 —:LABEL 作为保险 */
+function decodeByMode(u8: Uint8Array, start: number, size: number, type: string | undefined, endian: 'little' | 'big', mode: DecodeMode): { text: string; label: string } {
+  if (size <= 0 || start < 0 || start + size > u8.length) return { text: '—', label: MODE_LABEL[mode] };
+  switch (mode) {
+    case 'auto':
+      return autoDecode(u8, start, size, type, endian);
+    case 'hex': {
+      const parts: string[] = [];
+      for (let i = 0; i < size; i++) parts.push(toHexByte(u8[start + i]));
+      return { text: parts.join(' '), label: 'HEX' };
+    }
+    case 'dec':
+      return { text: readInt(u8, start, size, endian, false), label: 'DEC' };
+    case 'sdec':
+      return { text: readInt(u8, start, size, endian, true), label: 'SDEC' };
+    case 'ascii':
+      return { text: readText(u8, start, size), label: 'ASCII' };
+    case 'utf8':
+      return { text: readUtf8(u8, start, size), label: 'UTF-8' };
+    case 'ptr':
+      return { text: readPtr(u8, start, size, endian), label: 'PTR' };
+    case 'float': {
+      const v = readFloat(u8, start, size, endian);
+      return { text: v, label: size === 4 ? 'F32' : size === 8 ? 'F64' : 'FLOAT' };
+    }
+  }
 }
 
 const EMPTY_DUMP: MemoryDump = {
@@ -279,6 +340,10 @@ export function MemoryVisualizer() {
   const [viewEndian, setViewEndian] = useState<'little' | 'big'>('little');
   const manualEndianRef = useRef(false);
   const toggleEndian = () => { manualEndianRef.current = true; setViewEndian(v => (v === 'little' ? 'big' : 'little')); };
+  // 字段值全局解码模式：默认 AUTO（跟随字段 type），点击任一字段值 chip 循环切换
+  const [decodeMode, setDecodeMode] = useState<DecodeMode>('auto');
+  const cycleDecodeMode = () =>
+    setDecodeMode(m => DECODE_MODES[(DECODE_MODES.indexOf(m) + 1) % DECODE_MODES.length]);
 
   // URL 读取：hash ?data= 优先，否则 ?data= 在 search
   useEffect(() => {
@@ -345,7 +410,6 @@ export function MemoryVisualizer() {
   const bytes = new Uint8Array(viewTotal);
   bytes.set(srcBytes.subarray(0, Math.min(srcBytes.length, viewTotal)));
   const total = viewTotal;
-  const totalPadded = viewTotal > (parsed.total ?? 0);
 
   // address -> alloc / field
   const { addrToAlloc, addrToField, fieldRanges } = useMemo(() => {
@@ -435,24 +499,14 @@ export function MemoryVisualizer() {
   const asciiW = showAscii ? 176 : 0; // 16 字符 × ~10px + 内边距，保证不截断
   const rowTpl = `100px ${HEX_W}px ${asciiW}px`;
 
-  const selectedInfo = useMemo(() => {
-    if (selectedAddr === null) return null;
-    const off = selectedAddr - base;
-    if (off < 0 || off >= total) return null;
-    const val = bytes[off];
-    const alloc = addrToAlloc.get(selectedAddr) ?? null;
-    const fieldHit = addrToField.get(selectedAddr) ?? null;
-    return { addr: selectedAddr, off, val, alloc, fieldHit };
-  }, [selectedAddr, base, total, bytes, addrToAlloc, addrToField]);
-
   const copy = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-    } catch {}
+    } catch {
+      swallow();
+    }
   };
 
-  // 选中的字节所属块 key（供 HEX/ASCII/结构卡联动高亮）
-  const selKey = selectedAddr !== null ? (addrToAlloc.get(selectedAddr)?.key ?? null) : null;
   // 最小结构：命中字段 → 只高亮该字段区间；否则整块；空闲 → 单字节
   const selScope = useMemo(() => {
     if (selectedAddr === null) return null;
@@ -477,7 +531,11 @@ export function MemoryVisualizer() {
     const targetId = fh && key ? `alloc-${key}-f-${fh.field.name}` : key ? `alloc-${key}` : null;
     if (targetId) requestAnimationFrame(() => {
       // center：聚焦到结构视图可视区中央；顶部/底部空间不足时浏览器自动停边
-      try { document.getElementById(targetId)?.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch {}
+      try {
+        document.getElementById(targetId)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      } catch {
+        swallow();
+      }
     });
   };
 
@@ -760,6 +818,13 @@ export function MemoryVisualizer() {
                     {e}
                   </button>
                 ))}
+                <button
+                  onClick={cycleDecodeMode}
+                  title={`全局解码模式（点击循环）：${DECODE_MODES.map(l => MODE_LABEL[l]).join(' → ')}`}
+                  style={{ padding: '2px 8px', borderRadius: 999, border: '1px solid #c7d2fe', background: decodeMode !== 'auto' ? '#4f46e5' : '#fff', color: decodeMode !== 'auto' ? '#fff' : '#4338ca', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}
+                >
+                  模式:{MODE_LABEL[decodeMode]}
+                </button>
               </span>
               <span style={{ flex: 1 }} />
               <button
@@ -859,8 +924,7 @@ export function MemoryVisualizer() {
                                   const fAddr = addr + f.offset;
                                   const slice = bytes.slice(fAddr - base, fAddr - base + f.size);
                                   const hexSlice = Array.from(slice, b => toHexByte(b)).join(' ');
-                                  const asciiSlice = Array.from(slice, b => (b >= 32 && b <= 126 ? String.fromCharCode(b) : '.')).join('');
-                                  const typedValue = decodeField(bytes, fAddr - base, f.size, f.type, viewEndian);
+                                  const { text: decText, label: decLabel } = decodeByMode(bytes, fAddr - base, f.size, f.type, viewEndian, decodeMode);
                                   const selFieldHit = selScope !== null && selScope.field !== null && selScope.key === (a.key) && selScope.field.name === f.name;
                                   return (
                                     <div
@@ -895,7 +959,13 @@ export function MemoryVisualizer() {
                                       </div>
                                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', minWidth: 0 }}>
                                         <code style={{ fontFamily: 'monospace', fontSize: 11, color: '#0f172a', wordBreak: 'break-all' }}>{hexSlice}</code>
-                                        <code
+                                        <button
+                                          type="button"
+                                          onClick={e => {
+                                            e.stopPropagation();
+                                            cycleDecodeMode();
+                                          }}
+                                          title={`解码：${decLabel} · 点击循环切换（${DECODE_MODES.map(l => MODE_LABEL[l]).join(' → ')}）\n${hexSlice}`}
                                           style={{
                                             fontFamily: 'monospace',
                                             fontSize: 11,
@@ -907,11 +977,13 @@ export function MemoryVisualizer() {
                                             borderRadius: 6,
                                             whiteSpace: 'pre-wrap',
                                             wordBreak: 'break-all',
+                                            cursor: 'pointer',
+                                            textAlign: 'left',
                                           }}
-                                          title={`${f.type ?? 'ascii'}: ${typedValue} · ${hexSlice}`}
                                         >
-                                          {typedValue}
-                                        </code>
+                                          {decText}
+                                          <span style={{ color: '#64748b', fontWeight: 600, marginLeft: 3 }}>:{decLabel}</span>
+                                        </button>
                                       </div>
                                     </div>
                                   );
@@ -1057,7 +1129,9 @@ export function MemoryVisualizer() {
                         const h = location.hash;
                         const q = h.indexOf('?');
                         if (q !== -1) history.replaceState(null, '', location.pathname + location.search + h.slice(0, q));
-                      } catch {}
+                      } catch {
+                        swallow();
+                      }
                     }}
                   >
                     清空
@@ -1125,7 +1199,9 @@ export function MemoryVisualizer() {
                     onClick={() => {
                       try {
                         copy(tryBtoa(jsonText));
-                      } catch {}
+                      } catch {
+                        swallow();
+                      }
                     }}
                   >
                     复制 Base64

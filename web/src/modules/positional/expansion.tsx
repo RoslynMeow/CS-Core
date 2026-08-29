@@ -44,7 +44,7 @@ export const expansionModule: ModuleDef<Scene, Cfg> = {
     const lsb = parseDigits(cfg.numeral, cfg.base);
     const frames: Frame<Scene>[] = [];
     if (!lsb) {
-      frames.push({ line: 0, caption: T(`⚠ 数码不合法：需 $P_i\\in[0,${cfg.base})$`, `⚠ Invalid digits: need $P_i\\in[0,${cfg.base})$`), scene: { base: cfg.base, digits: [], value: 0, highlight: null, partials: [] } });
+      frames.push({ line: 0, caption: T(`! 数码不合法：需 $P_i\\in[0,${cfg.base})$`, `! Invalid digits: need $P_i\\in[0,${cfg.base})$`), scene: { base: cfg.base, digits: [], value: 0, highlight: null, partials: [] } });
       return frames;
     }
     const k = lsb.length;
@@ -52,8 +52,8 @@ export const expansionModule: ModuleDef<Scene, Cfg> = {
     const partials: number[] = [];
     frames.push({ line: 0, caption: T(`初始化 $y=0$，$n=${cfg.base}$，数码 $P=${cfg.numeral}$`, `Init $y=0$, $n=${cfg.base}$, digits $P=${cfg.numeral}$`), scene: { base: cfg.base, digits: lsb.slice().reverse(), value: 0, highlight: null, partials: [] } });
     for (let i = 0; i < k; i++) {
-      const term = lsb[i] * Math.pow(cfg.base, i);
-      frames.push({ line: 1, caption: T(`进入 $i=${i}$，$P_${i}=${lsb[i]}$，位权 $n^{${i}}=${Math.pow(cfg.base, i)}$`, `Loop $i=${i}$: $P_${i}=${lsb[i]}$, weight $n^{${i}}=${Math.pow(cfg.base, i)}$`), scene: { base: cfg.base, digits: lsb.slice().reverse(), value: y, highlight: k - 1 - i, partials: [...partials] } });
+      const term = lsb[i] * cfg.base ** i;
+      frames.push({ line: 1, caption: T(`进入 $i=${i}$，$P_${i}=${lsb[i]}$，位权 $n^{${i}}=${cfg.base ** i}$`, `Loop $i=${i}$: $P_${i}=${lsb[i]}$, weight $n^{${i}}=${cfg.base ** i}$`), scene: { base: cfg.base, digits: lsb.slice().reverse(), value: y, highlight: k - 1 - i, partials: [...partials] } });
       y += term;
       partials.push(term);
       frames.push({ line: 2, caption: T(`累加 $y \\gets ${y - term} + ${lsb[i]}\\cdot${cfg.base}^{${i}} = ${y}$`, `Accum $y \\gets ${y - term} + ${lsb[i]}\\cdot${cfg.base}^{${i}} = ${y}$`), scene: { base: cfg.base, digits: lsb.slice().reverse(), value: y, highlight: k - 1 - i, partials: [...partials] } });

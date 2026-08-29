@@ -87,7 +87,7 @@ function gen(cfg: Cfg): Frame<Scene>[] {
   }
   const full = build(ch, cfg.mode);
   if (!full) {
-    return [{ line: 0, caption: T('⚠ 无法解析字符', 'Invalid'), scene: { mode: cfg.mode, char: ch, cp: null, cpHex: '', cpBin: '', asciiByte: null, utf8Bytes: [], bytesHex: [], kind: 'invalid' } }];
+    return [{ line: 0, caption: T('! 无法解析字符', 'Invalid'), scene: { mode: cfg.mode, char: ch, cp: null, cpHex: '', cpBin: '', asciiByte: null, utf8Bytes: [], bytesHex: [], kind: 'invalid' } }];
   }
   // progressive: early frames hide bytes with ?
   const empty: Scene = { ...full, asciiByte: null, utf8Bytes: [], bytesHex: [] };
@@ -95,7 +95,7 @@ function gen(cfg: Cfg): Frame<Scene>[] {
     frames.push({ line: 0, caption: T(`字符 $c=${ch}$，$u=${full.cpHex} = ${full.cp}$`, `char $c=${ch}$ $u=${full.cpHex}$`), scene: empty });
     frames.push({ line: 1, caption: T(full.cp! <= 127 ? `$u=${full.cp} \\le 127$ 判 ASCII` : `$u=${full.cp} >127$ 非 ASCII`, full.cp! <= 127 ? `$u<=127$` : `non-ASCII`), scene: empty });
     if (full.cp! <= 127) {
-      frames.push({ line: 2, caption: T(`$byte \gets 0${toBin(full.cp!, 7)}$ // $0x${full.cp!.toString(16).toUpperCase().padStart(2, '0')}$`, `byte 0${toBin(full.cp!, 7)}`), scene: full });
+      frames.push({ line: 2, caption: T(`$byte gets 0${toBin(full.cp!, 7)}$ // $0x${full.cp!.toString(16).toUpperCase().padStart(2, '0')}$`, `byte 0${toBin(full.cp!, 7)}`), scene: full });
       frames.push({ line: 2, caption: T(`完成：$${ch}$ → $${full.asciiByte}$`, `Done`), scene: full });
     } else {
       frames.push({ line: 3, caption: T(`$${ch}$ 非 ASCII，需切 UTF-8`, `Need UTF-8`), scene: empty });
@@ -106,25 +106,25 @@ function gen(cfg: Cfg): Frame<Scene>[] {
     frames.push({ line: 0, caption: T(`字符 $c=${ch}$，$u=${full.cpHex}$，$bin=${full.cpBin}$`, `char $c=${ch}$ $u=${full.cpHex}$`), scene: empty });
     if (cp <= 0x7f) {
       frames.push({ line: 1, caption: T(`$u=${cp} \\le 0x7F$ ? 是`, `$u<=0x7F$ yes`), scene: empty });
-      frames.push({ line: 2, caption: T(`$bytes \gets [0${toBin(cp, 7)}]$ // 1 字节`, `1 byte`), scene: full });
+      frames.push({ line: 2, caption: T(`$bytes gets [0${toBin(cp, 7)}]$ // 1 字节`, `1 byte`), scene: full });
       frames.push({ line: 2, caption: T(`完成：$${ch}$ → 0x${full.bytesHex[0]}$`, `Done`), scene: full });
     } else if (cp <= 0x7ff) {
       frames.push({ line: 1, caption: T(`$u=${cp} \\le 0x7F$ ? 否`, `>0x7F`), scene: empty });
-      frames.push({ line: 3, caption: T(`$u \le 0x7FF$ ? 是 → 2 字节`, `2 bytes`), scene: empty });
-      frames.push({ line: 4, caption: T(`$bytes \gets [${full.utf8Bytes.join(',')}]$`, `bytes`), scene: full });
+      frames.push({ line: 3, caption: T(`$u le 0x7FF$ ? 是 → 2 字节`, `2 bytes`), scene: empty });
+      frames.push({ line: 4, caption: T(`$bytes gets [${full.utf8Bytes.join(',')}]$`, `bytes`), scene: full });
       frames.push({ line: 4, caption: T(`完成：$${ch}$ → ${full.bytesHex.map(h => '0x' + h).join(' ')}`, `Done`), scene: full });
     } else if (cp <= 0xffff) {
       frames.push({ line: 1, caption: T(`$u \\le 0x7F$ ? 否`, `>0x7F`), scene: empty });
-      frames.push({ line: 3, caption: T(`$u \le 0x7FF$ ? 否`, `>0x7FF`), scene: empty });
-      frames.push({ line: 5, caption: T(`$u \le 0xFFFF$ ? 是 → 3 字节`, `3 bytes`), scene: empty });
-      frames.push({ line: 6, caption: T(`$bytes \gets [${full.utf8Bytes.join(',')}]$`, `bytes`), scene: full });
+      frames.push({ line: 3, caption: T(`$u le 0x7FF$ ? 否`, `>0x7FF`), scene: empty });
+      frames.push({ line: 5, caption: T(`$u le 0xFFFF$ ? 是 → 3 字节`, `3 bytes`), scene: empty });
+      frames.push({ line: 6, caption: T(`$bytes gets [${full.utf8Bytes.join(',')}]$`, `bytes`), scene: full });
       frames.push({ line: 6, caption: T(`完成：$${ch}$ → ${full.bytesHex.map(h => '0x' + h).join(' ')}`, `Done`), scene: full });
     } else {
       frames.push({ line: 1, caption: T(`$u \\le 0x7F$ ? 否`, `>0x7F`), scene: empty });
-      frames.push({ line: 3, caption: T(`$u \le 0x7FF$ ? 否`, `>0x7FF`), scene: empty });
-      frames.push({ line: 5, caption: T(`$u \le 0xFFFF$ ? 否`, `>0xFFFF`), scene: empty });
+      frames.push({ line: 3, caption: T(`$u le 0x7FF$ ? 否`, `>0x7FF`), scene: empty });
+      frames.push({ line: 5, caption: T(`$u le 0xFFFF$ ? 否`, `>0xFFFF`), scene: empty });
       frames.push({ line: 7, caption: T(`else 4 字节`, `4 bytes`), scene: empty });
-      frames.push({ line: 7, caption: T(`$bytes \gets [${full.utf8Bytes.join(',')}]$`, `bytes`), scene: full });
+      frames.push({ line: 7, caption: T(`$bytes gets [${full.utf8Bytes.join(',')}]$`, `bytes`), scene: full });
       frames.push({ line: 7, caption: T(`完成：$${ch}$ → ${full.bytesHex.map(h => '0x' + h).join(' ')}`, `Done`), scene: full });
     }
     return frames;
@@ -138,7 +138,7 @@ export const characterEncodingModule: ModuleDef<Scene, Cfg> = {
   tags: ['data-structures', 'computer-organization'],
   defaultConfig: DEFAULT_CFG,
   randomize(c) {
-    const pool = ['A', 'a', '0', '好', '中', '🔥', '😀', 'é', 'ß'];
+    const pool = ['A', 'a', '0', '好', '中', '€', '𝄞', 'é', 'ß'];
     return { ...c, char: pool[Math.floor(Math.random() * pool.length)] };
   },
   Controls({ config, onChange, t }) {
@@ -165,7 +165,7 @@ export const characterEncodingModule: ModuleDef<Scene, Cfg> = {
             }} style={{ width: 80, textAlign: 'center', fontSize: 16 }} maxLength={2} placeholder="A/好" />
           </label>
           <button className="ghost" onClick={() => {
-            const pool = ['A', 'a', '0', '好', '中', 'é', 'Ω', '😀'];
+            const pool = ['A', 'a', '0', '好', '中', 'é', 'Ω', '𝄞'];
             onChange({ ...config, char: pool[Math.floor(Math.random() * pool.length)] });
           }}>↻ {t(T('重新生成', 'Regenerate'))}</button>
           <button className="ghost" onClick={() => onChange(DEFAULT_CFG as Cfg)}>{t(T('清空', 'Clear'))}</button>
@@ -188,7 +188,7 @@ export const characterEncodingModule: ModuleDef<Scene, Cfg> = {
         {isAscii ? (
           <div style={{ textAlign: 'center', padding: '10px 12px', border: `1px solid ${scene.kind === 'non-ascii' ? '#f59e0b' : '#c7d2fe'}`, borderRadius: 10, background: scene.kind === 'non-ascii' ? '#fffbeb' : '#eef2ff' }}>
             {scene.kind === 'non-ascii'
-              ? <span style={{ color: '#d97706' }}>⚠ 非 ASCII（&gt;127），需 UTF-8</span>
+              ? <span style={{ color: '#d97706' }}>! 非 ASCII（&gt;127），需 UTF-8</span>
               : <><div style={{ fontFamily: 'monospace', fontSize: 14, letterSpacing: 1 }}>{scene.asciiByte}</div><div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}><MathText text={`$0xxxxxxx$ · $0x${scene.cp!.toString(16).toUpperCase().padStart(2, '0')}$`} /></div></>}
           </div>
         ) : (

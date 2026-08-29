@@ -58,14 +58,14 @@ const CODE: Record<Mode, ReturnType<NonNullable<ModuleDef['codeFor']>>> = {
 
 function expansionFrames(base: number, numeral: string): Frame<Scene>[] {
   const lsb = parseLSB(numeral, base);
-  if (!lsb) return [{ line: 0, caption: T('⚠ 数码不合法', '⚠ Invalid digits'), scene: { base, digits: [], highlight: null } }];
+  if (!lsb) return [{ line: 0, caption: T('! 数码不合法', '! Invalid digits'), scene: { base, digits: [], highlight: null } }];
   const k = lsb.length;
   let y = 0; const partials: number[] = [];
   const frames: Frame<Scene>[] = [];
   frames.push({ line: 0, caption: T(`初始化 $y=0$，$n=${base}$，$P=${numeral}$`, `Init $y=0$, $n=${base}$, $P=${numeral}$`), scene: { base, digits: lsb.slice().reverse(), value: 0, highlight: null, partials: [] } });
   for (let i = 0; i < k; i++) {
-    const term = lsb[i] * Math.pow(base, i);
-    frames.push({ line: 1, caption: T(`$i=${i}$，$P_${i}=${lsb[i]}$，权 $n^{${i}}=${Math.pow(base, i)}$`, `$i=${i}$ $P_${i}=${lsb[i]}$ weight ${Math.pow(base, i)}$`), scene: { base, digits: lsb.slice().reverse(), value: y, highlight: k - 1 - i, partials: [...partials] } });
+    const term = lsb[i] * base ** i;
+    frames.push({ line: 1, caption: T(`$i=${i}$，$P_${i}=${lsb[i]}$，权 $n^{${i}}=${base ** i}$`, `$i=${i}$ $P_${i}=${lsb[i]}$ weight ${base ** i}$`), scene: { base, digits: lsb.slice().reverse(), value: y, highlight: k - 1 - i, partials: [...partials] } });
     y += term; partials.push(term);
     frames.push({ line: 2, caption: T(`$y\\gets${y - term}+${lsb[i]}\\cdot${base}^{${i}}=${y}$`, `$y\\gets${y - term}+${lsb[i]}\\cdot${base}^{${i}}=${y}$`), scene: { base, digits: lsb.slice().reverse(), value: y, highlight: k - 1 - i, partials: [...partials] } });
   }
@@ -75,13 +75,13 @@ function expansionFrames(base: number, numeral: string): Frame<Scene>[] {
 
 function additionFrames(base: number, aStr: string, bStr: string): Frame<Scene>[] {
   const aLSB = parseLSB(aStr, base), bLSB = parseLSB(bStr, base);
-  if (!aLSB || !bLSB) return [{ line: 0, caption: T('⚠ 数码不合法', '⚠ Invalid'), scene: { base, digits: [], highlight: null } }];
+  if (!aLSB || !bLSB) return [{ line: 0, caption: T('! 数码不合法', '! Invalid'), scene: { base, digits: [], highlight: null } }];
   const k = Math.max(aLSB.length, bLSB.length);
   while (aLSB.length < k) aLSB.push(0);
   while (bLSB.length < k) bLSB.push(0);
   const res: number[] = []; let c = 0;
   const frames: Frame<Scene>[] = [];
-  const scene = (i: number | null): Scene => ({ base, digits: aLSB.slice().reverse(), digitsB: bLSB.slice().reverse(), res: res.slice().reverse(), i, carry: c, highlight: i !== null ? (aLSB.length - 1 - i) : null } as Scene);
+  const scene = (i: number | null): Scene => ({ base, digits: aLSB.slice().reverse(), digitsB: bLSB.slice().reverse(), res: res.slice().reverse(), i, carry: c, highlight: i === null ? null : (aLSB.length - 1 - i) } as Scene);
   frames.push({ line: 0, caption: T(`$c=0$, $A=${aStr}$, $B=${bStr}$, $n=${base}$`, `$c=0$, $A=${aStr}$, $B=${bStr}$`), scene: scene(null) });
   for (let i = 0; i < k; i++) {
     frames.push({ line: 1, caption: T(`列 $i=${i}$`, `col $i=${i}$`), scene: scene(i) });
@@ -100,10 +100,10 @@ function additionFrames(base: number, aStr: string, bStr: string): Frame<Scene>[
 
 function successorInfinite(base: number, numeral: string): FramesOrInfinite<Scene> {
   const orig = parseLSB(numeral, base);
-  if (!orig) return { frames: [{ line: 0, caption: T('⚠ 数码不合法', '⚠ Invalid'), scene: { base, digits: [], highlight: null } }], extend: () => [] };
-  let p = [...orig, 0, 0, 0]; // extend space
+  if (!orig) return { frames: [{ line: 0, caption: T('! 数码不合法', '! Invalid'), scene: { base, digits: [], highlight: null } }], extend: () => [] };
+  const p = [...orig, 0, 0, 0]; // extend space
   const origLen = orig.length;
-  let curTrim = () => { let k = p.length; while (k > origLen && p[k - 1] === 0) k--; if (k === 0) k = 1; return p.slice(0, k).reverse(); };
+  const curTrim = () => { let k = p.length; while (k > origLen && p[k - 1] === 0) k--; if (k === 0) k = 1; return p.slice(0, k).reverse(); };
   let step = 0;
   const frames: Frame<Scene>[] = [];
   const initDigits = curTrim();

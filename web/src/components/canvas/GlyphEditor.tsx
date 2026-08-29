@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faXmark } from '@fortawesome/free-solid-svg-icons';
 
 export function GlyphEditor({ initial, onSave, onClose }: { initial: string | null; onSave: (dataUrl: string) => void; onClose: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -66,7 +68,7 @@ export function GlyphEditor({ initial, onSave, onClose }: { initial: string | nu
       <div style={{ background: '#fff', borderRadius: 16, padding: 16, width: 420, maxWidth: '100%', boxShadow: '0 20px 60px rgba(0,0,0,.2)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <strong>绘制字形 · 黑白位图</strong>
-          <button className="ghost" onClick={onClose}>✕</button>
+          <button className="ghost" onClick={onClose}><FontAwesomeIcon icon={faXmark} /></button>
         </div>
         <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden', background: '#fff' }}>
           <canvas
@@ -84,7 +86,7 @@ export function GlyphEditor({ initial, onSave, onClose }: { initial: string | nu
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12 }}>
             笔刷 <input type="range" min={2} max={14} value={brush} onChange={e => setBrush(Number(e.target.value))} />
           </label>
-          <button className={`pill ${!erasing ? 'active' : ''}`} onClick={() => setErasing(false)}>画笔</button>
+          <button className={`pill ${erasing ? '' : 'active'}`} onClick={() => setErasing(false)}>画笔</button>
           <button className={`pill ${erasing ? 'active' : ''}`} onClick={() => setErasing(true)}>橡皮</button>
           <button className="pill" onClick={clear}>清空</button>
           <span style={{ flex: 1 }} />

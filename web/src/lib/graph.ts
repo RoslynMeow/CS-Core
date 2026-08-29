@@ -31,7 +31,7 @@ export class Graph {
     n: number,
     opts: { directed?: boolean; labels?: string[]; weighted?: boolean } = {},
   ) {
-    this.n = Math.max(1, Math.floor(n));
+    this.n = Math.max(0, Math.floor(n)); // 允许 0 = 空图
     this.directed = opts.directed ?? false;
     this.weighted = opts.weighted ?? false;
     this.labels =
@@ -388,11 +388,15 @@ export class Graph {
   // ---------- 生成 ----------
 
   /** 随机树（无向连通 n-1 边）：每个 i 连到一个随机祖先 */
-  static randomTree(n: number, opts: { labels?: string[] } = {}): Graph {
+  static randomTree(
+    n: number,
+    opts: { labels?: string[]; weighted?: boolean } = {},
+  ): Graph {
     const g = new Graph(n, opts);
+    const w = opts.weighted ? randW : () => 1;
     for (let i = 1; i < n; i++) {
       const p = Math.floor(Math.random() * i);
-      g.addEdge(p, i);
+      g.addEdge(p, i, w());
     }
     return g;
   }
@@ -400,9 +404,10 @@ export class Graph {
   static randomForest(
     n: number,
     k: number,
-    opts: { labels?: string[] } = {},
+    opts: { labels?: string[]; weighted?: boolean } = {},
   ): Graph {
     const g = new Graph(n, opts);
+    const w = opts.weighted ? randW : () => 1;
     const kk = Math.max(1, Math.min(k, n));
     // 每棵树的大小尽量均匀；根依次是 0, s1, s2, …
     const roots: number[] = [];
@@ -413,22 +418,125 @@ export class Graph {
       roots.push(acc);
       for (let i = acc + 1; i < acc + size; i++) {
         const p = acc + Math.floor(Math.random() * (i - acc));
-        g.addEdge(p, i);
+        g.addEdge(p, i, w());
       }
       acc += size;
     }
     return g;
   }
-  /** 随机图（无向，边概率 p） */
+  /** 随机图（边概率 p；directed 控制有向/无向） */
   static randomGraph(
     n: number,
     p: number,
-    opts: { directed?: boolean; labels?: string[] } = {},
+    opts: { directed?: boolean; labels?: string[]; weighted?: boolean } = {},
   ): Graph {
     const g = new Graph(n, opts);
+    const w = opts.weighted ? randW : () => 1;
     for (let i = 0; i < n; i++)
       for (let j = opts.directed ? 0 : i + 1; j < n; j++)
-        if (i !== j && Math.random() < p) g.addEdge(i, j);
+        if (i !== j && Math.random() < p) g.addEdge(i, j, w());
+    return g;
+  }
+  /** 随机二叉树（每个节点至多 2 子）：新节点随机挂到有空位的节点下 */
+  static randomBinaryTree(
+    n: number,
+    opts: { labels?: string[]; weighted?: boolean } = {},
+  ): Graph {
+    const g = new Graph(n, opts);
+    const w = opts.weighted ? randW : () => 1;
+    const childCount = Array(n).fill(0);
+    const slots: number[] = [0]; // 还有空位（子 < 2）的节点
+    for (let i = 1; i < n; i++) {
+      const idx = Math.floor(Math.random() * slots.length);
+      const p = slots[idx];
+      g.addEdge(p, i, w());
+      if (++childCount[p] === 2) slots.splice(idx, 1);
+      slots.push(i);
+    }
+    return g;
+  }
+  /** 随机完全二叉树（严格层序填补：节点 i 挂在 floor((i-1)/2) 下） */
+  static randomCompleteBinaryTree(
+    n: number,
+    opts: { labels?: string[]; weighted?: boolean } = {},
+  ): Graph {
+    const g = new Graph(n, opts);
+    const w = opts.weighted ? randW : () => 1;
+    for (let i = 1; i < n; i++) g.addEdge(Math.floor((i - 1) / 2), i, w());
+    return g;
+  }
+  /** 随机偏斜树（退化链：每个节点至多 1 子）；random=false 时按自然序 0-1-2-… */
+  static randomSkewTree(
+    n: number,
+    opts: { labels?: string[]; weighted?: boolean; random?: boolean } = {},
+  ): Graph {
+    const g = new Graph(n, opts);
+    const w = opts.weighted ? randW : () => 1;
+    const perm =
+      opts.random === false
+        ? Array.from({ length: n }, (_, i) => i)
+        : shuffle(Array.from({ length: n }, (_, i) => i));
+    for (let i = 1; i < n; i++) g.addEdge(perm[i - 1], perm[i], w());
+    return g;
+  }
+  /** 随机 DAG：随机排列作拓扑序，只加前向边（并保证脊链连通） */
+  static randomDAG(
+    n: number,
+    p: number,
+    opts: { labels?: string[]; weighted?: boolean } = {},
+  ): Graph {
+    const g = new Graph(n, { ...opts, directed: true });
+    const w = opts.weighted ? randW : () => 1;
+    const perm = shuffle(Array.from({ length: n }, (_, i) => i));
+    const seen = new Set<string>();
+    // 脊链：perm[0]→perm[1]→… 保证弱连通（也是 DAG 的骨架）
+    for (let i = 0; i + 1 < n; i++) {
+      const a = perm[i],
+        b = perm[i + 1];
+      g.addEdge(a, b, w());
+      seen.add(`${a},${b}`);
+    }
+    for (let i = 0; i < n; i++)
+      for (let j = i + 1; j < n; j++) {
+        if (Math.random() >= p) continue;
+        const a = perm[i],
+          b = perm[j];
+        if (!seen.has(`${a},${b}`)) {
+          g.addEdge(a, b, w());
+          seen.add(`${a},${b}`);
+        }
+      }
+    return g;
+  }
+  /** 随机有环图（有向/无向）：先构造环保证有环，再按概率加随机边 */
+  static randomGraphWithCycle(
+    n: number,
+    p: number,
+    opts: { directed?: boolean; labels?: string[]; weighted?: boolean } = {},
+  ): Graph {
+    const directed = opts.directed ?? false;
+    const g = new Graph(n, { ...opts, directed });
+    const w = opts.weighted ? randW : () => 1;
+    const perm = shuffle(Array.from({ length: n }, (_, i) => i));
+    const key = (a: number, b: number) =>
+      directed ? `${a},${b}` : a < b ? `${a},${b}` : `${b},${a}`;
+    const seen = new Set<string>();
+    // 哈密顿环（n≥3 才可能成环）
+    if (n >= 3)
+      for (let i = 0; i < n; i++) {
+        const a = perm[i],
+          b = perm[(i + 1) % n];
+        g.addEdge(a, b, w());
+        seen.add(key(a, b));
+      }
+    for (let i = 0; i < n; i++)
+      for (let j = directed ? 0 : i + 1; j < n; j++) {
+        if (i === j || Math.random() >= p) continue;
+        if (!seen.has(key(i, j))) {
+          g.addEdge(i, j, w());
+          seen.add(key(i, j));
+        }
+      }
     return g;
   }
 
@@ -582,6 +690,18 @@ export class Graph {
     return pos;
   }
 }
+
+/** Fisher–Yates 洗牌（返回新数组，不改原数组） */
+function shuffle<T>(arr: readonly T[]): T[] {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [out[i], out[j]] = [out[j], out[i]];
+  }
+  return out;
+}
+/** 随机权重 1–10 */
+const randW = () => 1 + Math.floor(Math.random() * 10);
 
 /** 顶点标签美化（树常用字母序，图常用数字） */
 export function alphaLabels(n: number): string[] {
@@ -1009,6 +1129,7 @@ export function buildGraphDump(
   };
 
   const allocs: DumpAlloc[] = [];
+  let usedBytes = 0; // adjlist 分支的节点池总字节数（head 表 + 全部节点）
 
   if (repr === "adjmat") {
     const mat = g.mat();
@@ -1090,14 +1211,18 @@ export function buildGraphDump(
     const headTableSize = g.n * ptrSize;
     const headTableAddr = cursor;
     const nodeBase = cursor + headTableSize;
-    const nodeAddrs: number[][][] = adj.map((nbrs) => {
-      let off = 0;
-      return nbrs.map(() => {
-        const a = nodeBase + off;
-        off += elemSize + ptrSize;
-        return [a];
-      });
-    });
+    const nodeAddrs: number[][][] = [];
+    let off = 0; // 共享游标：所有顶点共用一个 8B 节点池,按列表顺序连续分配
+    for (const nbrs of adj) {
+      nodeAddrs.push(
+        nbrs.map(() => {
+          const a = nodeBase + off;
+          off += elemSize + ptrSize;
+          return [a];
+        }),
+      );
+    }
+    usedBytes = headTableSize + off; // head 表 + 全部节点 的池字节数
     const headDumpBytes: number[] = [];
     for (let u = 0; u < g.n; u++) {
       const first = nodeAddrs[u][0]?.[0] ?? 0;
@@ -1152,7 +1277,10 @@ export function buildGraphDump(
   }
   return {
     base: `0x${base.toString(16)}`,
-    total: cursor - base + 0x100,
+    total:
+      repr === "adjlist"
+        ? Math.max(0x100, usedBytes)
+        : cursor - base + 0x100,
     endian: "little",
     allocations: allocs,
   };

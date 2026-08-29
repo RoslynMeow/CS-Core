@@ -39,7 +39,7 @@ export const successorModule: ModuleDef<Scene, Cfg> = {
     const orig = parseLSB(cfg.numeral, cfg.base);
     const frames: Frame<Scene>[] = [];
     if (!orig) {
-      frames.push({ line: 0, caption: T('⚠ 数码不合法', '⚠ Invalid digits'), scene: { digits: [], i: null, carry: false } });
+      frames.push({ line: 0, caption: T('! 数码不合法', '! Invalid digits'), scene: { digits: [], i: null, carry: false } });
       return frames;
     }
     const p = [...orig, 0];
