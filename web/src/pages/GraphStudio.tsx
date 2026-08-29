@@ -521,7 +521,8 @@ export function GraphStudio() {
         if (vpos) setDragStart({ x: vpos.x, y: vpos.y }); // world 坐标
       }
     } else if (tool === "move") {
-      // 空白按下：开始平移画布（记录视口起点与指针）
+      // 空白按下：取消选中并开始平移画布（记录视口起点与指针）
+      setSelected(null);
       setPan({ startX: svgP.x, startY: svgP.y, tx: view.tx, ty: view.ty });
     } else setSelected(null);
   };
@@ -693,6 +694,7 @@ export function GraphStudio() {
         }
       } else if (e.key === "Escape") {
         setPending(null);
+        setSelected(null);
         setMenu(null);
         setEditing(null);
         setGenModal(false);
@@ -876,76 +878,87 @@ export function GraphStudio() {
       </div>
     );
     if (repr === "adjmat") {
-      // 邻接矩阵（权重 / 布尔）
+      // 邻接矩阵（权重 / 布尔）— 用真 <table>：列头与格子同格距，列数增多不错位
       const mat = g.mat();
       return (
         <div style={{ overflowX: "auto", padding: 4 }}>
-          <div style={{ display: "inline-block", borderCollapse: "collapse" }}>
-            <div style={{ display: "flex" }}>
-              <div style={{ width: 26 }} />
-              {g.labels.map((l, i) => (
-                <div
-                  key={i}
-                  style={{
-                    width: 34,
-                    textAlign: "center",
-                    fontSize: 10,
-                    fontWeight: 800,
-                    color: "#64748b",
-                  }}
-                >
-                  {l}
-                </div>
-              ))}
-            </div>
-            {mat.map((row, r) => (
-              <div key={r} style={{ display: "flex", alignItems: "center" }}>
-                <div
-                  style={{
-                    width: 26,
-                    textAlign: "center",
-                    fontSize: 10,
-                    fontWeight: 800,
-                    color: "#64748b",
-                  }}
-                >
-                  {g.labels[r]}
-                </div>
-                {row.map((w, c) => (
-                  <div
-                    key={c}
+          <table
+            style={{
+              borderCollapse: "separate",
+              borderSpacing: "1px 2px",
+              tableLayout: "fixed", // 列宽以表头行为准，列头/格子必然对齐
+            }}
+          >
+            <thead>
+              <tr>
+                <th style={{ width: 26, padding: 0 }} />
+                {g.labels.map((l, i) => (
+                  <th
+                    key={i}
                     style={{
-                      width: 34,
-                      height: 30,
-                      margin: 1,
-                      borderRadius: 6,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 11,
-                      fontWeight: 700,
-                      fontFamily: "monospace",
-                      background:
-                        w === null
-                          ? "#f8fafc"
-                          : selected === r || selected === c
-                            ? "#eef2ff"
-                            : "#4f46e5",
-                      color:
-                        w === null
-                          ? "#cbd5e1"
-                          : selected === r || selected === c
-                            ? "#4f46e5"
-                            : "#fff",
-                      border: `1px solid ${w === null ? "#e2e8f0" : "#c7d2fe"}`,
+                      width: 36,
+                      padding: "0 0 3px",
+                      textAlign: "center",
+                      fontSize: 10,
+                      fontWeight: 800,
+                      color: "#64748b",
                     }}
                   >
-                    {w === null ? "·" : w}
-                  </div>
+                    {l}
+                  </th>
                 ))}
-              </div>
-            ))}
-          </div>
+              </tr>
+            </thead>
+            <tbody>
+              {mat.map((row, r) => (
+                <tr key={r}>
+                  <td
+                    style={{
+                      textAlign: "center",
+                      fontSize: 10,
+                      fontWeight: 800,
+                      color: "#64748b",
+                      padding: 0,
+                      verticalAlign: "middle",
+                    }}
+                  >
+                    {g.labels[r]}
+                  </td>
+                  {row.map((w, c) => (
+                    <td
+                      key={c}
+                      style={{
+                        height: 30,
+                        boxSizing: "border-box",
+                        padding: 0,
+                        textAlign: "center",
+                        verticalAlign: "middle",
+                        borderRadius: 6,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        fontFamily: "monospace",
+                        background:
+                          w === null
+                            ? "#f8fafc"
+                            : selected === r || selected === c
+                              ? "#eef2ff"
+                              : "#4f46e5",
+                        color:
+                          w === null
+                            ? "#cbd5e1"
+                            : selected === r || selected === c
+                              ? "#4f46e5"
+                              : "#fff",
+                        border: `1px solid ${w === null ? "#e2e8f0" : "#c7d2fe"}`,
+                      }}
+                    >
+                      {w === null ? "·" : w}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
           <div style={{ fontSize: 11, color: "#64748b", marginTop: 6 }}>
             <MathText
               text={
@@ -1361,6 +1374,14 @@ export function GraphStudio() {
                   : selected !== null && (e.u === selected || e.v === selected)
                     ? 2.4
                     : 1.6;
+              // 权重徽章底色与边同源联动：算法/悬停/选中邻接边时跟随高亮色
+              const wFill = isAlgoEdge
+                ? "#f59e0b"
+                : isHoverE
+                  ? "#7c3aed"
+                  : selected !== null && (e.u === selected || e.v === selected)
+                    ? "#4f46e5"
+                    : "#0f172a";
               const w =
                 e.weight !== undefined && e.weight !== 1 ? e.weight : null;
               return (
@@ -1389,7 +1410,7 @@ export function GraphStudio() {
                   )}
                   {w !== null && (
                     <g>
-                      <circle cx={mid.x} cy={mid.y} r={9} fill="#0f172a" />
+                      <circle cx={mid.x} cy={mid.y} r={9} fill={wFill} />
                       <text
                         x={mid.x}
                         y={mid.y + 3}
