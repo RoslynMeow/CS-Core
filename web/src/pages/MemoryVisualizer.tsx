@@ -298,6 +298,39 @@ function decodeByMode(u8: Uint8Array, start: number, size: number, type: string 
   }
 }
 
+// —— 数据类型颜色（AUTO 模式字段值 chip 按解析出的类型着色；右键 chip 可自定义，localStorage 持久化）——
+const TYPE_COLORS_DEFAULT: Record<string, string> = {
+  U32: '#4f46e5', // 靛蓝
+  UINT: '#4f46e5',
+  DEC: '#4f46e5',
+  I32: '#0891b2', // 青
+  INT: '#0891b2',
+  SDEC: '#0891b2',
+  PTR: '#7c3aed', // 紫
+  F32: '#db2777', // 玫红
+  F64: '#db2777',
+  FLOAT: '#db2777',
+  ASCII: '#ea580c', // 橙
+  'UTF-8': '#16a34a', // 绿
+  BOOL: '#ca8a04', // 黄
+  HEX: '#475569', // 石板灰
+  AUTO: '#94a3b8', // 兜底灰
+};
+const TYPE_COLORS_KEY = 'memory.typeColors.v1';
+const PRESET_TYPE_COLORS = ['#4f46e5', '#7c3aed', '#0891b2', '#0ea5e9', '#16a34a', '#ca8a04', '#ea580c', '#db2777', '#dc2626', '#475569', '#64748b', '#0f172a'];
+function loadTypeColors(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(TYPE_COLORS_KEY);
+    if (raw) {
+      const saved = JSON.parse(raw);
+      if (saved && typeof saved === 'object') return { ...TYPE_COLORS_DEFAULT, ...saved };
+    }
+    return { ...TYPE_COLORS_DEFAULT };
+  } catch {
+    return { ...TYPE_COLORS_DEFAULT };
+  }
+}
+
 const EMPTY_DUMP: MemoryDump = {
   base: '0x1000',
   total: 64,
@@ -369,6 +402,23 @@ export function MemoryVisualizer() {
   const [decodeMode, setDecodeMode] = useState<DecodeMode>('auto');
   const cycleDecodeMode = () =>
     setDecodeMode(m => DECODE_MODES[(DECODE_MODES.indexOf(m) + 1) % DECODE_MODES.length]);
+  // 数据类型 -> 颜色（AUTO 模式生效；右键字段值 chip 可单独修改，localStorage 持久化）
+  const [typeColors, setTypeColors] = useState<Record<string, string>>(loadTypeColors);
+  const [colorMenu, setColorMenu] = useState<{ label: string; x: number; y: number } | null>(null);
+  const setTypeColor = (label: string, color: string) => {
+    setTypeColors(prev => {
+      const next = { ...prev, [label]: color };
+      try { localStorage.setItem(TYPE_COLORS_KEY, JSON.stringify(next)); } catch { swallow(); }
+      return next;
+    });
+  };
+  const resetTypeColor = (label: string) => {
+    setTypeColors(prev => {
+      const next = { ...prev, [label]: TYPE_COLORS_DEFAULT[label] ?? prev[label] ?? '#94a3b8' };
+      try { localStorage.setItem(TYPE_COLORS_KEY, JSON.stringify(next)); } catch { swallow(); }
+      return next;
+    });
+  };
 
   // URL 读取：hash ?data= 优先，否则 ?data= 在 search
   useEffect(() => {
@@ -950,6 +1000,7 @@ export function MemoryVisualizer() {
                                   const slice = bytes.slice(fAddr - base, fAddr - base + f.size);
                                   const hexSlice = Array.from(slice, b => toHexByte(b)).join(' ');
                                   const { text: decText, label: decLabel } = decodeByMode(bytes, fAddr - base, f.size, f.type, viewEndian, decodeMode, base, total);
+                                  const typeColor = decodeMode === 'auto' ? (typeColors[decLabel] ?? null) : null;
                                   const selFieldHit = selScope !== null && selScope.field !== null && selScope.key === (a.key) && selScope.field.name === f.name;
                                   return (
                                     <div
@@ -990,14 +1041,24 @@ export function MemoryVisualizer() {
                                             e.stopPropagation();
                                             cycleDecodeMode();
                                           }}
-                                          title={`解码：${decLabel} · 点击循环切换（${DECODE_MODES.map(l => MODE_LABEL[l]).join(' → ')}）\n${hexSlice}`}
+                                          onContextMenu={e => {
+                                            if (decodeMode !== 'auto') return;
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            setColorMenu({
+                                              label: decLabel,
+                                              x: Math.min(e.clientX, window.innerWidth - 220),
+                                              y: Math.min(e.clientY, window.innerHeight - 250),
+                                            });
+                                          }}
+                                          title={`解码：${decLabel} · 点击循环切换（${DECODE_MODES.map(l => MODE_LABEL[l]).join(' → ')}）\n${hexSlice}${decodeMode === 'auto' ? '\nAUTO 模式：右键自定义该类型颜色' : ''}`}
                                           style={{
                                             fontFamily: 'monospace',
                                             fontSize: 11,
                                             fontWeight: 700,
-                                            color: f.type ? '#4338ca' : '#475569',
-                                            background: f.type ? '#eef2ff' : '#fff',
-                                            border: `1px solid ${f.type ? '#c7d2fe' : '#e2e8f0'}`,
+                                            color: typeColor ? '#fff' : (f.type ? '#4338ca' : '#475569'),
+                                            background: typeColor ?? (f.type ? '#eef2ff' : '#fff'),
+                                            border: `1px solid ${typeColor ?? (f.type ? '#c7d2fe' : '#e2e8f0')}`,
                                             padding: '2px 6px',
                                             borderRadius: 6,
                                             whiteSpace: 'pre-wrap',
@@ -1007,7 +1068,7 @@ export function MemoryVisualizer() {
                                           }}
                                         >
                                           {decText}
-                                          <span style={{ color: '#64748b', fontWeight: 600, marginLeft: 3 }}>:{decLabel}</span>
+                                          <span style={{ color: typeColor ? 'rgba(255,255,255,.85)' : '#64748b', fontWeight: 600, marginLeft: 3 }}>:{decLabel}</span>
                                         </button>
                                       </div>
                                     </div>
@@ -1259,6 +1320,54 @@ export function MemoryVisualizer() {
           </div>
         )}
       </div>
+
+      {colorMenu && decodeMode === 'auto' && (
+        <>
+          <div style={{ position: 'fixed', inset: 0, zIndex: 120 }} onClick={() => setColorMenu(null)} />
+          <div
+            style={{
+              position: 'fixed',
+              left: colorMenu.x,
+              top: colorMenu.y,
+              zIndex: 121,
+              background: '#fff',
+              border: '1px solid #e2e8f0',
+              borderRadius: 10,
+              boxShadow: '0 12px 40px rgba(15,23,42,.18)',
+              padding: 10,
+              minWidth: 190,
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ width: 12, height: 12, borderRadius: 3, background: typeColors[colorMenu.label] ?? '#94a3b8', display: 'inline-block' }} />
+              {colorMenu.label} 颜色
+              <span style={{ flex: 1 }} />
+              <button className="ghost" style={{ fontSize: 10, padding: '2px 6px' }} onClick={() => setColorMenu(null)}>✕</button>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}>
+              {PRESET_TYPE_COLORS.map(c => (
+                <button
+                  key={c}
+                  onClick={() => setTypeColor(colorMenu.label, c)}
+                  title={c}
+                  style={{ width: 20, height: 20, borderRadius: 5, background: c, border: '1px solid #e2e8f0', cursor: 'pointer' }}
+                />
+              ))}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input
+                type="color"
+                value={typeColors[colorMenu.label] ?? '#4f46e5'}
+                onChange={e => setTypeColor(colorMenu.label, e.target.value)}
+                style={{ width: 44, height: 26, border: '1px solid #e2e8f0', borderRadius: 6, background: '#fff', cursor: 'pointer', padding: 0 }}
+              />
+              <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#475569', flex: 1 }}>{typeColors[colorMenu.label] ?? '—'}</span>
+              <button className="ghost" style={{ fontSize: 10, padding: '3px 8px' }} onClick={() => resetTypeColor(colorMenu.label)}>恢复默认</button>
+            </div>
+          </div>
+        </>
+      )}
 
       <style>{`
         @media(max-width: 900px){
