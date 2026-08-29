@@ -317,7 +317,6 @@ const TYPE_COLORS_DEFAULT: Record<string, string> = {
   AUTO: '#94a3b8', // 兜底灰
 };
 const TYPE_COLORS_KEY = 'memory.typeColors.v1';
-const PRESET_TYPE_COLORS = ['#4f46e5', '#7c3aed', '#0891b2', '#0ea5e9', '#16a34a', '#ca8a04', '#ea580c', '#db2777', '#dc2626', '#475569', '#64748b', '#0f172a'];
 function loadTypeColors(): Record<string, string> {
   try {
     const raw = localStorage.getItem(TYPE_COLORS_KEY);
@@ -392,7 +391,6 @@ export function MemoryVisualizer() {
   const [activeHex, setActiveHex] = useState<string>('');
   const [urlB64, setUrlB64] = useState<string | null>(null);
   const [selectedAddr, setSelectedAddr] = useState<number | null>(null);
-  const [showAscii, setShowAscii] = useState(true);
   const [inputCollapsed, setInputCollapsed] = useState(true);
   // 结构视图字段解码端序：默认跟随 dump.endian，可手动切换对比
   const [viewEndian, setViewEndian] = useState<'little' | 'big'>('little');
@@ -400,8 +398,10 @@ export function MemoryVisualizer() {
   const toggleEndian = () => { manualEndianRef.current = true; setViewEndian(v => (v === 'little' ? 'big' : 'little')); };
   // 字段值全局解码模式：默认 AUTO（跟随字段 type），点击任一字段值 chip 循环切换
   const [decodeMode, setDecodeMode] = useState<DecodeMode>('auto');
-  const cycleDecodeMode = () =>
+  const cycleDecodeMode = () => {
+    setFieldOverrides({}); // 全局切换：强制所有字段一起转（清除全部单独设置）
     setDecodeMode(m => DECODE_MODES[(DECODE_MODES.indexOf(m) + 1) % DECODE_MODES.length]);
+  };
   // 字段级单独解码：key = `${alloc.key}|${field.name}`；未覆盖的字段跟随全局 decodeMode
   const [fieldOverrides, setFieldOverrides] = useState<Record<string, DecodeMode>>({});
   const cycleFieldMode = (key: string) =>
@@ -418,7 +418,7 @@ export function MemoryVisualizer() {
     });
   // 数据类型 -> 颜色（AUTO 模式生效；右键字段值 chip 可单独修改，localStorage 持久化）
   const [typeColors, setTypeColors] = useState<Record<string, string>>(loadTypeColors);
-  const [colorMenu, setColorMenu] = useState<{ label: string; x: number; y: number } | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const setTypeColor = (label: string, color: string) => {
     setTypeColors(prev => {
       const next = { ...prev, [label]: color };
@@ -585,7 +585,7 @@ export function MemoryVisualizer() {
   // ASCII 列宽：16 字节/行固定，确保不截断
   // ASCII 紧贴 HEX：hex 列固定宽（16 字节），不撑满，避免中间空白
   const HEX_W = 410;
-  const asciiW = showAscii ? 176 : 0; // 16 字符 × ~10px + 内边距，保证不截断
+  const asciiW = 176; // 16 字符 × ~10px + 内边距，保证不截断（强制显示 ASCII 列）
   const rowTpl = `100px ${HEX_W}px ${asciiW}px`;
 
   const copy = async (text: string) => {
@@ -779,16 +779,13 @@ export function MemoryVisualizer() {
               点击字节查看详情 · 字段按色块叠加
             </span>
             <span style={{ flex: 1 }} />
-            <label style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 11, color: '#cbd5e1', cursor: 'pointer' }}>
-              <input type="checkbox" checked={showAscii} onChange={e => setShowAscii(e.target.checked)} /> ASCII
-            </label>
           </div>
 
           {/* 列头 */}
           <div style={{ display: 'grid', gridTemplateColumns: rowTpl, gap: 0, background: '#0f172a', color: '#94a3b8', padding: '6px 10px', fontSize: 10, fontWeight: 700, letterSpacing: 0.5, fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', flexShrink: 0 }}>
             <span>Address</span>
             <span>Hex（16 字节/行）</span>
-            {showAscii && <span>ASCII</span>}
+            <span>ASCII</span>
           </div>
 
           {/* HEX 行（16 字节/行，模块内滚动） */}
@@ -814,7 +811,7 @@ export function MemoryVisualizer() {
                                 return <span key={i} title={`0x${addr.toString(16)} 空闲 — 0x${toHexByte(v)}`} style={{ minWidth: 22, textAlign: 'center', padding: '2px 1px', borderRadius: 4, background: 'transparent', color: '#9a3412', border: '1px solid #fed7aa', opacity: 0.55 }}>{toHexByte(v)}</span>;
                               })}
                             </div>
-                            {showAscii && <span style={{ color: '#fed7aa', fontSize: 11 }}>········</span>}
+                            <span style={{ color: '#fed7aa', fontSize: 11 }}>········</span>
                           </div>
                         );
                       })}
@@ -828,7 +825,7 @@ export function MemoryVisualizer() {
                   <div key={`gap-${item.key}`} style={{ display: 'grid', gridTemplateColumns: rowTpl, gap: 0, padding: '6px 10px', borderTop: '1px solid #fdba74', alignItems: 'center', background: 'repeating-linear-gradient(135deg,#fffbeb,#fffbeb 8px,#fef3c7 8px,#fef3c7 16px)', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 11 }}>
                     <span style={{ color: '#92400e', fontWeight: 800 }}>0x{item.startAddr.toString(16)} ~ 0x{item.endAddr.toString(16)}</span>
                     <div style={{ textAlign: 'center', color: '#92400e', fontWeight: 700, letterSpacing: 2 }}>〰〰〰 省略 {item.size}B 空闲 · {(item.endOff - item.startOff) / 16 + 1} 行 〰〰〰</div>
-                    {showAscii ? <button className="pill" style={{ padding: '2px 8px', fontSize: 11, justifySelf: 'end' }} onClick={() => { const n = new Set(expandedGaps); n.add(item.key); setExpandedGaps(n); }}>展开</button> : <span />}
+                    <button className="pill" style={{ padding: '2px 8px', fontSize: 11, justifySelf: 'end' }} onClick={() => { const n = new Set(expandedGaps); n.add(item.key); setExpandedGaps(n); }}>展开</button>
                   </div>
                 );
               }
@@ -866,8 +863,7 @@ export function MemoryVisualizer() {
                       );
                     })}
                   </div>
-                  {showAscii && (
-                    <span style={{ color: '#64748b', letterSpacing: 0.5, overflow: 'hidden', whiteSpace: 'nowrap', fontSize: 11 }}>
+                  <span style={{ color: '#64748b', letterSpacing: 0.5, overflow: 'hidden', whiteSpace: 'nowrap', fontSize: 11 }}>
                       {Array.from({ length: 16 }, (_, i) => {
                         const idx = off + i;
                         if (idx >= total) return <span key={i}> </span>;
@@ -884,7 +880,6 @@ export function MemoryVisualizer() {
                         );
                       })}
                     </span>
-                  )}
                 </div>
               );
             })}
@@ -909,13 +904,16 @@ export function MemoryVisualizer() {
                 ))}
                 <button
                   onClick={cycleDecodeMode}
-                  title={`全局解码模式（点击循环，所有未单独设置的字段同步）：${DECODE_MODES.map(l => MODE_LABEL[l]).join(' → ')}`}
+                  title={`全局解码模式（点击强制全部字段一起切换，清除单独设置）：${DECODE_MODES.map(l => MODE_LABEL[l]).join(' → ')}`}
                   style={{ padding: '2px 8px', borderRadius: 999, border: '1px solid #c7d2fe', background: decodeMode !== 'auto' ? '#4f46e5' : '#fff', color: decodeMode !== 'auto' ? '#fff' : '#4338ca', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}
                 >
                   模式:{MODE_LABEL[decodeMode]}
                 </button>
               </span>
               <span style={{ flex: 1 }} />
+              <button className="ghost" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => setSettingsOpen(true)}>
+                ⚙ 总体设置
+              </button>
               <button
                 className="ghost"
                 style={{ padding: '4px 8px', fontSize: 11 }}
@@ -1058,17 +1056,7 @@ export function MemoryVisualizer() {
                                             e.stopPropagation();
                                             cycleFieldMode(fieldKey);
                                           }}
-                                          onContextMenu={e => {
-                                            if (decodeMode !== 'auto') return;
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            setColorMenu({
-                                              label: decLabel,
-                                              x: Math.min(e.clientX, window.innerWidth - 220),
-                                              y: Math.min(e.clientY, window.innerHeight - 250),
-                                            });
-                                          }}
-                                          title={`解码：${decLabel}${overridden ? '（已单独设置）' : ''} · 点击仅切换本字段（${DECODE_MODES.map(l => MODE_LABEL[l]).join(' → ')}）\n头部「模式:」按钮同步全部字段\n${hexSlice}${decodeMode === 'auto' ? '\nAUTO 模式：右键自定义该类型颜色' : ''}`}
+                                          title={`解码：${decLabel}${overridden ? '（已单独设置）*' : ''} · 点击仅切换本字段（${DECODE_MODES.map(l => MODE_LABEL[l]).join(' → ')}）\n头部「模式:」按钮强制同步全部字段\n类型颜色在「总体设置」中调整\n${hexSlice}`}
                                           style={{
                                             fontFamily: 'monospace',
                                             fontSize: 11,
@@ -1338,49 +1326,87 @@ export function MemoryVisualizer() {
         )}
       </div>
 
-      {colorMenu && decodeMode === 'auto' && (
+      {settingsOpen && (
         <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 120 }} onClick={() => setColorMenu(null)} />
+          <div style={{ position: 'fixed', inset: 0, zIndex: 150, background: 'rgba(15,23,42,.45)' }} onClick={() => setSettingsOpen(false)} />
           <div
             style={{
               position: 'fixed',
-              left: colorMenu.x,
-              top: colorMenu.y,
-              zIndex: 121,
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%,-50%)',
+              zIndex: 151,
               background: '#fff',
               border: '1px solid #e2e8f0',
-              borderRadius: 10,
-              boxShadow: '0 12px 40px rgba(15,23,42,.18)',
-              padding: 10,
-              minWidth: 190,
+              borderRadius: 14,
+              boxShadow: '0 24px 60px rgba(15,23,42,.3)',
+              padding: 14,
+              width: 460,
+              maxWidth: '92vw',
+              maxHeight: '82vh',
+              overflowY: 'auto',
             }}
             onClick={e => e.stopPropagation()}
           >
-            <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ width: 12, height: 12, borderRadius: 3, background: typeColors[colorMenu.label] ?? '#94a3b8', display: 'inline-block' }} />
-              {colorMenu.label} 颜色
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4 }}>
+              <span style={{ fontSize: 15, fontWeight: 800 }}>总体设置</span>
               <span style={{ flex: 1 }} />
-              <button className="ghost" style={{ fontSize: 10, padding: '2px 6px' }} onClick={() => setColorMenu(null)}>✕</button>
+              <button className="ghost" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => setSettingsOpen(false)}>✕ 关闭</button>
             </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 8 }}>
-              {PRESET_TYPE_COLORS.map(c => (
+            <div style={{ fontSize: 11, color: '#64748b', marginBottom: 10 }}>
+              字段解码模式与数据类型颜色（AUTO 模式生效）
+            </div>
+
+            {/* 全局解码模式 */}
+            <div style={{ background: '#f8fafc', border: '1px solid #f1f5f9', borderRadius: 10, padding: 10, marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 6 }}>字段解码模式（全局）</div>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                 <button
-                  key={c}
-                  onClick={() => setTypeColor(colorMenu.label, c)}
-                  title={c}
-                  style={{ width: 20, height: 20, borderRadius: 5, background: c, border: '1px solid #e2e8f0', cursor: 'pointer' }}
-                />
-              ))}
+                  onClick={cycleDecodeMode}
+                  style={{ padding: '4px 10px', borderRadius: 999, border: '1px solid #c7d2fe', background: '#fff', color: '#4338ca', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}
+                >
+                  模式:{MODE_LABEL[decodeMode]} → 点击切换
+                </button>
+                <span style={{ fontSize: 11, color: '#94a3b8' }}>切换时强制全部字段一起转（清除单独设置）</span>
+              </div>
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input
-                type="color"
-                value={typeColors[colorMenu.label] ?? '#4f46e5'}
-                onChange={e => setTypeColor(colorMenu.label, e.target.value)}
-                style={{ width: 44, height: 26, border: '1px solid #e2e8f0', borderRadius: 6, background: '#fff', cursor: 'pointer', padding: 0 }}
-              />
-              <span style={{ fontSize: 10, fontFamily: 'monospace', color: '#475569', flex: 1 }}>{typeColors[colorMenu.label] ?? '—'}</span>
-              <button className="ghost" style={{ fontSize: 10, padding: '3px 8px' }} onClick={() => resetTypeColor(colorMenu.label)}>恢复默认</button>
+
+            {/* 数据类型颜色表 */}
+            <div style={{ fontSize: 12, fontWeight: 800, marginBottom: 6 }}>数据类型颜色（AUTO 模式）</div>
+            <div style={{ display: 'grid', gap: 6 }}>
+              {Object.entries(TYPE_COLORS_DEFAULT).map(([label, def]) => {
+                const cur = typeColors[label] ?? def;
+                return (
+                  <div key={label} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span style={{ width: 16, height: 16, borderRadius: 5, background: cur, border: '1px solid #e2e8f0', flexShrink: 0 }} />
+                    <span style={{ width: 64, fontFamily: 'monospace', fontSize: 11, fontWeight: 700 }}>{label}</span>
+                    <input
+                      type="color"
+                      value={cur}
+                      onChange={e => setTypeColor(label, e.target.value)}
+                      style={{ width: 46, height: 26, border: '1px solid #e2e8f0', borderRadius: 6, background: '#fff', cursor: 'pointer', padding: 0 }}
+                    />
+                    <span style={{ flex: 1, fontSize: 10, fontFamily: 'monospace', color: '#64748b' }}>{cur}</span>
+                    {cur !== def && (
+                      <button className="ghost" style={{ fontSize: 10, padding: '2px 6px' }} onClick={() => resetTypeColor(label)}>恢复默认</button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ marginTop: 10, display: 'flex', gap: 8 }}>
+              <button
+                className="ghost"
+                style={{ fontSize: 11, padding: '4px 8px' }}
+                onClick={() => {
+                  setTypeColors({ ...TYPE_COLORS_DEFAULT });
+                  try { localStorage.setItem(TYPE_COLORS_KEY, JSON.stringify(TYPE_COLORS_DEFAULT)); } catch { swallow(); }
+                }}
+              >
+                全部恢复默认
+              </button>
+              <span style={{ flex: 1 }} />
+              <button className="pill active" style={{ fontSize: 11, padding: '4px 10px' }} onClick={() => setSettingsOpen(false)}>完成</button>
             </div>
           </div>
         </>

@@ -49,8 +49,24 @@ export function App() {
                               className="brand"
                               onClick={() => (location.hash = "")}
                         >
-                              计算机学习 <small>· Interactive</small>
+                              计算机学习
                         </div>
+                        {route.kind === "home" && (
+                              <nav className="hdr-toolbar">
+                                    <label className="search">
+                                          <input
+                                                placeholder="搜索：进制 / 展开 / expansion / base"
+                                                value={q}
+                                                onChange={(e) =>
+                                                      setQ(e.target.value)
+                                                }
+                                          />
+                                    </label>
+                                    <span className="count">
+                                          {filtered.length} 个
+                                    </span>
+                              </nav>
+                        )}
                         <div className="spacer" />
                         <button
                               className={`pill ${route.kind === "memory" ? "active" : ""}`}
@@ -87,37 +103,9 @@ export function App() {
                         ) : route.kind === "graph" ? (
                               <GraphStudio />
                         ) : mod ? (
-                              <>
-                                    <button
-                                          className="ghost"
-                                          onClick={() => (location.hash = "")}
-                                          style={{ marginBottom: 12 }}
-                                    >
-                                          ← 返回首页
-                                    </button>
-                                    <Stage mod={mod as never} />
-                              </>
+                              <Stage mod={mod as never} />
                         ) : (
                               <div className="home">
-                                    <div className="home-head">
-                                          <h1 className="home-title">
-                                                计算机学习
-                                          </h1>
-                                    </div>
-                                    <div className="home-toolbar">
-                                          <label className="search">
-                                                <input
-                                                      placeholder="搜索：进制 / 展开 / expansion / base"
-                                                      value={q}
-                                                      onChange={(e) =>
-                                                            setQ(e.target.value)
-                                                      }
-                                                />
-                                          </label>
-                                          <span className="count">
-                                                {filtered.length} 个
-                                          </span>
-                                    </div>
                                     <div className="tagbar">
                                           {TAGS.map((t) => (
                                                 <button

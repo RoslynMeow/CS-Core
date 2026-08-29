@@ -105,34 +105,22 @@ a {
  margin: 0 auto;
  padding: 20px 10px 40px;
 }
-.home-head {
- margin: 8px 0 16px;
-}
-.home-title {
- margin: 0;
- font-size: 28px;
- letter-spacing: -0.02em;
-}
-.home-sub {
- margin: 6px 0 0;
- color: var(--muted);
- max-width: 720px;
-}
-.home-toolbar {
+/* header 内嵌搜索工具条（首页） */
+.hdr-toolbar {
  display: flex;
  gap: 10px;
- flex-wrap: wrap;
  align-items: center;
- margin: 14px 0;
+ flex: 1 1 360px;
+ max-width: 560px;
 }
 .search {
- flex: 1 1 320px;
- max-width: 520px;
+ flex: 1 1 240px;
+ max-width: 380px;
  position: relative;
 }
 .search input {
  width: 100%;
- padding: 11px 14px 11px 36px;
+ padding: 8px 12px 8px 34px;
  border-radius: 999px;
  border: 1px solid var(--border);
  background: #fff;
@@ -190,9 +178,6 @@ a {
 @media (max-width: 640px) {
  .grid {
   grid-template-columns: 1fr;
- }
- .home-title {
-  font-size: 22px;
  }
 }
 .card {
