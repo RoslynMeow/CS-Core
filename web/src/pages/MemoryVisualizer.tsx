@@ -219,8 +219,27 @@ const MODE_LABEL: Record<DecodeMode, string> = {
   float: 'FLOAT',
 };
 
+/** 保险启发式：无符号值落在 dump 地址区间且 4 字节对齐 → 疑似指针（仅提示、不改值） */
+function looksLikePtr(vText: string, heapBase: number, heapTotal: number): boolean {
+  if (heapBase <= 0 || heapTotal <= 0) return false;
+  const m = vText.match(/^\d+/);
+  if (!m) return false;
+  let v: bigint;
+  try { v = BigInt(m[0]); } catch { return false; }
+  if (v < BigInt(heapBase) || v >= BigInt(heapBase + heapTotal)) return false;
+  return (v & 3n) === 0n;
+}
+/** 把疑似指针值格式化为提示文本：(→PTR? 0x…) 按字段宽度补零，与 readPtr 格式一致 */
+function ptrHintText(vText: string, size: number): string {
+  const m = vText.match(/^\d+/);
+  if (!m) return '';
+  let v: bigint;
+  try { v = BigInt(m[0]); } catch { return ''; }
+  return ` (→PTR? 0x${v.toString(16).toUpperCase().padStart(size * 2, '0')})`;
+}
+
 /** AUTO：依据字段 type 解码；返回 {值, 实际解析出的标签} */
-function autoDecode(u8: Uint8Array, start: number, size: number, type: string | undefined, endian: 'little' | 'big'): { text: string; label: string } {
+function autoDecode(u8: Uint8Array, start: number, size: number, type: string | undefined, endian: 'little' | 'big', heapBase = 0, heapTotal = 0): { text: string; label: string } {
   const t = (type ?? '').toLowerCase();
   if (!size || start < 0 || start + size > u8.length) return { text: '—', label: MODE_LABEL.auto };
   if (t.includes('bool')) return { text: u8[start] ? 'true' : 'false', label: 'BOOL' };
@@ -230,7 +249,11 @@ function autoDecode(u8: Uint8Array, start: number, size: number, type: string | 
   if (m) {
     const bits = parseInt(m[2], 10);
     const nBytes = Math.min(Math.ceil(bits / 8), 8);
-    if (nBytes === size) return { text: readInt(u8, start, size, endian, m[1] === 'i'), label: t.toUpperCase() };
+    if (nBytes === size) {
+      const s = readInt(u8, start, size, endian, m[1] === 'i');
+      const hint = looksLikePtr(s, heapBase, heapTotal) ? ptrHintText(s, size) : '';
+      return { text: s + hint, label: t.toUpperCase() };
+    }
   }
   if (t.startsWith('f') || t.includes('float') || t.includes('double')) {
     const bits = t.match(/(\d+)/);
@@ -240,17 +263,19 @@ function autoDecode(u8: Uint8Array, start: number, size: number, type: string | 
   // 常见 C 写法 int/uint/unsigned/long 等
   if (/^(u?int\d*|unsigned|signed|long|short|iint)/.test(t)) {
     const signed = !t.startsWith('u');
-    return { text: readInt(u8, start, size, endian, signed), label: signed ? 'INT' : 'UINT' };
+    const s = readInt(u8, start, size, endian, signed);
+    const hint = looksLikePtr(s, heapBase, heapTotal) ? ptrHintText(s, size) : '';
+    return { text: s + hint, label: signed ? 'INT' : 'UINT' };
   }
   return { text: readText(u8, start, size), label: 'ASCII' };
 }
 
 /** 按全局模式解码字段值；无效（字节数不够/越界）时返回 —:LABEL 作为保险 */
-function decodeByMode(u8: Uint8Array, start: number, size: number, type: string | undefined, endian: 'little' | 'big', mode: DecodeMode): { text: string; label: string } {
+function decodeByMode(u8: Uint8Array, start: number, size: number, type: string | undefined, endian: 'little' | 'big', mode: DecodeMode, heapBase = 0, heapTotal = 0): { text: string; label: string } {
   if (size <= 0 || start < 0 || start + size > u8.length) return { text: '—', label: MODE_LABEL[mode] };
   switch (mode) {
     case 'auto':
-      return autoDecode(u8, start, size, type, endian);
+      return autoDecode(u8, start, size, type, endian, heapBase, heapTotal);
     case 'hex': {
       const parts: string[] = [];
       for (let i = 0; i < size; i++) parts.push(toHexByte(u8[start + i]));
@@ -924,7 +949,7 @@ export function MemoryVisualizer() {
                                   const fAddr = addr + f.offset;
                                   const slice = bytes.slice(fAddr - base, fAddr - base + f.size);
                                   const hexSlice = Array.from(slice, b => toHexByte(b)).join(' ');
-                                  const { text: decText, label: decLabel } = decodeByMode(bytes, fAddr - base, f.size, f.type, viewEndian, decodeMode);
+                                  const { text: decText, label: decLabel } = decodeByMode(bytes, fAddr - base, f.size, f.type, viewEndian, decodeMode, base, total);
                                   const selFieldHit = selScope !== null && selScope.field !== null && selScope.key === (a.key) && selScope.field.name === f.name;
                                   return (
                                     <div

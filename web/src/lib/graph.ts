@@ -1239,7 +1239,7 @@ export function buildGraphDump(
         name: l,
         offset: u * ptrSize,
         size: ptrSize,
-        type: "u32",
+        type: `ptr${ptrSize * 8}`,
         color: "#6366f1",
       })),
     });
@@ -1267,7 +1267,7 @@ export function buildGraphDump(
               name: "next",
               offset: elemSize,
               size: ptrSize,
-              type: "u32",
+              type: `ptr${ptrSize * 8}`,
               color: "#64748b",
             },
           ],
