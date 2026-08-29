@@ -402,6 +402,20 @@ export function MemoryVisualizer() {
   const [decodeMode, setDecodeMode] = useState<DecodeMode>('auto');
   const cycleDecodeMode = () =>
     setDecodeMode(m => DECODE_MODES[(DECODE_MODES.indexOf(m) + 1) % DECODE_MODES.length]);
+  // 字段级单独解码：key = `${alloc.key}|${field.name}`；未覆盖的字段跟随全局 decodeMode
+  const [fieldOverrides, setFieldOverrides] = useState<Record<string, DecodeMode>>({});
+  const cycleFieldMode = (key: string) =>
+    setFieldOverrides(prev => {
+      const cur = prev[key] ?? decodeMode;
+      const next = DECODE_MODES[(DECODE_MODES.indexOf(cur) + 1) % DECODE_MODES.length];
+      // 循环到与全局一致时自动清除覆盖（归队）
+      if (next === decodeMode) {
+        const copy = { ...prev };
+        delete copy[key];
+        return copy;
+      }
+      return { ...prev, [key]: next };
+    });
   // 数据类型 -> 颜色（AUTO 模式生效；右键字段值 chip 可单独修改，localStorage 持久化）
   const [typeColors, setTypeColors] = useState<Record<string, string>>(loadTypeColors);
   const [colorMenu, setColorMenu] = useState<{ label: string; x: number; y: number } | null>(null);
@@ -895,7 +909,7 @@ export function MemoryVisualizer() {
                 ))}
                 <button
                   onClick={cycleDecodeMode}
-                  title={`全局解码模式（点击循环）：${DECODE_MODES.map(l => MODE_LABEL[l]).join(' → ')}`}
+                  title={`全局解码模式（点击循环，所有未单独设置的字段同步）：${DECODE_MODES.map(l => MODE_LABEL[l]).join(' → ')}`}
                   style={{ padding: '2px 8px', borderRadius: 999, border: '1px solid #c7d2fe', background: decodeMode !== 'auto' ? '#4f46e5' : '#fff', color: decodeMode !== 'auto' ? '#fff' : '#4338ca', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}
                 >
                   模式:{MODE_LABEL[decodeMode]}
@@ -999,7 +1013,10 @@ export function MemoryVisualizer() {
                                   const fAddr = addr + f.offset;
                                   const slice = bytes.slice(fAddr - base, fAddr - base + f.size);
                                   const hexSlice = Array.from(slice, b => toHexByte(b)).join(' ');
-                                  const { text: decText, label: decLabel } = decodeByMode(bytes, fAddr - base, f.size, f.type, viewEndian, decodeMode, base, total);
+                                  const fieldKey = `${a.key}|${f.name}`;
+                                  const overridden = fieldOverrides[fieldKey] !== undefined;
+                                  const effMode = fieldOverrides[fieldKey] ?? decodeMode;
+                                  const { text: decText, label: decLabel } = decodeByMode(bytes, fAddr - base, f.size, f.type, viewEndian, effMode, base, total);
                                   const typeColor = decodeMode === 'auto' ? (typeColors[decLabel] ?? null) : null;
                                   const selFieldHit = selScope !== null && selScope.field !== null && selScope.key === (a.key) && selScope.field.name === f.name;
                                   return (
@@ -1039,7 +1056,7 @@ export function MemoryVisualizer() {
                                           type="button"
                                           onClick={e => {
                                             e.stopPropagation();
-                                            cycleDecodeMode();
+                                            cycleFieldMode(fieldKey);
                                           }}
                                           onContextMenu={e => {
                                             if (decodeMode !== 'auto') return;
@@ -1051,7 +1068,7 @@ export function MemoryVisualizer() {
                                               y: Math.min(e.clientY, window.innerHeight - 250),
                                             });
                                           }}
-                                          title={`解码：${decLabel} · 点击循环切换（${DECODE_MODES.map(l => MODE_LABEL[l]).join(' → ')}）\n${hexSlice}${decodeMode === 'auto' ? '\nAUTO 模式：右键自定义该类型颜色' : ''}`}
+                                          title={`解码：${decLabel}${overridden ? '（已单独设置）' : ''} · 点击仅切换本字段（${DECODE_MODES.map(l => MODE_LABEL[l]).join(' → ')}）\n头部「模式:」按钮同步全部字段\n${hexSlice}${decodeMode === 'auto' ? '\nAUTO 模式：右键自定义该类型颜色' : ''}`}
                                           style={{
                                             fontFamily: 'monospace',
                                             fontSize: 11,
@@ -1068,7 +1085,7 @@ export function MemoryVisualizer() {
                                           }}
                                         >
                                           {decText}
-                                          <span style={{ color: typeColor ? 'rgba(255,255,255,.85)' : '#64748b', fontWeight: 600, marginLeft: 3 }}>:{decLabel}</span>
+                                          <span style={{ color: typeColor ? 'rgba(255,255,255,.85)' : '#64748b', fontWeight: 600, marginLeft: 3 }}>:{decLabel}{overridden ? '*' : ''}</span>
                                         </button>
                                       </div>
                                     </div>
