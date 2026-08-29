@@ -472,6 +472,8 @@ export class Graph {
           }
       }
     };
+    // 优先以 root 为根（设为根的节点位于最上层）；其余顶点照旧各自成树（森林/孤立点）
+    if (this.valid(root) && !visited[root]) build(root);
     for (let i = 0; i < this.n; i++) if (!visited[i]) build(i);
 
     // 深度
