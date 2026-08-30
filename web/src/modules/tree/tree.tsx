@@ -188,11 +188,31 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
     else if (cfg.mode === "search") steps = bstSearchSteps(values, cfg.target);
     else if (cfg.mode === "insert") steps = bstInsertSteps(values);
     else steps = bstDeleteSteps(values, cfg.target);
-    return steps.map((s) => ({
+    const frames: Frame<GraphCanvasScene>[] = steps.map((s) => ({
       line: s.line,
       caption: s.msg,
       scene: binScene(s.nodes, { current: s.focus, edge: s.edge }, s.root),
     }));
+    // 退化链（偏斜树）提示：BST 组值升序时逐点插入退化为单链，画布呈“直线”，查找 O(n)
+    if (
+      cfg.group === "bst" &&
+      frames.length > 0 &&
+      frames[0].scene.nodes.length > 1 &&
+      nodes.length === frames[0].scene.nodes.length &&
+      nodes.every((n) => n.left === null || n.right === null)
+    ) {
+      frames[0] = {
+        ...frames[0],
+        scene: {
+          ...frames[0].scene,
+          warn: T(
+            "退化链（偏斜树）：值升序 → 每次插入都挂最右，画布呈直线，查找退化为 $O(n)$",
+            "Skew chain: ascending values hang rightmost each time → a line; search degrades to $O(n)$",
+          ),
+        },
+      };
+    }
+    return frames;
   }
 
   // 堆：HeapStep 场景（完全二叉树，下标注释）

@@ -1,4 +1,5 @@
 import type { GraphAlgoScene } from "../../lib/graph";
+import type { Text } from "../../i18n/lang";
 
 /** 图/树共用的渲染场景：库的算法步进 + 位置/边信息，喂给 GraphCanvas */
 export type GraphCanvasScene = GraphAlgoScene & {
@@ -10,6 +11,7 @@ export type GraphCanvasScene = GraphAlgoScene & {
     edgeLabels?: Record<string, string>; // `${u}-${v}` → 'L' | 'R' 等边标注
     blurred?: boolean; // 虚化预览：已选“从图创建导入”且未确认（点击画布导入）
     error?: string; // 图不符合当前要求的原因（Render 显示红色横幅 + 去图创建）
+    warn?: Text; // 黄条警告（如退化链/偏斜树提示）
 };
 
 const W = 760,

@@ -340,6 +340,25 @@ export function TreeCanvas<C extends TreeCfg>({
               ↻ {t(T("重新载入", "Reload"))}
             </button>
           </div>
+        ) : scene.warn ? (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              flexWrap: "wrap",
+              background: "#fffbeb",
+              border: "1px solid #fde68a",
+              color: "#92400e",
+              padding: "8px 14px",
+              borderRadius: 12,
+              fontSize: 13,
+              fontWeight: 700,
+              maxWidth: "92%",
+            }}
+          >
+            ⚠ {t(scene.warn)}
+          </div>
         ) : undefined
       }
     />
@@ -552,6 +571,29 @@ export function binScene(
 ) {
   const g = binToGraph(nodes);
   const pos = g.layoutTree(root, TREE_BOX).pos;
+  // 单子节点修正：layoutTree 把独生子与父节点居中到同一横坐标 → 退化成竖直“直线”；
+  // 这里按左右方向把独生子错开成“阶梯链”，退化链/偏斜树一眼可辨，普通单子节点也不再重叠
+  if (nodes.length > 0) {
+    const dep: number[] = Array(nodes.length).fill(0);
+    for (let i = 0; i < nodes.length; i++) {
+      const l = nodes[i].left;
+      const r = nodes[i].right;
+      if (l !== null) dep[l] = dep[i] + 1;
+      if (r !== null) dep[r] = dep[i] + 1;
+    }
+    const maxDep = Math.max(0, ...dep);
+    const step = Math.min(
+      52,
+      Math.max(18, (TREE_BOX.w - 80) / Math.max(1, 2 * maxDep)),
+    );
+    for (let i = 0; i < nodes.length; i++) {
+      const u = nodes[i];
+      const only = u.left === null ? u.right : u.right === null ? u.left : null;
+      if (only !== null) {
+        pos[only].x = pos[i].x + (u.left === only ? -step : step);
+      }
+    }
+  }
   const edges = nodes.flatMap((n, i) => [
     ...(n.left === null ? [] : [{ u: i, v: n.left }]),
     ...(n.right === null ? [] : [{ u: i, v: n.right }]),

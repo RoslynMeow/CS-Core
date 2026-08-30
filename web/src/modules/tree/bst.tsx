@@ -74,11 +74,30 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
   if (cfg.mode === "search") steps = bstSearchSteps(res.values, cfg.target);
   else if (cfg.mode === "insert") steps = bstInsertSteps(res.values);
   else steps = bstDeleteSteps(res.values, cfg.target);
-  return steps.map((s) => ({
+  const frames: Frame<GraphCanvasScene>[] = steps.map((s) => ({
     line: s.line,
     caption: s.msg,
     scene: binScene(s.nodes, { current: s.focus, edge: s.edge }, s.root),
   }));
+  // 退化链（偏斜树）提示：值序列升序时逐点插入必然退化为单链，画布呈“直线”，查找退化为 O(n)
+  if (
+    frames.length > 0 &&
+    frames[0].scene.nodes.length > 1 &&
+    res.nodes.length === frames[0].scene.nodes.length &&
+    res.nodes.every((n) => n.left === null || n.right === null)
+  ) {
+    frames[0] = {
+      ...frames[0],
+      scene: {
+        ...frames[0].scene,
+        warn: T(
+          "退化链（偏斜树）：值升序 → 每次插入都挂最右，画布呈直线，查找退化为 $O(n)$",
+          "Skew chain: ascending values hang rightmost each time → a line; search degrades to $O(n)$",
+        ),
+      },
+    };
+  }
+  return frames;
 }
 
 export const treeBstModule: ModuleDef<GraphCanvasScene, Cfg> = {
