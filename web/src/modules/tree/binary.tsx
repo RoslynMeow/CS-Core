@@ -1,6 +1,11 @@
 import { T, type Text } from "../../i18n/lang";
 import type { Frame, ModuleDef } from "../../engine/types";
-import { treeTraverseSteps, type AlgoStep } from "../../lib/graph";
+import {
+  treeTraverseSteps,
+  levelOrderSteps,
+  LEVEL_CODE,
+  type AlgoStep,
+} from "../../lib/graph";
 import type { GraphCanvasScene } from "../../components/canvas/GraphCanvas";
 import {
   resolveTree,
@@ -12,7 +17,7 @@ import {
   type TreeCfg,
 } from "./source";
 
-type Mode = "pre" | "in" | "post";
+type Mode = "pre" | "in" | "post" | "level";
 type Cfg = TreeCfg & { mode: Mode };
 const DEFAULT: Cfg = {
   source: "random",
@@ -22,7 +27,7 @@ const DEFAULT: Cfg = {
   mode: "pre",
 };
 
-// 每模式各自完整、从 line0 开始的递归遍历伪代码（与 treeTraverseSteps 行号对齐）
+// 每模式各自完整、从 line0 开始的递归遍历伪代码
 const CODE: Record<Mode, Text[]> = {
   pre: [
     T("$visit(u)$  // 前序", "$visit(u)$  // preorder"),
@@ -39,12 +44,20 @@ const CODE: Record<Mode, Text[]> = {
     T("$F(u_R)$  // 右", "$F(u_R)$  // right"),
     T("$visit(u)$  // 后序", "$visit(u)$  // postorder"),
   ],
+  level: LEVEL_CODE as unknown as Text[],
 };
 
 function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
-  const pv = importPreviewFrames(cfg);
+  // 旧合并页存档防御：mode 可能残留 heap-* 等非法值 → 归一化到当前模式集
+  const mode: Mode = (["pre", "in", "post", "level"] as Mode[]).includes(
+    cfg.mode as Mode,
+  )
+    ? (cfg.mode as Mode)
+    : DEFAULT.mode;
+  const c: Cfg = { ...cfg, mode };
+  const pv = importPreviewFrames(c, { requireNumeric: false });
   if (pv) return pv;
-  const res = resolveTree(cfg);
+  const res = resolveTree(c, { requireNumeric: false });
   if (!res.ok || res.nodes.length === 0) {
     const cap = T(
       res.error ?? "空树 / 请选择来源",
@@ -63,16 +76,20 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
           edge: null,
           nodes: [],
           edges: [],
-          ...(cfg.source === "graph" ? { error: res.error ?? "" } : {}),
+          ...(c.source === "graph" ? { error: res.error ?? "" } : {}),
         },
       },
     ];
   }
-  const steps: AlgoStep[] = treeTraverseSteps(res.g, cfg.mode, 0, res.labels);
+  const { g, labels, nodes } = res;
+  const steps: AlgoStep[] =
+    mode === "level"
+      ? levelOrderSteps(g, 0, labels)
+      : treeTraverseSteps(g, mode, 0, labels);
   return steps.map((s) => ({
     line: s.line,
     caption: s.msg,
-    scene: binScene(res.nodes, {
+    scene: binScene(nodes, {
       current: s.current,
       exploring: s.exploring,
       visited: s.visited,
@@ -83,12 +100,12 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
   }));
 }
 
-export const treeTraversalModule: ModuleDef<GraphCanvasScene, Cfg> = {
-  id: "binary-tree-traverse",
-  title: T("二叉树 · 遍历", "Binary Tree Traversal"),
+export const treeTraverseModule: ModuleDef<GraphCanvasScene, Cfg> = {
+  id: "binary-tree",
+  title: T("二叉树 · 遍历", "Binary Tree · Traversal"),
   desc: T(
-    "前序/中序/后序递归轨迹；树可随机生成或从图创建导入（需是二叉树）",
-    "pre · in · post trace; random or imported binary tree",
+    "前序 / 中序 / 后序 / 层序遍历二叉树；树可随机生成或从图创建导入（须为二叉树）",
+    "preorder · inorder · postorder · level-order; random or imported binary tree",
   ),
   tags: ["data-structures"],
   defaultConfig: DEFAULT,
@@ -124,29 +141,32 @@ export const treeTraversalModule: ModuleDef<GraphCanvasScene, Cfg> = {
               letterSpacing: ".04em",
             }}
           >
-            {isZh ? "模式" : "MODE"}
+            {isZh ? "遍历" : "ORDER"}
           </span>
-          <label
-            style={{
-              display: "flex",
-              gap: 6,
-              alignItems: "center",
-              fontSize: 13,
-            }}
+          <select
+            className="txt"
+            value={config.mode}
+            onChange={(e) =>
+              onChange({ ...config, mode: e.target.value as Mode })
+            }
           >
-            <span>{t(T("序", "Order"))}</span>
-            <select
-              className="txt"
-              value={config.mode}
-              onChange={(e) =>
-                onChange({ ...config, mode: e.target.value as Mode })
-              }
-            >
-              <option value="pre">{t(T("前序", "Preorder"))}</option>
-              <option value="in">{t(T("中序", "Inorder"))}</option>
-              <option value="post">{t(T("后序", "Postorder"))}</option>
-            </select>
-          </label>
+            {(["pre", "in", "post", "level"] as Mode[]).map((m) => (
+              <option key={m} value={m}>
+                {t(
+                  T(
+                    m === "pre"
+                      ? "前序"
+                      : m === "in"
+                        ? "中序"
+                        : m === "post"
+                          ? "后序"
+                          : "层序",
+                    m,
+                  ),
+                )}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
     ) as unknown as never;

@@ -1,13 +1,16 @@
 import { T, type Text } from "../../i18n/lang";
 import type { Frame, ModuleDef } from "../../engine/types";
 import {
-  bstSearchSteps,
+  bstFromValues,
+  bstSearchOnTree,
+  bstInsertOne,
+  bstDeleteOnTree,
   bstInsertSteps,
-  bstDeleteSteps,
   BST_SEARCH_CODE,
   BST_INSERT_CODE,
   BST_DELETE_CODE,
   type BstStep,
+  type TreeSnap,
 } from "../../lib/graph";
 import type { GraphCanvasScene } from "../../components/canvas/GraphCanvas";
 import {
@@ -20,19 +23,23 @@ import {
   type TreeCfg,
 } from "./source";
 
-type Mode = "search" | "insert" | "delete";
-type Cfg = TreeCfg & { mode: Mode; target: number };
+type Mode = "view" | "search" | "build" | "insert" | "delete";
+type Cfg = TreeCfg & { mode: Mode; target: number; x: number };
 const DEFAULT: Cfg = {
   source: "random",
   values: [4, 2, 6, 1, 3, 5, 7],
   imp: null,
   confirmed: true,
-  mode: "search",
+  mode: "build",
   target: 3,
+  x: 5,
 };
 
+const VIEW_CODE: Text[] = [T("查看当前树", "view current tree")];
 const CODE: Record<Mode, Text[]> = {
+  view: VIEW_CODE,
   search: BST_SEARCH_CODE as unknown as Text[],
+  build: BST_INSERT_CODE as unknown as Text[],
   insert: BST_INSERT_CODE as unknown as Text[],
   delete: BST_DELETE_CODE as unknown as Text[],
 };
@@ -70,10 +77,53 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
       },
     ];
   }
+  const base: TreeSnap = cfg.work ?? { nodes: res.nodes, root: 0 };
+  const built = !!cfg.work || cfg.source === "graph";
+  // 建树 = 初始化：已建树（或图来源）时静态展示当前树（替代原「查看」）；旧存档 mode:"view" 同此
+  if (cfg.mode === "build" && built) {
+    return [
+      {
+        line: 0,
+        caption: T(
+          `当前树 · ${base.nodes.length} 节点 · 可选 查找/插入/删除（播完自动应用）`,
+          `current tree · ${base.nodes.length} nodes · pick search/insert/delete`,
+        ),
+        scene: binScene(base.nodes, {}, base.root),
+      },
+    ];
+  }
+  if (cfg.mode === "view") {
+    return [
+      {
+        line: 0,
+        caption: T(
+          `当前树 · ${base.nodes.length} 节点 · 可选 查找/插入/删除`,
+          `current tree · ${base.nodes.length} nodes · pick search/insert/delete`,
+        ),
+        scene: binScene(base.nodes, {}, base.root),
+      },
+    ];
+  }
+  // 无建树（非图来源）：其余操作先提示建树
+  if (!built && cfg.mode !== "build") {
+    return [
+      {
+        line: 0,
+        caption: T(
+          "请先建树：默认「建树」播放结束即初始化完成",
+          "Build first: play the default Build (init) first",
+        ),
+        scene: binScene(base.nodes, {}, base.root),
+      },
+    ];
+  }
   let steps: BstStep[];
-  if (cfg.mode === "search") steps = bstSearchSteps(res.values, cfg.target);
-  else if (cfg.mode === "insert") steps = bstInsertSteps(res.values);
-  else steps = bstDeleteSteps(res.values, cfg.target);
+  if (cfg.mode === "search")
+    steps = bstSearchOnTree(base.nodes, base.root, cfg.target);
+  else if (cfg.mode === "build") steps = bstInsertSteps(res.values);
+  else if (cfg.mode === "insert")
+    steps = bstInsertOne(base.nodes, base.root, cfg.x).steps;
+  else steps = bstDeleteOnTree(base.nodes, base.root, cfg.target).steps;
   const frames: Frame<GraphCanvasScene>[] = steps.map((s) => ({
     line: s.line,
     caption: s.msg,
@@ -83,8 +133,8 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
   if (
     frames.length > 0 &&
     frames[0].scene.nodes.length > 1 &&
-    res.nodes.length === frames[0].scene.nodes.length &&
-    res.nodes.every((n) => n.left === null || n.right === null)
+    base.nodes.length === frames[0].scene.nodes.length &&
+    base.nodes.every((n) => n.left === null || n.right === null)
   ) {
     frames[0] = {
       ...frames[0],
@@ -100,17 +150,38 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
   return frames;
 }
 
+/** 手动应用：把 建树/插入/删除 的最终树写入 work（新版本）并切回「查看」展示 */
+function applyWork(cfg: Cfg, onChange: (c: Cfg) => void): void {
+  const r = resolveTree(cfg, {
+    requireNumeric: true,
+    requireComplete: false,
+  });
+  if (!r.ok || r.values.length === 0) return;
+  const base: TreeSnap = cfg.work ?? { nodes: r.nodes, root: 0 };
+  let result: TreeSnap;
+  if (cfg.mode === "build") {
+    result = { nodes: bstFromValues(r.values), root: 0 };
+  } else if (cfg.mode === "insert") {
+    result = bstInsertOne(base.nodes, base.root, cfg.x).result;
+  } else if (cfg.mode === "delete") {
+    const out = bstDeleteOnTree(base.nodes, base.root, cfg.target);
+    if (!out.result.nodes.length && cfg.target !== base.nodes[0].val) return;
+    result = out.result;
+  } else return;
+  onChange({ ...cfg, work: result, mode: "build" });
+}
+
 export const treeBstModule: ModuleDef<GraphCanvasScene, Cfg> = {
   id: "binary-tree-bst",
   title: T("二叉搜索树 · BST", "Binary Search Tree"),
   desc: T(
-    "查找 / 插入 / 删除；树可随机生成或从图创建导入（需是带数字标签的二叉树）",
-    "search · insert · delete; random or imported",
+    "建树（初始化）/ 查找 / 插入 / 删除；插入 = 往当前树加一个节点；播完自动应用为新版本（导入当前图可覆盖回原图）",
+    "build (init) · search · insert · delete; insert adds a node to the current tree; auto-applies on play end (import to revert)",
   ),
   tags: ["data-structures"],
   defaultConfig: DEFAULT,
   randomize(c) {
-    return { ...c, values: randSeq() };
+    return { ...c, values: randSeq(), work: null };
   },
   Controls({ config, onChange, t }) {
     const isZh = t(T("中文", "en")) !== "en";
@@ -150,6 +221,7 @@ export const treeBstModule: ModuleDef<GraphCanvasScene, Cfg> = {
               onChange({ ...config, mode: e.target.value as Mode })
             }
           >
+            <option value="build">{t(T("建树", "Build"))}</option>
             <option value="search">{t(T("查找", "Search"))}</option>
             <option value="insert">{t(T("插入", "Insert"))}</option>
             <option value="delete">{t(T("删除", "Delete"))}</option>
@@ -166,7 +238,7 @@ export const treeBstModule: ModuleDef<GraphCanvasScene, Cfg> = {
               <span>
                 {config.mode === "search"
                   ? t(T("目标", "Target"))
-                  : t(T("删值", "Del"))}
+                  : t(T("删值", "Key"))}
               </span>
               <input
                 className="txt"
@@ -178,6 +250,37 @@ export const treeBstModule: ModuleDef<GraphCanvasScene, Cfg> = {
                 }
               />
             </label>
+          )}
+          {config.mode === "insert" && (
+            <label
+              style={{
+                display: "flex",
+                gap: 6,
+                alignItems: "center",
+                fontSize: 13,
+              }}
+            >
+              <span>{t(T("插值", "Value"))}</span>
+              <input
+                className="txt"
+                type="number"
+                style={{ width: 56 }}
+                value={config.x}
+                onChange={(e) =>
+                  onChange({ ...config, x: Number(e.target.value) })
+                }
+              />
+            </label>
+          )}
+          {(config.mode === "build" ||
+            config.mode === "insert" ||
+            config.mode === "delete") && (
+            <button
+              className="ghost"
+              onClick={() => applyWork(config, onChange)}
+            >
+              ✓ {t(T("应用为新版本", "Apply as new version"))}
+            </button>
           )}
         </div>
       </div>

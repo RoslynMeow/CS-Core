@@ -1278,9 +1278,7 @@ export function buildGraphDump(
   return {
     base: `0x${base.toString(16)}`,
     total:
-      repr === "adjlist"
-        ? Math.max(0x100, usedBytes)
-        : cursor - base + 0x100,
+      repr === "adjlist" ? Math.max(0x100, usedBytes) : cursor - base + 0x100,
     endian: "little",
     allocations: allocs,
   };
@@ -3609,6 +3607,16 @@ function binHeight(nodes: BinNode[]): number[] {
   return h;
 }
 
+/** 每个节点的平衡因子 bf = h(left) - h(right)，下标与 nodes 对齐（AVL 标注用） */
+export function binBf(nodes: BinNode[]): number[] {
+  const h = binHeight(nodes);
+  return nodes.map((n) => {
+    const lh = n.left === null ? 0 : h[n.left];
+    const rh = n.right === null ? 0 : h[n.right];
+    return lh - rh;
+  });
+}
+
 /** 插入序列建 AVL（逐帧含旋转） */
 export function avlInsertSteps(values: number[]): BstStep[] {
   const nodes: BinNode[] = [];
@@ -3638,8 +3646,8 @@ export function avlInsertSteps(values: number[]): BstStep[] {
       steps.push(snap(1, 0, `$bf=${0}$ 平衡`, `root ${x}`));
       continue;
     }
-    // BST 插入
-    let p = 0;
+    // BST 插入（AVL 旋转后根可能 ≠ 0：必须从当前 root 出发，否则会插到孤立子树上）
+    let p = root;
     while (true) {
       const cur = nodes[p];
       if (x < cur.val) {
@@ -3750,6 +3758,515 @@ export function avlInsertSteps(values: number[]): BstStep[] {
   );
   return steps;
 }
+
+export function bstSearchOnTree(
+  nodes0: BinNode[],
+  root: number,
+  target: number,
+): BstStep[] {
+  const nodes = nodes0.map((n) => ({ ...n }));
+  const steps: BstStep[] = [];
+  const snap = (
+    line: number,
+    focus: number | null,
+    zh: string,
+    en: string,
+  ): BstStep => ({
+    line,
+    nodes: nodes.map((n) => ({ ...n })),
+    visible: nodes.length,
+    root,
+    focus,
+    newNode: null,
+    edge: null,
+    side: null,
+    msg: { zh, en },
+  });
+  if (nodes.length === 0) return [snap(0, null, "空树", "empty")];
+  steps.push(
+    snap(
+      0,
+      null,
+      `$p gets root=${nodes[root].val}$，找 $x=${target}$`,
+      `p←root`,
+    ),
+  );
+  let p: number | null = root;
+  while (p !== null) {
+    steps.push(snap(1, p, `while：$p=${nodes[p].val}$`, `p=${nodes[p].val}`));
+    if (nodes[p].val === target) {
+      steps.push(snap(2, p, `$x=${target}=p.val$ → 命中`, `hit`));
+      return steps;
+    }
+    if (target < nodes[p].val) {
+      steps.push(snap(3, p, `$x< p.val$ → 走左`, `left`));
+      p = nodes[p].left;
+    } else {
+      steps.push(snap(4, p, `$x> p.val$ → 走右`, `right`));
+      p = nodes[p].right;
+    }
+  }
+  steps.push(snap(5, null, `$x=${target}$ 未找到（空位）`, `not found`));
+  return steps;
+}
+
+/** BST 真·插入：向现有树插入一个 x，返回动画 + 结果树（可提交为新版本） */
+export function bstInsertOne(
+  nodes0: BinNode[],
+  root0: number,
+  x: number,
+): { steps: BstStep[]; result: TreeSnap } {
+  const nodes = nodes0.map((n) => ({ ...n }));
+  const root = root0;
+  const steps: BstStep[] = [];
+  const snap = (
+    line: number,
+    focus: number | null,
+    newNode: number | null,
+    edge: [number, number] | null,
+    side: "l" | "r" | null,
+    zh: string,
+    en: string,
+  ): BstStep => ({
+    line,
+    nodes: nodes.map((n) => ({ ...n })),
+    visible: nodes.length,
+    root,
+    focus,
+    newNode,
+    edge,
+    side,
+    msg: { zh, en },
+  });
+  if (nodes.length === 0) {
+    nodes.push({ id: 0, val: x, left: null, right: null });
+    steps.push(snap(1, 0, 0, null, null, `空树 → 根 = ${x}`, `root ${x}`));
+    steps.push(snap(7, null, null, null, null, `完成`, `done`));
+    return { steps, result: { nodes, root: 0 } };
+  }
+  steps.push(
+    snap(
+      2,
+      root,
+      null,
+      null,
+      null,
+      `$p gets root=${nodes[root].val}$（插 $x=${x}$）`,
+      `p←root`,
+    ),
+  );
+  let p: number | null = root;
+  while (p !== null) {
+    steps.push(
+      snap(
+        3,
+        p,
+        null,
+        null,
+        null,
+        `while：$p=${nodes[p].val}$`,
+        `p=${nodes[p].val}`,
+      ),
+    );
+    if (x < nodes[p].val) {
+      if (nodes[p].left === null) {
+        const id = nodes.length;
+        nodes[p].left = id;
+        nodes.push({ id, val: x, left: null, right: null });
+        steps.push(
+          snap(
+            6,
+            p,
+            id,
+            [p, id],
+            "l",
+            `${nodes[p].val}.left 空 → 挂入 ${x}`,
+            `attach ${x}`,
+          ),
+        );
+        break;
+      }
+      p = nodes[p].left;
+    } else {
+      if (nodes[p].right === null) {
+        const id = nodes.length;
+        nodes[p].right = id;
+        nodes.push({ id, val: x, left: null, right: null });
+        steps.push(
+          snap(
+            6,
+            p,
+            id,
+            [p, id],
+            "r",
+            `${nodes[p].val}.right 空 → 挂入 ${x}`,
+            `attach ${x}`,
+          ),
+        );
+        break;
+      }
+      p = nodes[p].right;
+    }
+  }
+  steps.push(
+    snap(
+      7,
+      null,
+      null,
+      null,
+      null,
+      `完成：中序 $[${inorderOf(nodes).join(", ")}]$`,
+      `done`,
+    ),
+  );
+  return { steps, result: { nodes, root } };
+}
+
+/** 结构性删除核心（BST/AVL 共用）→ { nodes, root, found, startId }；startId=用于向上重平衡的起点 */
+function deleteCore(
+  nodes0: BinNode[],
+  root0: number,
+  target: number,
+  snap: (line: number, focus: number | null, zh: string, en: string) => void,
+): { nodes: BinNode[]; root: number; found: boolean; startId: number } {
+  let nodes = nodes0.map((n) => ({ ...n }));
+  let root = root0;
+  const before = nodes.map((n) => ({ ...n }));
+  const S = (id: number | null) => (id === null ? "∅" : String(before[id].val));
+  if (nodes.length === 0) return { nodes, root, found: false, startId: -1 };
+  let cur: number | null = root;
+  let par: number | null = null;
+  const locate = (): boolean => {
+    while (cur !== null) {
+      snap(0, cur, `定位 $p=${S(cur)}$（$x=${target}$）`, `locate p=${S(cur)}`);
+      if (before[cur].val === target) return true;
+      if (target < before[cur].val) {
+        par = cur;
+        cur = before[cur].left;
+      } else {
+        par = cur;
+        cur = before[cur].right;
+      }
+    }
+    return false;
+  };
+  if (!locate()) return { nodes, root, found: false, startId: -1 };
+  const d = cur as number;
+  const dl = nodes[d].left,
+    dr = nodes[d].right;
+  const isLeft = par !== null && nodes[par].left === d;
+  if (dl === null && dr === null) {
+    snap(1, d, `$p=${S(d)}$ 无子女 → 直接删除`, `leaf`);
+    if (par === null) {
+      nodes = [];
+      root = 0;
+    } else {
+      if (isLeft) nodes[par].left = null;
+      else nodes[par].right = null;
+      nodes = withoutNode(nodes, d);
+    }
+    return { nodes, root, found: true, startId: par ?? -1 };
+  }
+  if (dl === null || dr === null) {
+    snap(2, d, `$p=${S(d)}$ 仅一子 → 子顶替`, `one child`);
+    const ch = (dl === null ? dr : dl) as number;
+    if (par === null) {
+      root = ch > d ? ch - 1 : ch;
+      nodes = withoutNode(nodes, d);
+      return { nodes, root, found: true, startId: -1 };
+    }
+    if (isLeft) nodes[par].left = ch;
+    else nodes[par].right = ch;
+    nodes = withoutNode(nodes, d);
+    return { nodes, root, found: true, startId: par };
+  }
+  // 双子：找右子树最小后继 s，复制值后删 s（s 至多一子）
+  let s = dr as number,
+    sPar = d;
+  snap(3, d, `$p=${S(d)}$ 双子 → 右子树最小`, `two children`);
+  while (nodes[s].left !== null) {
+    snap(3, s, `找后继：$s=${S(s)}$（左走）`, `successor ${S(s)}`);
+    sPar = s;
+    s = nodes[s].left as number;
+  }
+  snap(3, s, `后继 $s=${S(s)}$`, `successor ${S(s)}`);
+  nodes[d].val = nodes[s].val;
+  snap(4, d, `$p.val gets ${nodes[d].val}$`, `copy ${nodes[d].val}`);
+  if (sPar === d) nodes[d].right = nodes[s].right;
+  else nodes[sPar].left = nodes[s].right;
+  const startId = sPar === d ? d : sPar;
+  nodes = withoutNode(nodes, s);
+  snap(
+    4,
+    startId > s ? startId - 1 : startId,
+    `删 $s$：剩余 $[${inorderOf(nodes).join(", ")}]$`,
+    `remove succ`,
+  );
+  return {
+    nodes,
+    root,
+    found: true,
+    startId: startId > s ? startId - 1 : startId,
+  };
+}
+
+/** BST 真·删除：从现有树删 target，返回动画 + 结果树 */
+export function bstDeleteOnTree(
+  nodes0: BinNode[],
+  root: number,
+  target: number,
+): { steps: BstStep[]; result: TreeSnap } {
+  const nodes = nodes0.map((n) => ({ ...n }));
+  let rootNow = root;
+  const steps: BstStep[] = [];
+  const snap = (
+    line: number,
+    focus: number | null,
+    zh: string,
+    en: string,
+  ): BstStep => ({
+    line,
+    nodes: nodes.map((n) => ({ ...n })),
+    visible: nodes.length,
+    root: rootNow,
+    focus,
+    newNode: null,
+    edge: null,
+    side: null,
+    msg: { zh, en },
+  });
+  const out = deleteCore(nodes, rootNow, target, (l, f, z, e) =>
+    steps.push(snap(l, f, z, e)),
+  );
+  if (!out.found) {
+    steps.push(snap(5, null, `$x=${target}$ 不存在（空位）`, `not found`));
+    return { steps, result: out };
+  }
+  nodes.splice(0, nodes.length, ...out.nodes);
+  rootNow = out.root;
+  steps.push(
+    snap(5, null, `完成：$[${inorderOf(nodes).join(", ") || "∅"}]$`, `done`),
+  );
+  return { steps, result: { nodes, root: rootNow } };
+}
+
+/** AVL 真·插入：向现有树插一个 x 并沿路径重平衡，返回动画 + 结果树 */
+export function avlInsertOne(
+  nodes0: BinNode[],
+  root0: number,
+  x: number,
+): { steps: BstStep[]; result: TreeSnap } {
+  const nodes = nodes0.map((n) => ({ ...n }));
+  let root = root0;
+  const steps: BstStep[] = [];
+  const snap = (
+    line: number,
+    focus: number | null,
+    zh: string,
+    en: string,
+  ): BstStep => ({
+    line,
+    nodes: nodes.map((n) => ({ ...n })),
+    visible: nodes.length,
+    root,
+    focus,
+    newNode: null,
+    edge: null,
+    side: null,
+    msg: { zh, en },
+  });
+  if (nodes.length === 0) {
+    nodes.push({ id: 0, val: x, left: null, right: null });
+    steps.push(snap(0, null, `插入 $x=${x}$ → 根`, `root ${x}`));
+    steps.push(snap(7, null, `完成`, `done`));
+    return { steps, result: { nodes, root: 0 } };
+  }
+  steps.push(snap(0, null, `插入 $x=${x}$（BST 步骤同插入）`, `insert ${x}`));
+  let p: number | null = root;
+  while (p !== null) {
+    if (x < nodes[p].val) {
+      if (nodes[p].left === null) {
+        const id = nodes.length;
+        nodes[p].left = id;
+        nodes.push({ id, val: x, left: null, right: null });
+        p = id;
+      } else p = nodes[p].left;
+    } else if (nodes[p].right === null) {
+      const id = nodes.length;
+      nodes[p].right = id;
+      nodes.push({ id, val: x, left: null, right: null });
+      p = id;
+    } else p = nodes[p].right;
+    if (p !== null && nodes[p].left === null && nodes[p].right === null) break;
+  }
+  const inserted = (p ?? 0) as number;
+  root = avlRebalance(
+    nodes,
+    root,
+    inserted,
+    (l, f, z, e) => steps.push(snap(l, f, z, e)),
+    {
+      bf: 2,
+      rot: 3,
+      kindOff: true,
+    },
+  );
+  steps.push(
+    snap(7, null, `完成：AVL 中序 $[${inorderOf(nodes).join(", ")}]$`, `done`),
+  );
+  return { steps, result: { nodes, root } };
+}
+
+/** AVL 真·删除：删除现有树中的 target 并沿父链重平衡（可能多次旋转） */
+export function avlDeleteOnTree(
+  nodes0: BinNode[],
+  root: number,
+  target: number,
+): { steps: BstStep[]; result: TreeSnap } {
+  const nodes = nodes0.map((n) => ({ ...n }));
+  let rootNow = root;
+  const steps: BstStep[] = [];
+  const snap = (
+    line: number,
+    focus: number | null,
+    zh: string,
+    en: string,
+  ): BstStep => ({
+    line,
+    nodes: nodes.map((n) => ({ ...n })),
+    visible: nodes.length,
+    root: rootNow,
+    focus,
+    newNode: null,
+    edge: null,
+    side: null,
+    msg: { zh, en },
+  });
+  const out = deleteCore(nodes, rootNow, target, (l, f, z, e) =>
+    steps.push(snap(l, f, z, e)),
+  );
+  if (!out.found) {
+    steps.push(snap(5, null, `$x=${target}$ 不存在（空位）`, `not found`));
+    return { steps, result: { nodes: out.nodes, root: out.root } };
+  }
+  nodes.splice(0, nodes.length, ...out.nodes);
+  rootNow = out.root;
+  if (out.startId >= 0 && out.startId < nodes.length) {
+    rootNow = avlRebalance(
+      nodes,
+      rootNow,
+      out.startId,
+      (l, f, z, e) => steps.push(snap(l, f, z, e)),
+      {
+        bf: 5,
+        rot: 6,
+        kindOff: false,
+      },
+    );
+  }
+  steps.push(
+    snap(7, null, `完成：$[${inorderOf(nodes).join(", ") || "∅"}]$`, `done`),
+  );
+  return { steps, result: { nodes, root: rootNow } };
+}
+
+/** 沿 startId 向上重平衡（插入：一般一次；删除：可能多处）。bf/rot=伪代码行号 */
+function avlRebalance(
+  nodes: BinNode[],
+  root: number,
+  startId: number,
+  snap: (line: number, focus: number | null, zh: string, en: string) => void,
+  ln: { bf: number; rot: number; kindOff: boolean },
+): number {
+  let r = root;
+  let u = startId;
+  let guard = 0;
+  while (u !== -1 && u < nodes.length && guard++ < 3 * nodes.length + 4) {
+    const h = binHeight(nodes);
+    const par = binParents(nodes);
+    const findBf = (v: number) => {
+      const lh = nodes[v].left === null ? 0 : h[nodes[v].left!];
+      const rh = nodes[v].right === null ? 0 : h[nodes[v].right!];
+      return lh - rh;
+    };
+    const b = findBf(u);
+    if (Math.abs(b) <= 1) {
+      snap(ln.bf, u, `$bf[${nodes[u].val}] = ${b}$ 平衡`, `bf=${b}`);
+      u = par[u];
+      continue;
+    }
+    const lc = nodes[u].left,
+      rc = nodes[u].right;
+    const lb = lc === null ? 0 : findBf(lc);
+    const rb = rc === null ? 0 : findBf(rc);
+    const kind = b > 1 ? (lb >= 0 ? "LL" : "LR") : rb <= 0 ? "RR" : "RL";
+    snap(
+      ln.rot +
+        (ln.kindOff
+          ? kind === "LL"
+            ? 0
+            : kind === "LR"
+              ? 1
+              : kind === "RR"
+                ? 2
+                : 3
+          : 0),
+      u,
+      `${kind}：$bf=${b}$，子$bf=${b > 1 ? lb : rb}$ → 旋转`,
+      kind,
+    );
+    const rv = (y0: number): number => {
+      const x0 = nodes[y0].left!;
+      nodes[y0].left = nodes[x0].right;
+      nodes[x0].right = y0;
+      return x0;
+    };
+    const lv = (y0: number): number => {
+      const x0 = nodes[y0].right!;
+      nodes[y0].right = nodes[x0].left;
+      nodes[x0].left = y0;
+      return x0;
+    };
+    const pPar = par[u];
+    let t = u;
+    if (kind === "LL") t = rv(t);
+    else if (kind === "RR") t = lv(t);
+    else if (kind === "LR") {
+      nodes[t].left = lv(nodes[t].left!);
+      t = rv(t);
+    } else {
+      nodes[t].right = rv(nodes[t].right!);
+      t = lv(t);
+    }
+    if (pPar === -1) r = t;
+    else if (nodes[pPar].left === u) nodes[pPar].left = t;
+    else nodes[pPar].right = t;
+    snap(
+      ln.bf,
+      t,
+      `旋转完成：子树根 → ${nodes[t].val}，$|bf|leq 1$`,
+      `rotated`,
+    );
+    u = pPar;
+  }
+  return r;
+}
+
+export type TreeSnap = { nodes: BinNode[]; root: number };
+
+export const AVL_DELETE_CODE: Text[] = [
+  { zh: "$p \\gets locate(x)$", en: "$p \\gets locate(x)$" },
+  { zh: "if $p$ 无子女: remove // 叶", en: "if leaf: remove" },
+  { zh: "else if $p$ 仅一子: 子顶替", en: "one child: promote" },
+  { zh: "else 双子: $s \\gets$ 右子树最小", en: "two children: successor s" },
+  { zh: "$p.val \\gets s.val$; $remove(s)$", en: "copy s.val; remove(s)" },
+  {
+    zh: "while $|bf(u)| \\leq 1$: $u \\gets parent$",
+    en: "while balanced: up",
+  },
+  { zh: "rotate(LL/LR/RR/RL)  // 失衡修复", en: "rotate(LL/LR/RR/RL)" },
+  { zh: "// 完成", en: "// done" },
+];
 
 // ============================================================
 // 二叉堆（大顶堆）：数组快照 + 比较/交换下标

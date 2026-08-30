@@ -6,7 +6,9 @@ import {
   bstFromValues,
   completeTree,
   binToGraph,
+  binBf,
   type BinNode,
+  type TreeSnap,
   type Vec2,
 } from "../../lib/graph";
 import {
@@ -29,6 +31,9 @@ export type TreeCfg = {
   imp: ImportedGraph | null;
   /** 当前 imp 是否已被用户确认导入（未确认时画布虚化预览，点击画布确认） */
   confirmed: boolean;
+  /** 工作版本：用户在页面内插入/删除/重建后的树快照（null=未修改，随来源派生）
+   *  方案A：修改后记为新版本；「导入当前图」覆盖回原图（置 null） */
+  work?: TreeSnap | null;
 };
 /** 解析结果：统一为 BinNode[]（根=0, BFS 重编号）+ 布局 + 数字值 */
 export type Resolved = {
@@ -334,6 +339,7 @@ export function TreeCanvas<C extends TreeCfg>({
                   source: "graph",
                   imp,
                   confirmed: !!imp,
+                  work: null,
                 });
               }}
             >
@@ -386,7 +392,8 @@ export function SourcePanel({
       return;
     }
     setErr(null);
-    onChange({ ...cfg, source: "graph", imp, confirmed: confirm });
+    // 导入覆盖用户修改：work 置 null 回到原图版本
+    onChange({ ...cfg, source: "graph", imp, confirmed: confirm, work: null });
   };
   const rows: React.ReactNode[] = [
     <div
@@ -424,7 +431,12 @@ export function SourcePanel({
               // 选择即载入图创建里的图（未确认 → 画布虚化预览，点击画布导入）
               importGraph(false);
             } else {
-              onChange({ ...cfg, source: "random", confirmed: true });
+              onChange({
+                ...cfg,
+                source: "random",
+                confirmed: true,
+                work: null,
+              });
             }
           }}
         >
@@ -505,6 +517,7 @@ export function SourcePanel({
                   .split(/[,，\s]+/)
                   .map(Number)
                   .filter(Number.isFinite),
+                work: null,
               })
             }
             style={{ width: 160 }}
@@ -512,13 +525,13 @@ export function SourcePanel({
         </label>
         <button
           className="ghost"
-          onClick={() => onChange({ ...cfg, values: randSeq() })}
+          onClick={() => onChange({ ...cfg, values: randSeq(), work: null })}
         >
           ↻ {t(T("重新生成", "Regenerate"))}
         </button>
         <button
           className="ghost"
-          onClick={() => onChange({ ...cfg, values: [] })}
+          onClick={() => onChange({ ...cfg, values: [], work: null })}
         >
           {t(T("清空", "Clear"))}
         </button>
@@ -553,6 +566,15 @@ export function randSeq(len = 5 + Math.floor(Math.random() * 4)): number[] {
     [pool[i], pool[j]] = [pool[j], pool[i]];
   }
   return pool.slice(0, len);
+}
+
+/** AVL 平衡因子标注：node id → bf 字符串（+1 / 0 / -1 …），画布节点下方小字 */
+export function bfAnn(nodes: BinNode[]): Record<number, string> {
+  const bf = binBf(nodes);
+  const ann: Record<number, string> = {};
+  for (let i = 0; i < bf.length; i++)
+    ann[i] = bf[i] > 0 ? `+${bf[i]}` : String(bf[i]);
+  return ann;
 }
 
 /** 场景辅助：BinNode 快照 → GraphCanvasScene（供 BstStep / 静态树通用） */
