@@ -371,7 +371,8 @@ export function TreeCanvas<C extends TreeCfg>({
   );
 }
 
-/** 共享的「树的来源」控件：随机生成 / 从图创建导入（含校验提示） */
+/** 共享的「树的来源」控件：一行式 — 来源下拉 + 「从图编辑中导入」「随机生成」两按钮
+ *  不再提供节点值手动输入（随机生成即可）；默认来源为「从图导入」 */
 export function SourcePanel({
   cfg,
   onChange,
@@ -388,24 +389,29 @@ export function SourcePanel({
   const importGraph = (confirm: boolean) => {
     const imp = loadGraphStudio();
     if (!imp) {
-      setErr(isZh ? "图创建里还没有可导入的图" : "No graph in studio");
+      setErr(
+        isZh ? "图创建里还没有可导入的图" : "No graph saved in Graph Studio",
+      );
       return;
     }
     setErr(null);
     // 导入覆盖用户修改：work 置 null 回到原图版本
     onChange({ ...cfg, source: "graph", imp, confirmed: confirm, work: null });
   };
-  const rows: React.ReactNode[] = [
+  const random = () =>
+    onChange({
+      ...cfg,
+      source: "random",
+      values: randSeq(),
+      confirmed: true,
+      work: null,
+    });
+  return (
     <div
-      key="src"
       style={{
         display: "flex",
         gap: 8,
         alignItems: "center",
-        padding: "8px 10px",
-        borderRadius: 12,
-        background: "#eef2ff",
-        border: "1px solid #c7d2fe",
         flexWrap: "wrap",
       }}
     >
@@ -417,40 +423,40 @@ export function SourcePanel({
           letterSpacing: ".04em",
         }}
       >
-        {isZh ? "树的来源" : "SOURCE"}
+        {isZh ? "来源" : "SRC"}
       </span>
-      <label
-        style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}
+      <select
+        className="txt"
+        value={cfg.source}
+        onChange={(e) => {
+          const v = e.target.value as TreeCfg["source"];
+          if (v === "graph") {
+            // 选择即载入图创建里的图（未确认 → 画布虚化预览，点击画布导入）；无图则提示
+            importGraph(false);
+          } else {
+            random();
+          }
+        }}
       >
-        <select
-          className="txt"
-          value={cfg.source}
-          onChange={(e) => {
-            const v = e.target.value as TreeCfg["source"];
-            if (v === "graph") {
-              // 选择即载入图创建里的图（未确认 → 画布虚化预览，点击画布导入）
-              importGraph(false);
-            } else {
-              onChange({
-                ...cfg,
-                source: "random",
-                confirmed: true,
-                work: null,
-              });
-            }
-          }}
-        >
-          <option value="random">{t(T("随机生成", "Random"))}</option>
-          <option value="graph">
-            {t(T("从图创建导入", "Import from Graph Studio"))}
-          </option>
-        </select>
-      </label>
-      {cfg.source === "graph" && (
-        <button className="ghost" onClick={() => importGraph(true)}>
-          ⤓ {t(T("导入当前图", "Import now"))}
-        </button>
-      )}
+        <option value="graph">
+          {t(T("从图创建导入", "From Graph Studio"))}
+        </option>
+        <option value="random">{t(T("随机生成", "Random"))}</option>
+      </select>
+      <button
+        className="ghost"
+        onClick={() => importGraph(true)}
+        title={isZh ? "立即导入图创建里保存的图" : "Import saved graph now"}
+      >
+        ⤓ {t(T("从图编辑中导入", "Import graph"))}
+      </button>
+      <button
+        className="ghost"
+        onClick={random}
+        title={isZh ? "随机生成一棵新树" : "Generate a random tree"}
+      >
+        ↻ {t(T("随机生成", "Randomize"))}
+      </button>
       {requireComplete && (
         <span style={{ fontSize: 11, color: "#b45309" }}>
           {t(T("需完全二叉树", "needs complete tree"))}
@@ -461,100 +467,7 @@ export function SourcePanel({
           {cfg.imp.n} 顶点 · {cfg.imp.spec}
         </span>
       )}
-      {cfg.source === "graph" && cfg.imp && !cfg.confirmed && (
-        <span style={{ fontSize: 11, color: "#b45309", fontWeight: 700 }}>
-          {t(
-            T(
-              "虚化预览中 · 点击画布导入",
-              "Blurred preview · click the canvas to import",
-            ),
-          )}
-        </span>
-      )}
-    </div>,
-  ];
-  if (cfg.source === "random") {
-    rows.push(
-      <div
-        key="vals"
-        style={{
-          display: "flex",
-          gap: 8,
-          alignItems: "center",
-          padding: "8px 10px",
-          borderRadius: 12,
-          background: "#f8fafc",
-          border: "1px solid #e2e8f0",
-          flexWrap: "wrap",
-        }}
-      >
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 800,
-            color: "#475569",
-            letterSpacing: ".04em",
-          }}
-        >
-          {isZh ? "参数" : "PARAMS"}
-        </span>
-        <label
-          style={{
-            display: "flex",
-            gap: 6,
-            alignItems: "center",
-            fontSize: 13,
-          }}
-        >
-          <span>{t(T("节点值", "Values"))}</span>
-          <input
-            className="txt"
-            value={cfg.values.join(",")}
-            onChange={(e) =>
-              onChange({
-                ...cfg,
-                values: e.target.value
-                  .split(/[,，\s]+/)
-                  .map(Number)
-                  .filter(Number.isFinite),
-                work: null,
-              })
-            }
-            style={{ width: 160 }}
-          />
-        </label>
-        <button
-          className="ghost"
-          onClick={() => onChange({ ...cfg, values: randSeq(), work: null })}
-        >
-          ↻ {t(T("重新生成", "Regenerate"))}
-        </button>
-        <button
-          className="ghost"
-          onClick={() => onChange({ ...cfg, values: [], work: null })}
-        >
-          {t(T("清空", "Clear"))}
-        </button>
-      </div>,
-    );
-  }
-  return (
-    <div style={{ display: "grid", gap: 8, width: "100%" }}>
-      {rows}
-      {err && (
-        <div
-          style={{
-            color: "#dc2626",
-            fontSize: 12,
-            padding: "6px 10px",
-            background: "#fef2f2",
-            border: "1px solid #fecaca",
-            borderRadius: 10,
-          }}
-        >
-          {err}
-        </div>
-      )}
+      {err && <span style={{ fontSize: 11, color: "#dc2626" }}>{err}</span>}
     </div>
   );
 }

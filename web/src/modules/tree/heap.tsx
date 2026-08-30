@@ -25,7 +25,7 @@ import {
 type Mode = "build" | "insert" | "delete" | "sort";
 type Cfg = TreeCfg & { mode: Mode; x: number };
 const DEFAULT: Cfg = {
-  source: "random",
+  source: "graph",
   values: [70, 40, 60, 10, 30, 50, 20],
   imp: null,
   confirmed: true,
@@ -111,12 +111,6 @@ export const treeHeapModule: ModuleDef<GraphCanvasScene, Cfg> = {
     const isZh = t(T("中文", "en")) !== "en";
     return (
       <div style={{ display: "grid", gap: 8, width: "100%" }}>
-        <SourcePanel
-          cfg={config}
-          onChange={(c) => onChange({ ...config, ...c })}
-          t={t}
-          requireComplete
-        />
         <div
           style={{
             display: "flex",
@@ -172,6 +166,12 @@ export const treeHeapModule: ModuleDef<GraphCanvasScene, Cfg> = {
               />
             </label>
           )}
+          <SourcePanel
+            cfg={config}
+            onChange={(c) => onChange({ ...config, ...c })}
+            t={t}
+            requireComplete
+          />
         </div>
       </div>
     ) as unknown as never;

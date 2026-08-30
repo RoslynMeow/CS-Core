@@ -20,7 +20,7 @@ import {
 type Mode = "terms" | "pre" | "post" | "level" | "forest";
 type Cfg = TreeCfg & { mode: Mode };
 const DEFAULT: Cfg = {
-  source: "random",
+  source: "graph",
   values: [1, 2, 3, 4, 5, 6, 7, 8],
   imp: null,
   confirmed: true,
@@ -469,12 +469,7 @@ function postSteps(g: Graph, root: number, labels: string[]): AlgoStep[] {
 }
 
 const CODE: Record<Mode, Text[]> = {
-  terms: [
-    T("$root$ 无父", "root has no parent"),
-    T("$parent(u)$ · $deg(u)$ · $depth(u)$", "parent · degree · depth"),
-    T("$ancestors$ · $descendants$", "ancestors · descendants"),
-    T("$height = \\max depth$", "height = max depth"),
-  ],
+  terms: [], // 术语无算法 → 不显示伪代码
   pre: [T("先根遍历（根 → 各子树）", "preorder (root → subtrees)")],
   post: [T("后根遍历（子树 → 根）", "postorder (subtrees → root)")],
   level: [T("层序（队列逐层）", "level order (queue, layer by layer)")],
@@ -497,12 +492,6 @@ export const generalTreeModule: ModuleDef<GraphCanvasScene, Cfg> = {
     const isZh = t(T("中文", "en")) !== "en";
     return (
       <div style={{ display: "grid", gap: 8, width: "100%" }}>
-        <SourcePanel
-          cfg={config}
-          onChange={(c) => onChange({ ...config, ...c })}
-          t={t}
-          requireComplete={false}
-        />
         <div
           style={{
             display: "flex",
@@ -546,6 +535,12 @@ export const generalTreeModule: ModuleDef<GraphCanvasScene, Cfg> = {
               </option>
             ))}
           </select>
+          <SourcePanel
+            cfg={config}
+            onChange={(c) => onChange({ ...config, ...c })}
+            t={t}
+            requireComplete={false}
+          />
         </div>
       </div>
     ) as unknown as never;

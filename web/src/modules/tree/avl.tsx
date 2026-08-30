@@ -26,7 +26,7 @@ import {
 type Mode = "view" | "search" | "build" | "insert" | "delete";
 type Cfg = TreeCfg & { mode: Mode; target: number; x: number };
 const DEFAULT: Cfg = {
-  source: "random",
+  source: "graph",
   values: [4, 2, 6, 1, 3, 5, 7],
   imp: null,
   confirmed: true,
@@ -165,11 +165,6 @@ export const treeAvlModule: ModuleDef<GraphCanvasScene, Cfg> = {
     const isZh = t(T("中文", "en")) !== "en";
     return (
       <div style={{ display: "grid", gap: 8, width: "100%" }}>
-        <SourcePanel
-          cfg={config}
-          onChange={(c) => onChange({ ...config, ...c })}
-          t={t}
-        />
         <div
           style={{
             display: "flex",
@@ -271,6 +266,11 @@ export const treeAvlModule: ModuleDef<GraphCanvasScene, Cfg> = {
               )}
             </span>
           )}
+          <SourcePanel
+            cfg={config}
+            onChange={(c) => onChange({ ...config, ...c })}
+            t={t}
+          />
         </div>
       </div>
     ) as unknown as never;
