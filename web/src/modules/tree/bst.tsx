@@ -150,13 +150,14 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
   return frames;
 }
 
-/** 手动应用：把 建树/插入/删除 的最终树写入 work（新版本）并切回「查看」展示 */
-function applyWork(cfg: Cfg, onChange: (c: Cfg) => void): void {
+/** 播完自动应用：建树/插入/删除 结束即把结果写入 work（新版本）并切回「建树」静态展示；
+ *  不提供手动按钮；仅「从图编辑中导入」会把 work 置 null 覆盖回原图 */
+function applyOnEnd(cfg: Cfg): Cfg | null {
   const r = resolveTree(cfg, {
     requireNumeric: true,
     requireComplete: false,
   });
-  if (!r.ok || r.values.length === 0) return;
+  if (!r.ok || r.values.length === 0) return null;
   const base: TreeSnap = cfg.work ?? { nodes: r.nodes, root: 0 };
   let result: TreeSnap;
   if (cfg.mode === "build") {
@@ -165,10 +166,11 @@ function applyWork(cfg: Cfg, onChange: (c: Cfg) => void): void {
     result = bstInsertOne(base.nodes, base.root, cfg.x).result;
   } else if (cfg.mode === "delete") {
     const out = bstDeleteOnTree(base.nodes, base.root, cfg.target);
-    if (!out.result.nodes.length && cfg.target !== base.nodes[0].val) return;
+    if (!out.result.nodes.length && cfg.target !== base.nodes[0].val)
+      return null;
     result = out.result;
-  } else return;
-  onChange({ ...cfg, work: result, mode: "build" });
+  } else return null;
+  return { ...cfg, work: result, mode: "build" };
 }
 
 export const treeBstModule: ModuleDef<GraphCanvasScene, Cfg> = {
@@ -183,6 +185,7 @@ export const treeBstModule: ModuleDef<GraphCanvasScene, Cfg> = {
   randomize(c) {
     return { ...c, values: randSeq(), work: null };
   },
+  onPlayEnd: applyOnEnd,
   Controls({ config, onChange, t }) {
     const isZh = t(T("中文", "en")) !== "en";
     return (
@@ -266,16 +269,6 @@ export const treeBstModule: ModuleDef<GraphCanvasScene, Cfg> = {
                 }
               />
             </label>
-          )}
-          {(config.mode === "build" ||
-            config.mode === "insert" ||
-            config.mode === "delete") && (
-            <button
-              className="ghost"
-              onClick={() => applyWork(config, onChange)}
-            >
-              ✓ {t(T("应用为新版本", "Apply as new version"))}
-            </button>
           )}
           <SourcePanel
             cfg={config}

@@ -132,10 +132,11 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
   }));
 }
 
-/** 手动应用：把 建树/插入/删除 的最终树写入 work（新版本）并切回「查看」展示 */
-function applyWork(cfg: Cfg, onChange: (c: Cfg) => void): void {
+/** 播完自动应用：建树/插入/删除 结束即把结果写入 work（新版本）并切回「建树」静态展示；
+ *  不提供手动按钮；仅「从图编辑中导入」会把 work 置 null 覆盖回原图 */
+function applyOnEnd(cfg: Cfg): Cfg | null {
   const res = resolveTree(cfg, { requireNumeric: true });
-  if (!res.ok || res.values.length === 0) return;
+  if (!res.ok || res.values.length === 0) return null;
   const base: TreeSnap = cfg.work ?? { nodes: res.nodes, root: 0 };
   let result: TreeSnap;
   if (cfg.mode === "build") {
@@ -145,22 +146,23 @@ function applyWork(cfg: Cfg, onChange: (c: Cfg) => void): void {
     result = avlInsertOne(base.nodes, base.root, cfg.x).result;
   } else if (cfg.mode === "delete") {
     result = avlDeleteOnTree(base.nodes, base.root, cfg.target).result;
-  } else return;
-  onChange({ ...cfg, work: result, mode: "build" });
+  } else return null;
+  return { ...cfg, work: result, mode: "build" };
 }
 
 export const treeAvlModule: ModuleDef<GraphCanvasScene, Cfg> = {
   id: "binary-tree-avl",
   title: T("AVL 树", "AVL Tree"),
   desc: T(
-    "建树（初始化）/ 查找 / 插入 / 删除；插入、删除自动 LL/LR/RR/RL 旋转重平衡；点「应用为新版本」保存（导入当前图可覆盖回原图）",
-    "build (init) · search · insert · delete; auto rotations; apply-as-new-version saves (import to revert)",
+    "建树（初始化）/ 查找 / 插入 / 删除；插入、删除自动 LL/LR/RR/RL 旋转重平衡；播完自动保存为新版本（导入当前图可覆盖回原图）",
+    "build (init) · search · insert · delete; auto rotations; auto-applies on play end (import to revert)",
   ),
   tags: ["data-structures"],
   defaultConfig: DEFAULT,
   randomize(c) {
     return { ...c, values: randSeq(), work: null };
   },
+  onPlayEnd: applyOnEnd,
   Controls({ config, onChange, t }) {
     const isZh = t(T("中文", "en")) !== "en";
     return (
@@ -245,16 +247,6 @@ export const treeAvlModule: ModuleDef<GraphCanvasScene, Cfg> = {
                 }}
               />
             </label>
-          )}
-          {(config.mode === "build" ||
-            config.mode === "insert" ||
-            config.mode === "delete") && (
-            <button
-              className="ghost"
-              onClick={() => applyWork(config, (c) => onChange(c))}
-            >
-              ✓ {t(T("应用为新版本", "Apply as new version"))}
-            </button>
           )}
           {config.work && (
             <span style={{ fontSize: 11, color: "#b45309", fontWeight: 700 }}>

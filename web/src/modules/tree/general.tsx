@@ -470,10 +470,30 @@ function postSteps(g: Graph, root: number, labels: string[]): AlgoStep[] {
 
 const CODE: Record<Mode, Text[]> = {
   terms: [], // 术语无算法 → 不显示伪代码
-  pre: [T("先根遍历（根 → 各子树）", "preorder (root → subtrees)")],
-  post: [T("后根遍历（子树 → 根）", "postorder (subtrees → root)")],
-  level: [T("层序（队列逐层）", "level order (queue, layer by layer)")],
-  forest: [T("多叉树 → 左孩子右兄弟二叉树", "poly tree → LCRS binary")],
+  pre: [
+    T(
+      "$visit(u)$  // 访问根，再各子树 $F(u_1),\\ldots,F(u_k)$",
+      "$visit(u)$; $F(u_1),\\ldots,F(u_k)$  // preorder",
+    ),
+  ],
+  post: [
+    T(
+      "$F(u_1),\\ldots,F(u_k)$; $visit(u)$  // 先子树后根",
+      "$F(u_1),\\ldots,F(u_k)$; $visit(u)$  // postorder",
+    ),
+  ],
+  level: [
+    T(
+      "$Q \\gets \\{root\\}$; while $Q\\neq\\emptyset$: $u\\gets Q.pop()$, $visit(u)$, $Q\\gets Q\\cup children(u)$",
+      "$Q \\gets \\{root\\}$; while $Q\\neq\\emptyset$: $u\\gets Q.pop()$, visit, enqueue children",
+    ),
+  ],
+  forest: [
+    T(
+      "$left(u)=u_1$（长子）; $right(u_i)=u_{i+1}$（次子→兄弟链）",
+      "$left(u)=u_1$ (first child); $right(u_i)=u_{i+1}$ (next sibling)",
+    ),
+  ],
 };
 
 export const generalTreeModule: ModuleDef<GraphCanvasScene, Cfg> = {

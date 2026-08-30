@@ -425,24 +425,6 @@ export function SourcePanel({
       >
         {isZh ? "来源" : "SRC"}
       </span>
-      <select
-        className="txt"
-        value={cfg.source}
-        onChange={(e) => {
-          const v = e.target.value as TreeCfg["source"];
-          if (v === "graph") {
-            // 选择即载入图创建里的图（未确认 → 画布虚化预览，点击画布导入）；无图则提示
-            importGraph(false);
-          } else {
-            random();
-          }
-        }}
-      >
-        <option value="graph">
-          {t(T("从图创建导入", "From Graph Studio"))}
-        </option>
-        <option value="random">{t(T("随机生成", "Random"))}</option>
-      </select>
       <button
         className="ghost"
         onClick={() => importGraph(true)}

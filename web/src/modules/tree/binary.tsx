@@ -172,7 +172,13 @@ export const treeTraverseModule: ModuleDef<GraphCanvasScene, Cfg> = {
     ) as unknown as never;
   },
   codeFor(cfg) {
-    return CODE[cfg.mode];
+    // 旧合并页存档防御：与 buildFrames 一致，mode 可能残留 heap-* 等非法值 → 归一化，避免 CODE[cfg.mode] 为 undefined
+    const mode: Mode = (["pre", "in", "post", "level"] as Mode[]).includes(
+      cfg.mode as Mode,
+    )
+      ? (cfg.mode as Mode)
+      : DEFAULT.mode;
+    return CODE[mode];
   },
   generate(config) {
     return buildFrames(config);
