@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { T, type Text } from "../../i18n/lang";
+import type { Frame } from "../../engine/types";
 import {
   Graph,
   bstFromValues,
@@ -8,6 +9,10 @@ import {
   type BinNode,
   type Vec2,
 } from "../../lib/graph";
+import {
+  GraphCanvas,
+  type GraphCanvasScene,
+} from "../../components/canvas/GraphCanvas";
 
 /** 从“图创建”页导入的快照（GraphStudio 持久化的图状态） */
 export type ImportedGraph = {
@@ -22,6 +27,8 @@ export type TreeCfg = {
   source: "random" | "graph";
   values: number[];
   imp: ImportedGraph | null;
+  /** 当前 imp 是否已被用户确认导入（未确认时画布虚化预览，点击画布确认） */
+  confirmed: boolean;
 };
 /** 解析结果：统一为 BinNode[]（根=0, BFS 重编号）+ 布局 + 数字值 */
 export type Resolved = {
@@ -174,6 +181,171 @@ export function loadGraphStudio(): ImportedGraph | null {
   }
 }
 
+/** 图创建快照 → 原始图形场景（不做树校验，无效图也能显示并说明原因） */
+export function impScene(imp: ImportedGraph | null): GraphCanvasScene | null {
+  if (!imp || imp.n <= 0) return null;
+  const g = new Graph(imp.n, { directed: imp.directed, labels: imp.labels });
+  const r = g.fromSpec(imp.spec);
+  if (!r.ok) return null;
+  const root = imp.root >= 0 && imp.root < imp.n ? imp.root : 0;
+  const isTree = g.isTree();
+  const pos = isTree
+    ? g.layoutTree(root, TREE_BOX).pos
+    : g.layoutCircle(
+        TREE_BOX.x0 + TREE_BOX.w / 2,
+        TREE_BOX.y0 + TREE_BOX.h / 2,
+        Math.min(TREE_BOX.w, TREE_BOX.h) / 2 - 46,
+      );
+  return {
+    current: null,
+    exploring: null,
+    visited: [],
+    frontier: [],
+    order: [],
+    edge: null,
+    root: isTree ? root : null,
+    directed: imp.directed,
+    nodes: Array.from({ length: imp.n }, (_, i) => ({
+      id: i,
+      label: imp.labels[i] ?? String(i),
+      x: pos[i]?.x ?? 0,
+      y: pos[i]?.y ?? 0,
+    })),
+    edges: g.edges.map((e) => ({ u: e.u, v: e.v, weight: e.weight })),
+  };
+}
+
+/**
+ * "从图创建导入" 的预览帧：
+ * - 未确认且有效 → 虚化预览（点击画布导入）
+ * - 未确认但无效 → 原样显示 + 原因 + 去图创建（不虚化，避免误导入）
+ * - 已确认但无效 → 原样显示 + 原因 + 去图创建
+ * - 有效且已确认 → null（走正常动画帧）
+ */
+export function importPreviewFrames(
+  cfg: TreeCfg,
+  opts: { requireComplete?: boolean; requireNumeric?: boolean } = {},
+): Frame<GraphCanvasScene>[] | null {
+  if (cfg.source !== "graph") return null;
+  const scene = impScene(cfg.imp);
+  if (!scene) return null; // 图创建为空 → 走 resolveTree 的“请先保存一张图”提示
+  const r = resolveTree(cfg, opts);
+  const ok = r.ok && r.nodes.length > 0;
+  if (!cfg.confirmed && ok) {
+    return [
+      {
+        line: 0,
+        caption: T(
+          "已载入「图创建」里保存的图（虚化预览）：点击画布导入后即可播放动画",
+          "Loaded your saved Graph Studio graph (blurred): click the canvas to import, then play",
+        ),
+        scene: { ...scene, blurred: true },
+      },
+    ];
+  }
+  if (!ok) {
+    return [
+      {
+        line: 0,
+        caption: T(
+          r.error ?? "图不符合当前要求",
+          r.error ?? "graph does not meet the requirement",
+        ),
+        scene: { ...scene, error: r.error ?? "图不符合当前要求" },
+      },
+    ];
+  }
+  return null;
+}
+
+/** 二叉树模块共用画布：虚化预览（点击导入）· 无效图红色横幅（原因 + 去图创建） */
+export function TreeCanvas<C extends TreeCfg>({
+  scene,
+  t,
+  config,
+  onChange,
+}: {
+  scene: GraphCanvasScene;
+  t: (x: Text) => string;
+  config?: C;
+  onChange?: (c: C) => void;
+}) {
+  const isGraph = config?.source === "graph";
+  const importing = scene.blurred && isGraph && !!config;
+  return (
+    <GraphCanvas
+      scene={scene}
+      hint={
+        scene.blurred
+          ? t(
+              T(
+                "虚化预览 · 点击画布导入",
+                "Blurred preview · click the canvas to import",
+              ),
+            )
+          : undefined
+      }
+      onClick={
+        importing ? () => onChange?.({ ...config, confirmed: true }) : undefined
+      }
+      notice={
+        scene.error && isGraph ? (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              flexWrap: "wrap",
+            }}
+          >
+            <span>{scene.error}</span>
+            <a
+              href="#/graph"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+                color: "#b91c1c",
+                background: "#fff",
+                border: "1px solid #fecaca",
+                borderRadius: 8,
+                padding: "4px 10px",
+                fontSize: 12,
+                fontWeight: 700,
+                textDecoration: "none",
+              }}
+            >
+              ✎ {t(T("去图创建修改", "Edit in Graph Studio"))}
+            </a>
+            <button
+              className="ghost"
+              style={{
+                color: "#b91c1c",
+                borderColor: "#fecaca",
+                padding: "4px 10px",
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 700,
+              }}
+              onClick={() => {
+                const imp = loadGraphStudio();
+                onChange?.({
+                  ...config,
+                  source: "graph",
+                  imp,
+                  confirmed: !!imp,
+                });
+              }}
+            >
+              ↻ {t(T("重新载入", "Reload"))}
+            </button>
+          </div>
+        ) : undefined
+      }
+    />
+  );
+}
+
 /** 共享的「树的来源」控件：随机生成 / 从图创建导入（含校验提示） */
 export function SourcePanel({
   cfg,
@@ -188,14 +360,14 @@ export function SourcePanel({
 }) {
   const isZh = t(T("中文", "en")) !== "en";
   const [err, setErr] = useState<string | null>(null);
-  const importGraph = () => {
+  const importGraph = (confirm: boolean) => {
     const imp = loadGraphStudio();
     if (!imp) {
       setErr(isZh ? "图创建里还没有可导入的图" : "No graph in studio");
       return;
     }
     setErr(null);
-    onChange({ ...cfg, source: "graph", imp });
+    onChange({ ...cfg, source: "graph", imp, confirmed: confirm });
   };
   const rows: React.ReactNode[] = [
     <div
@@ -227,9 +399,15 @@ export function SourcePanel({
         <select
           className="txt"
           value={cfg.source}
-          onChange={(e) =>
-            onChange({ ...cfg, source: e.target.value as TreeCfg["source"] })
-          }
+          onChange={(e) => {
+            const v = e.target.value as TreeCfg["source"];
+            if (v === "graph") {
+              // 选择即载入图创建里的图（未确认 → 画布虚化预览，点击画布导入）
+              importGraph(false);
+            } else {
+              onChange({ ...cfg, source: "random", confirmed: true });
+            }
+          }}
         >
           <option value="random">{t(T("随机生成", "Random"))}</option>
           <option value="graph">
@@ -238,7 +416,7 @@ export function SourcePanel({
         </select>
       </label>
       {cfg.source === "graph" && (
-        <button className="ghost" onClick={importGraph}>
+        <button className="ghost" onClick={() => importGraph(true)}>
           ⤓ {t(T("导入当前图", "Import now"))}
         </button>
       )}
@@ -250,6 +428,16 @@ export function SourcePanel({
       {cfg.source === "graph" && cfg.imp && (
         <span style={{ fontSize: 11, color: "#64748b" }}>
           {cfg.imp.n} 顶点 · {cfg.imp.spec}
+        </span>
+      )}
+      {cfg.source === "graph" && cfg.imp && !cfg.confirmed && (
+        <span style={{ fontSize: 11, color: "#b45309", fontWeight: 700 }}>
+          {t(
+            T(
+              "虚化预览中 · 点击画布导入",
+              "Blurred preview · click the canvas to import",
+            ),
+          )}
         </span>
       )}
     </div>,

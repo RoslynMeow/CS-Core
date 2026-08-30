@@ -9,15 +9,14 @@ import {
   BST_DELETE_CODE,
   type BstStep,
 } from "../../lib/graph";
-import {
-  GraphCanvas,
-  type GraphCanvasScene,
-} from "../../components/canvas/GraphCanvas";
+import type { GraphCanvasScene } from "../../components/canvas/GraphCanvas";
 import {
   resolveTree,
   SourcePanel,
   randSeq,
   binScene,
+  importPreviewFrames,
+  TreeCanvas,
   type TreeCfg,
 } from "./source";
 
@@ -27,6 +26,7 @@ const DEFAULT: Cfg = {
   source: "random",
   values: [4, 2, 6, 1, 3, 5, 7],
   imp: null,
+  confirmed: true,
   mode: "search",
   target: 3,
 };
@@ -38,6 +38,11 @@ const CODE: Record<Mode, Text[]> = {
 };
 
 function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
+  const pv = importPreviewFrames(cfg, {
+    requireNumeric: true,
+    requireComplete: false,
+  });
+  if (pv) return pv;
   const res = resolveTree(cfg, {
     requireNumeric: true,
     requireComplete: false,
@@ -60,6 +65,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
           edge: null,
           nodes: [],
           edges: [],
+          ...(cfg.source === "graph" ? { error: res.error ?? "" } : {}),
         },
       },
     ];
@@ -164,7 +170,9 @@ export const treeBstModule: ModuleDef<GraphCanvasScene, Cfg> = {
   generate(config) {
     return buildFrames(config);
   },
-  Render({ scene }) {
-    return <GraphCanvas scene={scene} />;
+  Render({ scene, t, config, onChange }) {
+    return (
+      <TreeCanvas scene={scene} t={t} config={config} onChange={onChange} />
+    );
   },
 };

@@ -1,15 +1,14 @@
 import { T, type Text } from "../../i18n/lang";
 import type { Frame, ModuleDef } from "../../engine/types";
 import { treeTraverseSteps, type AlgoStep } from "../../lib/graph";
-import {
-  GraphCanvas,
-  type GraphCanvasScene,
-} from "../../components/canvas/GraphCanvas";
+import type { GraphCanvasScene } from "../../components/canvas/GraphCanvas";
 import {
   resolveTree,
   SourcePanel,
   randSeq,
   binScene,
+  importPreviewFrames,
+  TreeCanvas,
   type TreeCfg,
 } from "./source";
 
@@ -19,6 +18,7 @@ const DEFAULT: Cfg = {
   source: "random",
   values: [4, 2, 6, 1, 3, 5, 7],
   imp: null,
+  confirmed: true,
   mode: "pre",
 };
 
@@ -42,6 +42,8 @@ const CODE: Record<Mode, Text[]> = {
 };
 
 function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
+  const pv = importPreviewFrames(cfg);
+  if (pv) return pv;
   const res = resolveTree(cfg);
   if (!res.ok || res.nodes.length === 0) {
     const cap = T(
@@ -61,6 +63,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
           edge: null,
           nodes: [],
           edges: [],
+          ...(cfg.source === "graph" ? { error: res.error ?? "" } : {}),
         },
       },
     ];
@@ -154,7 +157,9 @@ export const treeTraversalModule: ModuleDef<GraphCanvasScene, Cfg> = {
   generate(config) {
     return buildFrames(config);
   },
-  Render({ scene }) {
-    return <GraphCanvas scene={scene} />;
+  Render({ scene, t, config, onChange }) {
+    return (
+      <TreeCanvas scene={scene} t={t} config={config} onChange={onChange} />
+    );
   },
 };

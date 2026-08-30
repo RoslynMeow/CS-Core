@@ -24,15 +24,14 @@ import {
   type BstStep,
   type HeapStep,
 } from "../../lib/graph";
-import {
-  GraphCanvas,
-  type GraphCanvasScene,
-} from "../../components/canvas/GraphCanvas";
+import type { GraphCanvasScene } from "../../components/canvas/GraphCanvas";
 import {
   resolveTree,
   SourcePanel,
   randSeq,
   binScene,
+  importPreviewFrames,
+  TreeCanvas,
   type TreeCfg,
 } from "./source";
 
@@ -55,6 +54,7 @@ const DEFAULT: Cfg = {
   source: "random",
   values: [4, 2, 6, 1, 3, 5, 7],
   imp: null,
+  confirmed: true,
   group: "traverse",
   mode: "pre",
   target: 3,
@@ -136,16 +136,28 @@ const EMPTY: GraphCanvasScene = {
 
 function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
   const isHeap = cfg.group === "heap";
-  const res = resolveTree(cfg, {
+  const opts = {
     requireComplete: isHeap,
     requireNumeric: cfg.group !== "traverse",
-  });
+  };
+  const pv = importPreviewFrames(cfg, opts);
+  if (pv) return pv;
+  const res = resolveTree(cfg, opts);
   if (!res.ok || res.nodes.length === 0) {
     const cap = T(
       res.error ?? "空树 / 请选择来源",
       res.error ?? "empty / pick a source",
     );
-    return [{ line: 0, caption: cap, scene: EMPTY }];
+    return [
+      {
+        line: 0,
+        caption: cap,
+        scene: {
+          ...EMPTY,
+          ...(cfg.source === "graph" ? { error: res.error ?? "" } : {}),
+        },
+      },
+    ];
   }
   const { g, labels, values, nodes } = res;
 
@@ -372,7 +384,9 @@ export const binaryTreeModule: ModuleDef<GraphCanvasScene, Cfg> = {
   generate(config) {
     return buildFrames(config);
   },
-  Render({ scene }) {
-    return <GraphCanvas scene={scene} />;
+  Render({ scene, t, config, onChange }) {
+    return (
+      <TreeCanvas scene={scene} t={t} config={config} onChange={onChange} />
+    );
   },
 };
