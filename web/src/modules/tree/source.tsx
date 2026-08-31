@@ -586,6 +586,13 @@ export function dualBuildScene(opts: {
     });
   }
   const edges: { u: number; v: number; beam?: boolean }[] = [];
+  // 左面板（输入树：随机生成的值树 / 图编辑导入的自定义树）自身的边：
+  // 节点 id 带 SRC_OFF 偏移，边两端也要同步偏移，否则节点孤悬无连线
+  for (let i = 0; i < opts.src.length; i++) {
+    const n = opts.src[i];
+    if (n.left !== null) edges.push({ u: SRC_OFF + i, v: SRC_OFF + n.left });
+    if (n.right !== null) edges.push({ u: SRC_OFF + i, v: SRC_OFF + n.right });
+  }
   for (let i = 0; i < opts.nodes.length; i++) {
     const n = opts.nodes[i];
     if (n.left !== null) edges.push({ u: i, v: n.left });
@@ -612,11 +619,10 @@ export function dualBuildScene(opts: {
     annotate: opts.annotate,
     ...(opts.warn ? { warn: opts.warn } : {}),
     panel: {
-      left:
-        opts.titleL ?? {
-          zh: "随机生成的树 · 输入",
-          en: "Random tree · input",
-        },
+      left: opts.titleL ?? {
+        zh: "随机生成的树 · 输入",
+        en: "Random tree · input",
+      },
       right: opts.titleR,
     },
   };

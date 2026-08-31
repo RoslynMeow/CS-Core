@@ -86,10 +86,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
   // 未建树（无 work）的 mode=build → 走下方双面板建树动画（随机序列或图导入的自定义树作左侧输入树）。
   // 播完自动应用（applied）后保持所选操作不变、静态展示结果树，避免重播时重复插入/删除；
   // applied 仅在 applyOnEnd 写入 work 时同时置位，导入/重新载入（work 置 null）后自动失效
-  if (
-    (cfg.mode === "build" && !!cfg.work) ||
-    (cfg.applied && !!cfg.work)
-  ) {
+  if ((cfg.mode === "build" && !!cfg.work) || (cfg.applied && !!cfg.work)) {
     const appliedTxt =
       cfg.applied && cfg.mode !== "build"
         ? T(
