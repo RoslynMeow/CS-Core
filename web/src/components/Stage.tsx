@@ -4,19 +4,21 @@ import { createElement, useEffect, useMemo, useRef, useState } from "react";
 function cfgKey(id: string) {
   return `module-cfg:${id}`;
 }
-// 剔除动画/瞬态字段，只保存用户可见状态
-function persistable(c: object): object {
+// 剔除动画/瞬态字段与模块声明的排除字段（如堆的 work/applied：无参数操作的结果不应跨会话污染首帧）
+function persistable(c: object, exclude: string[] = []): object {
   const { prevValuesStr, prevKeysStr, execTick, op, ...rest } = c as Record<
     string,
     unknown
   >;
-  return {
+  const out: Record<string, unknown> = {
     ...rest,
     prevValuesStr: undefined,
     prevKeysStr: undefined,
     execTick: 0,
     op: "idle",
   }; // undefined 键在 JSON 中省略
+  for (const k of exclude) delete out[k];
+  return out;
 }
 import { useLang } from "../i18n/LangContext";
 import type { ModuleDef } from "../engine/types";
@@ -33,10 +35,31 @@ export function Stage({ mod }: { mod: ModuleDef }) {
       const saved = localStorage.getItem(cfgKey(mod.id));
       if (saved !== null) {
         const parsed = JSON.parse(saved) as Record<string, unknown>;
-        return {
+        // 否访模块声明的排除字段（旧存档可能的 work/applied 残留 → 每轮首次进入回到来源）
+        for (const k of mod.persistExclude ?? []) delete parsed[k];
+        const merged = {
           ...(mod.defaultConfig as object),
           ...parsed,
-        } as typeof mod.defaultConfig;
+        } as Record<string, unknown>;
+        // 知识点输入框默认值为空（'' 或 NaN）的字段：始终以空为准，
+        // 不采纳旧存档里的默认值/演示值（如 BST 搜索值 3、插值 5），让用户自己输入；
+        // 内容字段（列表/字符串数据）除外，仍保留用户数据
+        const CONTENT_KEYS = new Set([
+          "valuesStr",
+          "prevValuesStr",
+          "dataStr",
+          "prevDataStr",
+          "keysStr",
+          "prevKeysStr",
+        ]);
+        for (const k of Object.keys(mod.defaultConfig as object)) {
+          if (CONTENT_KEYS.has(k)) continue;
+          const d = (mod.defaultConfig as Record<string, unknown>)[k];
+          if (d === "" || (typeof d === "number" && Number.isNaN(d))) {
+            merged[k] = d;
+          }
+        }
+        return merged as typeof mod.defaultConfig;
       }
     } catch {
       /* storage unavailable */
@@ -48,12 +71,30 @@ export function Stage({ mod }: { mod: ModuleDef }) {
     try {
       localStorage.setItem(
         cfgKey(mod.id),
-        JSON.stringify(persistable(config as object)),
+        JSON.stringify(persistable(config as object, mod.persistExclude)),
       );
     } catch {
       /* storage unavailable */
     }
   }, [mod, config]);
+  // 画布节点选中（terms 模式右侧图例/属性面板）：切换模式不丢选中，换树（随机生成/重新导入）时清除
+  const [inspected, setInspected] = useState<number | null>(null);
+  // 树身份 = source + values + imp（不含 mode）：同一棵树换模式保留结果
+  const treeKey = useMemo(() => {
+    const c = config as {
+      source?: unknown;
+      values?: unknown;
+      imp?: unknown;
+      confirmed?: unknown;
+    } | null;
+    return JSON.stringify([
+      c?.source ?? null,
+      c?.values ?? null,
+      c?.imp ?? null,
+      c?.confirmed ?? null,
+    ]);
+  }, [config]);
+  useEffect(() => setInspected(null), [mod, treeKey]);
   const frames = useMemo(() => mod.generate(config), [mod, config]);
   const code = useMemo(
     () => (mod.codeFor ? mod.codeFor(config) : (mod.code ?? [])),
@@ -145,6 +186,8 @@ export function Stage({ mod }: { mod: ModuleDef }) {
               t={t}
               config={config as never}
               onChange={handleChange as never}
+              inspected={inspected as never}
+              onInspect={(id) => setInspected(id ?? null)}
             />
           )}
           {pb.frame && (
@@ -153,7 +196,18 @@ export function Stage({ mod }: { mod: ModuleDef }) {
             </div>
           )}
         </div>
-        {code.length > 0 && <Pseudocode code={code} active={pb.frame?.line} />}
+        {code.length > 0 ? (
+          <Pseudocode code={code} active={pb.frame?.line} />
+        ) : mod.Side && pb.frame ? (
+          <mod.Side
+            scene={pb.frame.scene}
+            t={t}
+            config={config as never}
+            onChange={handleChange as never}
+            inspected={inspected as never}
+            onInspect={(id) => setInspected(id ?? null)}
+          />
+        ) : null}
       </div>
     </div>
   );

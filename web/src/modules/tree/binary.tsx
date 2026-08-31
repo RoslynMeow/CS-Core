@@ -85,7 +85,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
   const steps: AlgoStep[] =
     mode === "level"
       ? levelOrderSteps(g, 0, labels)
-      : treeTraverseSteps(g, mode, 0, labels);
+      : treeTraverseSteps(g, mode, 0, labels, nodes);
   return steps.map((s) => ({
     line: s.line,
     caption: s.msg,

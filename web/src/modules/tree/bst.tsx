@@ -24,15 +24,21 @@ import {
 } from "./source";
 
 type Mode = "view" | "search" | "build" | "insert" | "delete";
-type Cfg = TreeCfg & { mode: Mode; target: number; x: number };
+type Cfg = TreeCfg & {
+  mode: Mode;
+  target: number;
+  x: number;
+  /** 播完自动应用标记：操作结果已写入 work；保持所选操作、静态展示结果，改参数后重播 */
+  applied?: boolean;
+};
 const DEFAULT: Cfg = {
   source: "graph",
   values: [4, 2, 6, 1, 3, 5, 7],
   imp: null,
   confirmed: true,
   mode: "build",
-  target: 3,
-  x: 5,
+  target: NaN,
+  x: NaN,
 };
 
 const VIEW_CODE: Text[] = [T("查看当前树", "view current tree")];
@@ -79,15 +85,24 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
   }
   const base: TreeSnap = cfg.work ?? { nodes: res.nodes, root: 0 };
   const built = !!cfg.work || cfg.source === "graph";
-  // 建树 = 初始化：已建树（或图来源）时静态展示当前树（替代原「查看」）；旧存档 mode:"view" 同此
-  if (cfg.mode === "build" && built) {
+  // 建树 = 初始化：已建树（或图来源）时静态展示当前树（替代原「查看」）；旧存档 mode:"view" 同此。
+  // 播完自动应用（applied）后保持所选操作不变、静态展示结果树，避免重播时重复插入/删除；
+  // applied 仅在 applyOnEnd 写入 work 时同时置位，导入/重新载入（work 置 null）后自动失效
+  if ((cfg.mode === "build" || (cfg.applied && !!cfg.work)) && built) {
+    const appliedTxt =
+      cfg.applied && cfg.mode !== "build"
+        ? T(
+            `当前树 · ${base.nodes.length} 节点 · 已应用该操作（改参数后重播）`,
+            `current tree · ${base.nodes.length} nodes · op applied (tweak params to replay)`,
+          )
+        : T(
+            `当前树 · ${base.nodes.length} 节点 · 可选 查找/插入/删除（播完自动应用）`,
+            `current tree · ${base.nodes.length} nodes · pick search/insert/delete`,
+          );
     return [
       {
         line: 0,
-        caption: T(
-          `当前树 · ${base.nodes.length} 节点 · 可选 查找/插入/删除（播完自动应用）`,
-          `current tree · ${base.nodes.length} nodes · pick search/insert/delete`,
-        ),
+        caption: appliedTxt,
         scene: binScene(base.nodes, {}, base.root),
       },
     ];
@@ -113,6 +128,31 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
           "请先建树：默认「建树」播放结束即初始化完成",
           "Build first: play the default Build (init) first",
         ),
+        scene: binScene(base.nodes, {}, base.root),
+      },
+    ];
+  }
+  // 搜索/删除/插入 的参数未填写（默认空）：提示输入，不执行算法
+  if (
+    (cfg.mode === "search" || cfg.mode === "delete") &&
+    Number.isNaN(cfg.target)
+  ) {
+    return [
+      {
+        line: 0,
+        caption: T(
+          "请输入查找值 / 删值后再执行",
+          "enter a target / key before executing",
+        ),
+        scene: binScene(base.nodes, {}, base.root),
+      },
+    ];
+  }
+  if (cfg.mode === "insert" && Number.isNaN(cfg.x)) {
+    return [
+      {
+        line: 0,
+        caption: T("请输入插值后再执行", "enter a value before executing"),
         scene: binScene(base.nodes, {}, base.root),
       },
     ];
@@ -150,9 +190,18 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
   return frames;
 }
 
-/** 播完自动应用：建树/插入/删除 结束即把结果写入 work（新版本）并切回「建树」静态展示；
+/** 播完自动应用：建树/插入/删除 结束即把结果写入 work（新版本）；
+ *  保持所选操作不回跳「建树」（applied 标记后静态展示结果，改参数重播）；
  *  不提供手动按钮；仅「从图编辑中导入」会把 work 置 null 覆盖回原图 */
 function applyOnEnd(cfg: Cfg): Cfg | null {
+  // 已应用过：重播（拉回首帧再播）不再重复应用
+  if (cfg.applied) return null;
+  if (cfg.mode === "insert" && Number.isNaN(cfg.x)) return null;
+  if (
+    (cfg.mode === "search" || cfg.mode === "delete") &&
+    Number.isNaN(cfg.target)
+  )
+    return null;
   const r = resolveTree(cfg, {
     requireNumeric: true,
     requireComplete: false,
@@ -170,7 +219,7 @@ function applyOnEnd(cfg: Cfg): Cfg | null {
       return null;
     result = out.result;
   } else return null;
-  return { ...cfg, work: result, mode: "build" };
+  return { ...cfg, work: result, applied: true };
 }
 
 export const treeBstModule: ModuleDef<GraphCanvasScene, Cfg> = {
@@ -183,7 +232,7 @@ export const treeBstModule: ModuleDef<GraphCanvasScene, Cfg> = {
   tags: ["data-structures"],
   defaultConfig: DEFAULT,
   randomize(c) {
-    return { ...c, values: randSeq(), work: null };
+    return { ...c, values: randSeq(), work: null, applied: false };
   },
   onPlayEnd: applyOnEnd,
   Controls({ config, onChange, t }) {
@@ -216,7 +265,11 @@ export const treeBstModule: ModuleDef<GraphCanvasScene, Cfg> = {
             className="txt"
             value={config.mode}
             onChange={(e) =>
-              onChange({ ...config, mode: e.target.value as Mode })
+              onChange({
+                ...config,
+                mode: e.target.value as Mode,
+                applied: false,
+              })
             }
           >
             <option value="build">{t(T("建树", "Build"))}</option>
@@ -242,9 +295,14 @@ export const treeBstModule: ModuleDef<GraphCanvasScene, Cfg> = {
                 className="txt"
                 type="number"
                 style={{ width: 56 }}
-                value={config.target}
+                value={Number.isNaN(config.target) ? "" : config.target}
                 onChange={(e) =>
-                  onChange({ ...config, target: Number(e.target.value) })
+                  onChange({
+                    ...config,
+                    target:
+                      e.target.value === "" ? NaN : Number(e.target.value),
+                    applied: false,
+                  })
                 }
               />
             </label>
@@ -265,14 +323,18 @@ export const treeBstModule: ModuleDef<GraphCanvasScene, Cfg> = {
                 style={{ width: 56 }}
                 value={config.x}
                 onChange={(e) =>
-                  onChange({ ...config, x: Number(e.target.value) })
+                  onChange({
+                    ...config,
+                    x: Number(e.target.value),
+                    applied: false,
+                  })
                 }
               />
             </label>
           )}
           <SourcePanel
             cfg={config}
-            onChange={(c) => onChange({ ...config, ...c })}
+            onChange={(c) => onChange({ ...config, ...c, applied: false })}
             t={t}
           />
         </div>

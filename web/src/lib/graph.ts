@@ -1294,11 +1294,14 @@ export function treeTraverseSteps(
   mode: "pre" | "in" | "post",
   root = 0,
   labels: string[] = g.labels,
+  nodes?: BinNode[], // 二叉树的真实左右指针；提供时单子节点也能正确区分左右
 ): AlgoStep[] {
   const n = g.n;
-  const { parent } = g.bfs(root);
+  // 后备：无 nodes 时按 BFS 发现序收集子节点（binToGraph 先插左子边，双子女时即左→右；
+  // 不能用顶点 id 升序 —— 随机 BST 按插入序编号，右子 id 可能小于左子 id）
+  const { parent, order } = g.bfs(root);
   const children: number[][] = Array.from({ length: n }, () => []);
-  for (let v = 0; v < n; v++)
+  for (const v of order)
     if (v !== root && parent[v] !== -1) children[parent[v]].push(v);
   const extraRoots = Array.from({ length: n }, (_, i) => i).filter(
     (v) => v !== root && parent[v] === -1,
@@ -1327,17 +1330,15 @@ export function treeTraverseSteps(
       msg: { zh, en },
     });
 
-  // 递归：二叉时 children[0]=左 /*, */ children[1];=右；行号按模式独立(0..2)
-  // 前序 VLR: visit0 → 左1 → 右2
-  // 中序 LVR: 左0 → visit1 → 右2
-  // 后序 LRV: 左0 → 右1 → visit2
+  // 递归：优先用真实左右指针（nodes[u].left/right），否则退化到 children[0]=左、children[1]=右
+  // 行号按模式独立(0..2)：前序 VLR visit0→左1→右2；中序 LVR 左0→visit1→右2；后序 LRV 左0→右1→visit2
   const visit = (u: number, line: number, zh: string, en: string) => {
     visited.push(u);
     push(line, u, null, null, zh, en);
   };
   const rec = (u: number) => {
-    const L = children[u][0];
-    const R = children[u][1];
+    const L = nodes ? (nodes[u].left ?? undefined) : children[u][0];
+    const R = nodes ? (nodes[u].right ?? undefined) : children[u][1];
     const go = (k: number | undefined, line: number, note: string) => {
       if (k === undefined) return;
       push(line, u, k, [u, k], `${note}：${S(u)}→${S(k)}`, `into ${S(k)}`);
@@ -1594,32 +1595,32 @@ export const TOPO_CODE: Text[] = [
 
 export const LEVEL_CODE: Text[] = [
   {
-    zh: "$Q \\\\gets \\\\{r\\\\}$; $visited[r] \\\\gets true$",
-    en: "$Q \\\\gets \\\\{r\\\\}$; $visited[r] \\\\gets true$",
+    zh: "$Q \\gets \\{r\\}$; $visited[r] \\gets true$",
+    en: "$Q \\gets \\{r\\}$; $visited[r] \\gets true$",
   },
   {
-    zh: "while $Q \\\\neq \\\\emptyset$:",
-    en: "while $Q \\\\neq \\\\emptyset$:",
+    zh: "while $Q \\neq \\emptyset$:",
+    en: "while $Q \\neq \\emptyset$:",
   },
   {
-    zh: "  $k \\\\gets |Q|$  // 本层节点数",
-    en: "  $k \\\\gets |Q|$  // nodes in this level",
+    zh: "  $k \\gets |Q|$  // 本层节点数",
+    en: "  $k \\gets |Q|$  // nodes in this level",
   },
   {
-    zh: "  for $i \\\\gets 1$ to $k$:",
-    en: "  for $i \\\\gets 1$ to $k$:",
+    zh: "  for $i \\gets 1$ to $k$:",
+    en: "  for $i \\gets 1$ to $k$:",
   },
   {
-    zh: "    $u \\\\gets Q.pop()$  // 出队",
-    en: "    $u \\\\gets Q.pop()$  // dequeue",
+    zh: "    $u \\gets Q.pop()$  // 出队",
+    en: "    $u \\gets Q.pop()$  // dequeue",
   },
   {
-    zh: "    for $v \\\\in adj(u)$: if $!visited[v]$:",
-    en: "    for $v \\\\in adj(u)$: if $!visited[v]$:",
+    zh: "    for $v \\in adj(u)$: if $!visited[v]$:",
+    en: "    for $v \\in adj(u)$: if $!visited[v]$:",
   },
   {
-    zh: "      $visited[v] \\\\gets true$; $Q \\\\gets Q \\\\cup \\\\{v\\\\}$  // 入队",
-    en: "      $visited[v] \\\\gets true$; $Q \\\\gets Q \\\\cup \\\\{v\\\\}$  // enqueue",
+    zh: "      $visited[v] \\gets true$; $Q \\gets Q \\cup \\{v\\}$  // 入队",
+    en: "      $visited[v] \\gets true$; $Q \\gets Q \\cup \\{v\\}$  // enqueue",
   },
   {
     zh: "  // 层序遍历完成",
@@ -1629,32 +1630,32 @@ export const LEVEL_CODE: Text[] = [
 
 export const ALL_BFS_CODE: Text[] = [
   {
-    zh: "for $v$: $visited[v] \\\\gets false$",
-    en: "for $v$: $visited[v] \\\\gets false$",
+    zh: "for $v$: $visited[v] \\gets false$",
+    en: "for $v$: $visited[v] \\gets false$",
   },
   {
     zh: "for $s$: if $!visited[s]$:",
     en: "for $s$: if $!visited[s]$:",
   },
   {
-    zh: "  $Q \\\\gets \\\\{s\\\\}$; $visited[s] \\\\gets true$  // BFS($s$)",
-    en: "  $Q \\\\gets \\\\{s\\\\}$; $visited[s] \\\\gets true$  // BFS($s$)",
+    zh: "  $Q \\gets \\{s\\}$; $visited[s] \\gets true$  // BFS($s$)",
+    en: "  $Q \\gets \\{s\\}$; $visited[s] \\gets true$  // BFS($s$)",
   },
   {
-    zh: "  while $Q \\\\neq \\\\emptyset$:",
-    en: "  while $Q \\\\neq \\\\emptyset$:",
+    zh: "  while $Q \\neq \\emptyset$:",
+    en: "  while $Q \\neq \\emptyset$:",
   },
   {
-    zh: "    $u \\\\gets Q.pop()$  // 出队",
-    en: "    $u \\\\gets Q.pop()$  // dequeue",
+    zh: "    $u \\gets Q.pop()$  // 出队",
+    en: "    $u \\gets Q.pop()$  // dequeue",
   },
   {
-    zh: "    for $v \\\\in adj(u)$: if $!visited[v]$:",
-    en: "    for $v \\\\in adj(u)$: if $!visited[v]$:",
+    zh: "    for $v \\in adj(u)$: if $!visited[v]$:",
+    en: "    for $v \\in adj(u)$: if $!visited[v]$:",
   },
   {
-    zh: "      $visited[v] \\\\gets true$; $Q \\\\gets Q \\\\cup \\\\{v\\\\}$  // 入队",
-    en: "      $visited[v] \\\\gets true$; $Q \\\\gets Q \\\\cup \\\\{v\\\\}$  // enqueue",
+    zh: "      $visited[v] \\gets true$; $Q \\gets Q \\cup \\{v\\}$  // 入队",
+    en: "      $visited[v] \\gets true$; $Q \\gets Q \\cup \\{v\\}$  // enqueue",
   },
   {
     zh: "  // 全部连通分量完成",
@@ -1664,32 +1665,32 @@ export const ALL_BFS_CODE: Text[] = [
 
 export const ALL_DFS_CODE: Text[] = [
   {
-    zh: "for $v$: $visited[v] \\\\gets false$",
-    en: "for $v$: $visited[v] \\\\gets false$",
+    zh: "for $v$: $visited[v] \\gets false$",
+    en: "for $v$: $visited[v] \\gets false$",
   },
   {
     zh: "for $s$: if $!visited[s]$:",
     en: "for $s$: if $!visited[s]$:",
   },
   {
-    zh: "  $S \\\\gets \\\\{s\\\\}$  // DFS($s$)",
-    en: "  $S \\\\gets \\\\{s\\\\}$  // DFS($s$)",
+    zh: "  $S \\gets \\{s\\}$  // DFS($s$)",
+    en: "  $S \\gets \\{s\\}$  // DFS($s$)",
   },
   {
-    zh: "  while $S \\\\neq \\\\emptyset$:",
-    en: "  while $S \\\\neq \\\\emptyset$:",
+    zh: "  while $S \\neq \\emptyset$:",
+    en: "  while $S \\neq \\emptyset$:",
   },
   {
-    zh: "    $u \\\\gets S.pop()$  // 出栈",
-    en: "    $u \\\\gets S.pop()$  // pop",
+    zh: "    $u \\gets S.pop()$  // 出栈",
+    en: "    $u \\gets S.pop()$  // pop",
   },
   {
-    zh: "    if $!visited[u]$: $visited[u] \\\\gets true$  // 访问 $u$",
-    en: "    if $!visited[u]$: $visited[u] \\\\gets true$  // visit $u$",
+    zh: "    if $!visited[u]$: $visited[u] \\gets true$  // 访问 $u$",
+    en: "    if $!visited[u]$: $visited[u] \\gets true$  // visit $u$",
   },
   {
-    zh: "    for $v \\\\in adj(u)$: if $!visited[v]$: $S \\\\gets S \\\\cup \\\\{v\\\\}$",
-    en: "    for $v \\\\in adj(u)$: if $!visited[v]$: $S \\\\gets S \\\\cup \\\\{v\\\\}$",
+    zh: "    for $v \\in adj(u)$: if $!visited[v]$: $S \\gets S \\cup \\{v\\}$",
+    en: "    for $v \\in adj(u)$: if $!visited[v]$: $S \\gets S \\cup \\{v\\}$",
   },
   {
     zh: "  // 全部连通分量完成",
@@ -1699,32 +1700,32 @@ export const ALL_DFS_CODE: Text[] = [
 
 export const CYCLE_CODE: Text[] = [
   {
-    zh: "for $v$: $c[v] \\\\gets 0$  // 白",
-    en: "for $v$: $c[v] \\\\gets 0$  // white",
+    zh: "for $v$: $c[v] \\gets 0$  // 白",
+    en: "for $v$: $c[v] \\gets 0$  // white",
   },
   {
     zh: "for $v$: if $c[v]=0$: DFS($v$)",
     en: "for $v$: if $c[v]=0$: DFS($v$)",
   },
   {
-    zh: "  $c[v] \\\\gets 1$  // 灰：入栈",
-    en: "  $c[v] \\\\gets 1$  // gray: on stack",
+    zh: "  $c[v] \\gets 1$  // 灰：入栈",
+    en: "  $c[v] \\gets 1$  // gray: on stack",
   },
   {
-    zh: "  for $w \\\\in adj(v)$:",
-    en: "  for $w \\\\in adj(v)$:",
+    zh: "  for $w \\in adj(v)$:",
+    en: "  for $w \\in adj(v)$:",
   },
   {
-    zh: "    if $c[w]=1$: return true  // 回边 $v \\\\to w$",
-    en: "    if $c[w]=1$: return true  // back edge $v \\\\to w$",
+    zh: "    if $c[w]=1$: return true  // 回边 $v \\to w$",
+    en: "    if $c[w]=1$: return true  // back edge $v \\to w$",
   },
   {
     zh: "    if $c[w]=0$: DFS($w$)",
     en: "    if $c[w]=0$: DFS($w$)",
   },
   {
-    zh: "  $c[v] \\\\gets 2$  // 黑：出栈完成",
-    en: "  $c[v] \\\\gets 2$  // black: done",
+    zh: "  $c[v] \\gets 2$  // 黑：出栈完成",
+    en: "  $c[v] \\gets 2$  // black: done",
   },
   {
     zh: "  // 结果：有/无环",
@@ -1734,36 +1735,36 @@ export const CYCLE_CODE: Text[] = [
 
 export const DIJKSTRA_CODE: Text[] = [
   {
-    zh: "$dist[s] \\\\gets 0$; $\\\\forall v\\\\neq s$: $dist[v] \\\\gets \\\\infty$; $prev[v] \\\\gets -1$",
-    en: "$dist[s] \\\\gets 0$; $\\\\forall v\\\\neq s$: $dist[v] \\\\gets \\\\infty$; $prev[v] \\\\gets -1$",
+    zh: "$dist[s] \\gets 0$; $\\forall v\\neq s$: $dist[v] \\gets \\infty$; $prev[v] \\gets -1$",
+    en: "$dist[s] \\gets 0$; $\\forall v\\neq s$: $dist[v] \\gets \\infty$; $prev[v] \\gets -1$",
   },
   {
-    zh: "$S \\\\gets \\\\emptyset$  // 已确定集",
-    en: "$S \\\\gets \\\\emptyset$  // settled",
+    zh: "$S \\gets \\emptyset$  // 已确定集",
+    en: "$S \\gets \\emptyset$  // settled",
   },
   {
     zh: "while $|S| < n$:",
     en: "while $|S| < n$:",
   },
   {
-    zh: "  $u \\\\gets \\\\arg\\\\min\\\\{dist[v] \\\\mid v \\\\notin S\\\\}$",
-    en: "  $u \\\\gets \\\\arg\\\\min\\\\{dist[v] \\\\mid v \\\\notin S\\\\}$",
+    zh: "  $u \\gets \\arg\\min\\{dist[v] \\mid v \\notin S\\}$",
+    en: "  $u \\gets \\arg\\min\\{dist[v] \\mid v \\notin S\\}$",
   },
   {
-    zh: "  if $dist[u] = \\\\infty$: return  // 剩余不可达",
-    en: "  if $dist[u] = \\\\infty$: return  // unreachable",
+    zh: "  if $dist[u] = \\infty$: return  // 剩余不可达",
+    en: "  if $dist[u] = \\infty$: return  // unreachable",
   },
   {
-    zh: "  $S \\\\gets S \\\\cup \\\\{u\\\\}$  // 确定 $u$",
-    en: "  $S \\\\gets S \\\\cup \\\\{u\\\\}$  // settle $u$",
+    zh: "  $S \\gets S \\cup \\{u\\}$  // 确定 $u$",
+    en: "  $S \\gets S \\cup \\{u\\}$  // settle $u$",
   },
   {
-    zh: "  for $(u,v,w) \\\\in E$: if $dist[u]+w < dist[v]$:",
-    en: "  for $(u,v,w) \\\\in E$: if $dist[u]+w < dist[v]$:",
+    zh: "  for $(u,v,w) \\in E$: if $dist[u]+w < dist[v]$:",
+    en: "  for $(u,v,w) \\in E$: if $dist[u]+w < dist[v]$:",
   },
   {
-    zh: "    $dist[v] \\\\gets dist[u]+w$; $prev[v] \\\\gets u$",
-    en: "    $dist[v] \\\\gets dist[u]+w$; $prev[v] \\\\gets u$",
+    zh: "    $dist[v] \\gets dist[u]+w$; $prev[v] \\gets u$",
+    en: "    $dist[v] \\gets dist[u]+w$; $prev[v] \\gets u$",
   },
   {
     zh: "  // 完成",
@@ -1773,36 +1774,36 @@ export const DIJKSTRA_CODE: Text[] = [
 
 export const PRIM_CODE: Text[] = [
   {
-    zh: "$key[s] \\\\gets 0$; $\\\\forall v\\\\neq s$: $key[v] \\\\gets \\\\infty$; $parent[v] \\\\gets -1$",
-    en: "$key[s] \\\\gets 0$; $\\\\forall v\\\\neq s$: $key[v] \\\\gets \\\\infty$; $parent[v] \\\\gets -1$",
+    zh: "$key[s] \\gets 0$; $\\forall v\\neq s$: $key[v] \\gets \\infty$; $parent[v] \\gets -1$",
+    en: "$key[s] \\gets 0$; $\\forall v\\neq s$: $key[v] \\gets \\infty$; $parent[v] \\gets -1$",
   },
   {
-    zh: "$T \\\\gets \\\\emptyset$  // 已选入 MST",
-    en: "$T \\\\gets \\\\emptyset$  // in MST",
+    zh: "$T \\gets \\emptyset$  // 已选入 MST",
+    en: "$T \\gets \\emptyset$  // in MST",
   },
   {
     zh: "while $|T| < n$:",
     en: "while $|T| < n$:",
   },
   {
-    zh: "  $u \\\\gets \\\\arg\\\\min\\\\{key[v] \\\\mid v \\\\notin T\\\\}$",
-    en: "  $u \\\\gets \\\\arg\\\\min\\\\{key[v] \\\\mid v \\\\notin T\\\\}$",
+    zh: "  $u \\gets \\arg\\min\\{key[v] \\mid v \\notin T\\}$",
+    en: "  $u \\gets \\arg\\min\\{key[v] \\mid v \\notin T\\}$",
   },
   {
-    zh: "  if $key[u] = \\\\infty$: return  // 图不连通",
-    en: "  if $key[u] = \\\\infty$: return  // disconnected",
+    zh: "  if $key[u] = \\infty$: return  // 图不连通",
+    en: "  if $key[u] = \\infty$: return  // disconnected",
   },
   {
-    zh: "  $T \\\\gets T \\\\cup \\\\{u\\\\}$",
-    en: "  $T \\\\gets T \\\\cup \\\\{u\\\\}$",
+    zh: "  $T \\gets T \\cup \\{u\\}$",
+    en: "  $T \\gets T \\cup \\{u\\}$",
   },
   {
-    zh: "  for $(u,v,w) \\\\in E$: if $v \\\\notin T$ , $w < key[v]$:",
-    en: "  for $(u,v,w) \\\\in E$: if $v \\\\notin T$ , $w < key[v]$:",
+    zh: "  for $(u,v,w) \\in E$: if $v \\notin T$ , $w < key[v]$:",
+    en: "  for $(u,v,w) \\in E$: if $v \\notin T$ , $w < key[v]$:",
   },
   {
-    zh: "    $key[v] \\\\gets w$; $parent[v] \\\\gets u$",
-    en: "    $key[v] \\\\gets w$; $parent[v] \\\\gets u$",
+    zh: "    $key[v] \\gets w$; $parent[v] \\gets u$",
+    en: "    $key[v] \\gets w$; $parent[v] \\gets u$",
   },
   {
     zh: "  // 完成",
@@ -1812,20 +1813,20 @@ export const PRIM_CODE: Text[] = [
 
 export const KRUSKAL_CODE: Text[] = [
   {
-    zh: "$E' \\\\gets \\\\mathrm{sort}(E)$  // 按 $w$ 升序",
-    en: "$E' \\\\gets \\\\mathrm{sort}(E)$  // sort by $w$",
+    zh: "$E' \\gets \\mathrm{sort}(E)$  // 按 $w$ 升序",
+    en: "$E' \\gets \\mathrm{sort}(E)$  // sort by $w$",
   },
   {
-    zh: "for $(u,v,w) \\\\in E'$:",
-    en: "for $(u,v,w) \\\\in E'$:",
+    zh: "for $(u,v,w) \\in E'$:",
+    en: "for $(u,v,w) \\in E'$:",
   },
   {
-    zh: "  if $find(u) \\\\neq find(v)$:",
-    en: "  if $find(u) \\\\neq find(v)$:",
+    zh: "  if $find(u) \\neq find(v)$:",
+    en: "  if $find(u) \\neq find(v)$:",
   },
   {
-    zh: "    $MST \\\\gets MST \\\\cup \\\\{(u,v)\\\\}$; $union(u,v)$",
-    en: "    $MST \\\\gets MST \\\\cup \\\\{(u,v)\\\\}$; $union(u,v)$",
+    zh: "    $MST \\gets MST \\cup \\{(u,v)\\}$; $union(u,v)$",
+    en: "    $MST \\gets MST \\cup \\{(u,v)\\}$; $union(u,v)$",
   },
   {
     zh: "  else continue  // 会成环",
@@ -1839,24 +1840,24 @@ export const KRUSKAL_CODE: Text[] = [
 
 export const BELLMAN_CODE: Text[] = [
   {
-    zh: "$dist[s] \\\\gets 0$; $\\\\forall v\\\\neq s$: $dist[v] \\\\gets \\\\infty$; $prev[v] \\\\gets -1$",
-    en: "$dist[s] \\\\gets 0$; $\\\\forall v\\\\neq s$: $dist[v] \\\\gets \\\\infty$; $prev[v] \\\\gets -1$",
+    zh: "$dist[s] \\gets 0$; $\\forall v\\neq s$: $dist[v] \\gets \\infty$; $prev[v] \\gets -1$",
+    en: "$dist[s] \\gets 0$; $\\forall v\\neq s$: $dist[v] \\gets \\infty$; $prev[v] \\gets -1$",
   },
   {
-    zh: "for $i \\\\gets 1$ to $n-1$:",
-    en: "for $i \\\\gets 1$ to $n-1$:",
+    zh: "for $i \\gets 1$ to $n-1$:",
+    en: "for $i \\gets 1$ to $n-1$:",
   },
   {
-    zh: "  for $(u,v,w) \\\\in E$:",
-    en: "  for $(u,v,w) \\\\in E$:",
+    zh: "  for $(u,v,w) \\in E$:",
+    en: "  for $(u,v,w) \\in E$:",
   },
   {
-    zh: "    if $dist[u]+w < dist[v]$: $dist[v] \\\\gets dist[u]+w$; $prev[v] \\\\gets u$",
-    en: "    if $dist[u]+w < dist[v]$: $dist[v] \\\\gets dist[u]+w$; $prev[v] \\\\gets u$",
+    zh: "    if $dist[u]+w < dist[v]$: $dist[v] \\gets dist[u]+w$; $prev[v] \\gets u$",
+    en: "    if $dist[u]+w < dist[v]$: $dist[v] \\gets dist[u]+w$; $prev[v] \\gets u$",
   },
   {
-    zh: "for $(u,v,w) \\\\in E$:  // 负环检测",
-    en: "for $(u,v,w) \\\\in E$:  // neg-cycle check",
+    zh: "for $(u,v,w) \\in E$:  // 负环检测",
+    en: "for $(u,v,w) \\in E$:  // neg-cycle check",
   },
   {
     zh: "  if $dist[u]+w < dist[v]$: return false  // 存在负环",
@@ -1877,6 +1878,7 @@ export function levelOrderSteps(
   g: Graph,
   root = 0,
   labels: string[] = g.labels,
+  extraRoots: number[] = [], // 森林：root 之外各自成树（每棵树的根也入队）
 ): AlgoStep[] {
   const n = g.n,
     adj = g.adj();
@@ -1886,22 +1888,26 @@ export function levelOrderSteps(
   const order: number[] = [];
   const S = (i: number) => labels[i];
   const visitedList = () => visited.map((_, i) => i).filter((i) => visited[i]);
+  const seeds = [root, ...extraRoots].filter((r) => r >= 0 && r < n);
+  const seedLabel = seeds.map(S).join(", ");
 
   steps.push({
     line: 0,
     current: null,
     exploring: null,
     visited: [],
-    frontier: [root],
+    frontier: [...seeds],
     order: [],
     edge: null,
     msg: {
-      zh: `初始化：$Q \\gets \\{${S(root)}\\}$，$visited[${S(root)}] \\gets true$`,
-      en: `init: Q←{${S(root)}}`,
+      zh: `初始化：$Q \\gets \\{${seedLabel}\\}$，$visited[${seedLabel}] \\gets true$`,
+      en: `init: Q←{${seedLabel}}`,
     },
   });
-  visited[root] = true;
-  q.push(root);
+  for (const r of seeds) {
+    visited[r] = true;
+    q.push(r);
+  }
 
   while (q.length) {
     steps.push({
@@ -3016,12 +3022,14 @@ export type BinNode = {
   val: number;
   left: number | null;
   right: number | null;
+  /** 原始标签（非数字导入场景用；未设置则显示 String(val)） */
+  label?: string;
 };
 
 /** BinNode 数组 → 无向 Graph（左先右后入邻接表 → children[0]=左, children[1]=右） */
 export function binToGraph(nodes: BinNode[]): Graph {
   const g = new Graph(nodes.length, {
-    labels: nodes.map((n) => String(n.val)),
+    labels: nodes.map((n) => n.label ?? String(n.val)),
   });
   for (const n of nodes) {
     if (n.left !== null) g.addEdge(n.id, n.left);
@@ -4279,6 +4287,8 @@ export type HeapStep = {
   b: number | null;
   kind: "cmp" | "swap" | "done";
   msg: { zh: string; en: string };
+  /** 删除堆顶的“末元素上移”飞行标记：幽灵节点从 src 位飞向 dst 位（t=0..1 进度） */
+  fly?: { val: number; src: number; dst: number; t: number } | null;
 };
 
 export const HEAP_INSERT_CODE: Text[] = [
@@ -4305,8 +4315,7 @@ export const HEAP_INSERT_CODE: Text[] = [
 ];
 
 export function heapInsertSteps(heap: number[], x: number): HeapStep[] {
-  const v = [...heap, x];
-  let i = v.length - 1;
+  const v = [...heap];
   const steps: HeapStep[] = [];
   const snap = (
     line: number,
@@ -4316,6 +4325,20 @@ export function heapInsertSteps(heap: number[], x: number): HeapStep[] {
     zh: string,
     en: string,
   ): HeapStep => ({ line, values: [...v], a, b, kind, msg: { zh, en } });
+  // 首帧 = 插入前的完整堆（`A[n] ← x`：点播放后才追加）
+  steps.push(
+    snap(
+      0,
+      null,
+      null,
+      "cmp",
+      `当前堆 $[${v.join(", ") || "—"}]$：$A[${v.length}] \\gets x=${x}$`,
+      `current heap; A[${v.length}]←x=${x}`,
+    ),
+  );
+  // 追加 x 到末尾：A[n] ← x; i ← n
+  v.push(x);
+  let i = v.length - 1;
   steps.push(
     snap(
       0,
@@ -4374,8 +4397,12 @@ export function heapInsertSteps(heap: number[], x: number): HeapStep[] {
 
 export const HEAP_DELETE_CODE: Text[] = [
   {
-    zh: "$root \\gets A_0$; $A_0 \\gets A_{n-1}$; $n \\gets n-1$",
-    en: "$root \\gets A_0$; $A_0 \\gets A_{n-1}$; $n \\gets n-1$",
+    zh: "$root \\gets A_0$  // 记堆顶",
+    en: "$root \\gets A_0$  // save top",
+  },
+  {
+    zh: "$A_0 \\gets A_{n-1}$;  $n \\gets n-1$  // 末元素上移、长度减一",
+    en: "$A_0 \\gets A_{n-1}$; $n \\gets n-1$",
   },
   {
     zh: "$i \\gets 0$",
@@ -4410,22 +4437,55 @@ export function heapDeleteTopSteps(heap: number[]): HeapStep[] {
     zh: string,
     en: string,
   ): HeapStep => ({ line, values: [...v], a, b, kind, msg: { zh, en } });
-  if (v.length === 0) return [snap(5, null, null, "done", "空堆", "empty")];
+  if (v.length === 0) return [snap(6, null, null, "done", "空堆", "empty")];
   const rootV = v[0];
-  v[0] = v[v.length - 1];
-  v.pop();
-  let i = 0;
+  // 首帧 = 删除前的完整堆，高亮根（`root ← A_0`：点播放后才执行后续删除）
   steps.push(
     snap(
       0,
-      null,
+      0,
       null,
       "cmp",
-      `$root \\gets ${rootV}$; $A[0] \\gets A[n-1]=${i < v.length ? v[i] : ""}$`,
-      `root=${rootV}`,
+      `当前堆 $[${v.join(", ")}]$：$root \\gets A_0=${rootV}$`,
+      `current heap; root=${rootV}`,
     ),
   );
-  steps.push(snap(1, i, null, "cmp", `$i \\gets ${i}$`, `i←${i}`));
+  // 末元素上移动画：幽灵节点从最后位置（src）逐帧飞到根位置（dst），替换根
+  const lastIdx = v.length - 1;
+  const lastV = v[lastIdx];
+  if (lastIdx > 0) {
+    const FLY_FRAMES = 6;
+    for (let k = 1; k <= FLY_FRAMES; k++) {
+      const t = k / FLY_FRAMES;
+      steps.push({
+        line: 1,
+        values: [...v],
+        a: null,
+        b: null,
+        kind: "cmp",
+        msg: {
+          zh: `末元素 ${lastV} 上移 $A_{${lastIdx}} \\to A_0$（${Math.round(t * 100)}%）`,
+          en: `last ${lastV} moving to root (${Math.round(t * 100)}%)`,
+        },
+        fly: { val: lastV, src: lastIdx, dst: 0, t },
+      });
+    }
+  }
+  // 执行 A_0 ← A_{n-1}; n ← n-1（此时数组 = 删除后的堆）
+  v[0] = lastV;
+  v.pop();
+  steps.push(
+    snap(
+      1,
+      0,
+      null,
+      "cmp",
+      `$A[0] \\gets A[n-1]=${lastV}$；$n \\gets n-1$ → 存储 $[${v.join(", ")}]$`,
+      `A[0]←${lastV}; n←n-1`,
+    ),
+  );
+  let i = 0;
+  steps.push(snap(2, i, null, "cmp", `$i \\gets ${i}$`, `i←${i}`));
   while (2 * i + 1 < v.length) {
     const l = 2 * i + 1,
       r = 2 * i + 2;
@@ -4433,7 +4493,7 @@ export function heapDeleteTopSteps(heap: number[]): HeapStep[] {
     if (v[i] < v[j]) {
       steps.push(
         snap(
-          2,
+          3,
           i,
           j,
           "cmp",
@@ -4441,11 +4501,11 @@ export function heapDeleteTopSteps(heap: number[]): HeapStep[] {
           `A[${i}]<A[${j}]`,
         ),
       );
-      steps.push(snap(3, i, j, "cmp", `$j \\gets ${j}$`, `j←${j}`));
+      steps.push(snap(4, i, j, "cmp", `$j \\gets ${j}$`, `j←${j}`));
       [v[i], v[j]] = [v[j], v[i]];
       steps.push(
         snap(
-          4,
+          5,
           j,
           i,
           "swap",
@@ -4457,7 +4517,7 @@ export function heapDeleteTopSteps(heap: number[]): HeapStep[] {
     } else {
       steps.push(
         snap(
-          2,
+          3,
           i,
           j,
           "cmp",
@@ -4470,7 +4530,7 @@ export function heapDeleteTopSteps(heap: number[]): HeapStep[] {
   }
   steps.push(
     snap(
-      5,
+      6,
       null,
       null,
       "done",

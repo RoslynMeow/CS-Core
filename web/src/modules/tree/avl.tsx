@@ -24,7 +24,13 @@ import {
 } from "./source";
 
 type Mode = "view" | "search" | "build" | "insert" | "delete";
-type Cfg = TreeCfg & { mode: Mode; target: number; x: number };
+type Cfg = TreeCfg & {
+  mode: Mode;
+  target: number;
+  x: number;
+  /** 播完自动应用标记：操作结果已写入 work；保持所选操作、静态展示结果，改参数后重播 */
+  applied?: boolean;
+};
 const DEFAULT: Cfg = {
   source: "graph",
   values: [4, 2, 6, 1, 3, 5, 7],
@@ -75,15 +81,24 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
   }
   const base: TreeSnap = cfg.work ?? { nodes: res.nodes, root: 0 };
   const built = !!cfg.work || cfg.source === "graph";
-  // 建树 = 初始化：已建树（或图来源）时静态展示当前树（替代原「查看」）；旧存档 mode:"view" 同此
-  if (cfg.mode === "build" && built) {
+  // 建树 = 初始化：已建树（或图来源）时静态展示当前树（替代原「查看」）；旧存档 mode:"view" 同此。
+  // 播完自动应用（applied）后保持所选操作不变、静态展示结果树，避免重播时重复插入/删除；
+  // applied 仅在 applyOnEnd 写入 work 时同时置位，导入/重新载入（work 置 null）后自动失效
+  if ((cfg.mode === "build" || (cfg.applied && !!cfg.work)) && built) {
+    const appliedTxt =
+      cfg.applied && cfg.mode !== "build"
+        ? T(
+            `当前树 · ${base.nodes.length} 节点 · 已应用该操作（改参数后重播）`,
+            `current tree · ${base.nodes.length} nodes · op applied (tweak params to replay)`,
+          )
+        : T(
+            `当前树 · ${base.nodes.length} 节点 · 可选 查找/插入/删除（播完自动应用）`,
+            `current tree · ${base.nodes.length} nodes · pick search/insert/delete`,
+          );
     return [
       {
         line: 0,
-        caption: T(
-          `当前树 · ${base.nodes.length} 节点 · 可选 查找/插入/删除（播完自动应用）`,
-          `current tree · ${base.nodes.length} nodes · pick search/insert/delete`,
-        ),
+        caption: appliedTxt,
         scene: binScene(base.nodes, {}, base.root, bfAnn(base.nodes)),
       },
     ];
@@ -132,9 +147,12 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
   }));
 }
 
-/** 播完自动应用：建树/插入/删除 结束即把结果写入 work（新版本）并切回「建树」静态展示；
+/** 播完自动应用：建树/插入/删除 结束即把结果写入 work（新版本）；
+ *  保持所选操作不回跳「建树」（applied 标记后静态展示结果，改参数重播）；
  *  不提供手动按钮；仅「从图编辑中导入」会把 work 置 null 覆盖回原图 */
 function applyOnEnd(cfg: Cfg): Cfg | null {
+  // 已应用过：重播（拉回首帧再播）不再重复应用
+  if (cfg.applied) return null;
   const res = resolveTree(cfg, { requireNumeric: true });
   if (!res.ok || res.values.length === 0) return null;
   const base: TreeSnap = cfg.work ?? { nodes: res.nodes, root: 0 };
@@ -147,7 +165,7 @@ function applyOnEnd(cfg: Cfg): Cfg | null {
   } else if (cfg.mode === "delete") {
     result = avlDeleteOnTree(base.nodes, base.root, cfg.target).result;
   } else return null;
-  return { ...cfg, work: result, mode: "build" };
+  return { ...cfg, work: result, applied: true };
 }
 
 export const treeAvlModule: ModuleDef<GraphCanvasScene, Cfg> = {
@@ -160,7 +178,7 @@ export const treeAvlModule: ModuleDef<GraphCanvasScene, Cfg> = {
   tags: ["data-structures"],
   defaultConfig: DEFAULT,
   randomize(c) {
-    return { ...c, values: randSeq(), work: null };
+    return { ...c, values: randSeq(), work: null, applied: false };
   },
   onPlayEnd: applyOnEnd,
   Controls({ config, onChange, t }) {
@@ -193,7 +211,11 @@ export const treeAvlModule: ModuleDef<GraphCanvasScene, Cfg> = {
             className="txt"
             value={config.mode}
             onChange={(e) =>
-              onChange({ ...config, mode: e.target.value as Mode })
+              onChange({
+                ...config,
+                mode: e.target.value as Mode,
+                applied: false,
+              })
             }
           >
             <option value="build">{t(T("建树", "Build"))}</option>
@@ -221,7 +243,11 @@ export const treeAvlModule: ModuleDef<GraphCanvasScene, Cfg> = {
                 style={{ width: 56 }}
                 value={config.target}
                 onChange={(e) =>
-                  onChange({ ...config, target: Number(e.target.value) })
+                  onChange({
+                    ...config,
+                    target: Number(e.target.value),
+                    applied: false,
+                  })
                 }
               />
             </label>
@@ -242,25 +268,19 @@ export const treeAvlModule: ModuleDef<GraphCanvasScene, Cfg> = {
                 style={{ width: 56 }}
                 value={config.x}
                 onChange={(e) => {
-                  const c = { ...config, x: Number(e.target.value) };
+                  const c = {
+                    ...config,
+                    x: Number(e.target.value),
+                    applied: false,
+                  };
                   onChange(c);
                 }}
               />
             </label>
           )}
-          {config.work && (
-            <span style={{ fontSize: 11, color: "#b45309", fontWeight: 700 }}>
-              {t(
-                T(
-                  "已修改 · 点「导入当前图」覆盖回原图",
-                  "modified · import to revert",
-                ),
-              )}
-            </span>
-          )}
           <SourcePanel
             cfg={config}
-            onChange={(c) => onChange({ ...config, ...c })}
+            onChange={(c) => onChange({ ...config, ...c, applied: false })}
             t={t}
           />
         </div>
