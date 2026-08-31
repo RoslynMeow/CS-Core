@@ -10,22 +10,8 @@ import {
   faPlus,
   faStar,
 } from "@fortawesome/free-solid-svg-icons";
-import {
-  Graph,
-  alphaLabels,
-  bfsSteps,
-  dfsSteps,
-  topoSteps,
-  buildGraphDump,
-  BFS_CODE,
-  DFS_CODE,
-  TOPO_CODE,
-  type AlgoStep,
-} from "../lib/graph";
+import { Graph, alphaLabels, buildGraphDump } from "../lib/graph";
 import { buildMemoryUrl } from "../lib/memoryDump";
-import { usePlayback, type Playback } from "../engine/usePlayback";
-import { PlaybackBar } from "../components/PlaybackBar";
-import { Pseudocode } from "../components/Pseudocode";
 import { MathText } from "../lib/tex";
 
 /**
@@ -37,29 +23,10 @@ import { MathText } from "../lib/tex";
  *  - 新建：点画布空白处新增顶点
  *  - 删除：点击顶点删除（含其所有边；顶点重编号，保持标签稳定）
  * 布局：环形 / 树形 / 力导向 / 自由拖拽（手动位置覆盖）
- * 算法展示（下一步）：顶部「BFS/DFS/拓扑」→ generate 帧 → 复用 PlaybackBar
  */
 
 type Layout = "circle" | "tree" | "force" | "free";
 type Tool = "move" | "addEdge" | "addVertex" | "delete";
-type AlgoKind = "none" | "bfs" | "dfs" | "topo";
-type AlgoFrame = {
-  line: number;
-  scene: {
-    current: number | null;
-    exploring: number | null;
-    visited: number[];
-    frontier: number[];
-    order: number[];
-    edge: [number, number] | null;
-  };
-  caption: { zh: string; en: string };
-};
-// 无算法时的空帧：固定引用。若每次渲染新建 []，usePlayback 的
-// useEffect 依赖 framesOr 会在每帧变化 → setState → 重渲染 → 无限循环
-// （React “Maximum update depth exceeded”）。
-const EMPTY_FRAMES: AlgoFrame[] = [];
-// 伪代码：统一从 lib/graph 取（BFS_CODE / DFS_CODE / TOPO_CODE），不再本地复制
 const SVG_W = 760,
   SVG_H = 440;
 const V_R = 17;
@@ -128,7 +95,6 @@ export function GraphStudio() {
   ); // 内存表示
   const [root, setRoot] = useState(0);
   const [tool, setTool] = useState<Tool>("move");
-  const [algo, setAlgo] = useState<AlgoKind>("none");
   const [selected, setSelected] = useState<number | null>(null);
   const [pending, setPending] = useState<number | null>(null); // addEdge 第一个端点
   const [drag, setDrag] = useState<number | null>(null); // 正在拖的顶点
@@ -252,49 +218,11 @@ export function GraphStudio() {
     y: (p.y - view.ty) / view.s,
   });
 
-  // 算法帧：从 bfsSteps/dfsSteps/topoSteps 生成 Frame[]（复用 usePlayback）
+  // 顶点列表（渲染用）；g.n 变化时重建
   const activeVertices = useMemo(
     () => Array.from({ length: g.n }, (_, i) => i),
     [g.n],
   );
-  const algoFrames = useMemo<AlgoFrame[]>(() => {
-    if (algo === "none") return [];
-    const start = Math.min(root, g.n - 1);
-    const raw: AlgoStep[] =
-      algo === "bfs"
-        ? bfsSteps(g, start)
-        : algo === "dfs"
-          ? dfsSteps(g, start)
-          : topoSteps(g);
-    return raw.map((s) => ({
-      line: s.line,
-      scene: {
-        current: s.current,
-        exploring: s.exploring,
-        visited: s.visited,
-        frontier: s.frontier,
-        order: s.order,
-        edge: s.edge,
-      },
-      caption: s.msg,
-    }));
-  }, [algo, g, root]);
-  // 引用稳定：播放期间 framesOr 不变 → usePlayback 不会因重渲染 reset 到首帧
-  const algoFramesRef = useRef(algoFrames);
-  if (algo !== "none" && algoFramesRef.current !== algoFrames)
-    algoFramesRef.current = algoFrames;
-  const playbackFrames = algo === "none" ? EMPTY_FRAMES : algoFramesRef.current;
-  const pb = usePlayback(playbackFrames, {
-    autoPlay: false,
-    autoPlayOnMount: false,
-    interval: 750,
-  });
-  const frame = pb.frame as
-    | (AlgoFrame & { caption: { zh: string; en: string } })
-    | undefined;
-  // 画布高亮快照：无算法时为空，有算法时取当前帧
-  const hl = frame?.scene ?? null;
-  const isAlgoActive = algo !== "none";
 
   const analysis = useMemo(() => {
     if (!gRef.current) return null;
@@ -568,7 +496,7 @@ export function GraphStudio() {
     }
     if (tool === "addEdge" && pending !== null) setHover(svgP);
     // 悬停高亮（非拖拽时）
-    if (drag === null && !isAlgoActive) {
+    if (drag === null) {
       const p = svgToWorld(svgP);
       setHoverV(hitVertex(p));
       setHoverE(hitEdge(p));
@@ -688,7 +616,7 @@ export function GraphStudio() {
         return;
       }
       if (e.key === "Delete" || e.key === "Backspace") {
-        if (selected !== null && isAlgoActive === false) {
+        if (selected !== null) {
           removeVertex(selected);
           e.preventDefault();
         }
@@ -703,7 +631,7 @@ export function GraphStudio() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selected, isAlgoActive]);
+  }, [selected]);
 
   // ---- 随机生成（覆盖当前图，可撤销） ----
   const genGraph = (cfg: GenCfg) => {
@@ -1122,8 +1050,9 @@ export function GraphStudio() {
         display: "flex",
         flexDirection: "column",
         gap: 10,
-        height: `calc(100dvh - ${hdrH}px)`,
+        height: `calc(100dvh - ${hdrH}px - 16px)`,
         overflow: "hidden",
+        // 底部留 16px 呼吸空间，不贴合视口（与 .graph-root 的 padding-bottom 对应）
       }}
     >
       <div style={{ flexShrink: 0 }}>
@@ -1141,57 +1070,7 @@ export function GraphStudio() {
           </span>
         </div>
 
-        {/* 行 1：算法（工具操作全部走右键/快捷键，无独立工具条） */}
-        <div
-          style={{
-            display: "flex",
-            gap: 6,
-            flexWrap: "wrap",
-            alignItems: "center",
-            marginTop: 8,
-          }}
-        >
-          <div
-            style={{
-              display: "inline-flex",
-              gap: 6,
-              alignItems: "center",
-              padding: "4px 10px",
-              borderRadius: 999,
-              background: "#f0fdf4",
-              border: "1px solid #bbf7d0",
-            }}
-          >
-            <span style={{ fontSize: 10, fontWeight: 800, color: "#15803d" }}>
-              算法
-            </span>
-            {(["bfs", "dfs", "topo"] as const).map((k) => (
-              <button
-                key={k}
-                className={`pill ${algo === k ? "active" : ""}`}
-                onClick={() => {
-                  setAlgo(algo === k ? "none" : k);
-                  setSelected(null);
-                  setPending(null);
-                }}
-              >
-                {k === "bfs" ? "BFS" : k === "dfs" ? "DFS" : "拓扑"}
-              </button>
-            ))}
-            {isAlgoActive && (
-              <button className="ghost" onClick={() => setAlgo("none")}>
-                退出
-              </button>
-            )}
-          </div>
-        </div>
-        {isAlgoActive && pb && (
-          <div style={{ marginTop: 6 }}>
-            <PlaybackBar pb={pb as Playback} />
-          </div>
-        )}
-
-        {/* 行 2：模式参数 + 知识点参数（合并一行，紧凑） */}
+        {/* 行 1：模式参数 + 知识点参数（合并一行，紧凑） */}
         <div
           style={{
             display: "flex",
@@ -1356,32 +1235,22 @@ export function GraphStudio() {
                 hoverE !== null &&
                 ((hoverE.u === e.u && hoverE.v === e.v) ||
                   (!directed && hoverE.u === e.v && hoverE.v === e.u));
-              const isAlgoEdge =
-                hl?.edge &&
-                ((hl.edge[0] === e.u && hl.edge[1] === e.v) ||
-                  (!directed && hl.edge[0] === e.v && hl.edge[1] === e.u));
-              const stroke = isAlgoEdge
-                ? "#f59e0b"
-                : isHoverE
-                  ? "#7c3aed"
-                  : selected !== null && (e.u === selected || e.v === selected)
-                    ? "#4f46e5"
-                    : "#94a3b8";
-              const sw = isAlgoEdge
-                ? 3
-                : isHoverE
-                  ? 2.8
-                  : selected !== null && (e.u === selected || e.v === selected)
-                    ? 2.4
-                    : 1.6;
-              // 权重徽章底色与边同源联动：算法/悬停/选中邻接边时跟随高亮色
-              const wFill = isAlgoEdge
-                ? "#f59e0b"
-                : isHoverE
-                  ? "#7c3aed"
-                  : selected !== null && (e.u === selected || e.v === selected)
-                    ? "#4f46e5"
-                    : "#0f172a";
+              const stroke = isHoverE
+                ? "#7c3aed"
+                : selected !== null && (e.u === selected || e.v === selected)
+                  ? "#4f46e5"
+                  : "#94a3b8";
+              const sw = isHoverE
+                ? 2.8
+                : selected !== null && (e.u === selected || e.v === selected)
+                  ? 2.4
+                  : 1.6;
+              // 权重徽章底色与边同源联动：悬停/选中邻接边时跟随高亮色
+              const wFill = isHoverE
+                ? "#7c3aed"
+                : selected !== null && (e.u === selected || e.v === selected)
+                  ? "#4f46e5"
+                  : "#0f172a";
               const w =
                 e.weight !== undefined && e.weight !== 1 ? e.weight : null;
               return (
@@ -1448,63 +1317,25 @@ export function GraphStudio() {
               const isSel = selected === i;
               const isPending = pending === i;
               const isHoverV = hoverV === i;
-              const isVisited = hl ? hl.visited.includes(i) : false;
-              const isCurrent = hl ? hl.current === i : false;
-              const isFrontier = hl ? hl.frontier.includes(i) : false;
-              const isExploring = hl ? hl.exploring === i : false;
-              // 算法高亮优先级：current > exploring > visited > frontier > 普通 > 选中
               const isRoot = i === root;
-              const fill = isAlgoActive
-                ? isCurrent
-                  ? "#4f46e5"
-                  : isExploring
-                    ? "#f59e0b"
-                    : isVisited
-                      ? "#10b981"
-                      : isFrontier
-                        ? "#38bdf8"
-                        : "#eef2ff"
-                : isHoverV
-                  ? "#ddd6fe"
-                  : vertexColor(i);
-              const stroke = isAlgoActive
-                ? isCurrent
-                  ? "#312e81"
-                  : isExploring
-                    ? "#b45309"
-                    : isVisited
-                      ? "#059669"
-                      : isFrontier
-                        ? "#0284c7"
-                        : "#6366f1"
-                : isSel
-                  ? "#312e81"
-                  : isRoot
-                    ? "#b91c1c"
+              const fill = isHoverV ? "#ddd6fe" : vertexColor(i);
+              const stroke = isSel
+                ? "#312e81"
+                : isRoot
+                  ? "#b91c1c"
+                  : isHoverV
+                    ? "#7c3aed"
+                    : "#6366f1";
+              const sw = isSel
+                ? 2.6
+                : isRoot
+                  ? 2.4
+                  : isPending
+                    ? 2.2
                     : isHoverV
-                      ? "#7c3aed"
-                      : "#6366f1";
-              const sw = isAlgoActive
-                ? isCurrent || isExploring
-                  ? 3
-                  : 1.6
-                : isSel
-                  ? 2.6
-                  : isRoot
-                    ? 2.4
-                    : isPending
-                      ? 2.2
-                      : isHoverV
-                        ? 2.4
-                        : 1.4;
-              const labelColor = isAlgoActive
-                ? isCurrent || isVisited || isFrontier || isExploring
-                  ? "#fff"
-                  : "#1e293b"
-                : isSel || isRoot
-                  ? "#fff"
-                  : "#1e293b";
-              const orderIdx = hl ? hl.order.indexOf(i) : -1;
+                      ? 2.4
+                      : 1.4;
+              const labelColor = isSel || isRoot ? "#fff" : "#1e293b";
               return (
                 <g key={i}>
                   <circle
@@ -1526,7 +1357,7 @@ export function GraphStudio() {
                     {g.labels[i]}
                   </text>
                   {/* 根标注 */}
-                  {!isAlgoActive && isRoot && (
+                  {isRoot && (
                     <text
                       x={p.x}
                       y={p.y - V_R - 3}
@@ -1538,38 +1369,23 @@ export function GraphStudio() {
                       根
                     </text>
                   )}
-                  {/* 访问序角标 */}
-                  {isAlgoActive && orderIdx >= 0 && (
+                  {/* 度标记（小字） */}
+                  {analysis && directed && analysis.deg[i] > 0 && (
                     <text
-                      x={p.x + V_R - 2}
+                      x={p.x + V_R + 4}
                       y={p.y - V_R + 2}
                       fontSize={9}
-                      fontWeight={800}
-                      fill={isCurrent ? "#e0e7ff" : "#475569"}
+                      fill="#64748b"
                     >
-                      {orderIdx + 1}
+                      {analysis.deg[i]}
                     </text>
                   )}
-                  {/* 度标记（小字） */}
-                  {!isAlgoActive &&
-                    analysis &&
-                    directed &&
-                    analysis.deg[i] > 0 && (
-                      <text
-                        x={p.x + V_R + 4}
-                        y={p.y - V_R + 2}
-                        fontSize={9}
-                        fill="#64748b"
-                      >
-                        {analysis.deg[i]}
-                      </text>
-                    )}
                 </g>
               );
             })}
           </svg>
           {/* 选中信息浮层（算法时用 caption 替代） */}
-          {!isAlgoActive && selInfo && (
+          {selInfo && (
             <div
               style={{
                 position: "absolute",
@@ -1822,26 +1638,9 @@ export function GraphStudio() {
               onToast={(s) => setMsg(s)}
             />
           )}
-          {/* 算法当前步骤 caption */}
-          {isAlgoActive && frame && (
-            <div
-              style={{
-                position: "absolute",
-                bottom: 8,
-                left: 12,
-                right: 12,
-                background: "rgba(15,23,42,.85)",
-                color: "#e2e8f0",
-                borderRadius: 10,
-                padding: "8px 12px",
-                fontSize: 13,
-              }}
-            >
-              <MathText text={frame.caption.zh} />
-            </div>
-          )}
+          {/* 算法当前步骤 caption 已移除：图创建页只负责建图 */}
         </div>
-        {/* 右栏：算法时伪代码面板 / 编辑时内存表示（与画布各占 50%） */}
+        {/* 右栏：内存表示（画布与表示各占 50%） */}
         <div
           style={{
             flex: "1 1 0",
@@ -1852,87 +1651,63 @@ export function GraphStudio() {
             overflow: "hidden",
           }}
         >
-          {isAlgoActive ? (
-            <div
+          <div
+            style={{
+              padding: "8px 10px",
+              fontSize: 11,
+              fontWeight: 800,
+              color: "#4338ca",
+              display: "flex",
+              gap: 6,
+              alignItems: "center",
+              flexWrap: "wrap",
+              borderBottom: "1px solid #c7d2fe",
+            }}
+          >
+            <span>内存表示</span>
+            {(
+              [
+                ["adjlist", "邻接表"],
+                ["adjmat", "矩阵"],
+                ["array", "parent"],
+                ["edges", "边集"],
+              ] as Array<[typeof repr, string]>
+            ).map(([v, lb]) => (
+              <button
+                key={v}
+                className={`pill ${repr === v ? "active" : ""}`}
+                style={{ padding: "2px 8px", fontSize: 11 }}
+                onClick={() => setRepr(v)}
+              >
+                {lb}
+              </button>
+            ))}
+            <button
+              className="pill"
               style={{
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                minHeight: 0,
+                marginLeft: "auto",
+                padding: "2px 8px",
+                fontSize: 11,
+              }}
+              onClick={() => {
+                location.href = buildMemoryUrl(
+                  buildGraphDump(g, repr, { root }) as any,
+                );
               }}
             >
-              <Pseudocode
-                code={
-                  algo === "bfs"
-                    ? BFS_CODE
-                    : algo === "dfs"
-                      ? DFS_CODE
-                      : TOPO_CODE
-                }
-                active={frame?.line}
-              />
-            </div>
-          ) : (
-            <>
-              <div
-                style={{
-                  padding: "8px 10px",
-                  fontSize: 11,
-                  fontWeight: 800,
-                  color: "#4338ca",
-                  display: "flex",
-                  gap: 6,
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                  borderBottom: "1px solid #c7d2fe",
-                }}
-              >
-                <span>内存表示</span>
-                {(
-                  [
-                    ["adjlist", "邻接表"],
-                    ["adjmat", "矩阵"],
-                    ["array", "parent"],
-                    ["edges", "边集"],
-                  ] as Array<[typeof repr, string]>
-                ).map(([v, lb]) => (
-                  <button
-                    key={v}
-                    className={`pill ${repr === v ? "active" : ""}`}
-                    style={{ padding: "2px 8px", fontSize: 11 }}
-                    onClick={() => setRepr(v)}
-                  >
-                    {lb}
-                  </button>
-                ))}
-                <button
-                  className="pill"
-                  style={{
-                    marginLeft: "auto",
-                    padding: "2px 8px",
-                    fontSize: 11,
-                  }}
-                  onClick={() => {
-                    location.href = buildMemoryUrl(
-                      buildGraphDump(g, repr, { root }) as any,
-                    );
-                  }}
-                >
-                  查看内存 ↗
-                </button>
-              </div>
-              <div
-                style={{
-                  flex: 1,
-                  overflow: "auto",
-                  padding: 8,
-                  background: "#fff",
-                }}
-              >
-                {reprContent}
-              </div>
-            </>
-          )}
+              查看内存 ↗
+            </button>
+          </div>
+          <div
+            style={{
+              flex: 1,
+              overflow: "auto",
+              padding: 8,
+              background: "#fff",
+            }}
+          >
+            {reprContent}
+          </div>
         </div>
       </div>
     </div>

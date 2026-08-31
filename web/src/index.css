@@ -348,7 +348,7 @@ a {
 .graph-root {
  width: 80%;
  margin: 0 auto;
- padding-top: 12px;
+ padding: 12px 24px 16px;
 }
 @media (max-width: 1800px) {
  .graph-root {
