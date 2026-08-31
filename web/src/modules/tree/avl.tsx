@@ -294,11 +294,14 @@ export const treeAvlModule: ModuleDef<GraphCanvasScene, Cfg> = {
               />
             </label>
           )}
-          <SourcePanel
-            cfg={config}
-            onChange={(c) => onChange({ ...config, ...c, applied: false })}
-            t={t}
-          />
+          {/* 来源仅在「建树」时可选择：查找/插入/删除在建好的树上操作，不允许改来源 */}
+          {config.mode === "build" && (
+            <SourcePanel
+              cfg={config}
+              onChange={(c) => onChange({ ...config, ...c, applied: false })}
+              t={t}
+            />
+          )}
         </div>
       </div>
     ) as unknown as never;

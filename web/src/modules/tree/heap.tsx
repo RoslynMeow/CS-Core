@@ -297,29 +297,31 @@ export const treeHeapModule: ModuleDef<GraphCanvasScene, Cfg> = {
                 onChange={(e) =>
                   onChange({
                     ...config,
-                    x:
-                      e.target.value === "" ? "" : Number(e.target.value),
+                    x: e.target.value === "" ? "" : Number(e.target.value),
                     applied: false,
                   })
                 }
               />
             </label>
           )}
-          <SourcePanel
-            cfg={config}
-            onChange={(c) => onChange({ ...config, ...c, applied: false })}
-            t={t}
-            requireComplete
-          />
+          {/* 来源仅在「建堆」时可选择：插入/删除堆顶/堆排序在建好的堆上操作，不允许改来源 */}
+          {config.mode === "build" && (
+            <SourcePanel
+              cfg={config}
+              onChange={(c) => onChange({ ...config, ...c, applied: false })}
+              t={t}
+              requireComplete
+            />
+          )}
         </div>
       </div>
     ) as unknown as never;
   },
   codeFor(cfg) {
     // 旧合并页存档防御：与 buildFrames 一致，mode 可能残留 heap-* 等非法值 → 归一化，避免 CODE[cfg.mode] 为 undefined
-    const mode: Mode = (["build", "insert", "delete", "sort"] as Mode[]).includes(
-      cfg.mode as Mode,
-    )
+    const mode: Mode = (
+      ["build", "insert", "delete", "sort"] as Mode[]
+    ).includes(cfg.mode as Mode)
       ? (cfg.mode as Mode)
       : DEFAULT.mode;
     return CODE[mode];
