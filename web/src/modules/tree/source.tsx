@@ -558,6 +558,7 @@ export function dualBuildScene(opts: {
   appeared: boolean;
   annotate?: Record<number, string>;
   titleR: Text;
+  titleL?: Text;
   warn?: Text;
 }): GraphCanvasScene {
   const srcPos = treePositions(opts.src, 0, DUAL_PANEL.left);
@@ -611,7 +612,11 @@ export function dualBuildScene(opts: {
     annotate: opts.annotate,
     ...(opts.warn ? { warn: opts.warn } : {}),
     panel: {
-      left: { zh: "随机生成的树 · 输入", en: "Random tree · input" },
+      left:
+        opts.titleL ?? {
+          zh: "随机生成的树 · 输入",
+          en: "Random tree · input",
+        },
       right: opts.titleR,
     },
   };
@@ -627,6 +632,7 @@ export function buildDualFrames(
   src: BinNode[],
   titleR: Text,
   annotate?: (nodes: BinNode[]) => Record<number, string>,
+  titleL?: Text,
 ): Frame<GraphCanvasScene>[] {
   const srcPos = treePositions(src, 0, DUAL_PANEL.left);
   let inserted = 0;
@@ -659,6 +665,7 @@ export function buildDualFrames(
         appeared,
         annotate: annotate ? annotate(s.nodes) : undefined,
         titleR,
+        titleL,
       }),
     };
   });

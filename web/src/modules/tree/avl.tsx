@@ -4,7 +4,6 @@ import {
   avlInsertSteps,
   avlInsertOne,
   avlDeleteOnTree,
-  bstFromValues,
   bstSearchOnTree,
   BST_SEARCH_CODE,
   AVL_CODE,
@@ -83,10 +82,14 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
   }
   const base: TreeSnap = cfg.work ?? { nodes: res.nodes, root: 0 };
   const built = !!cfg.work || cfg.source === "graph";
-  // 建树 = 初始化：已建树（或图来源）时静态展示当前树（替代原「查看」）；旧存档 mode:"view" 同此。
+  // 建树 = 初始化：已建树（work 存在，含随机播完自动应用 / 图导入后已应用操作）时静态展示当前树；
+  // 未建树（无 work）的 mode=build → 走下方双面板建树动画（随机序列或图导入的自定义树作左侧输入树）。
   // 播完自动应用（applied）后保持所选操作不变、静态展示结果树，避免重播时重复插入/删除；
   // applied 仅在 applyOnEnd 写入 work 时同时置位，导入/重新载入（work 置 null）后自动失效
-  if ((cfg.mode === "build" || (cfg.applied && !!cfg.work)) && built) {
+  if (
+    (cfg.mode === "build" && !!cfg.work) ||
+    (cfg.applied && !!cfg.work)
+  ) {
     const appliedTxt =
       cfg.applied && cfg.mode !== "build"
         ? T(
@@ -137,15 +140,18 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
   else if (cfg.mode === "insert")
     steps = avlInsertOne(base.nodes, base.root, cfg.x).steps;
   else steps = avlDeleteOnTree(base.nodes, base.root, cfg.target).steps;
-  // 建树：双面板动画 — 左：随机生成的输入树（已插入节点逐颗“拆走”、下一个高亮），
+  // 建树：双面板动画 — 左：输入树（随机生成的值树 / 图编辑导入的自定义树；已插入节点逐颗“拆走”、下一个高亮），
   // 右：正在建立的 AVL 树（新节点从输入树位置“飞”过来 + 流动光束）
   if (cfg.mode === "build") {
     return buildDualFrames(
       steps,
       res.values,
-      bstFromValues(res.values),
+      base.nodes,
       T("AVL 树 · 正在建立", "AVL tree · building"),
       bfAnn,
+      cfg.source === "graph"
+        ? T("图编辑导入的树 · 输入", "Imported tree · input")
+        : undefined,
     );
   }
   return steps.map((s) => ({
