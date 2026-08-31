@@ -12,8 +12,17 @@ export type GraphCanvasScene = GraphAlgoScene & {
         hollow?: boolean;
         /** 飞入动画起点（输入树坐标）：新节点从输入树“飞”到正在建立的树 */
         fly?: { x: number; y: number };
+        /** 货架节点（B树/B+树）：多键一行排列；设置了 keys 时 label 不渲染（由 keys 渲染） */
+        keys?: (string | number)[];
     }[];
-    edges: { u: number; v: number; weight?: number; beam?: boolean }[];
+    edges: {
+        u: number;
+        v: number;
+        weight?: number;
+        beam?: boolean;
+        /** 虚线边（B+树叶子兄弟链等结构示意） */
+        dashed?: boolean;
+    }[];
     directed?: boolean;
     root?: number | null;
     annotate?: Record<number, string>; // 节点下方小字（如 dist / key / bf）
@@ -21,7 +30,7 @@ export type GraphCanvasScene = GraphAlgoScene & {
     blurred?: boolean; // 虚化预览：已选“从图创建导入”且未确认（点击画布导入）
     error?: string; // 图不符合当前要求的原因（Render 显示红色横幅 + 去图创建）
     warn?: Text; // 黄条警告（如退化链/偏斜树提示）
-    tone?: Record<number, number>; // 术语模式：节点类别配色索引（0=根 1=内部 2=叶子），fill 固定用 TONE_FILL
+    tone?: Record<number, number>; // 彩色树：节点类别配色索引（0=红 1=蓝 2=黄 3=灰 4=黑），fill 固定用 TONE_FILL
     /** 双面板建树（AVL/BST）：左右面板标题（左=随机生成的输入树，右=正在建立的树）；GraphCanvas 需传 t 才渲染 */
     panel?: { left?: Text; right?: Text };
 };
@@ -30,9 +39,16 @@ const W = 760,
     H = 440,
     R = 17;
 
-/** 节点类别配色（术语等模式的角色着色）：索引 → 填充色 / 标签色 */
-export const TONE_FILL = ["#dc2626", "#4f46e5", "#eab308", "#64748b"];
-export const TONE_LABEL = ["#fff", "#fff", "#1e293b", "#fff"];
+/** 节点类别配色（彩色树 tone 的角色着色）：索引 → 填充色 / 标签色
+ *  0=红（根/红黑树红节点） 1=蓝 2=黄 3=灰 4=黑（红黑树黑节点） */
+export const TONE_FILL = [
+    "#dc2626",
+    "#4f46e5",
+    "#eab308",
+    "#64748b",
+    "#1e293b",
+];
+export const TONE_LABEL = ["#fff", "#fff", "#1e293b", "#fff", "#fff"];
 /** 彩色树（tone）下算法高亮的“圆环”颜色：fill 保持角色色，不再被算法色覆盖 */
 export const HL_RING = {
     current: "#f59e0b",
@@ -40,6 +56,11 @@ export const HL_RING = {
     visited: "#059669",
     frontier: "#0284c7",
 } as const;
+
+/** 货架节点（B树/B+树）：一行多键；宽随键数增长（封顶防溢出画布），高固定 */
+export const KEYS_BOX_W = (k: number) =>
+    Math.min(170, Math.max(34, 16 + k * 30));
+export const KEYS_BOX_H = 34;
 
 export function GraphCanvas({
     scene,
@@ -67,6 +88,23 @@ export function GraphCanvas({
 }) {
     const { nodes, edges, directed = false } = scene;
     const pos = new Map(nodes.map((n) => [n.id, n]));
+    // 端点偏移量：圆=R+4；货架(box)节点按射线与矩形求交（矩形半宽/半高）
+    const nodeOffset = (
+        n: { keys?: (string | number)[] },
+        ux: number,
+        uy: number,
+    ) => {
+        if (n.keys && n.keys.length > 0) {
+            const w = KEYS_BOX_W(n.keys.length);
+            const h = KEYS_BOX_H;
+            const t = Math.min(
+                (w / 2 + 2) / Math.max(Math.abs(ux), 1e-9),
+                (h / 2 + 2) / Math.max(Math.abs(uy), 1e-9),
+            );
+            return { x: ux * t, y: uy * t };
+        }
+        return { x: ux * (R + 4), y: uy * (R + 4) };
+    };
     const edgePos = (u: number, v: number) => {
         const a = pos.get(u),
             b = pos.get(v);
@@ -76,11 +114,13 @@ export function GraphCanvas({
         const len = Math.hypot(dx, dy) || 1;
         const ux = dx / len,
             uy = dy / len;
+        const oa = nodeOffset(a, ux, uy);
+        const ob = nodeOffset(b, -ux, -uy);
         return {
-            ax: a.x + ux * (R + 4),
-            ay: a.y + uy * (R + 4),
-            bx: b.x - ux * (R + 4),
-            by: b.y - uy * (R + 4),
+            ax: a.x + oa.x,
+            ay: a.y + oa.y,
+            bx: b.x - ob.x,
+            by: b.y - ob.y,
             mx: (a.x + b.x) / 2,
             my: (a.y + b.y) / 2,
         };
@@ -171,6 +211,9 @@ export function GraphCanvas({
                                 y2={p.by}
                                 stroke={stroke}
                                 strokeWidth={sw}
+                                strokeDasharray={
+                                    e.dashed && !active ? "4 4" : undefined
+                                }
                             />
                             {directed && (
                                 <polygon
@@ -222,6 +265,12 @@ export function GraphCanvas({
                     const isFr = scene.frontier.includes(n.id);
                     const isRoot = scene.root === n.id;
                     const isAlgo = isCurrent || isExp || isVis || isFr;
+                    const boxKeys =
+                        n.keys !== undefined && n.keys.length > 0
+                            ? n.keys
+                            : null;
+                    const boxW = boxKeys ? KEYS_BOX_W(boxKeys.length) : 0;
+                    const cellW = boxKeys ? boxW / boxKeys.length : 0;
                     const tone = scene.tone?.[n.id];
                     const toneMode =
                         scene.tone !== undefined && tone !== undefined;
@@ -284,6 +333,7 @@ export function GraphCanvas({
                               "--fy": `${n.fly.y - n.y}px`,
                           } as React.CSSProperties)
                         : undefined;
+                    const topGap = boxKeys ? KEYS_BOX_H / 2 : R;
                     return (
                         <g
                             key={n.id}
@@ -304,42 +354,113 @@ export function GraphCanvas({
                                 className={n.fly ? "tree-fly" : undefined}
                                 style={flyStyle}
                             >
-                                <circle
-                                    cx={n.x}
-                                    cy={n.y}
-                                    r={R}
-                                    fill={fill}
-                                    stroke={stroke}
-                                    strokeWidth={sw}
-                                    strokeDasharray={hollow ? "4 3" : undefined}
-                                />
-                                {/* 彩色树（tone）下算法高亮用圆环表示，保持角色色与图例一致 */}
-                                {toneMode && ringColor && (
+                                {boxKeys ? (
+                                    // 货架节点（B树/B+树）：多键一行，键间竖线分隔
+                                    <g>
+                                        <rect
+                                            x={n.x - boxW / 2}
+                                            y={n.y - KEYS_BOX_H / 2}
+                                            width={boxW}
+                                            height={KEYS_BOX_H}
+                                            rx={8}
+                                            fill={fill}
+                                            stroke={stroke}
+                                            strokeWidth={sw}
+                                            strokeDasharray={
+                                                hollow ? "4 3" : undefined
+                                            }
+                                        />
+                                        {boxKeys.map((k, i) => (
+                                            <g key={i}>
+                                                {i > 0 && (
+                                                    <line
+                                                        x1={n.x - boxW / 2 + i * cellW}
+                                                        y1={n.y - KEYS_BOX_H / 2 + 6}
+                                                        x2={n.x - boxW / 2 + i * cellW}
+                                                        y2={n.y + KEYS_BOX_H / 2 - 6}
+                                                        stroke={
+                                                            hollow
+                                                                ? "#cbd5e1"
+                                                                : "#94a3b8"
+                                                        }
+                                                        strokeWidth={1}
+                                                    />
+                                                )}
+                                                <text
+                                                    x={
+                                                        n.x -
+                                                        boxW / 2 +
+                                                        i * cellW +
+                                                        cellW / 2
+                                                    }
+                                                    y={n.y + 4}
+                                                    textAnchor="middle"
+                                                    fontSize={11}
+                                                    fontWeight={700}
+                                                    fill={labelColor}
+                                                >
+                                                    {String(k)}
+                                                </text>
+                                            </g>
+                                        ))}
+                                    </g>
+                                ) : (
                                     <circle
                                         cx={n.x}
                                         cy={n.y}
-                                        r={R + (isCurrent || isExp ? 5 : 4)}
-                                        fill="none"
-                                        stroke={ringColor}
-                                        strokeWidth={
-                                            isCurrent || isExp ? 3.5 : 2.5
+                                        r={R}
+                                        fill={fill}
+                                        stroke={stroke}
+                                        strokeWidth={sw}
+                                        strokeDasharray={
+                                            hollow ? "4 3" : undefined
                                         }
                                     />
                                 )}
-                                <text
-                                    x={n.x}
-                                    y={n.y + 4}
-                                    textAnchor="middle"
-                                    fontSize={11}
-                                    fontWeight={700}
-                                    fill={labelColor}
-                                >
-                                    {n.label}
-                                </text>
+                                {/* 彩色树（tone）下算法高亮用圆环表示，保持角色色与图例一致 */}
+                                {toneMode && ringColor && (
+                                    boxKeys ? (
+                                        <rect
+                                            x={n.x - boxW / 2 - 3}
+                                            y={n.y - KEYS_BOX_H / 2 - 3}
+                                            width={boxW + 6}
+                                            height={KEYS_BOX_H + 6}
+                                            rx={11}
+                                            fill="none"
+                                            stroke={ringColor}
+                                            strokeWidth={
+                                                isCurrent || isExp ? 3.5 : 2.5
+                                            }
+                                        />
+                                    ) : (
+                                        <circle
+                                            cx={n.x}
+                                            cy={n.y}
+                                            r={R + (isCurrent || isExp ? 5 : 4)}
+                                            fill="none"
+                                            stroke={ringColor}
+                                            strokeWidth={
+                                                isCurrent || isExp ? 3.5 : 2.5
+                                            }
+                                        />
+                                    )
+                                )}
+                                {!boxKeys && (
+                                    <text
+                                        x={n.x}
+                                        y={n.y + 4}
+                                        textAnchor="middle"
+                                        fontSize={11}
+                                        fontWeight={700}
+                                        fill={labelColor}
+                                    >
+                                        {n.label}
+                                    </text>
+                                )}
                                 {isRoot && (
                                     <text
                                         x={n.x}
-                                        y={n.y - R - 3}
+                                        y={n.y - topGap - 3}
                                         textAnchor="middle"
                                         fontSize={9}
                                         fontWeight={800}
@@ -350,8 +471,8 @@ export function GraphCanvas({
                                 )}
                                 {orderIdx >= 0 && (
                                     <text
-                                        x={n.x + R - 2}
-                                        y={n.y - R + 2}
+                                        x={n.x + (boxKeys ? boxW / 2 : R) - 2}
+                                        y={n.y - topGap + 2}
                                         fontSize={9}
                                         fontWeight={800}
                                         fill={isCurrent ? "#e0e7ff" : "#475569"}
@@ -362,7 +483,7 @@ export function GraphCanvas({
                                 {ann !== undefined && (
                                     <text
                                         x={n.x}
-                                        y={n.y + R + 12}
+                                        y={n.y + topGap + 12}
                                         textAnchor="middle"
                                         fontSize={9}
                                         fontWeight={700}
@@ -373,15 +494,29 @@ export function GraphCanvas({
                                 )}
                                 {/* 被点击选中：紫色虚线环 */}
                                 {selected === n.id && (
-                                    <circle
-                                        cx={n.x}
-                                        cy={n.y}
-                                        r={R + 7}
-                                        fill="none"
-                                        stroke="#7c3aed"
-                                        strokeWidth={2.5}
-                                        strokeDasharray="5 4"
-                                    />
+                                    boxKeys ? (
+                                        <rect
+                                            x={n.x - boxW / 2 - 4}
+                                            y={n.y - KEYS_BOX_H / 2 - 4}
+                                            width={boxW + 8}
+                                            height={KEYS_BOX_H + 8}
+                                            rx={13}
+                                            fill="none"
+                                            stroke="#7c3aed"
+                                            strokeWidth={2.5}
+                                            strokeDasharray="5 4"
+                                        />
+                                    ) : (
+                                        <circle
+                                            cx={n.x}
+                                            cy={n.y}
+                                            r={R + 7}
+                                            fill="none"
+                                            stroke="#7c3aed"
+                                            strokeWidth={2.5}
+                                            strokeDasharray="5 4"
+                                        />
+                                    )
                                 )}
                             </g>
                         </g>

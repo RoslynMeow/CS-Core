@@ -3024,6 +3024,8 @@ export type BinNode = {
   right: number | null;
   /** 原始标签（非数字导入场景用；未设置则显示 String(val)） */
   label?: string;
+  /** 红黑树颜色：true=红，false/缺省=黑（RB 模块使用；其它模块无此字段则自然为黑） */
+  red?: boolean;
 };
 
 /** BinNode 数组 → 无向 Graph（左先右后入邻接表 → children[0]=左, children[1]=右） */
@@ -4090,24 +4092,32 @@ export function avlInsertOne(
     return { steps, result: { nodes, root: 0 } };
   }
   steps.push(snap(0, null, `插入 $x=${x}$（BST 步骤同插入）`, `insert ${x}`));
-  let p: number | null = root;
-  while (p !== null) {
-    if (x < nodes[p].val) {
-      if (nodes[p].left === null) {
+  // BST 插位定位：只有“挂入空位”才 break；下探到已有子节点（即使它是叶片）继续循环。
+  // 原实现底部「p 是叶子即 break」会在下探到已有叶片时提前退出 → 新节点从未挂载 → 插入失效
+  let p = root;
+  while (true) {
+    const cur = nodes[p];
+    if (x < cur.val) {
+      if (cur.left === null) {
         const id = nodes.length;
-        nodes[p].left = id;
+        cur.left = id;
         nodes.push({ id, val: x, left: null, right: null });
         p = id;
-      } else p = nodes[p].left;
-    } else if (nodes[p].right === null) {
-      const id = nodes.length;
-      nodes[p].right = id;
-      nodes.push({ id, val: x, left: null, right: null });
-      p = id;
-    } else p = nodes[p].right;
-    if (p !== null && nodes[p].left === null && nodes[p].right === null) break;
+        break;
+      }
+      p = cur.left;
+    } else {
+      if (cur.right === null) {
+        const id = nodes.length;
+        cur.right = id;
+        nodes.push({ id, val: x, left: null, right: null });
+        p = id;
+        break;
+      }
+      p = cur.right;
+    }
   }
-  const inserted = (p ?? 0) as number;
+  const inserted = p;
   root = avlRebalance(
     nodes,
     root,

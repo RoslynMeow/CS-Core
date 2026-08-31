@@ -19,6 +19,8 @@ import { treeTraverseModule } from "./tree/binary";
 import { treeBstModule } from "./tree/bst";
 import { treeAvlModule } from "./tree/avl";
 import { treeHeapModule } from "./tree/heap";
+import { treeRbModule } from "./tree/rb";
+import { treeSplayModule } from "./tree/splay";
 
 // SAFETY: 所有模块实现同一 ModuleDef 契约;泛型形参仅约束模块内部实现,运行时结构一致
 const asModule = (m: unknown): ModuleDef => m as ModuleDef;
@@ -44,6 +46,8 @@ export const KNOWLEDGE: Record<string, ModuleDef> = {
         [treeBstModule.id]: asModule(treeBstModule),
         [treeAvlModule.id]: asModule(treeAvlModule),
         [treeHeapModule.id]: asModule(treeHeapModule),
+        [treeRbModule.id]: asModule(treeRbModule),
+        [treeSplayModule.id]: asModule(treeSplayModule),
 };
 
 export const allModules = Object.values(KNOWLEDGE);

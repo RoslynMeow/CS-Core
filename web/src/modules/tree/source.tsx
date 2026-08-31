@@ -557,6 +557,8 @@ export function dualBuildScene(opts: {
   flyFrom: Vec2 | null;
   appeared: boolean;
   annotate?: Record<number, string>;
+  /** 目标树（右面板）彩色着色：id → tone 索引（红黑树：红=0 黑=4）；左面板 SRC_OFF 节点不受影响 */
+  tone?: Record<number, number>;
   titleR: Text;
   titleL?: Text;
   warn?: Text;
@@ -617,6 +619,7 @@ export function dualBuildScene(opts: {
     root: opts.root,
     directed: false,
     annotate: opts.annotate,
+    ...(opts.tone ? { tone: opts.tone } : {}),
     ...(opts.warn ? { warn: opts.warn } : {}),
     panel: {
       left: opts.titleL ?? {
@@ -639,6 +642,8 @@ export function buildDualFrames(
   titleR: Text,
   annotate?: (nodes: BinNode[]) => Record<number, string>,
   titleL?: Text,
+  /** 目标树彩色着色（红黑树等）：snap 节点快照 → tone 映射 */
+  toneFor?: (nodes: BinNode[]) => Record<number, number>,
 ): Frame<GraphCanvasScene>[] {
   const srcPos = treePositions(src, 0, DUAL_PANEL.left);
   let inserted = 0;
@@ -670,6 +675,7 @@ export function buildDualFrames(
             : null,
         appeared,
         annotate: annotate ? annotate(s.nodes) : undefined,
+        tone: toneFor ? toneFor(s.nodes) : undefined,
         titleR,
         titleL,
       }),
