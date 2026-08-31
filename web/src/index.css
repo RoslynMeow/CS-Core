@@ -489,3 +489,29 @@ a {
 .digit strong {
  font-size: 18px;
 }
+
+/* ============================================================
+   AVL/BST 建树双面板动画
+   左面板：随机生成的输入树；右面板：正在建立的 AVL/BST 树
+   - .tree-fly：  新节点从输入树位置“飞入”目标树（--fx/--fy=起点偏移）
+   - .tree-beam： 被拆节点 → 新节点的流动虚线光束（“棋子”沿线送过去）
+   ============================================================ */
+@keyframes treeFlyIn {
+ from {
+  transform: translate(var(--fx, 0px), var(--fy, 0px));
+ }
+ to {
+  transform: translate(0px, 0px);
+ }
+}
+.tree-fly {
+ animation: treeFlyIn 0.7s cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+@keyframes treeBeamFlow {
+ to {
+  stroke-dashoffset: -12;
+ }
+}
+.tree-beam {
+ animation: treeBeamFlow 0.8s linear infinite;
+}

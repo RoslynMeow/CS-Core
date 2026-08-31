@@ -20,6 +20,7 @@ import {
   binScene,
   importPreviewFrames,
   TreeCanvas,
+  buildDualFrames,
   type TreeCfg,
 } from "./source";
 
@@ -164,11 +165,21 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
   else if (cfg.mode === "insert")
     steps = bstInsertOne(base.nodes, base.root, cfg.x).steps;
   else steps = bstDeleteOnTree(base.nodes, base.root, cfg.target).steps;
-  const frames: Frame<GraphCanvasScene>[] = steps.map((s) => ({
-    line: s.line,
-    caption: s.msg,
-    scene: binScene(s.nodes, { current: s.focus, edge: s.edge }, s.root),
-  }));
+  // 建树：双面板动画 — 左：随机生成的输入树（已插入节点逐颗“拆走”、下一个高亮），
+  // 右：正在建立的 BST 树（新节点从输入树位置“飞”过来 + 流动光束）
+  const frames: Frame<GraphCanvasScene>[] =
+    cfg.mode === "build"
+      ? buildDualFrames(
+          steps,
+          res.values,
+          bstFromValues(res.values),
+          T("BST 树 · 正在建立", "BST tree · building"),
+        )
+      : steps.map((s) => ({
+          line: s.line,
+          caption: s.msg,
+          scene: binScene(s.nodes, { current: s.focus, edge: s.edge }, s.root),
+        }));
   // 退化链（偏斜树）提示：值序列升序时逐点插入必然退化为单链，画布呈“直线”，查找退化为 O(n)
   if (
     frames.length > 0 &&

@@ -4,6 +4,7 @@ import {
   avlInsertSteps,
   avlInsertOne,
   avlDeleteOnTree,
+  bstFromValues,
   bstSearchOnTree,
   BST_SEARCH_CODE,
   AVL_CODE,
@@ -20,6 +21,7 @@ import {
   importPreviewFrames,
   TreeCanvas,
   bfAnn,
+  buildDualFrames,
   type TreeCfg,
 } from "./source";
 
@@ -135,6 +137,17 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
   else if (cfg.mode === "insert")
     steps = avlInsertOne(base.nodes, base.root, cfg.x).steps;
   else steps = avlDeleteOnTree(base.nodes, base.root, cfg.target).steps;
+  // 建树：双面板动画 — 左：随机生成的输入树（已插入节点逐颗“拆走”、下一个高亮），
+  // 右：正在建立的 AVL 树（新节点从输入树位置“飞”过来 + 流动光束）
+  if (cfg.mode === "build") {
+    return buildDualFrames(
+      steps,
+      res.values,
+      bstFromValues(res.values),
+      T("AVL 树 · 正在建立", "AVL tree · building"),
+      bfAnn,
+    );
+  }
   return steps.map((s) => ({
     line: s.line,
     caption: s.msg,

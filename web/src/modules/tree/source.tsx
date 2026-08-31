@@ -8,6 +8,7 @@ import {
   binToGraph,
   binBf,
   type BinNode,
+  type BstStep,
   type TreeSnap,
   type Vec2,
 } from "../../lib/graph";
@@ -287,6 +288,7 @@ export function TreeCanvas<C extends TreeCfg>({
       scene={scene}
       onNodeClick={onNodeClick}
       selected={selected}
+      t={t}
       hint={
         scene.blurred
           ? t(
@@ -479,22 +481,14 @@ export function bfAnn(nodes: BinNode[]): Record<number, string> {
   return ann;
 }
 
-/** 场景辅助：BinNode 快照 → GraphCanvasScene（供 BstStep / 静态树通用） */
-export function binScene(
+/** 布局：BinNode 树 → 节点坐标（含单子节点“阶梯链”修正），box 为画布区域 */
+export function treePositions(
   nodes: BinNode[],
-  hl: {
-    current?: number | null;
-    exploring?: number | null;
-    visited?: number[];
-    frontier?: number[];
-    edge?: [number, number] | null;
-    order?: number[];
-  },
-  root = 0,
-  annotate?: Record<number, string>,
-) {
+  root: number,
+  box: { x0: number; y0: number; w: number; h: number },
+): Vec2[] {
   const g = binToGraph(nodes);
-  const pos = g.layoutTree(root, TREE_BOX).pos;
+  const pos = g.layoutTree(root, box).pos;
   // 单子节点修正：layoutTree 把独生子与父节点居中到同一横坐标 → 退化成竖直“直线”；
   // 这里按左右方向把独生子连同其整棵子树错开成“阶梯链”，退化链/偏斜树一眼可辨，
   // 普通单子节点也不再重叠；整棵子树一起平移 → 父节点仍居中于子树中心，不会出现
@@ -510,7 +504,7 @@ export function binScene(
     const maxDep = Math.max(0, ...dep);
     const step = Math.min(
       52,
-      Math.max(18, (TREE_BOX.w - 80) / Math.max(1, 2 * maxDep)),
+      Math.max(18, (box.w - 80) / Math.max(1, 2 * maxDep)),
     );
     // 收集 u 的整棵子树（含 u 自身）的节点 id
     const subTree = (u: number): number[] => {
@@ -535,6 +529,156 @@ export function binScene(
       }
     }
   }
+  return pos;
+}
+
+/** 双面板建树（AVL/BST）画布分区：左=随机生成的输入树，右=正在建立的树 */
+export const DUAL_PANEL = {
+  left: { x0: 16, y0: 40, w: 352, h: 384 },
+  right: { x0: 392, y0: 40, w: 352, h: 384 },
+};
+/** 左面板（输入树）节点 id 偏移：与右面板（目标树）id 空间隔离 */
+export const SRC_OFF = 2000;
+
+/** 双面板场景：左=输入树（已插入的拆成空心，下一个蓝色高亮），
+ *  右=正在建立的树（新节点从输入树位置“飞”过来 + 流动光束）
+ *  - consumed：已从输入树拆走的节点数（左面板前 consumed 个空心）
+ *  - next：输入树中“即将插入”的节点（蓝色高亮，null=全部插完）
+ *  - fly / flyFrom：本轮刚“拆”到目标树的节点 id 及其输入树坐标（飞入动画起点） */
+export function dualBuildScene(opts: {
+  src: BinNode[];
+  nodes: BinNode[];
+  root: number;
+  focus: number | null;
+  edge: [number, number] | null;
+  consumed: number;
+  next: number | null;
+  fly: number | null;
+  flyFrom: Vec2 | null;
+  appeared: boolean;
+  annotate?: Record<number, string>;
+  titleR: Text;
+  warn?: Text;
+}): GraphCanvasScene {
+  const srcPos = treePositions(opts.src, 0, DUAL_PANEL.left);
+  const pos = treePositions(opts.nodes, opts.root, DUAL_PANEL.right);
+  const nodes: GraphCanvasScene["nodes"] = [];
+  for (let i = 0; i < opts.src.length; i++) {
+    nodes.push({
+      id: SRC_OFF + i,
+      label: String(opts.src[i].val),
+      x: srcPos[i]?.x ?? 0,
+      y: srcPos[i]?.y ?? 0,
+      hollow: i < opts.consumed,
+    });
+  }
+  for (let i = 0; i < opts.nodes.length; i++) {
+    nodes.push({
+      id: i,
+      label: String(opts.nodes[i].val),
+      x: pos[i]?.x ?? 0,
+      y: pos[i]?.y ?? 0,
+      fly:
+        opts.fly === i && opts.flyFrom !== null
+          ? { x: opts.flyFrom.x, y: opts.flyFrom.y }
+          : undefined,
+    });
+  }
+  const edges: { u: number; v: number; beam?: boolean }[] = [];
+  for (let i = 0; i < opts.nodes.length; i++) {
+    const n = opts.nodes[i];
+    if (n.left !== null) edges.push({ u: i, v: n.left });
+    if (n.right !== null) edges.push({ u: i, v: n.right });
+  }
+  // 光束：左面板被拆节点 → 右面板新节点（流动虚线，体现“拆过去”)
+  if (opts.fly !== null && opts.fly >= 0 && opts.flyFrom !== null) {
+    edges.push({ u: SRC_OFF + opts.fly, v: opts.fly, beam: true });
+  }
+  return {
+    current: opts.appeared && opts.fly !== null ? opts.fly : opts.focus,
+    exploring: null,
+    visited: [],
+    frontier:
+      opts.next !== null && opts.next >= 0 && opts.next < opts.src.length
+        ? [SRC_OFF + opts.next]
+        : [],
+    order: [],
+    edge: opts.edge,
+    nodes,
+    edges,
+    root: opts.root,
+    directed: false,
+    annotate: opts.annotate,
+    ...(opts.warn ? { warn: opts.warn } : {}),
+    panel: {
+      left: { zh: "随机生成的树 · 输入", en: "Random tree · input" },
+      right: opts.titleR,
+    },
+  };
+}
+
+/** 建树双面板帧序列：左=随机生成的输入树（已插入节点逐颗“拆走”、下一个高亮），
+ *  右=正在建立的 AVL/BST 树（新节点带飞入动画 + 光束飞过来）
+ *  关键：bstInsertSteps / avlInsertSteps 的节点 id = 插入顺序（0,1,2,…），
+ *  且 bstFromValues(values) 也是同样 id → 左面板 SRC_OFF+i 与右面板 i 是同一个值 */
+export function buildDualFrames(
+  steps: BstStep[],
+  values: number[],
+  src: BinNode[],
+  titleR: Text,
+  annotate?: (nodes: BinNode[]) => Record<number, string>,
+): Frame<GraphCanvasScene>[] {
+  const srcPos = treePositions(src, 0, DUAL_PANEL.left);
+  let inserted = 0;
+  let inPost = false; // 处于“刚插完、正在做后续处理（平衡检查/旋转）”阶段 → 光束指向该节点
+  return steps.map((s) => {
+    const phaseStart = s.line === 0 && s.focus === null;
+    if (phaseStart || s.line === 7) inPost = false; // 新值宣布 / 完成 → 关闭光束
+    const appeared = s.visible > inserted;
+    if (appeared) {
+      inserted = s.visible;
+      inPost = true;
+    }
+    const flyId = inPost && inserted > 0 ? inserted - 1 : null; // 本轮刚插入的节点
+    return {
+      line: s.line,
+      caption: s.msg,
+      scene: dualBuildScene({
+        src,
+        nodes: s.nodes,
+        root: s.root,
+        focus: s.focus,
+        edge: s.edge,
+        consumed: s.visible,
+        next: s.visible < values.length ? s.visible : null,
+        fly: flyId,
+        flyFrom:
+          flyId !== null && flyId >= 0 && flyId < srcPos.length
+            ? srcPos[flyId]
+            : null,
+        appeared,
+        annotate: annotate ? annotate(s.nodes) : undefined,
+        titleR,
+      }),
+    };
+  });
+}
+
+/** 场景辅助：BinNode 快照 → GraphCanvasScene（供 BstStep / 静态树通用） */
+export function binScene(
+  nodes: BinNode[],
+  hl: {
+    current?: number | null;
+    exploring?: number | null;
+    visited?: number[];
+    frontier?: number[];
+    edge?: [number, number] | null;
+    order?: number[];
+  },
+  root = 0,
+  annotate?: Record<number, string>,
+) {
+  const pos = treePositions(nodes, root, TREE_BOX);
   const edges = nodes.flatMap((n, i) => [
     ...(n.left === null ? [] : [{ u: i, v: n.left }]),
     ...(n.right === null ? [] : [{ u: i, v: n.right }]),
