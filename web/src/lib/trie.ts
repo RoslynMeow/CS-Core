@@ -342,12 +342,13 @@ export function trieDeleteOne(
     u = par;
   }
   if (toRemove.size > 0) {
-    nodes = nodes.filter((n) => !toRemove.has(n.id)).map((n, i) => ({ ...n, id: i }));
-    // 重映射孩子引用
+    // 先 filter 保留旧 id → 以旧 id 建映射 → 最后才重编号（与 suffix/radix 压缩一致）
+    const keep = nodes.filter((n) => !toRemove.has(n.id));
     const map = new Map<number, number>();
-    nodes.forEach((n, i) => map.set(n.id, i));
-    nodes = nodes.map((n) => ({
+    keep.forEach((n, i) => map.set(n.id, i));
+    nodes = keep.map((n) => ({
       ...n,
+      id: map.get(n.id)!,
       parent: n.parent === null ? null : map.get(n.parent!) ?? null,
       children: Object.fromEntries(
         Object.entries(n.children)
@@ -430,11 +431,13 @@ export function suffixTreeFrames(
     par.children[tNode.ch + onlyCh] = onlyId;
     nodes[onlyId].parent = par.id;
     delete par.children[tNode.ch];
-    nodes = nodes.filter((n) => n.id !== target).map((n, i) => ({ ...n, id: i }));
+    // 先 filter 保留旧 id → 以旧 id 建映射 → 最后才重编号（radix.tsx 同款正确顺序）
+    const remNodes = nodes.filter((n) => n.id !== target);
     const map = new Map<number, number>();
-    nodes.forEach((n, i) => map.set(n.id, i));
-    nodes = nodes.map((n) => ({
+    remNodes.forEach((n, i) => map.set(n.id, i));
+    nodes = remNodes.map((n) => ({
       ...n,
+      id: map.get(n.id)!,
       parent: n.parent === null ? null : map.get(n.parent!) ?? null,
       children: Object.fromEntries(
         Object.entries(n.children)

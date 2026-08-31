@@ -210,7 +210,7 @@ const CODE: Record<Op, any> = {
 function toHex(b: number) { return b.toString(16).padStart(2, '0').toUpperCase(); }
 
 export const hashTableModule: ModuleDef<Scene, Cfg> = {
-  id: 'hash-table', title: T('哈希表 · 散列寻址', 'Hash Table'),
+  id: 'hash-table', title: T('哈希表', 'Hash Table'),
   desc: T('固定桶数组 $table[0..m-1]$（每个桶存链表头指针），子 $hash$ 定归属：除法 $k\\bmod m$ / 乘法 $\\lfloor m(kA\\bmod 1)\\rfloor$ / 平方取中；冲突用链地址法。', 'Bucket array + chained hash (division/multiplication/mid-square).'),
   tags: ['data-structures', 'computer-organization'],
   defaultConfig: { elemType: 'i32', endian: 'little', ptrSize: 4, bucketM: 10, method: 'division' as HashMethod, dup: 'reject' as Dup, inited: false, keysStr: '', op: 'idle', key: 4, execTick: 0 },

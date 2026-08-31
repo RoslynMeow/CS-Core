@@ -40,8 +40,8 @@ export const BTREE_INSERT_CODE: Text[] = [
   { zh: "$p \\gets$ 会插入的叶子（沿键下探）", en: "$p \\gets$ target leaf (descend by keys)" },
   { zh: "叶内有序插入 $x$", en: "insert $x$ in order into leaf" },
   { zh: "$|keys| = m$（满）→ 分裂：中间键上提", en: "$|keys| = m$ (full) → split: middle key moves up" },
-  { zh: "沿父链回溯修复（可能逐层分裂到根）", en: "walk up fixing (splits may propagate to root)" },
-  { zh: "if 根满 → 新建根，全树高度 +1  // 完成", en: "if root full → new root, height +1  // done" },
+  { zh: "while 父满：$|keys| \\geq m$ → 逐层分裂上提（可能到根）", en: "while parent full: $|keys| \\geq m$ → split and move up (may reach root)" },
+  { zh: "if $root$ 满 → 新建根，$height \\gets height+1$  // 完成", en: "if $root$ full → new root, $height+1$  // done" },
 ];
 
 export const BTREE_DELETE_CODE: Text[] = [
@@ -108,9 +108,7 @@ export function bTreeLayout(
   const pos: { x: number; y: number }[] = nodes.map(() => ({ x: 0, y: 0 }));
   if (nodes.length === 0) return pos;
   const maxDepth = nodes.reduce((m, n) => Math.max(m, depthOf(nodes, n.id)), 0);
-  const total = nodes.reduce((s, n) => s + (n.children.length === 0 ? 1 : 0), 0);
   const stepY = Math.min(72, Math.max(44, box.h / Math.max(2, maxDepth + 1)));
-  const unit = box.w / Math.max(1, total);
   const alloc = (u: number, x0: number, x1: number) => {
     const lc = leafCount(nodes, u);
     pos[u] = { x: (x0 + x1) / 2, y: box.y0 + depthOf(nodes, u) * stepY };
@@ -405,16 +403,20 @@ export function bPlusInsertSteps(values: number[], m: number): BStep[] {
     const i = lowerBound(nodes[p].keys, x);
     nodes[p].keys.splice(i, 0, x);
     steps.push(snap(1, p, `叶 ${S(p)} 插入 $x=${x}$`, `leaf ${S(p)} insert ${x}`));
-    // 叶满分裂：中键上提（叶内保留全部数据键 → 左右各半平分）
+    // 叶满分裂
     let cur = p;
     while (isFull(nodes[cur], m)) {
       const mid = Math.floor(nodes[cur].keys.length / 2);
       const midKey = nodes[cur].keys[mid];
+      const isLeaf = nodes[cur].children.length === 0;
+      // B+ 叶子：数据均分，midKey 留在右叶（slice(mid)）；
+      // 内层：midKey 上提，右半必须 slice(mid+1)（否则父键与右孩子最小键重复、keys/children 失同步）
       const leftKeys = nodes[cur].keys.slice(0, mid);
-      const rightKeys = nodes[cur].keys.slice(mid);
+      const rightKeys = isLeaf
+        ? nodes[cur].keys.slice(mid)
+        : nodes[cur].keys.slice(mid + 1);
       const leftCh = nodes[cur].children.slice(0, mid + 1);
       const rightCh = nodes[cur].children.slice(mid + 1);
-      const isLeaf = nodes[cur].children.length === 0;
       nodes[cur].keys = leftKeys;
       nodes[cur].children = leftCh;
       const rightId = nodes.length;
@@ -438,8 +440,15 @@ export function bPlusInsertSteps(values: number[], m: number): BStep[] {
         steps.push(snap(4, newRoot, `根满 → 新建根 $[${idxKey}]$`, `new root [${idxKey}]`));
         break;
       }
+      // B+ 内层/叶子分裂：索引键 idxKey 分隔 cur 与 rightId（位于原 cur 的位置 ci），
+      // 必须插在 keys[ci]，而不是用 lowerBound（两者不一致会令 keys 与 children 失同步,
+      // 后续下探 children[i] 越界崩溃）
       const ci = nodes[pcur].children.indexOf(cur);
-      nodes[pcur].keys.splice(lowerBound(nodes[pcur].keys, idxKey), 0, idxKey);
+      if (ci === -1) {
+        // 防御：父引用丢失则重建父链（理论不可达，防呆）
+        throw new Error(`bplus split: parent ${pcur} lost child ${cur}`);
+      }
+      nodes[pcur].keys.splice(ci, 0, idxKey);
       nodes[pcur].children.splice(ci, 1, cur, rightId);
       steps.push(snap(3, pcur, `内层 ${S(pcur)} 收索引 $[${idxKey}]$`, `index ${S(pcur)} takes ${idxKey}`));
       cur = pcur;

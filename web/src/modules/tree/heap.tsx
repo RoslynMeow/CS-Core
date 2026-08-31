@@ -224,7 +224,7 @@ function applyOnEnd(cfg: Cfg): Cfg | null {
 
 export const treeHeapModule: ModuleDef<GraphCanvasScene, Cfg> = {
   id: "binary-tree-heap",
-  title: T("二叉堆 · Heap", "Binary Heap"),
+  title: T("二叉堆", "Binary Heap"),
   desc: T(
     "建堆 / 上滤插入 / 下滤删顶 / 堆排序；需完全二叉树；播完自动保存为新版本（导入当前图可覆盖回原图）；删除堆顶可连续进行",
     "build · insert · delete-top · sort; needs complete tree; auto-applies on play end (import to revert); delete-top is repeatable",

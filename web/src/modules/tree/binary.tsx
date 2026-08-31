@@ -102,7 +102,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
 
 export const treeTraverseModule: ModuleDef<GraphCanvasScene, Cfg> = {
   id: "binary-tree",
-  title: T("二叉树 · 遍历", "Binary Tree · Traversal"),
+  title: T("二叉树", "Binary Tree"),
   desc: T(
     "前序 / 中序 / 后序 / 层序遍历二叉树；树可随机生成或从图创建导入（须为二叉树）",
     "preorder · inorder · postorder · level-order; random or imported binary tree",

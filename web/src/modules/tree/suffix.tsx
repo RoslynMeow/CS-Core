@@ -19,9 +19,9 @@ type Cfg = {
 const DEFAULT: Cfg = { text: "banana", target: "ana", mode: "build" };
 const CODE: Record<Mode, Text[]> = {
   build: [
-    T("后缀字典树：把 $s+\\$$ 的全部后缀插入（$$$ 表结束）", "suffix trie: insert every suffix of $s+\\$$ ($\\$$ = terminator)"),
-    T("压缩：单子路径合并  // 边标签 = 子串", "compress single-child paths  // edge label = substring"),
-    T("// 后缀树完成：读边标还原后缀；最长公共子串/回文关键结构", "// suffix tree done; edge labels reconstruct suffixes"),
+    T("后缀字典树：插入 $s+\\$$ 的全部后缀 $s_i..s_n$", "suffix trie: insert every suffix of $s+\\$$ ($\\$$ = terminator)"),
+    T("merge 单子路径 $u \\to$ 父边  // 边标签 = 子串", "merge single-child $u \\to$ parent edge  // edge label = substring"),
+    T("// 后缀树完成：边标 = 后缀；$LCS$/回文关键结构", "// suffix tree done: edge = suffix; key for $LCS$/palindromes"),
   ],
   search: [
     T("沿边标签匹配子串（可能跨字符）", "match substring along edge labels"),
@@ -228,7 +228,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
 
 export const SuffixTreeModule: ModuleDef<GraphCanvasScene, Cfg> = {
   id: "suffix-tree",
-  title: T("后缀树 · Suffix Tree", "Suffix Tree"),
+  title: T("后缀树", "Suffix Tree"),
   desc: T(
     "两段式建树(后缀字典树 → 压缩成后缀树，边标签=子串)/ 子串查找(带出现次数)；$$$ 结束符；Ukkonen 在线算法留作讲义延伸",
     "two-stage build (suffix trie → compressed suffix tree, edge=substring) · substring search with occurrence count; $ terminator; Ukkonen's online algorithm deferred to notes",

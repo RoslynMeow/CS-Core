@@ -186,7 +186,7 @@ function applyOnEnd(cfg: Cfg): Cfg | null {
 
 export const treeAvlModule: ModuleDef<GraphCanvasScene, Cfg> = {
   id: "binary-tree-avl",
-  title: T("AVL 树", "AVL Tree"),
+  title: T("平衡二叉树", "Balanced Binary Tree"),
   desc: T(
     "建树（初始化）/ 查找 / 插入 / 删除；插入、删除自动 LL/LR/RR/RL 旋转重平衡；播完自动保存为新版本（导入当前图可覆盖回原图）",
     "build (init) · search · insert · delete; auto rotations; auto-applies on play end (import to revert)",

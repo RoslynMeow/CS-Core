@@ -240,7 +240,7 @@ function applyOnEnd(cfg: Cfg): Cfg | null {
 
 export const treeBstModule: ModuleDef<GraphCanvasScene, Cfg> = {
   id: "binary-tree-bst",
-  title: T("二叉搜索树 · BST", "Binary Search Tree"),
+  title: T("二叉搜索树", "Binary Search Tree"),
   desc: T(
     "建树（初始化）/ 查找 / 插入 / 删除；插入 = 往当前树加一个节点；播完自动应用为新版本（导入当前图可覆盖回原图）",
     "build (init) · search · insert · delete; insert adds a node to the current tree; auto-applies on play end (import to revert)",

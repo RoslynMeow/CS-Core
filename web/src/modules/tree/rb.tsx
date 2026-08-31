@@ -442,7 +442,7 @@ function RbSide({
 
 export const treeRbModule: ModuleDef<GraphCanvasScene, Cfg> = {
   id: "binary-tree-rb",
-  title: T("红黑树 · RB", "Red-Black Tree"),
+  title: T("红黑树", "Red-Black Tree"),
   desc: T(
     "建树（初始化）/ 查找 / 插入 / 删除；插入修复 case1-3、删除修复 case1-4（含二次替换与全部旋转）；红/黑着色 + 黑高标注；播完自动保存为新版本（导入当前图可覆盖回原图）",
     "build (init) · search · insert · delete; insert fixups case1-3, delete fixups case1-4; red/black coloring + black-height; auto-applies on play end (import to revert)",

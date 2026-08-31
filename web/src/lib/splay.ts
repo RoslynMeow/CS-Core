@@ -9,28 +9,28 @@ import { bstSearchOnTree } from "./graph";
 // 结构仍为 BinNode 数组 + 紧凑 id；旋转复用 rbtree 同款 rotL/rotR。
 // ============================================================
 
-/** Splay 纯旋转说明（搜索/建树内部帧高亮旋转类型） */
+/** Splay 纯旋转说明（搜索/建树内部帧高亮旋转类型）；正文仅英文伪代码词 + $数学$，中文在 // 后 */
 export const SPLAY_CODE: Text[] = [
-  { zh: "zig：$x$ 是根的孩子 → 单旋", en: "zig: $x$ is a child of root → single rotate" },
-  { zh: "zig-zig：$x$ 与父同侧 → 双旋（先父后 $x$）", en: "zig-zig: same side as parent → double rotate (parent first)" },
-  { zh: "zig-zag：$x$ 与父异侧 → 双旋（先 $x$ 后父）", en: "zig-zag: opposite side → double rotate ($x$ first)" },
+  { zh: "$rotate(x)$  // zig：$x$ 是根的孩子, 单旋", en: "$rotate(x)$  // zig: $x$ is root's child, single rotate" },
+  { zh: "$rotate(p); rotate(x)$  // zig-zig：与父同侧, 双旋先父后 $x$", en: "$rotate(p); rotate(x)$  // zig-zig: same side, parent first" },
+  { zh: "$rotate(x); rotate(p)$  // zig-zag：与父异侧, 双旋先 $x$ 后父", en: "$rotate(x); rotate(p)$  // zig-zag: opposite side, $x$ first" },
   { zh: "// $x$ 到达根", en: "// $x$ reaches the root" },
 ];
 
-/** 插入/建树伪代码 */
+/** 插入/建树伪代码（正文数学 + 英文结构词，中文在 // 后） */
 export const SPLAY_INSERT_CODE: Text[] = [
-  { zh: "$z \\gets$ 新节点（BST 插入到空位）", en: "$z \\gets$ new node (BST insert to leaf)" },
-  { zh: "while $z.p \\neq NIL$：$splay(z)$  // 旋到根", en: "while $z.p \\neq NIL$: $splay(z)$  // to root" },
-  { zh: "$z$ 成为根（热点上浮）", en: "$z$ is now root (hot node floats up)" },
+  { zh: "$z \\gets$ newNode  // BST 插入到空位的新节点", en: "$z \\gets$ newNode  // BST insert to leaf" },
+  { zh: "while $z.p \\neq NIL$: $splay(z)$  // 旋到根", en: "while $z.p \\neq NIL$: $splay(z)$  // to root" },
+  { zh: "$root \\gets z$  // 热点上浮至根", en: "$root \\gets z$  // hot node floats up" },
 ];
 
-/** 删除伪代码 */
+/** 删除伪代码（正文数学 + 英文结构词，中文在 // 后） */
 export const SPLAY_DELETE_CODE: Text[] = [
-  { zh: "定位 $p$（BST 删除搜索）", en: "locate $p$ (BST delete search)" },
+  { zh: "locate $p$  // BST 删除搜索", en: "locate $p$  // BST delete search" },
   { zh: "$splay(p)$  // 先把目标旋到根", en: "$splay(p)$  // splay target to root first" },
-  { zh: "摘根：左右子树 $T_L$、$T_R$ 分离", en: "remove root: split into $T_L$ and $T_R$" },
-  { zh: "if $T_L$ 空：新根 $= T_R$", en: "if $T_L$ empty: new root $= T_R$" },
-  { zh: "else：$m \\gets max(T_L)$；$splay(m)$，右接 $T_R$  // 完成", en: "else: $m \\gets max(T_L)$; $splay(m)$, attach $T_R$ on right  // done" },
+  { zh: "$split(T, p)$  // 摘根：左右子树 $T_L$、$T_R$ 分离", en: "$split(T, p)$  // split into $T_L$ and $T_R$" },
+  { zh: "if $T_L$ empty: $root \\gets T_R$  // 左子树空", en: "if $T_L$ empty: $root \\gets T_R$" },
+  { zh: "else: $m \\gets max(T_L)$; $splay(m)$; attach $T_R$  // 右接 $T_R$, 完成", en: "else: $m \\gets max(T_L)$; $splay(m)$; attach $T_R$  // done" },
 ];
 
 function binParents(nodes: BinNode[]): number[] {

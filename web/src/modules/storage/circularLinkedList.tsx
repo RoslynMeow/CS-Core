@@ -122,7 +122,7 @@ const CODE: Record<Op, any> = {
 function toHex(b: number) { return b.toString(16).padStart(2, '0').toUpperCase(); }
 
 export const circularLinkedListModule: ModuleDef<Scene, Cfg> = {
-  id: 'circular-linked-list', title: T('循环链表 · 环形链式', 'Circular Linked List'),
+  id: 'circular-linked-list', title: T('循环链表', 'Circular Linked List'),
   desc: T('单链表的尾节点 $next$ 不指向 $null$，而是指回头节点 $head$，形成闭环；遍历无终止标记需计步。', 'Tail next points back to head.'),
   tags: ['data-structures', 'computer-organization'],
   defaultConfig: { elemType: 'i32', endian: 'little', valuesStr: '', ptrSize: 4, op: 'idle', pos: 0, insVal: 99, execTick: 0 },

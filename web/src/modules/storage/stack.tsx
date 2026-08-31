@@ -149,7 +149,7 @@ const CODE: Record<Op, any> = {
 };
 
 export const stackModule: ModuleDef<Scene, Cfg> = {
-  id: 'stack', title: T('栈 · 后进先出', 'Stack (LIFO)'),
+  id: 'stack', title: T('栈', 'Stack (LIFO)'),
   desc: T('Push/Pop 都发生在栈顶 $top$；顺序栈用连续数组 + top 下标，链式栈用链表头作栈顶。$O(1)$。', 'LIFO; array or linked top.'),
   tags: ['data-structures', 'computer-organization'],
   defaultConfig: { impl: 'array' as Impl, elemType: 'i32', endian: 'little', capacity: 8, inited: false, dataStr: '', op: 'idle', val: 9, execTick: 0 },

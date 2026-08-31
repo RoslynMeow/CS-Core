@@ -208,7 +208,7 @@ const CODE: Record<Op, any> = {
 
 export const sequentialListModule: ModuleDef<Scene, Cfg> = {
   id: 'sequential-list',
-  title: T('顺序表 · 连续存储', 'Sequential List'),
+  title: T('顺序表', 'Sequential List'),
   desc: T('预分配 $capacity$ 槽，$L[i]$ 映到 $malloc$ 返回的真实连续地址 $base+i\\cdot elemSize$；位置可用 $0..capacity-1$。', 'Fixed capacity via real malloc.'),
   tags: ['data-structures', 'computer-organization'],
   defaultConfig: { elemType: 'i32', endian: 'little', capacity: 8, inited: false, valuesStr: '', op: 'idle', pos: 0, insVal: 99, execTick: 0 },

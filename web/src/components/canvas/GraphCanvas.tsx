@@ -88,39 +88,16 @@ export function GraphCanvas({
 }) {
     const { nodes, edges, directed = false } = scene;
     const pos = new Map(nodes.map((n) => [n.id, n]));
-    // 端点偏移量：圆=R+4；货架(box)节点按射线与矩形求交（矩形半宽/半高）
-    const nodeOffset = (
-        n: { keys?: (string | number)[] },
-        ux: number,
-        uy: number,
-    ) => {
-        if (n.keys && n.keys.length > 0) {
-            const w = KEYS_BOX_W(n.keys.length);
-            const h = KEYS_BOX_H;
-            const t = Math.min(
-                (w / 2 + 2) / Math.max(Math.abs(ux), 1e-9),
-                (h / 2 + 2) / Math.max(Math.abs(uy), 1e-9),
-            );
-            return { x: ux * t, y: uy * t };
-        }
-        return { x: ux * (R + 4), y: uy * (R + 4) };
-    };
+    // 边端点直接落在节点圆心（连接两个节点圆的中心）；节点圆/矩形后绘会盖住穿心线段，视觉上自然衔接
     const edgePos = (u: number, v: number) => {
         const a = pos.get(u),
             b = pos.get(v);
         if (!a || !b) return null;
-        const dx = b.x - a.x,
-            dy = b.y - a.y;
-        const len = Math.hypot(dx, dy) || 1;
-        const ux = dx / len,
-            uy = dy / len;
-        const oa = nodeOffset(a, ux, uy);
-        const ob = nodeOffset(b, -ux, -uy);
         return {
-            ax: a.x + oa.x,
-            ay: a.y + oa.y,
-            bx: b.x - ob.x,
-            by: b.y - ob.y,
+            ax: a.x,
+            ay: a.y,
+            bx: b.x,
+            by: b.y,
             mx: (a.x + b.x) / 2,
             my: (a.y + b.y) / 2,
         };

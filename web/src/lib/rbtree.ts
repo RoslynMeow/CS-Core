@@ -12,33 +12,33 @@ import { bstSearchOnTree } from "./graph";
 /** 红黑树节点：BinNode + red（true=红，false/缺省=黑） */
 export type RBNode = BinNode;
 
-/** RB 插入伪代码（build/insert 共用；行 0 为新值宣布、行 7 为完成，与 buildDualFrames 约定一致） */
+/** RB 插入伪代码（build/insert 共用；行 0 为新值宣布、行 7 为完成，与 buildDualFrames 约定一致）
+ *  正文仅含伪代码结构词与 $数学$，中文说明均在 // 注释后 */
 export const RB_INSERT_CODE: Text[] = [
-  { zh: "$z \\gets$ 新节点，$z.c \\gets RED$  // 插入 $z$", en: "$z \\gets$ new node, $z.c \\gets RED$" },
-  { zh: "$y \\gets NIL$；$x \\gets root$  // 定位空位", en: "$y \\gets NIL$; $x \\gets root$  // locate" },
-  { zh: "while $x \\neq NIL$：$y \\gets x$，左/右下探", en: "while $x \\neq NIL$: $y \\gets x$, go left/right" },
-  { zh: "空位挂 $z$（$z.p \\gets y$，$z.c \\gets RED$）", en: "attach $z$ at the empty slot ($z.c \\gets RED$)" },
-  { zh: "while $z.p.c = RED$：  // 红红冲突", en: "while $z.p.c = RED$:  // red-red conflict" },
-  { zh: "if 叔 $u$ 红：父/叔 $\\gets BLACK$，爷 $\\gets RED$，$z \\gets$ 爷  // case1", en: "if uncle $u$ RED: parent/uncle $\\gets BLACK$, gp $\\gets RED$, $z \\gets$ gp  // case1" },
-  { zh: "elif $z$ 内侧子：旋父使 $z$ 变外侧，$z \\gets z.p$  // case2", en: "elif $z$ is inner: rotate parent so $z$ becomes outer, $z \\gets z.p$  // case2" },
-  { zh: "else：父 $\\gets BLACK$，爷 $\\gets RED$，旋爷  // case3", en: "else: parent $\\gets BLACK$, gp $\\gets RED$, rotate gp  // case3" },
-  { zh: "$root.c \\gets BLACK$  // 完成", en: "$root.c \\gets BLACK$  // done" },
+  { zh: "new $z$; $z.c \\gets RED$  // 新节点染红", en: "new $z$; $z.c \\gets RED$  // new node, red" },
+  { zh: "$y \\gets NIL$; $x \\gets root$  // 定位空位", en: "$y \\gets NIL$; $x \\gets root$  // locate" },
+  { zh: "while $x \\neq NIL$: $y \\gets x$, $x \\gets$ child  // 左/右下探", en: "while $x \\neq NIL$: $y \\gets x$, descend  // left/right" },
+  { zh: "$z.p \\gets y$; attach $z$  // 空位挂入", en: "$z.p \\gets y$; attach $z$" },
+  { zh: "while $z.p.c = RED$:  // 红红冲突", en: "while $z.p.c = RED$:  // red-red conflict" },
+  { zh: "if $u = uncle(z)$ RED: $p,u \\gets BLACK$; $g \\gets RED$; $z \\gets g$  // case1 叔红", en: "if uncle $u$ RED: $p,u \\gets BLACK$; $g \\gets RED$; $z \\gets g$  // case1" },
+  { zh: "elif $z$ inner: $rotate(p)$  // case2 内侧旋父", en: "elif $z$ is inner: $rotate(p)$  // case2" },
+  { zh: "else: $p \\gets BLACK$; $g \\gets RED$; $rotate(g)$  // case3 外侧旋爷", en: "else: $p \\gets BLACK$; $g \\gets RED$; $rotate(g)$  // case3" },
+  { zh: "$root.c \\gets BLACK$  // 根恒黑 · 完成", en: "$root.c \\gets BLACK$  // done" },
 ];
 
-/** RB 删除伪代码（全量的删黑修复 case1-4） */
+/** RB 删除伪代码（全量的删黑修复 case1-4）；正文仅数学 + 伪代码结构词，中文在 // 后 */
 export const RB_DELETE_CODE: Text[] = [
-  { zh: "定位 $p$（BST 删除搜索）  // 删 $x$", en: "locate $p$ (BST delete search)  // delete $x$" },
-  { zh: "$y \\gets z$；$y.orig \\gets y.color$", en: "$y \\gets z$; $y.orig \\gets y.color$" },
-  { zh: "if $z$ 至多一子：$x \\gets$ 子或 NIL，$transplant(z, x)$", en: "if $z$ has $\\leq 1$ child: $x \\gets$ child or NIL, $transplant(z,x)$" },
-  { zh: "else：$y \\gets$ 右子树最小；$y.orig \\gets y.color$；$x \\gets y.R$", en: "else: $y \\gets$ min of right; $y.orig \\gets y.color$; $x \\gets y.R$" },
-  { zh: "$transplant(y, x)$；$transplant(z, y)$；$y.color \\gets z.color$", en: "$transplant(y,x)$; $transplant(z,y)$; $y.color \\gets z.color$" },
-  { zh: "if 原 $y.c = BLACK$：$fixup(x)$  // 删黑 → 双黑补救", en: "if $y.c$ was BLACK: $fixup(x)$  // double-black" },
-  { zh: "while $x \\neq root \\wedge x = BLACK$：", en: "while $x \\neq root \\wedge x = BLACK$:" },
-  { zh: "case1 兄 $w$ 红：换色 + 旋父（$w \\gets$ 新兄）", en: "case1 sibling RED: recolor + rotate parent" },
-  { zh: "case2 兄 $w$ 双子黑：$w$ 红、双黑上移 $x \\gets x.p$", en: "case2 sibling's children BLACK: $w$ RED, double-black moves up" },
-  { zh: "case3 兄近子红远子黑：换色 + 旋兄（$w \\gets$ 新兄）", en: "case3 near child RED / far BLACK: recolor + rotate sibling" },
-  { zh: "case4 兄远子红：$w$ 取父色、父/远子黑、旋父、$x \\gets root$", en: "case4 far child RED: recolor + rotate parent, $x \\gets root$" },
-  { zh: "$x.c \\gets BLACK$；$root.c \\gets BLACK$  // 完成", en: "$x.c \\gets BLACK$; done" },
+  { zh: "locate $z$; $y \\gets z$; $y.orig \\gets y.color$  // 定位 $z$ 并记录", en: "locate $z$; $y \\gets z$; record $y.color$" },
+  { zh: "if $z$ child $\\leq 1$: $x \\gets$ child $\\vee$ NIL; $transplant(z, x)$  // 至多一子", en: "if $\\leq 1$ child: $x \\gets$ child or NIL, $transplant(z,x)$" },
+  { zh: "else: $y \\gets min(z.R)$; $y.orig \\gets y.color$; $x \\gets y.R$  // 双子找后继", en: "else: $y \\gets$ min of right subtree, $x \\gets y.R$" },
+  { zh: "$transplant(y,x)$; $transplant(z,y)$; $y.color \\gets z.color$  // 后继顶替", en: "$transplant(y,x)$; $transplant(z,y)$; $y.color \\gets z.color$" },
+  { zh: "if $y.orig = BLACK$: $fixup(x)$  // 删黑 → 双黑补救", en: "if $y.c$ was BLACK: $fixup(x)$  // double-black" },
+  { zh: "while $x \\neq root \\wedge x = BLACK$:  // 双黑上升", en: "while $x \\neq root \\wedge x$ is BLACK $\\uparrow$  // double-black" },
+  { zh: "case1 $w = sib(x)$ RED: $w \\gets BLACK$; $p \\gets RED$; $rotate(p)$; $w \\gets$ new  // 兄红旋父", en: "case1 $w$ RED: recolor + rotate parent" },
+  { zh: "case2 $w$ BLACK $\\wedge$ children BLACK: $w \\gets RED$; $x \\gets x.p$  // 双子黑上移", en: "case2 sibling's children BLACK: $w$ RED, double-black moves up" },
+  { zh: "case3 near child RED: $near \\gets BLACK$; $w \\gets RED$; $rotate(w)$; $w \\gets$ new  // 旋兄", en: "case3 near child RED / far BLACK: recolor + rotate sibling" },
+  { zh: "case4 far child RED: $w.color \\gets p.color$; $p \\gets BLACK$; $far \\gets BLACK$; $rotate(p)$; $x \\gets root$  // 旋父消双黑", en: "case4 far child RED: recolor + rotate parent, $x \\gets root$" },
+  { zh: "$x.c \\gets BLACK$; $root.c \\gets BLACK$  // 完成", en: "$x.c \\gets BLACK$; done" },
 ];
 
 function binParents(nodes: BinNode[]): number[] {

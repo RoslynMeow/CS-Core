@@ -146,7 +146,7 @@ function sanitize(s: string, n: number): string { return s.replace(/[^\x20-\x7E]
 
 export const stringOpsModule: ModuleDef<Scene, Cfg> = {
   id: 'string',
-  title: T('字符串 · 定界与运算', 'String · Terminator & Ops'),
+  title: T('字符串', 'String'),
   desc: T('$s\\in\\Sigma^*$ 以字符数组存放、$\\#\\notin\\Sigma$（0x00）终结；strlen/strcat/strcmp 逐字节走查。', 'Char array + NUL terminator; strlen/strcat/strcmp.'),
   tags: ['data-structures', 'computer-organization'],
   defaultConfig: { mode: 'layout' as Mode, s1: 'Hi', s2: '!' , execTick: 0 },

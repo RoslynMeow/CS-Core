@@ -7,7 +7,7 @@ type Scene = { arr: number[]; hl: number[] };
 
 export const demoModule: ModuleDef<Scene, Cfg> = {
   id: 'demo',
-  title: T('演示 · 冒泡', 'Demo · Bubble'),
+  title: T('演示', 'Demo'),
   desc: T('三件套最小闭环：`$Frame.line$` 高亮 + 柱状动画 + 播放控制', 'Minimal loop: PC highlight + bars + playback'),
   tags: ['data-structures'],
   defaultConfig: { n: 8 },

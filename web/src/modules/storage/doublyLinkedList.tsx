@@ -144,7 +144,7 @@ const CODE: Record<Op, any> = {
 function toHex(b: number) { return b.toString(16).padStart(2, '0').toUpperCase(); }
 
 export const doublyLinkedListModule: ModuleDef<Scene, Cfg> = {
-  id: 'doubly-linked-list', title: T('双向链表 · 双链式', 'Doubly Linked List'),
+  id: 'doubly-linked-list', title: T('双向链表', 'Doubly Linked List'),
   desc: T('每节点含 $prev$（前驱地址）与 $next$（后继地址）两个指针，可双向遍历；$nodeSize=2\\times ptr+elem$。', 'prev + data + next, bidirectional.'),
   tags: ['data-structures', 'computer-organization'],
   defaultConfig: { elemType: 'i32', endian: 'little', valuesStr: '', ptrSize: 4, op: 'idle', pos: 0, insVal: 99, execTick: 0 },

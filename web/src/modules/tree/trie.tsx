@@ -284,7 +284,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
 
 export const TrieModule: ModuleDef<GraphCanvasScene, Cfg> = {
   id: "trie",
-  title: T("字典树 · Trie", "Trie"),
+  title: T("字典树", "Trie"),
   desc: T(
     "建树（逐词插入）/ 查找（须完整词）/ 插入 / 删除（回收无分支路径）；词尾蓝色标记；点节点 → 下侧显示该路径词表",
     "build (insert words) · search (full word only) · insert · delete (reclaim single-child paths); word-end blue; click a node → words under that path",

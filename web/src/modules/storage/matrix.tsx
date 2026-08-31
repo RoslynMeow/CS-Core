@@ -137,7 +137,7 @@ const CODE: Record<Op, any> = {
 function toHex(b: number) { return b.toString(16).padStart(2, '0').toUpperCase(); }
 
 export const matrixModule: ModuleDef<Scene, Cfg> = {
-  id: 'matrix', title: T('矩阵 · 二维线性化', 'Matrix (2D Addressing)'),
+  id: 'matrix', title: T('矩阵', 'Matrix (2D Addressing)'),
   desc: T('$M[i][j]$ 按行优先 $idx=i\\cdot C+j$ 或列优先 $idx=j\\cdot R+i$ 线性化到连续内存，$addr=base+idx\\cdot elemSize$。', 'Row/column-major linearization to contiguous memory.'),
   tags: ['data-structures', 'computer-organization'],
   defaultConfig: { elemType: 'i32', endian: 'little', rows: 3, cols: 4, order: 'row' as Order, inited: false, dataStr: '', op: 'idle', i: 0, j: 0, val: 0, execTick: 0 },

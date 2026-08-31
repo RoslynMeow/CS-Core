@@ -25,9 +25,9 @@ const DEFAULT: Cfg = {
 };
 const CODE: Record<Mode, Text[]> = {
   build: [
-    T("先建普通字典树（逐词插入）", "build plain trie first"),
-    T("压缩：单子路径合并  // 边标签 = 子串", "compress single-child paths  // edge label = substring"),
-    T("// 基数树（Patricia Trie）完成，读边标可还原词", "// Radix / Patricia Trie done; read edge labels to rebuild words"),
+    T("$Trie(w_1,\\ldots,w_k)$  // 先建普通字典树", "$Trie(w_1,\\ldots,w_k)$  // build plain trie first"),
+    T("merge 单子路径 $u \\to$ 父边  // 边标签 = 子串", "merge single-child $u \\to$ parent edge  // edge label = substring"),
+    T("// $Patricia$-完成：读边标还原词 $w_i$", "// $Patricia$ done; read edge labels to rebuild $w_i$"),
   ],
   search: [
     T("顺着边标签匹配 $w$（可能一次跨多个字符）", "follow edge labels matching $w$ (may skip chars)"),
@@ -206,7 +206,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
 
 export const RadixModule: ModuleDef<GraphCanvasScene, Cfg> = {
   id: "radix-tree",
-  title: T("基数树 · Radix", "Radix Tree"),
+  title: T("基数树", "Radix Tree"),
   desc: T(
     "建树（先普通字典树 → 自动压缩单子路径成基数树，边标签=子串）/ 查找；与后缀树同源：路径压缩技巧",
     "build (plain trie → compress single-child paths into radix tree, edge=substring) · search; same compression trick as suffix tree",

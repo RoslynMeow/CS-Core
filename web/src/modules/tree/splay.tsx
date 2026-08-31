@@ -171,7 +171,7 @@ function applyOnEnd(cfg: Cfg): Cfg | null {
 
 export const treeSplayModule: ModuleDef<GraphCanvasScene, Cfg> = {
   id: "binary-tree-splay",
-  title: T("伸展树 · Splay", "Splay Tree"),
+  title: T("伸展树", "Splay Tree"),
   desc: T(
     "建树（初始化）/ 查找 / 插入 / 删除；每次操作后热点节点 zig/zig-zig/zig-zag 旋转到根（查找也重排树！）；摊还 O(log n)；播完自动应用为新版本（导入当前图可覆盖回原图）",
     "build (init) · search · insert · delete; hot node rotates to the root via zig/zig-zig/zig-zag after every op (search also reshapes the tree!); amortized O(log n); auto-applies on play end (import to revert)",
