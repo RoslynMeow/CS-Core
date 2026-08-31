@@ -139,7 +139,7 @@ export function GraphCanvas({
                 height={height}
                 style={{ width: "100%", height: "auto", display: "block" }}
             >
-                {/* 双面板建树（AVL/BST）：左=随机生成的输入树，右=正在建立的树；中缝 + 面板标题 */}
+                {/* 双面板建树（AVL/BST）：左=输入树，右=正在建立的树；中缝 + 面板标题 */}
                 {scene.panel && t && (
                     <g>
                         <line
@@ -334,6 +334,121 @@ export function GraphCanvas({
                           } as React.CSSProperties)
                         : undefined;
                     const topGap = boxKeys ? KEYS_BOX_H / 2 : R;
+                    // 预计算三种状态的外圈（货架用矩形、圆用圆环），避免在 JSX 里内联 `{cond ? (` 三元
+                    const shapeBody = boxKeys ? (
+                        <g>
+                            <rect
+                                x={n.x - boxW / 2}
+                                y={n.y - KEYS_BOX_H / 2}
+                                width={boxW}
+                                height={KEYS_BOX_H}
+                                rx={8}
+                                fill={fill}
+                                stroke={stroke}
+                                strokeWidth={sw}
+                                strokeDasharray={
+                                    hollow ? "4 3" : undefined
+                                }
+                            />
+                            {boxKeys.map((k, i) => (
+                                <g key={i}>
+                                    {i > 0 && (
+                                        <line
+                                            x1={n.x - boxW / 2 + i * cellW}
+                                            y1={n.y - KEYS_BOX_H / 2 + 6}
+                                            x2={n.x - boxW / 2 + i * cellW}
+                                            y2={n.y + KEYS_BOX_H / 2 - 6}
+                                            stroke={
+                                                hollow
+                                                    ? "#cbd5e1"
+                                                    : "#94a3b8"
+                                            }
+                                            strokeWidth={1}
+                                        />
+                                    )}
+                                    <text
+                                        x={
+                                            n.x -
+                                            boxW / 2 +
+                                            i * cellW +
+                                            cellW / 2
+                                        }
+                                        y={n.y + 4}
+                                        textAnchor="middle"
+                                        fontSize={11}
+                                        fontWeight={700}
+                                        fill={labelColor}
+                                    >
+                                        {String(k)}
+                                    </text>
+                                </g>
+                            ))}
+                        </g>
+                    ) : (
+                        <circle
+                            cx={n.x}
+                            cy={n.y}
+                            r={R}
+                            fill={fill}
+                            stroke={stroke}
+                            strokeWidth={sw}
+                            strokeDasharray={hollow ? "4 3" : undefined}
+                        />
+                    );
+                    const ringBody =
+                        toneMode && ringColor ? (
+                            boxKeys ? (
+                                <rect
+                                    x={n.x - boxW / 2 - 3}
+                                    y={n.y - KEYS_BOX_H / 2 - 3}
+                                    width={boxW + 6}
+                                    height={KEYS_BOX_H + 6}
+                                    rx={11}
+                                    fill="none"
+                                    stroke={ringColor}
+                                    strokeWidth={
+                                        isCurrent || isExp ? 3.5 : 2.5
+                                    }
+                                />
+                            ) : (
+                                <circle
+                                    cx={n.x}
+                                    cy={n.y}
+                                    r={R + (isCurrent || isExp ? 5 : 4)}
+                                    fill="none"
+                                    stroke={ringColor}
+                                    strokeWidth={
+                                        isCurrent || isExp ? 3.5 : 2.5
+                                    }
+                                />
+                            )
+                        ) : null;
+                    const selBody =
+                        selected === n.id ? (
+                            boxKeys ? (
+                                <rect
+                                    x={n.x - boxW / 2 - 4}
+                                    y={n.y - KEYS_BOX_H / 2 - 4}
+                                    width={boxW + 8}
+                                    height={KEYS_BOX_H + 8}
+                                    rx={13}
+                                    fill="none"
+                                    stroke="#7c3aed"
+                                    strokeWidth={2.5}
+                                    strokeDasharray="5 4"
+                                />
+                            ) : (
+                                <circle
+                                    cx={n.x}
+                                    cy={n.y}
+                                    r={R + 7}
+                                    fill="none"
+                                    stroke="#7c3aed"
+                                    strokeWidth={2.5}
+                                    strokeDasharray="5 4"
+                                />
+                            )
+                        ) : null;
                     return (
                         <g
                             key={n.id}
@@ -354,97 +469,9 @@ export function GraphCanvas({
                                 className={n.fly ? "tree-fly" : undefined}
                                 style={flyStyle}
                             >
-                                {boxKeys ? (
-                                    // 货架节点（B树/B+树）：多键一行，键间竖线分隔
-                                    <g>
-                                        <rect
-                                            x={n.x - boxW / 2}
-                                            y={n.y - KEYS_BOX_H / 2}
-                                            width={boxW}
-                                            height={KEYS_BOX_H}
-                                            rx={8}
-                                            fill={fill}
-                                            stroke={stroke}
-                                            strokeWidth={sw}
-                                            strokeDasharray={
-                                                hollow ? "4 3" : undefined
-                                            }
-                                        />
-                                        {boxKeys.map((k, i) => (
-                                            <g key={i}>
-                                                {i > 0 && (
-                                                    <line
-                                                        x1={n.x - boxW / 2 + i * cellW}
-                                                        y1={n.y - KEYS_BOX_H / 2 + 6}
-                                                        x2={n.x - boxW / 2 + i * cellW}
-                                                        y2={n.y + KEYS_BOX_H / 2 - 6}
-                                                        stroke={
-                                                            hollow
-                                                                ? "#cbd5e1"
-                                                                : "#94a3b8"
-                                                        }
-                                                        strokeWidth={1}
-                                                    />
-                                                )}
-                                                <text
-                                                    x={
-                                                        n.x -
-                                                        boxW / 2 +
-                                                        i * cellW +
-                                                        cellW / 2
-                                                    }
-                                                    y={n.y + 4}
-                                                    textAnchor="middle"
-                                                    fontSize={11}
-                                                    fontWeight={700}
-                                                    fill={labelColor}
-                                                >
-                                                    {String(k)}
-                                                </text>
-                                            </g>
-                                        ))}
-                                    </g>
-                                ) : (
-                                    <circle
-                                        cx={n.x}
-                                        cy={n.y}
-                                        r={R}
-                                        fill={fill}
-                                        stroke={stroke}
-                                        strokeWidth={sw}
-                                        strokeDasharray={
-                                            hollow ? "4 3" : undefined
-                                        }
-                                    />
-                                )}
+                                {shapeBody}
                                 {/* 彩色树（tone）下算法高亮用圆环表示，保持角色色与图例一致 */}
-                                {toneMode && ringColor && (
-                                    boxKeys ? (
-                                        <rect
-                                            x={n.x - boxW / 2 - 3}
-                                            y={n.y - KEYS_BOX_H / 2 - 3}
-                                            width={boxW + 6}
-                                            height={KEYS_BOX_H + 6}
-                                            rx={11}
-                                            fill="none"
-                                            stroke={ringColor}
-                                            strokeWidth={
-                                                isCurrent || isExp ? 3.5 : 2.5
-                                            }
-                                        />
-                                    ) : (
-                                        <circle
-                                            cx={n.x}
-                                            cy={n.y}
-                                            r={R + (isCurrent || isExp ? 5 : 4)}
-                                            fill="none"
-                                            stroke={ringColor}
-                                            strokeWidth={
-                                                isCurrent || isExp ? 3.5 : 2.5
-                                            }
-                                        />
-                                    )
-                                )}
+                                {ringBody}
                                 {!boxKeys && (
                                     <text
                                         x={n.x}
@@ -493,31 +520,7 @@ export function GraphCanvas({
                                     </text>
                                 )}
                                 {/* 被点击选中：紫色虚线环 */}
-                                {selected === n.id && (
-                                    boxKeys ? (
-                                        <rect
-                                            x={n.x - boxW / 2 - 4}
-                                            y={n.y - KEYS_BOX_H / 2 - 4}
-                                            width={boxW + 8}
-                                            height={KEYS_BOX_H + 8}
-                                            rx={13}
-                                            fill="none"
-                                            stroke="#7c3aed"
-                                            strokeWidth={2.5}
-                                            strokeDasharray="5 4"
-                                        />
-                                    ) : (
-                                        <circle
-                                            cx={n.x}
-                                            cy={n.y}
-                                            r={R + 7}
-                                            fill="none"
-                                            stroke="#7c3aed"
-                                            strokeWidth={2.5}
-                                            strokeDasharray="5 4"
-                                        />
-                                    )
-                                )}
+                                {selBody}
                             </g>
                         </g>
                     );
