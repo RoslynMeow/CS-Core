@@ -31,26 +31,68 @@ export type BStep = {
 };
 
 export const BTREE_SEARCH_CODE: Text[] = [
-  { zh: "$p \\gets root$；$i \\gets$ 键位  // 定位", en: "$p \\gets root$; $i \\gets$ key slot" },
-  { zh: "while $p$ 非叶：沿 $child_i$ 下探", en: "while $p$ is internal: descend via $child_i$" },
-  { zh: "叶内找到 $x$ → 命中（B+：数据在叶）", en: "$x$ found in leaf → hit" },
+  {
+    zh: "$p \\gets root$; $i \\gets$ slot  // 定位键位 $i$",
+    en: "$p \\gets root$; $i \\gets$ slot  // locate key slot $i$",
+  },
+  {
+    zh: "while $p$ internal: descend via $child_i$  // 非叶则下探",
+    en: "while $p$ internal: descend via $child_i$  // internal → descend",
+  },
+  {
+    zh: "$x$ found in leaf → hit  // 叶内命中; B+ 数据在叶",
+    en: "$x$ found in leaf → hit  // in-leaf hit; (B+) data in leaf",
+  },
 ];
 
 export const BTREE_INSERT_CODE: Text[] = [
-  { zh: "$p \\gets$ 会插入的叶子（沿键下探）", en: "$p \\gets$ target leaf (descend by keys)" },
-  { zh: "叶内有序插入 $x$", en: "insert $x$ in order into leaf" },
-  { zh: "$|keys| = m$（满）→ 分裂：中间键上提", en: "$|keys| = m$ (full) → split: middle key moves up" },
-  { zh: "while 父满：$|keys| \\geq m$ → 逐层分裂上提（可能到根）", en: "while parent full: $|keys| \\geq m$ → split and move up (may reach root)" },
-  { zh: "if $root$ 满 → 新建根，$height \\gets height+1$  // 完成", en: "if $root$ full → new root, $height+1$  // done" },
+  {
+    zh: "$p \\gets$ target leaf  // 沿键下探到目标叶子",
+    en: "$p \\gets$ target leaf  // descend by keys to target leaf",
+  },
+  {
+    zh: "insert $x$ in order  // 叶内有序插入",
+    en: "insert $x$ in order  // into leaf, in order",
+  },
+  {
+    zh: "if $|keys| = m$ → split  // 中间键上提",
+    en: "if $|keys| = m$ → split  // full; middle key moves up",
+  },
+  {
+    zh: "while $|keys| \\geq m$: split up  // 父满则逐层分裂上提",
+    en: "while $|keys| \\geq m$: split up  // parent full → split & move up (may reach root)",
+  },
+  {
+    zh: "if $root$ full → new root, $h \\gets h+1$  // 根满建新根, 完成",
+    en: "if $root$ full → new root, $h \\gets h+1$  // root full → new root, done",
+  },
 ];
 
 export const BTREE_DELETE_CODE: Text[] = [
-  { zh: "定位 $p$（叶/非叶）  // 删 $x$", en: "locate $p$ (leaf/internal)  // delete $x$" },
-  { zh: "if 非叶：走后继键（叶内真删）", en: "if internal: replace with successor key (real delete in leaf)" },
-  { zh: "if $|keys| < \\lceil m/2\\rceil-1$：", en: "if $|keys| < \\lceil m/2\\rceil-1$:" },
-  { zh: "  兄弟可借 → 借键 + 父键旋转调整", en: "  borrow from sibling + rotate via parent key" },
-  { zh: "  否则 → 合并兄弟 + 父键下移（可能上溯）", en: "  else merge sibling + pull parent key down (may cascade)" },
-  { zh: "if 根空 → 降根  // 完成", en: "if root empty → shrink root  // done" },
+  {
+    zh: "locate $p$  // 叶/非叶; 删 $x$",
+    en: "locate $p$  // leaf or internal; delete $x$",
+  },
+  {
+    zh: "if internal: successor key  // 非叶走后继, 叶内真删",
+    en: "if internal: successor key  // replace; real delete in leaf",
+  },
+  {
+    zh: "if $|keys| < \\lceil m/2 \\rceil - 1$:",
+    en: "if $|keys| < \\lceil m/2 \\rceil - 1$:",
+  },
+  {
+    zh: "borrow from sibling  // 兄弟可借 + 父键旋转",
+    en: "borrow from sibling  // sibling has a spare → rotate via parent key",
+  },
+  {
+    zh: "else merge siblings  // 合并兄弟 + 父键下移",
+    en: "else merge siblings  // merge sibling + pull parent key down (may cascade)",
+  },
+  {
+    zh: "if $root$ empty → shrink  // 降根, 完成",
+    en: "if $root$ empty → shrink  // shrink root, done",
+  },
 ];
 
 /** 节点最小键数（根除外） */
@@ -140,7 +182,11 @@ export function bTreeInsertSteps(values: number[], m: number): BStep[] {
     en: string,
   ): BStep => ({
     line,
-    nodes: nodes.map((n) => ({ ...n, keys: [...n.keys], children: [...n.children] })),
+    nodes: nodes.map((n) => ({
+      ...n,
+      keys: [...n.keys],
+      children: [...n.children],
+    })),
     visible: nodes.length,
     root,
     focus,
@@ -154,7 +200,14 @@ export function bTreeInsertSteps(values: number[], m: number): BStep[] {
     node.keys.splice(i, 0, x);
   };
   for (const x of values) {
-    steps.push(snap(0, root < nodes.length ? root : null, `插入 $x=${x}$`, `insert ${x}`));
+    steps.push(
+      snap(
+        0,
+        root < nodes.length ? root : null,
+        `插入 $x=${x}$`,
+        `insert ${x}`,
+      ),
+    );
     if (nodes.length === 0) {
       nodes.push({ id: 0, keys: [x], children: [] });
       steps.push(snap(4, 0, `新根 $[${x}]$`, `root [${x}]`));
@@ -164,10 +217,14 @@ export function bTreeInsertSteps(values: number[], m: number): BStep[] {
     let p = root;
     while (nodes[p].children.length > 0) {
       const i = lowerBound(nodes[p].keys, x);
-      steps.push(snap(0, p, `下探 ${S(p)} → 孩子 ${i}`, `descend ${S(p)} → child ${i}`));
+      steps.push(
+        snap(0, p, `下探 ${S(p)} → 孩子 ${i}`, `descend ${S(p)} → child ${i}`),
+      );
       p = nodes[p].children[i];
     }
-    steps.push(snap(0, p, `叶 ${S(p)} 插入 $x=${x}$`, `leaf ${S(p)} insert ${x}`));
+    steps.push(
+      snap(0, p, `叶 ${S(p)} 插入 $x=${x}$`, `leaf ${S(p)} insert ${x}`),
+    );
     insertInto(nodes[p], x);
     // 沿父链修复：满则分裂
     let cur = p;
@@ -185,26 +242,52 @@ export function bTreeInsertSteps(values: number[], m: number): BStep[] {
       const par = parentsOf(nodes);
       const pcur = par[cur];
       steps.push(
-        snap(2, cur, `${S(cur)} 满 → 分裂：中键 $[${midKey}]$ 上提，右半 → ${S(rightId)}`, `split ${S(cur)}: middle ${midKey} up`),
+        snap(
+          2,
+          cur,
+          `${S(cur)} 满 → 分裂：中键 $[${midKey}]$ 上提，右半 → ${S(rightId)}`,
+          `split ${S(cur)}: middle ${midKey} up`,
+        ),
       );
       if (pcur === -1) {
         // 根分裂 → 新根
         const newRoot = nodes.length;
         nodes.push({ id: newRoot, keys: [midKey], children: [cur, rightId] });
         root = newRoot;
-        steps.push(snap(4, newRoot, `根满 → 新建根 $[${midKey}]$（高度+1）`, `new root [${midKey}] (height+1)`));
+        steps.push(
+          snap(
+            4,
+            newRoot,
+            `根满 → 新建根 $[${midKey}]$（高度+1）`,
+            `new root [${midKey}] (height+1)`,
+          ),
+        );
         break;
       }
       // 中间键并入父；父的孩子指针：把原 cur 替换为 [cur, rightId]
       insertInto(nodes[pcur], midKey);
       const ci = nodes[pcur].children.indexOf(cur);
       nodes[pcur].children.splice(ci, 1, cur, rightId);
-      steps.push(snap(3, pcur, `父 ${S(pcur)} 收中键 $[${midKey}]$，孩子 → [${S(cur)}, ${S(rightId)}]`, `parent ${S(pcur)} takes ${midKey}`));
+      steps.push(
+        snap(
+          3,
+          pcur,
+          `父 ${S(pcur)} 收中键 $[${midKey}]$，孩子 → [${S(cur)}, ${S(rightId)}]`,
+          `parent ${S(pcur)} takes ${midKey}`,
+        ),
+      );
       cur = pcur;
     }
     steps.push(snap(1, cur, `完成 $x=${x}$（当前 ${S(cur)}）`, `done ${x}`));
   }
-  steps.push(snap(4, null, `完成：B${m} 树 · 键共 ${nodes.reduce((s, n) => s + n.keys.length, 0)}`, `done: B${m} tree`));
+  steps.push(
+    snap(
+      4,
+      null,
+      `完成：B${m} 树 · 键共 ${nodes.reduce((s, n) => s + n.keys.length, 0)}`,
+      `done: B${m} tree`,
+    ),
+  );
   return steps;
 }
 
@@ -215,7 +298,11 @@ export function bTreeDeleteOnTree(
   m: number,
   x: number,
 ): { steps: BStep[]; result: BTreeSnap } {
-  let nodes = nodes0.map((n) => ({ ...n, keys: [...n.keys], children: [...n.children] }));
+  let nodes = nodes0.map((n) => ({
+    ...n,
+    keys: [...n.keys],
+    children: [...n.children],
+  }));
   let root = root0;
   const steps: BStep[] = [];
   const snap = (
@@ -225,14 +312,19 @@ export function bTreeDeleteOnTree(
     en: string,
   ): BStep => ({
     line,
-    nodes: nodes.map((n) => ({ ...n, keys: [...n.keys], children: [...n.children] })),
+    nodes: nodes.map((n) => ({
+      ...n,
+      keys: [...n.keys],
+      children: [...n.children],
+    })),
     visible: nodes.length,
     root,
     focus,
     edge: null,
     msg: { zh, en },
   });
-  const S = (id: number | null) => (id === null ? "∅" : `[${nodes[id].keys.join(",")}]`);
+  const S = (id: number | null) =>
+    id === null ? "∅" : `[${nodes[id].keys.join(",")}]`;
   if (nodes.length === 0) {
     steps.push(snap(0, null, "空树", "empty"));
     return { steps, result: { nodes, root } };
@@ -254,7 +346,14 @@ export function bTreeDeleteOnTree(
     steps.push(snap(0, null, `$x=${x}$ 不存在`, `not found`));
     return { steps, result: { nodes, root } };
   }
-  steps.push(snap(0, foundAt, `定位 $x=${x}$ ∈ ${S(foundAt)}`, `locate ${x} in ${S(foundAt)}`));
+  steps.push(
+    snap(
+      0,
+      foundAt,
+      `定位 $x=${x}$ ∈ ${S(foundAt)}`,
+      `locate ${x} in ${S(foundAt)}`,
+    ),
+  );
   // 非叶：用右子树最小键（后继）替换，真实删除发生在叶
   if (nodes[foundAt].children.length > 0) {
     let succ = nodes[foundAt].children[lowerBound(nodes[foundAt].keys, x) + 1];
@@ -262,14 +361,28 @@ export function bTreeDeleteOnTree(
     const succKey = nodes[succ].keys[0];
     const ki = nodes[foundAt].keys.indexOf(x);
     nodes[foundAt].keys[ki] = succKey;
-    steps.push(snap(1, foundAt, `非叶：后继键 $[${succKey}]$ 顶替 $[${x}]$，真删在叶`, `successor ${succKey} replaces ${x}`));
+    steps.push(
+      snap(
+        1,
+        foundAt,
+        `非叶：后继键 $[${succKey}]$ 顶替 $[${x}]$，真删在叶`,
+        `successor ${succKey} replaces ${x}`,
+      ),
+    );
     x = succKey;
     foundAt = succ;
   }
   // 叶内真删
   const li = nodes[foundAt].keys.indexOf(x);
   nodes[foundAt].keys.splice(li, 1);
-  steps.push(snap(2, foundAt, `叶 ${S(foundAt)} 删 $[${x}]$`, `leaf ${S(foundAt)} delete ${x}`));
+  steps.push(
+    snap(
+      2,
+      foundAt,
+      `叶 ${S(foundAt)} 删 $[${x}]$`,
+      `leaf ${S(foundAt)} delete ${x}`,
+    ),
+  );
   // 借 / 合并：自底向上
   let cur = foundAt;
   const minK = minKeys(m);
@@ -290,7 +403,14 @@ export function bTreeDeleteOnTree(
       nodes[pcur].keys[midIdx] = lastKey;
       nodes[cur].keys.unshift(midKey);
       if (lastChild !== undefined) nodes[cur].children.unshift(lastChild);
-      steps.push(snap(3, pcur, `借左兄弟 ${S(leftSib)}：$[${lastKey}]$ ↔ 父键 $[${midKey}]$`, `borrow left ${S(leftSib)}`));
+      steps.push(
+        snap(
+          3,
+          pcur,
+          `借左兄弟 ${S(leftSib)}：$[${lastKey}]$ ↔ 父键 $[${midKey}]$`,
+          `borrow left ${S(leftSib)}`,
+        ),
+      );
       break;
     }
     if (rightSib !== -1 && nodes[rightSib].keys.length > minK) {
@@ -301,7 +421,14 @@ export function bTreeDeleteOnTree(
       nodes[pcur].keys[midIdx] = firstKey;
       nodes[cur].keys.push(midKey);
       if (firstChild !== undefined) nodes[cur].children.push(firstChild);
-      steps.push(snap(3, pcur, `借右兄弟 ${S(rightSib)}：$[${firstKey}]$ ↔ 父键 $[${midKey}]$`, `borrow right ${S(rightSib)}`));
+      steps.push(
+        snap(
+          3,
+          pcur,
+          `借右兄弟 ${S(rightSib)}：$[${firstKey}]$ ↔ 父键 $[${midKey}]$`,
+          `borrow right ${S(rightSib)}`,
+        ),
+      );
       break;
     }
     // 合并
@@ -314,7 +441,12 @@ export function bTreeDeleteOnTree(
     nodes[pcur].keys.splice(midIdx, 1);
     nodes[pcur].children.splice(midIdx + 1, 1);
     steps.push(
-      snap(4, pcur, `合并 ${S(keep)}+${S(merge)}：父键 $[${midKey}]$ 下移，删 ${S(merge)}`, `merge ${S(keep)}+${S(merge)} via ${midKey}`),
+      snap(
+        4,
+        pcur,
+        `合并 ${S(keep)}+${S(merge)}：父键 $[${midKey}]$ 下移，删 ${S(merge)}`,
+        `merge ${S(keep)}+${S(merge)} via ${midKey}`,
+      ),
     );
     // 删掉 merge 节点（紧凑 id 重编号）
     nodes = nodes
@@ -339,12 +471,21 @@ export function bTreeDeleteOnTree(
   }
   if (nodes[root].keys.length === 0 && nodes[root].children.length > 0) {
     const child = nodes[root].children[0];
-    steps.push(snap(5, root, `根空 → 降根为 ${S(child)}（高度-1）`, `shrink root to ${S(child)}`));
-    nodes = nodes.filter((n) => n.id !== root).map((n) => ({
-      ...n,
-      keys: [...n.keys],
-      children: [...n.children],
-    }));
+    steps.push(
+      snap(
+        5,
+        root,
+        `根空 → 降根为 ${S(child)}（高度-1）`,
+        `shrink root to ${S(child)}`,
+      ),
+    );
+    nodes = nodes
+      .filter((n) => n.id !== root)
+      .map((n) => ({
+        ...n,
+        keys: [...n.keys],
+        children: [...n.children],
+      }));
     const map = new Map<number, number>();
     nodes.forEach((n, i) => map.set(n.id, i));
     nodes = nodes.map((n) => ({
@@ -354,7 +495,14 @@ export function bTreeDeleteOnTree(
     }));
     root = map.get(child) ?? 0;
   }
-  steps.push(snap(5, null, `完成：删除 $x=${x}$ 后 ${S(root)} 为根`, `done: ${x} deleted`));
+  steps.push(
+    snap(
+      5,
+      null,
+      `完成：删除 $x=${x}$ 后 ${S(root)} 为根`,
+      `done: ${x} deleted`,
+    ),
+  );
   return { steps, result: { nodes, root } };
 }
 
@@ -387,7 +535,14 @@ export function bPlusInsertSteps(values: number[], m: number): BStep[] {
   const S = (id: number | null) =>
     id === null ? "∅" : `[${nodes[id].keys.join(",")}]`;
   for (const x of values) {
-    steps.push(snap(0, root < nodes.length ? root : null, `插入 $x=${x}$（数据只进叶）`, `insert ${x} (leaf only)`));
+    steps.push(
+      snap(
+        0,
+        root < nodes.length ? root : null,
+        `插入 $x=${x}$（数据只进叶）`,
+        `insert ${x} (leaf only)`,
+      ),
+    );
     if (nodes.length === 0) {
       nodes.push({ id: 0, keys: [x], children: [], next: null });
       steps.push(snap(1, 0, `根=叶 $[${x}]$`, `root leaf [${x}]`));
@@ -397,12 +552,16 @@ export function bPlusInsertSteps(values: number[], m: number): BStep[] {
     let p = root;
     while (nodes[p].children.length > 0) {
       const i = lowerBound(nodes[p].keys, x);
-      steps.push(snap(0, p, `索引 ${S(p)} → 孩子 ${i}`, `index ${S(p)} → child ${i}`));
+      steps.push(
+        snap(0, p, `索引 ${S(p)} → 孩子 ${i}`, `index ${S(p)} → child ${i}`),
+      );
       p = nodes[p].children[i];
     }
     const i = lowerBound(nodes[p].keys, x);
     nodes[p].keys.splice(i, 0, x);
-    steps.push(snap(1, p, `叶 ${S(p)} 插入 $x=${x}$`, `leaf ${S(p)} insert ${x}`));
+    steps.push(
+      snap(1, p, `叶 ${S(p)} 插入 $x=${x}$`, `leaf ${S(p)} insert ${x}`),
+    );
     // 叶满分裂
     let cur = p;
     while (isFull(nodes[cur], m)) {
@@ -424,20 +583,32 @@ export function bPlusInsertSteps(values: number[], m: number): BStep[] {
         id: rightId,
         keys: rightKeys,
         children: rightCh,
-        next: isLeaf ? nodes[cur].next ?? null : undefined,
+        next: isLeaf ? (nodes[cur].next ?? null) : undefined,
       });
       if (isLeaf) nodes[cur].next = rightId;
       const par = parentsOf(nodes);
       const pcur = par[cur];
       const idxKey = isLeaf ? rightKeys[0] : midKey;
       steps.push(
-        snap(2, cur, `${S(cur)} 满 → 分裂：索引键 $[${idxKey}]$ 上提`, `split ${S(cur)}: index ${idxKey} up`),
+        snap(
+          2,
+          cur,
+          `${S(cur)} 满 → 分裂：索引键 $[${idxKey}]$ 上提`,
+          `split ${S(cur)}: index ${idxKey} up`,
+        ),
       );
       if (pcur === -1) {
         const newRoot = nodes.length;
         nodes.push({ id: newRoot, keys: [idxKey], children: [cur, rightId] });
         root = newRoot;
-        steps.push(snap(4, newRoot, `根满 → 新建根 $[${idxKey}]$`, `new root [${idxKey}]`));
+        steps.push(
+          snap(
+            4,
+            newRoot,
+            `根满 → 新建根 $[${idxKey}]$`,
+            `new root [${idxKey}]`,
+          ),
+        );
         break;
       }
       // B+ 内层/叶子分裂：索引键 idxKey 分隔 cur 与 rightId（位于原 cur 的位置 ci），
@@ -450,12 +621,26 @@ export function bPlusInsertSteps(values: number[], m: number): BStep[] {
       }
       nodes[pcur].keys.splice(ci, 0, idxKey);
       nodes[pcur].children.splice(ci, 1, cur, rightId);
-      steps.push(snap(3, pcur, `内层 ${S(pcur)} 收索引 $[${idxKey}]$`, `index ${S(pcur)} takes ${idxKey}`));
+      steps.push(
+        snap(
+          3,
+          pcur,
+          `内层 ${S(pcur)} 收索引 $[${idxKey}]$`,
+          `index ${S(pcur)} takes ${idxKey}`,
+        ),
+      );
       cur = pcur;
     }
     steps.push(snap(1, cur, `完成 $x=${x}$`, `done ${x}`));
   }
-  steps.push(snap(4, null, `完成：B+树 · 叶共 ${nodes.reduce((s, n) => s + n.keys.length, 0)} 键（数据全在叶）`, `done: B+ tree`));
+  steps.push(
+    snap(
+      4,
+      null,
+      `完成：B+树 · 叶共 ${nodes.reduce((s, n) => s + n.keys.length, 0)} 键（数据全在叶）`,
+      `done: B+ tree`,
+    ),
+  );
   return steps;
 }
 

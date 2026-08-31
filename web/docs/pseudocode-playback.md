@@ -38,11 +38,12 @@ Stage: Render(scene) + Pseudocode(active=frame.line) + caption(MathText)
 - 每条可执行语句（`for/while` 头、`if`、赋值、返回）各一帧，`line` 从 `0` 走到 `code.length-1`。
 - 例：`99→100` 的进位链 `while→清零→i++` 每位各一帧，保留中间 `00` 不裁。
 
-### 3.2 只用数学语言
+### 3.2 伪代码语言
 
-- 正文只含 `$...$` 数学，如 `$P_i \gets 0$`、`$s \gets P_i+Q_i+c$`。
-- 说明放 `//` 后，如 `$R_i \gets s \bmod n$  // 本位`。
-- 禁止 `//` 前出现中/英文。
+- 正文 = 纯数学 `$...$` + 少量英文结构词（`while/if/for` 等循环分支头、`return/locate/insert/merge` 等操作动词），如 `while $i < |w|$: $p \gets p.child(w_i)$`、`if $|keys| = m$ → split`。
+- 说明放 `//` 后，并按语言本地化：zh 注释中文、en 注释英文，如 `$R_i \gets s \bmod n$  // 本位` / `// current digit`。
+- 禁止 `//` 前出现中文字符或中文叙述；英文结构词允许（伪代码关键词），其余概念一律进 `//`。
+- 纯数学行（无结构词，如 `if $|keys| < \lceil m/2\rceil-1$:`）可不带 `//`，且 zh/en 写法须完全一致。
 
 ### 3.3 多模式
 

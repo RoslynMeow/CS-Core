@@ -8,7 +8,10 @@ import {
   type TrieNode,
   type TrieSnapshot,
 } from "../../lib/trie";
-import { GraphCanvas, type GraphCanvasScene } from "../../components/canvas/GraphCanvas";
+import {
+  GraphCanvas,
+  type GraphCanvasScene,
+} from "../../components/canvas/GraphCanvas";
 
 // ---------- 基数树（压缩字典树）：普通 Trie 建树后逐条压缩单子路径 ----------
 
@@ -19,19 +22,42 @@ type Cfg = {
   mode: Mode;
 };
 const DEFAULT: Cfg = {
-  words: ["romane", "romanus", "romulus", "rubens", "ruber", "rubicon", "rubicundus"],
+  words: [
+    "romane",
+    "romanus",
+    "romulus",
+    "rubens",
+    "ruber",
+    "rubicon",
+    "rubicundus",
+  ],
   target: "ruber",
   mode: "build",
 };
 const CODE: Record<Mode, Text[]> = {
   build: [
-    T("$Trie(w_1,\\ldots,w_k)$  // 先建普通字典树", "$Trie(w_1,\\ldots,w_k)$  // build plain trie first"),
-    T("merge 单子路径 $u \\to$ 父边  // 边标签 = 子串", "merge single-child $u \\to$ parent edge  // edge label = substring"),
-    T("// $Patricia$-完成：读边标还原词 $w_i$", "// $Patricia$ done; read edge labels to rebuild $w_i$"),
+    T(
+      "$Trie(w_1,\\ldots,w_k)$  // 先建普通字典树",
+      "$Trie(w_1,\\ldots,w_k)$  // build plain trie first",
+    ),
+    T(
+      "merge single-child $u$  // 合并单子路径到父, 边标签 = 子串",
+      "merge single-child $u$  // compress into parent, edge label = substring",
+    ),
+    T(
+      "// $Patricia$-完成：读边标还原词 $w_i$",
+      "// $Patricia$ done; read edge labels to rebuild $w_i$",
+    ),
   ],
   search: [
-    T("顺着边标签匹配 $w$（可能一次跨多个字符）", "follow edge labels matching $w$ (may skip chars)"),
-    T("到叶或词尾 → 命中", "hit at leaf / word end"),
+    T(
+      "match $w$ along edge labels  // 沿边标匹配, 可能跨多字符",
+      "match $w$ along edge labels  // may skip chars",
+    ),
+    T(
+      "hit at leaf / word end  // 到叶或词尾即命中",
+      "hit at leaf / word end  // reached leaf or word end → hit",
+    ),
   ],
 };
 
@@ -163,7 +189,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
       nodes = remNodes.map((n) => ({
         ...n,
         id: map.get(n.id)!,
-        parent: n.parent === null ? null : map.get(n.parent!) ?? null,
+        parent: n.parent === null ? null : (map.get(n.parent!) ?? null),
         children: Object.fromEntries(
           Object.entries(n.children)
             .filter(([, v]) => map.has(v))
@@ -178,14 +204,20 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
         `基数树完成：${words.length} 词 · ${nodes.length} 节点 · 读边标还原词`,
         `radix tree done: ${words.length} words · ${nodes.length} nodes`,
       ),
-      scene: trieScene(nodes, null, (() => {
-        const lbl = radixOf(nodes, 0).label;
-        const ed: Record<string, string> = {};
-        for (const nd of nodes)
-          if (nd.parent !== null)
-            ed[`${nd.parent}-${nd.id}`] = lbl[nd.id].slice(lbl[nd.parent].length);
-        return ed;
-      })()),
+      scene: trieScene(
+        nodes,
+        null,
+        (() => {
+          const lbl = radixOf(nodes, 0).label;
+          const ed: Record<string, string> = {};
+          for (const nd of nodes)
+            if (nd.parent !== null)
+              ed[`${nd.parent}-${nd.id}`] = lbl[nd.id].slice(
+                lbl[nd.parent].length,
+              );
+          return ed;
+        })(),
+      ),
     });
     void labels;
     return frames;
@@ -208,8 +240,8 @@ export const RadixModule: ModuleDef<GraphCanvasScene, Cfg> = {
   id: "radix-tree",
   title: T("基数树", "Radix Tree"),
   desc: T(
-    "建树（先普通字典树 → 自动压缩单子路径成基数树，边标签=子串）/ 查找；与后缀树同源：路径压缩技巧",
-    "build (plain trie → compress single-child paths into radix tree, edge=substring) · search; same compression trick as suffix tree",
+    "建树（先普通字典树 → 自动压缩单子路径成基数树，边标签=子串）/ 查找；路径压缩技巧",
+    "build (plain trie → compress single-child paths into radix tree, edge=substring) · search; path compression",
   ),
   tags: ["data-structures"],
   defaultConfig: DEFAULT,
@@ -257,19 +289,31 @@ export const RadixModule: ModuleDef<GraphCanvasScene, Cfg> = {
           </select>
           {config.mode === "search" && (
             <label
-              style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}
+              style={{
+                display: "flex",
+                gap: 6,
+                alignItems: "center",
+                fontSize: 13,
+              }}
             >
               <span>{t(T("目标词", "Word"))}</span>
               <input
                 className="txt"
                 style={{ width: 76 }}
                 value={config.target}
-                onChange={(e) => onChange({ ...config, target: e.target.value.trim() })}
+                onChange={(e) =>
+                  onChange({ ...config, target: e.target.value.trim() })
+                }
               />
             </label>
           )}
           <div
-            style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}
+            style={{
+              display: "flex",
+              gap: 6,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
           >
             <input
               className="txt"

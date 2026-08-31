@@ -14,9 +14,12 @@ import {
   type TrieStep,
   type TrieSnapshot,
 } from "../../lib/trie";
-import { GraphCanvas, type GraphCanvasScene } from "../../components/canvas/GraphCanvas";
+import {
+  GraphCanvas,
+  type GraphCanvasScene,
+} from "../../components/canvas/GraphCanvas";
 
-// ---------- 字符树共享配置（trie / radix / suffix 共用） ----------
+// ---------- 字符树共享配置（trie / radix 共用） ----------
 
 /** 预设词表（教学用） */
 export const PRESET_WORDS = [
@@ -363,5 +366,9 @@ export const TrieModule: ModuleDef<GraphCanvasScene, Cfg> = {
   },
 };
 
-// 导出别名：让 radix / suffix 复用同一场景组帧
-export { trieScene as charScene, TRIE_BOX as CHAR_BOX, END_TONE as END_TONE_IDX };
+// 导出别名：让 radix 复用同一场景组帧
+export {
+  trieScene as charScene,
+  TRIE_BOX as CHAR_BOX,
+  END_TONE as END_TONE_IDX,
+};

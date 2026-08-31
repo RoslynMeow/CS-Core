@@ -42,7 +42,7 @@ interface ModuleDef<S,C> {
 
 - 标题按语言：`zh→伪代码` / `en→Pseudocode`。
 - 行号重编号（过滤空行），`active===i` 高亮，文本走 `MathText`。
-- 正文只含 `$...$` 数学，注释在 `//` 后。
+- 正文 = 纯数学 `$...$` + 少量英文结构词，注释在 `//` 后并按语言本地化（zh 中文 / en 英文）；zh/en 正文本体须一致、仅 `//` 注释异文。
 
 ## 5. Playback `engine/usePlayback.ts` + `components/PlaybackBar.tsx`
 
