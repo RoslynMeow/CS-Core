@@ -25,6 +25,7 @@ import { TrieModule } from "./tree/trie";
 import { treeBTreeModule } from "./tree/btree";
 import { RadixModule } from "./tree/radix";
 import { BPlusModule } from "./tree/bplus";
+import { graphTraverseModule } from "./graph/bfsDfs";
 
 // SAFETY: 所有模块实现同一 ModuleDef 契约;泛型形参仅约束模块内部实现,运行时结构一致
 const asModule = (m: unknown): ModuleDef => m as ModuleDef;
@@ -56,6 +57,7 @@ export const KNOWLEDGE: Record<string, ModuleDef> = {
   [treeBTreeModule.id]: asModule(treeBTreeModule),
   [RadixModule.id]: asModule(RadixModule),
   [BPlusModule.id]: asModule(BPlusModule),
+  [graphTraverseModule.id]: asModule(graphTraverseModule),
 };
 
 export const allModules = Object.values(KNOWLEDGE);
