@@ -1869,6 +1869,75 @@ export const BELLMAN_CODE: Text[] = [
   },
 ];
 
+export const ASTAR_CODE: Text[] = [
+  { zh: "$openSet \\gets \\{s\\}$; $g[s] \\gets 0$; $f[s] \\gets h(s)$", en: "$openSet \\gets \\{s\\}$; $g[s] \\gets 0$; $f[s] \\gets h(s)$" },
+  { zh: "while $openSet \\neq \\emptyset$:", en: "while $openSet \\neq \\emptyset$:" },
+  { zh: "  $u \\gets \\arg\\min_{v \\in openSet} f[v]$", en: "  $u \\gets \\arg\\min_{v \\in openSet} f[v]$" },
+  { zh: "  if $u = t$: return reconstruct_path(u)  // 到达目标", en: "  if $u = t$: return path" },
+  { zh: "  $openSet \\gets openSet \\setminus \\{u\\}$; $closedSet \\gets closedSet \\cup \\{u\\}$", en: "  move u to closedSet" },
+  { zh: "  for $(u,v,w) \\in E$: if $v \\notin closedSet$:", en: "  for $(u,v,w) \\in E$: if $v \\notin closedSet$:" },
+  { zh: "    if $g[u]+w < g[v]$: $g[v] \\gets g[u]+w$; $f[v] \\gets g[v]+h(v)$; $parent[v] \\gets u$", en: "    if $g[u]+w < g[v]$: update $g,f,parent$" },
+  { zh: "    if $v \\notin openSet$: $openSet \\gets openSet \\cup \\{v\\}$", en: "    if $v \\notin openSet$: add to openSet" },
+  { zh: "  // 失败：openSet 空且未达目标", en: "  // fail: openSet empty" },
+];
+
+export const FLOYD_CODE: Text[] = [
+  { zh: "for $i$: $dist[i][i] \\gets 0$", en: "for $i$: $dist[i][i] \\gets 0$" },
+  { zh: "for $(u,v,w) \\in E$: $dist[u][v] \\gets w$; $next[u][v] \\gets v$", en: "for edges: $dist[u][v]=w$, $next[u][v]=v$" },
+  { zh: "for $k \\gets 0$ to $n-1$:", en: "for $k \\gets 0$ to $n-1$:" },
+  { zh: "  for $i \\gets 0$ to $n-1$:", en: "  for $i \\gets 0$ to $n-1$:" },
+  { zh: "    for $j \\gets 0$ to $n-1$:", en: "    for $j \\gets 0$ to $n-1$:" },
+  { zh: "      if $dist[i][k]+dist[k][j] < dist[i][j]$:", en: "      if $dist[i][k]+dist[k][j] < dist[i][j]$:" },
+  { zh: "        $dist[i][j] \\gets dist[i][k]+dist[k][j]$; $next[i][j] \\gets next[i][k]$", en: "        $dist[i][j] \\gets ...$; $next[i][j] \\gets next[i][k]$" },
+  { zh: "if $\\exists i: dist[i][i] < 0$: negative cycle", en: "if $\\exists i: dist[i][i] < 0$: negative cycle" },
+];
+
+export const KOSARAJU_CODE: Text[] = [
+  { zh: "# Pass 1: 原图 DFS，记完成序", en: "# Pass 1: DFS on G, record finish order" },
+  { zh: "for $v$: if $!vis[v]$: $DFS1(v)$", en: "for $v$: if $!vis[v]$: $DFS1(v)$" },
+  { zh: "  $vis[v] \\gets true$; for $w \\in adj(v)$: if $!vis[w]$: $DFS1(w)$", en: "  $vis[v]=true$; for $w$: $DFS1(w)$" },
+  { zh: "  $order.push(v)$  // 完成时入序", en: "  $order.push(v)$  // on finish" },
+  { zh: "# Pass 2: 反图 $G^R$，按 $order$ 逆序 DFS", en: "# Pass 2: on $G^R$, reverse $order$" },
+  { zh: "for $v \\in reverse(order)$: if $comp[v]=-1$: $DFS2(v, cid++)$", en: "for $v \\in rev(order)$: if $comp[v]=-1$: $DFS2(v)$" },
+  { zh: "  $comp[v] \\gets cid$; for $w \\in radj(v)$: if $comp[w]=-1$: $DFS2(w)$", en: "  $comp[v]=cid$; for $w \\in radj(v)$: $DFS2(w)$" },
+];
+
+export const TARJAN_CODE: Text[] = [
+  { zh: "$index[v] \\gets low[v] \\gets idx++$; $push(v)$; $onStack[v] \\gets true$", en: "$index[v] \\gets low[v] \\gets idx++$; push $v$" },
+  { zh: "for $w \\in adj(v)$:", en: "for $w \\in adj(v)$:" },
+  { zh: "  if $index[w] = -1$: $DFS(w)$; $low[v] \\gets \\min(low[v], low[w])$", en: "  if $index[w]=-1$: $DFS(w)$; $low[v] \\gets \\min(low[v], low[w])$" },
+  { zh: "  else if $onStack[w]$: $low[v] \\gets \\min(low[v], index[w])$", en: "  else if $onStack[w]$: $low[v] \\gets \\min(low[v], index[w])$" },
+  { zh: "if $low[v] = index[v]$: pop 直到 $v$ → 1 个 SCC", en: "if $low[v] = index[v]$: pop until $v$ = 1 SCC" },
+];
+
+export const DINIC_CODE: Text[] = [
+  { zh: "$flow \\gets 0$", en: "$flow \\gets 0$" },
+  { zh: "while $BFS()$ builds level graph:", en: "while $BFS()$ builds level graph:" },
+  { zh: "  $level[s] \\gets 0$; $Q \\gets \\{s\\}$", en: "  $level[s] \\gets 0$; $Q \\gets \\{s\\}$" },
+  { zh: "  while $Q$: pop $u$; for $v$: if $cap[u][v]-flow[u][v]>0 \\land level[v]=-1$:", en: "  while $Q$: pop $u$; for $v$: if residual>0 & level=-1:" },
+  { zh: "    $level[v] \\gets level[u]+1$; $Q.push(v)$", en: "    $level[v] \\gets level[u]+1$" },
+  { zh: "  if $level[t] = -1$: break  // 不可达", en: "  if $level[t]=-1$: break" },
+  { zh: "  $iter[v] \\gets 0$", en: "  $iter[v] \\gets 0$" },
+  { zh: "  while $(pushed = DFS(s, \\infty)) > 0$: $flow \\gets flow + pushed$", en: "  while $(pushed = DFS(s, \\infty)) > 0$: $flow \\plus= pushed$" },
+  { zh: "    $DFS(u, f)$: if $u=t$: return $f$", en: "    $DFS(u, f)$: if $u=t$: return $f$" },
+  { zh: "      for $v$ from $iter[u]$: if $residual>0 \\land level[v]=level[u]+1$:", en: "      for $v$ from $iter[u]$: if residual & level:" },
+  { zh: "        $ret \\gets DFS(v, \\min(f, residual))$", en: "        $ret \\gets DFS(v, \\min(f, residual))$" },
+  { zh: "        if $ret>0$: $flow[u][v]\\plus=ret$; $flow[v][u]\\minus=ret$; return $ret$", en: "        if $ret>0$: augment; return $ret$" },
+];
+
+export const LCA_CODE: Text[] = [
+  { zh: "# 预处理：DFS 计算 depth 与 $up[v][j]=2^j$ 祖先", en: "# Preprocess: DFS for depth & $up[v][j]$" },
+  { zh: "$up[v][0] \\gets parent$; $up[v][j] \\gets up[up[v][j-1]][j-1]$", en: "$up[v][0] \\gets parent$; $up[v][j] \\gets up[up[v][j-1]][j-1]$" },
+  { zh: "# 查询 LCA(u,v):", en: "# Query LCA(u,v):" },
+  { zh: "if $depth[u] < depth[v]$: swap", en: "if $depth[u] < depth[v]$: swap" },
+  { zh: "for $j \\gets LOG-1$ downto 0: if $up[u][j] \\neq -1 \\land depth[up[u][j]] \\ge depth[v]$:", en: "for $j$ down: if ancestor at $2^j$ deep enough:" },
+  { zh: "  $u \\gets up[u][j]$  // 提升 u", en: "  $u \\gets up[u][j]$" },
+  { zh: "if $u = v$: return $u$", en: "if $u=v$: return $u$" },
+  { zh: "for $j \\gets LOG-1$ downto 0: if $up[u][j] \\neq up[v][j]$:", en: "for $j$ down: if $2^j$ ancestors differ:" },
+  { zh: "  $u \\gets up[u][j]$; $v \\gets up[v][j]$", en: "  $u \\gets up[u][j]$; $v \\gets up[v][j]$" },
+  { zh: "return $up[u][0]$  // 父节点即 LCA", en: "return $up[u][0]$" },
+];
+
 // ============================================================
 // P0：遍历补齐（固定图高亮，沿用 AlgoStep）
 // ============================================================
@@ -4706,4 +4775,852 @@ export function heapSortSteps(values: number[]): HeapStep[] {
     ),
   );
   return steps;
+}
+
+// ============================================================
+// P3：新增图算法（A* / Floyd-Warshall / SCC / Max Flow / LCA）
+// ============================================================
+
+export type AStarStep = AlgoStep & {
+  dist: number[];
+  fScore: number[];
+  openSet: number[];
+  closedSet: number[];
+  parent: number[];
+  heuristic: number[];
+};
+
+export function aStarSteps(
+  g: Graph,
+  start = 0,
+  target: number,
+  labels: string[] = g.labels,
+  heuristic?: (u: number, v: number) => number,
+): AStarStep[] {
+  const n = g.n;
+  const adj = g.adj();
+  const INF = Number.POSITIVE_INFINITY;
+  const h = heuristic ?? (() => 0);
+  const dist = Array(n).fill(INF);
+  dist[start] = 0;
+  const fScore = Array(n).fill(INF);
+  fScore[start] = h(start, target);
+  const parent = Array(n).fill(-1);
+  const openSet: number[] = [start];
+  const closedSet: number[] = [];
+  const inOpen = Array(n).fill(false);
+  inOpen[start] = true;
+  const steps: AStarStep[] = [];
+  const S = (i: number) => labels[i];
+  const D = (v: number) => (Number.isFinite(dist[v]) ? String(dist[v]) : "∞");
+  const F = (v: number) => (Number.isFinite(fScore[v]) ? String(fScore[v]) : "∞");
+  const H = (v: number) => String(h(v, target));
+
+  const snap = (
+    line: number,
+    current: number | null,
+    exploring: number | null,
+    edge: [number, number] | null,
+    zh: string,
+    en: string,
+  ): AStarStep => ({
+    line,
+    current,
+    exploring,
+    visited: [...closedSet],
+    frontier: [...openSet],
+    order: [...closedSet],
+    edge,
+    dist: [...dist],
+    fScore: [...fScore],
+    openSet: [...openSet],
+    closedSet: [...closedSet],
+    parent: [...parent],
+    heuristic: [...Array(n)].map((_, i) => h(i, target)),
+    msg: { zh, en },
+  });
+
+  steps.push(
+    snap(
+      0,
+      start,
+      null,
+      null,
+      `初始化：openSet={${S(start)}}，g(${S(start)})=0，f=g+h=${F(start)}，其余 ∞`,
+      `init: openSet={${S(start)}}, g=0, f=${F(start)}`,
+    ),
+  );
+
+  while (openSet.length > 0) {
+    let current = openSet[0];
+    let bestF = fScore[current];
+    for (const u of openSet) {
+      if (fScore[u] < bestF) {
+        bestF = fScore[u];
+        current = u;
+      }
+    }
+
+    steps.push(
+      snap(
+        1,
+        current,
+        null,
+        null,
+        `选取 f 最小：u=${S(current)} (f=${F(current)}=g${D(current)}+h${H(current)})`,
+        `pick u=${S(current)} (f=${F(current)})`,
+      ),
+    );
+
+    if (current === target) {
+      steps.push(
+        snap(
+          2,
+          current,
+          null,
+          null,
+          `目标 ${S(target)} 已出队 → 找到最短路径`,
+          `target ${S(target)} reached`,
+        ),
+      );
+      break;
+    }
+
+    const idx = openSet.indexOf(current);
+    if (idx >= 0) openSet.splice(idx, 1);
+    inOpen[current] = false;
+    closedSet.push(current);
+
+    steps.push(
+      snap(
+        3,
+        current,
+        current,
+        null,
+        `移入 closedSet：${S(current)} (g=${D(current)})`,
+        `close ${S(current)}`,
+      ),
+    );
+
+    for (const [neighbor, w] of adj[current]) {
+      if (closedSet.includes(neighbor)) continue;
+
+      const tentativeG = Number.isFinite(dist[current]) ? dist[current] + w : INF;
+
+      steps.push(
+        snap(
+          4,
+          current,
+          current,
+          [current, neighbor],
+          `检查邻边 (${S(current)},${S(neighbor)},w=${w})：tentative g=${tentativeG} vs 当前 g=${D(neighbor)}`,
+          `check (${S(current)},${S(neighbor)})`,
+        ),
+      );
+
+      if (tentativeG < dist[neighbor]) {
+        parent[neighbor] = current;
+        dist[neighbor] = tentativeG;
+        fScore[neighbor] = dist[neighbor] + h(neighbor, target);
+
+        if (!inOpen[neighbor]) {
+          openSet.push(neighbor);
+          inOpen[neighbor] = true;
+          steps.push(
+            snap(
+              5,
+              current,
+              current,
+              [current, neighbor],
+              `更优路径：g(${S(neighbor)})←${D(neighbor)}，f←${F(neighbor)}，加入 openSet`,
+              `update g(${S(neighbor)})=${D(neighbor)}, f=${F(neighbor)}`,
+            ),
+          );
+        } else {
+          steps.push(
+            snap(
+              5,
+              current,
+              current,
+              [current, neighbor],
+              `更优路径：g(${S(neighbor)})←${D(neighbor)}，f←${F(neighbor)}，更新 openSet 中优先级`,
+              `update g(${S(neighbor)})=${D(neighbor)}, f=${F(neighbor)}`,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  const path: number[] = [];
+  if (parent[target] !== -1 || target === start) {
+    let cur: number | null = target;
+    while (cur !== null && cur !== -1) {
+      path.unshift(cur);
+      cur = parent[cur];
+    }
+  }
+
+  steps.push(
+    snap(
+      6,
+      null,
+      null,
+      null,
+      path.length > 1
+        ? `完成：路径 ${path.map(S).join(" → ")}，总代价 ${D(target)}`
+        : `无路径：${S(target)} 不可达`,
+      path.length > 1
+        ? `path: ${path.map(S).join(" → ")}, cost ${D(target)}`
+        : `no path`,
+    ),
+  );
+
+  return steps;
+}
+
+export type FloydStep = AlgoStep & {
+  dist: number[][];
+  next: number[][];
+  k: number;
+};
+
+export function floydWarshallSteps(
+  g: Graph,
+  labels: string[] = g.labels,
+): FloydStep[] {
+  const n = g.n;
+  const INF = Number.POSITIVE_INFINITY;
+  const dist: number[][] = Array.from({ length: n }, () => Array(n).fill(INF));
+  const next: number[][] = Array.from({ length: n }, () => Array(n).fill(-1));
+  const S = (i: number) => labels[i];
+
+  for (let i = 0; i < n; i++) {
+    dist[i][i] = 0;
+    next[i][i] = i;
+  }
+  for (const e of g.edges) {
+    const w = e.weight ?? 1;
+    dist[e.u][e.v] = w;
+    next[e.u][e.v] = e.v;
+    if (!g.directed) {
+      dist[e.v][e.u] = w;
+      next[e.v][e.u] = e.u;
+    }
+  }
+
+  const steps: FloydStep[] = [];
+  const snap = (
+    line: number,
+    current: number | null,
+    exploring: number | null,
+    k: number,
+    edge: [number, number] | null,
+    zh: string,
+    en: string,
+  ): FloydStep => ({
+    line,
+    current,
+    exploring,
+    visited: [],
+    frontier: [],
+    order: [],
+    edge,
+    dist: dist.map((row) => [...row]),
+    next: next.map((row) => [...row]),
+    k,
+    msg: { zh, en },
+  });
+
+  steps.push(
+    snap(
+      0,
+      null,
+      null,
+      -1,
+      null,
+      `初始化：dist[i][i]=0，邻边权重，其余 ∞；next[i][j]=j（直达）`,
+      `init: dist[i][i]=0, edges, next[i][j]=j`,
+    ),
+  );
+
+  for (let k = 0; k < n; k++) {
+    steps.push(
+      snap(
+        1,
+        k,
+        null,
+        k,
+        null,
+        `第 k=${k} (${S(k)}) 轮：允许经过顶点 ${S(k)} 作为中转`,
+        `k=${k} (${S(k)}) as intermediate`,
+      ),
+    );
+
+    for (let i = 0; i < n; i++) {
+      if (!Number.isFinite(dist[i][k])) continue;
+      for (let j = 0; j < n; j++) {
+        if (!Number.isFinite(dist[k][j])) continue;
+
+        const via = dist[i][k] + dist[k][j];
+        steps.push(
+          snap(
+            2,
+            i,
+            j,
+            k,
+            [i, j],
+            `检查 ${S(i)}→${S(k)}→${S(j)}：${dist[i][k]}+${dist[k][j]}=${via} vs 当前 ${D2(dist[i][j])}`,
+            `check ${S(i)}→${S(k)}→${S(j)}: ${via} vs ${D2(dist[i][j])}`,
+          ),
+        );
+
+        if (via < dist[i][j]) {
+          dist[i][j] = via;
+          next[i][j] = next[i][k];
+          steps.push(
+            snap(
+              3,
+              i,
+              j,
+              k,
+              [i, j],
+              `更新：dist[${S(i)}][${S(j)}]←${via}，next←${S(next[i][j])}`,
+              `update dist[${S(i)}][${S(j)}]=${via}`,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  let negCycle = false;
+  for (let i = 0; i < n; i++) {
+    if (dist[i][i] < 0) {
+      negCycle = true;
+      break;
+    }
+  }
+
+  steps.push(
+    snap(
+      4,
+      null,
+      null,
+      n,
+      null,
+      negCycle
+        ? `负环检测：存在 dist[i][i]<0 → 有负环`
+        : `完成：所有点对最短路已求出（无负环）`,
+      negCycle ? `negative cycle detected` : `done, no neg cycles`,
+    ),
+  );
+
+  return steps;
+}
+
+function D2(v: number): string {
+  return Number.isFinite(v) ? String(v) : "∞";
+}
+
+export type SCCStep = AlgoStep & {
+  comp: number[];
+  stack: number[];
+  index: number[];
+  lowlink: number[];
+  onStack: boolean[];
+  sccCount: number;
+};
+
+export function kosarajuSteps(
+  g: Graph,
+  labels: string[] = g.labels,
+): SCCStep[] {
+  if (!g.directed) {
+    return [{
+      line: 0,
+      current: null,
+      exploring: null,
+      visited: [],
+      frontier: [],
+      order: [],
+      edge: null,
+      comp: [],
+      stack: [],
+      index: [],
+      lowlink: [],
+      onStack: [],
+      sccCount: 0,
+      msg: { zh: "Kosaraju 仅适用于有向图", en: "Kosaraju only for directed graphs" },
+    }];
+  }
+
+  const n = g.n;
+  const adj = g.adj();
+  const visited = Array(n).fill(false);
+  const order: number[] = [];
+  const comp = Array(n).fill(-1);
+  const steps: SCCStep[] = [];
+  const S = (i: number) => labels[i];
+
+  const snap = (
+    line: number,
+    current: number | null,
+    exploring: number | null,
+    edge: [number, number] | null,
+    zh: string,
+    en: string,
+    extra?: Partial<SCCStep>,
+  ): SCCStep => ({
+    line,
+    current,
+    exploring,
+    visited: [...order].filter((v) => comp[v] !== -1),
+    frontier: [],
+    order: [...order],
+    edge,
+    comp: [...comp],
+    stack: [],
+    index: [],
+    lowlink: [],
+    onStack: [],
+    sccCount: Math.max(...comp, -1) + 1,
+    msg: { zh, en },
+    ...extra,
+  });
+
+  steps.push(snap(0, null, null, null, "第 1 遍 DFS：计算完成时间序", "pass 1: finish times"));
+
+  const dfs1 = (u: number): void => {
+    visited[u] = true;
+    steps.push(snap(1, u, u, null, `访问 ${S(u)}`, `visit ${S(u)}`));
+    for (const [v] of adj[u]) {
+      steps.push(snap(1, u, u, [u, v], `检查 ${S(u)}→${S(v)}: visited=${visited[v]}`, `check ${S(u)}→${S(v)}`));
+      if (!visited[v]) dfs1(v);
+    }
+    order.push(u);
+    steps.push(snap(2, u, null, null, `${S(u)} 完成，加入序列 (pos=${order.length})`, `${S(u)} done`));
+  };
+
+  for (let i = 0; i < n; i++) if (!visited[i]) dfs1(i);
+
+  const radj: number[][][] = Array.from({ length: n }, () => []);
+  for (const e of g.edges) {
+    radj[e.v].push([e.u, e.weight ?? 1]);
+  }
+
+  steps.push(snap(3, null, null, null, "第 2 遍：在反图上按完成序逆序 DFS，每棵树 = 1 个 SCC", "pass 2: reverse graph, reverse finish order"));
+
+  let cid = 0;
+  for (let i = n - 1; i >= 0; i--) {
+    const v = order[i];
+    if (comp[v] !== -1) continue;
+    const stack: number[] = [v];
+    comp[v] = cid;
+    steps.push(snap(4, v, v, null, `新 SCC #${cid}：从 ${S(v)} 开始`, `new SCC #${cid} from ${S(v)}`));
+
+    while (stack.length) {
+      const u = stack.pop()!;
+      for (const [w] of radj[u]) {
+        steps.push(snap(4, u, u, [u, w], `反图边 ${S(u)}←${S(w)} (原 ${S(w)}→${S(u)})`, `rev edge ${S(w)}→${S(u)}`));
+        if (comp[w] === -1) {
+          comp[w] = cid;
+          stack.push(w);
+          steps.push(snap(4, w, null, null, `${S(w)} 归入 SCC #${cid}`, `assign ${S(w)} to SCC #${cid}`));
+        }
+      }
+    }
+    cid++;
+  }
+
+  steps.push(snap(5, null, null, null, `完成：共 ${cid} 个强连通分量`, `done: ${cid} SCCs`));
+
+  return steps;
+}
+
+export function tarjanSteps(
+  g: Graph,
+  labels: string[] = g.labels,
+): SCCStep[] {
+  if (!g.directed) {
+    return [{
+      line: 0,
+      current: null,
+      exploring: null,
+      visited: [],
+      frontier: [],
+      order: [],
+      edge: null,
+      comp: [],
+      stack: [],
+      index: [],
+      lowlink: [],
+      onStack: [],
+      sccCount: 0,
+      msg: { zh: "Tarjan 仅适用于有向图", en: "Tarjan only for directed graphs" },
+    }];
+  }
+
+  const n = g.n;
+  const adj = g.adj();
+  const index = Array(n).fill(-1);
+  const lowlink = Array(n).fill(-1);
+  const onStack = Array(n).fill(false);
+  const stack: number[] = [];
+  const comp = Array(n).fill(-1);
+  let idx = 0;
+  let sccCount = 0;
+  const steps: SCCStep[] = [];
+  const S = (i: number) => labels[i];
+
+  const snap = (
+    line: number,
+    current: number | null,
+    exploring: number | null,
+    edge: [number, number] | null,
+    zh: string,
+    en: string,
+  ): SCCStep => ({
+    line,
+    current,
+    exploring,
+    visited: comp.map((c, i) => c !== -1 ? i : -1).filter((i) => i >= 0),
+    frontier: [...stack],
+    order: [],
+    edge,
+    comp: [...comp],
+    stack: [...stack],
+    index: [...index],
+    lowlink: [...lowlink],
+    onStack: [...onStack],
+    sccCount,
+    msg: { zh, en },
+  });
+
+  steps.push(snap(0, null, null, null, "初始化：index/lowlink=-1，栈空", "init: index/lowlink=-1, stack empty"));
+
+  const strongconnect = (v: number): void => {
+    index[v] = lowlink[v] = idx++;
+    stack.push(v);
+    onStack[v] = true;
+    steps.push(snap(1, v, v, null, `${S(v)}: index=lowlink=${index[v]}，入栈`, `${S(v)}: index=lowlink=${index[v]}, push`));
+
+    for (const [w] of adj[v]) {
+      steps.push(snap(2, v, v, [v, w], `检查边 ${S(v)}→${S(w)}`, `check ${S(v)}→${S(w)}`));
+      if (index[w] === -1) {
+        strongconnect(w);
+        lowlink[v] = Math.min(lowlink[v], lowlink[w]);
+        steps.push(snap(3, v, w, [v, w], `更新 lowlink[${S(v)}]=min(${lowlink[v]}, lowlink[${S(w)}]=${lowlink[w]})=${Math.min(lowlink[v], lowlink[w])}`, `update lowlink[${S(v)}]`));
+      } else if (onStack[w]) {
+        lowlink[v] = Math.min(lowlink[v], index[w]);
+        steps.push(snap(3, v, w, [v, w], `回边到栈上 ${S(w)}：lowlink[${S(v)}]=min(${lowlink[v]}, index[${S(w)}]=${index[w]})=${Math.min(lowlink[v], index[w])}`, `back edge to stack ${S(w)}`));
+      }
+    }
+
+    if (lowlink[v] === index[v]) {
+      const scc: number[] = [];
+      let w: number;
+      do {
+        w = stack.pop()!;
+        onStack[w] = false;
+        comp[w] = sccCount;
+        scc.push(w);
+      } while (w !== v);
+      sccCount++;
+      steps.push(snap(4, v, null, null, `lowlink=index → 弹出 SCC #${sccCount-1}: [${scc.map(S).join(", ")}]`, `SCC #${sccCount-1}: [${scc.map(S).join(", ")}]`));
+    }
+  };
+
+  for (let v = 0; v < n; v++) {
+    if (index[v] === -1) strongconnect(v);
+  }
+
+  steps.push(snap(5, null, null, null, `完成：共 ${sccCount} 个强连通分量`, `done: ${sccCount} SCCs`));
+
+  return steps;
+}
+
+export type MaxFlowStep = AlgoStep & {
+  capacity: number[][];
+  flow: number[][];
+  level: number[];
+  iter: number[];
+  s: number;
+  t: number;
+  phase: "bfs" | "dfs" | "done";
+  path: number[];
+  bottleneck: number;
+};
+
+export function dinicSteps(
+  g: Graph,
+  source = 0,
+  sink: number,
+  labels: string[] = g.labels,
+): MaxFlowStep[] {
+  if (!g.directed) {
+    return [{
+      line: 0,
+      current: null,
+      exploring: null,
+      visited: [],
+      frontier: [],
+      order: [],
+      edge: null,
+      capacity: [],
+      flow: [],
+      level: [],
+      iter: [],
+      s: source,
+      t: sink,
+      phase: "done",
+      path: [],
+      bottleneck: 0,
+      msg: { zh: "Dinic 仅适用于有向图", en: "Dinic only for directed graphs" },
+    }];
+  }
+
+  const n = g.n;
+  const t = sink >= 0 && sink < n ? sink : n - 1;
+  const cap: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
+  for (const e of g.edges) {
+    cap[e.u][e.v] += e.weight ?? 1;
+  }
+  const flow: number[][] = Array.from({ length: n }, () => Array(n).fill(0));
+  const level: number[] = Array(n).fill(-1);
+  const iter: number[] = Array(n).fill(0);
+  const S = (i: number) => labels[i];
+  const steps: MaxFlowStep[] = [];
+
+  const snap = (
+    line: number,
+    current: number | null,
+    exploring: number | null,
+    edge: [number, number] | null,
+    phase: "bfs" | "dfs" | "done",
+    path: number[],
+    bottleneck: number,
+    zh: string,
+    en: string,
+  ): MaxFlowStep => ({
+    line,
+    current,
+    exploring,
+    visited: level.map((l, i) => l >= 0 ? i : -1).filter((i) => i >= 0),
+    frontier: [],
+    order: [],
+    edge,
+    capacity: cap.map((row) => [...row]),
+    flow: flow.map((row) => [...row]),
+    level: [...level],
+    iter: [...iter],
+    s: source,
+    t,
+    phase,
+    path: [...path],
+    bottleneck,
+    msg: { zh, en },
+  });
+
+  let totalFlow = 0;
+
+  const bfs = (): boolean => {
+    level.fill(-1);
+    const q: number[] = [source];
+    level[source] = 0;
+    steps.push(snap(0, source, null, null, "bfs", [], 0, `BFS 分层：level[${S(source)}]=0，其余 -1`, `BFS level graph`));
+
+    while (q.length) {
+      const v = q.shift()!;
+      for (let to = 0; to < n; to++) {
+        if (cap[v][to] - flow[v][to] > 0 && level[to] < 0) {
+          level[to] = level[v] + 1;
+          q.push(to);
+          steps.push(snap(0, v, to, [v, to], "bfs", [], 0, `发现 ${S(v)}→${S(to)} (cap-${flow[v][to]}=${cap[v][to]-flow[v][to]}>0) → level[${S(to)}]=${level[to]}`, `edge ${S(v)}→${S(to)}, level=${level[to]}`));
+        }
+      }
+    }
+    const reachable = level[t] >= 0;
+    steps.push(snap(0, null, null, null, "bfs", [], 0, reachable ? `汇点 ${S(t)} 可达 (level=${level[t]})` : `汇点 ${S(t)} 不可达 → 结束`, reachable ? `sink reachable (level=${level[t]})` : `sink unreachable → stop`));
+    return reachable;
+  };
+
+  const dfs = (v: number, upTo: number, path: number[]): number => {
+    if (v === t) return upTo;
+    for (let i = iter[v]; i < n; i++) {
+      iter[v] = i;
+      if (cap[v][i] - flow[v][i] > 0 && level[v] < level[i]) {
+        const newPath = [...path, i];
+        steps.push(snap(1, v, i, [v, i], "dfs", newPath, upTo, `DFS 尝试 ${S(v)}→${S(i)} (残量=${cap[v][i]-flow[v][i]})`, `DFS try ${S(v)}→${S(i)}`));
+        const pushed = dfs(i, Math.min(upTo, cap[v][i] - flow[v][i]), newPath);
+        if (pushed > 0) {
+          flow[v][i] += pushed;
+          flow[i][v] -= pushed;
+          steps.push(snap(1, v, i, [v, i], "dfs", newPath, pushed, `增广 ${S(v)}→${S(i)} +${pushed} (总流量 ${totalFlow + pushed})`, `augment ${S(v)}→${S(i)} +${pushed}`));
+          return pushed;
+        }
+      }
+    }
+    return 0;
+  };
+
+  let round = 0;
+  while (bfs()) {
+    round++;
+    steps.push(snap(2, null, null, null, "bfs", [], 0, `第 ${round} 轮分层完成，开始 DFS 增广`, `phase ${round}: BFS done, start DFS`));
+    iter.fill(0);
+    while (true) {
+      const pushed = dfs(source, Number.POSITIVE_INFINITY, [source]);
+      if (pushed === 0) break;
+      totalFlow += pushed;
+    }
+    steps.push(snap(2, null, null, null, "bfs", [], 0, `本轮无增广路，进入下一轮 BFS`, `round ${round} done, flow=${totalFlow}`));
+  }
+
+  steps.push(snap(3, null, null, null, "done", [], 0, `最大流 = ${totalFlow}`, `max flow = ${totalFlow}`));
+
+  return steps;
+}
+
+export type LCAStep = AlgoStep & {
+  up: number[][];
+  depth: number[];
+  u: number;
+  v: number;
+  lca: number | null;
+};
+
+export function lcaBinaryLiftingSteps(
+  g: Graph,
+  root = 0,
+  u: number,
+  v: number,
+  labels: string[] = g.labels,
+): LCAStep[] {
+  if (!g.isTree()) {
+    return [{
+      line: 0,
+      current: null,
+      exploring: null,
+      visited: [],
+      frontier: [],
+      order: [],
+      edge: null,
+      up: [],
+      depth: [],
+      u,
+      v,
+      lca: null,
+      msg: { zh: "LCA 倍增法要求输入是树（无环连通图）", en: "LCA requires a tree" },
+    }];
+  }
+
+  const n = g.n;
+  const adj = g.adj();
+  const LOG = Math.ceil(Math.log2(Math.max(1, n))) + 1;
+  const up: number[][] = Array.from({ length: n }, () => Array(LOG).fill(-1));
+  const depth: number[] = Array(n).fill(0);
+
+  const steps: LCAStep[] = [];
+  const S = (i: number) => labels[i];
+
+  const snap = (
+    line: number,
+    current: number | null,
+    exploring: number | null,
+    edge: [number, number] | null,
+    uNode: number,
+    vNode: number,
+    lca: number | null,
+    zh: string,
+    en: string,
+  ): LCAStep => ({
+    line,
+    current,
+    exploring,
+    visited: [],
+    frontier: [],
+    order: [],
+    edge,
+    up: up.map((row) => [...row]),
+    depth: [...depth],
+    u: uNode,
+    v: vNode,
+    lca,
+    msg: { zh, en },
+  });
+
+  const visited = Array(n).fill(false);
+  const dfs = (node: number, parent: number, d: number): void => {
+    visited[node] = true;
+    depth[node] = d;
+    up[node][0] = parent;
+    for (let j = 1; j < LOG; j++) {
+      if (up[node][j - 1] !== -1) {
+        up[node][j] = up[up[node][j - 1]][j - 1];
+      }
+    }
+    for (const [child] of adj[node]) {
+      if (child !== parent && !visited[child]) {
+        dfs(child, node, d + 1);
+      }
+    }
+  };
+
+  steps.push(snap(0, root, null, null, u, v, null, `DFS 预处理：从根 ${S(root)} 开始计算 depth 和 2^j 祖先`, `preprocess: depth & up from root ${S(root)}`));
+  dfs(root, -1, 0);
+
+  steps.push(snap(1, u, v, null, u, v, null, `预处理完成：depth=[${depth.join(",")}]，LOG=${LOG}`, `preprocess done: depth, LOG=${LOG}`));
+
+  let uu = u, vv = v;
+  if (depth[uu] < depth[vv]) [uu, vv] = [vv, uu];
+
+  steps.push(snap(2, uu, vv, null, uu, vv, null, `对齐深度：${S(uu)} (depth=${depth[uu]}) 与 ${S(vv)} (depth=${depth[vv]})`, `align depth: ${S(uu)} vs ${S(vv)}`));
+
+  for (let j = LOG - 1; j >= 0; j--) {
+    if (up[uu][j] !== -1 && depth[up[uu][j]] >= depth[vv]) {
+      steps.push(snap(3, uu, vv, [uu, up[uu][j]], uu, vv, null, `${S(uu)} ← up[${S(uu)}][${j}]=${S(up[uu][j])} (2^${j}=${1<<j} 步)`, `lift ${S(uu)} by 2^${j}`));
+      uu = up[uu][j];
+    }
+  }
+
+  if (uu === vv) {
+    steps.push(snap(4, uu, vv, null, uu, vv, uu, `对齐后相等 → LCA = ${S(uu)}`, `aligned → LCA = ${S(uu)}`));
+    return steps;
+  }
+
+  steps.push(snap(4, uu, vv, null, uu, vv, null, `对齐后不同：${S(uu)} ≠ ${S(vv)}，二者同步上跳`, `not equal, lift together`));
+
+  for (let j = LOG - 1; j >= 0; j--) {
+    if (up[uu][j] !== -1 && up[uu][j] !== up[vv][j]) {
+      steps.push(snap(5, uu, vv, [uu, up[uu][j]], uu, vv, null, `${S(uu)}←${S(up[uu][j])}, ${S(vv)}←${S(up[vv][j])} (2^${j})`, `lift both by 2^${j}`));
+      uu = up[uu][j];
+      vv = up[vv][j];
+    }
+  }
+
+  const lca = up[uu][0];
+  steps.push(snap(6, uu, vv, [uu, lca], uu, vv, lca, `父节点相同 → LCA = ${S(lca)}`, `parent same → LCA = ${S(lca)}`));
+
+  return steps;
+}
+
+export function reconstructPath(next: number[][], u: number, v: number): number[] {
+  if (next[u][v] === -1) return [];
+  const path = [u];
+  while (u !== v) {
+    u = next[u][v];
+    path.push(u);
+  }
+  return path;
+}
+
+export function reconstructPathFromParent(parent: number[], target: number): number[] {
+  const path: number[] = [];
+  let cur = target;
+  while (cur !== -1) {
+    path.unshift(cur);
+    cur = parent[cur];
+  }
+  return path;
 }

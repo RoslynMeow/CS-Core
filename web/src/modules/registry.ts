@@ -27,6 +27,11 @@ import { graphTopoModule } from "./graph/topo";
 import { graphDijkstraModule } from "./graph/dijkstra";
 import { graphMstModule } from "./graph/mst";
 import { graphBellmanModule } from "./graph/bellman";
+import { graphAStarModule } from "./graph/astar";
+import { graphFloydModule } from "./graph/floyd";
+import { graphSCCModule } from "./graph/scc";
+import { graphMaxFlowModule } from "./graph/maxflow";
+import { graphLCAModule } from "./graph/lca";
 
 // SAFETY: 所有模块实现同一 ModuleDef 契约;泛型形参仅约束模块内部实现,运行时结构一致
 const asModule = (m: unknown): ModuleDef => m as ModuleDef;
@@ -60,6 +65,11 @@ export const KNOWLEDGE: Record<string, ModuleDef> = {
   [graphDijkstraModule.id]: asModule(graphDijkstraModule),
   [graphMstModule.id]: asModule(graphMstModule),
   [graphBellmanModule.id]: asModule(graphBellmanModule),
+  [graphAStarModule.id]: asModule(graphAStarModule),
+  [graphFloydModule.id]: asModule(graphFloydModule),
+  [graphSCCModule.id]: asModule(graphSCCModule),
+  [graphMaxFlowModule.id]: asModule(graphMaxFlowModule),
+  [graphLCAModule.id]: asModule(graphLCAModule),
 };
 
 export const allModules = Object.values(KNOWLEDGE);
