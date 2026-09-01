@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMaximize } from "@fortawesome/free-solid-svg-icons";
 import type { GraphAlgoScene } from "../../lib/graph";
 import type { Text } from "../../i18n/lang";
+import type { AlgoTable } from "./StateBar";
 
 /** 图/树共用的渲染场景：库的算法步进 + 位置/边信息，喂给 GraphCanvas */
 export type GraphCanvasScene = GraphAlgoScene & {
@@ -26,6 +27,8 @@ export type GraphCanvasScene = GraphAlgoScene & {
         /** 虚线边（B+树叶子兄弟链等结构示意） */
         dashed?: boolean;
     }[];
+    /** MST 已选边（Prim 的 T 边 / Kruskal 的并查集 accepted 边）：绿色加粗，用于最小生成树演示 */
+    picked?: Array<[number, number]>;
     directed?: boolean;
     root?: number | null;
     annotate?: Record<number, string>; // 节点下方小字（如 dist / key / bf）
@@ -36,6 +39,8 @@ export type GraphCanvasScene = GraphAlgoScene & {
     tone?: Record<number, number>; // 彩色树：节点类别配色索引（0=红 1=蓝 2=黄 3=灰 4=黑），fill 固定用 TONE_FILL
     /** 双面板建树（AVL/BST）：左右面板标题（左=随机生成的输入树，右=正在建立的树）；GraphCanvas 需传 t 才渲染 */
     panel?: { left?: Text; right?: Text };
+    /** 算法状态数组面板：画布下方展示 邻接表 / dist / prev / key / uf 等，随帧刷新 */
+    stateTables?: AlgoTable[];
 };
 
 const W = 760,
@@ -290,19 +295,43 @@ export function GraphCanvas({
                             );
                         }
                         const active = isAlgoEdge(e.u, e.v);
-                        const stroke = active ? "#f59e0b" : "#94a3b8";
-                        const sw = active ? 3 : 1.6;
-                        const ang =
-                            (Math.atan2(p.by - p.ay, p.bx - p.ax) * 180) /
-                            Math.PI;
+                        // MST 已选边（picked）：绿色加粗
+                        const mstPicked =
+                            scene.picked?.some(
+                                ([a, b]) =>
+                                    (a === e.u && b === e.v) ||
+                                    (a === e.v && b === e.u),
+                            ) ?? false;
+                        const stroke = mstPicked
+                            ? "#059669"
+                            : active
+                              ? "#f59e0b"
+                              : "#94a3b8";
+                        const sw = mstPicked ? 3.2 : active ? 3 : 1.6;
                         const elb = scene.edgeLabels?.[`${e.u}-${e.v}`];
+                        // 有向边：箭头画在目标节点外沿，线止于外沿，避免被后绘的实心节点圆盖住
+                        const dxx = p.bx - p.ax,
+                            dyy = p.by - p.ay;
+                        const dl = Math.hypot(dxx, dyy) || 1;
+                        const ux = dxx / dl,
+                            uy = dyy / dl; // 源→目标单位向量
+                        const ARR = 12,
+                            AHW = 5.5; // 箭头长 / 半宽
+                        const tx2 = p.bx - ux * R; // 目标外沿（箭头尖）
+                        const ty2 = p.by - uy * R;
+                        const bx2 = tx2 - ux * ARR,
+                            by2 = ty2 - uy * ARR; // 底边中心（回退）
+                        const px2 = -uy,
+                            py2 = ux; // 垂直单位
+                        const x2 = directed ? tx2 : p.bx;
+                        const y2 = directed ? ty2 : p.by;
                         return (
                             <g key={i}>
                                 <line
                                     x1={p.ax}
                                     y1={p.ay}
-                                    x2={p.bx}
-                                    y2={p.by}
+                                    x2={x2}
+                                    y2={y2}
                                     stroke={stroke}
                                     strokeWidth={sw}
                                     strokeDasharray={
@@ -311,9 +340,8 @@ export function GraphCanvas({
                                 />
                                 {directed && (
                                     <polygon
-                                        points={`${p.bx},${p.by} ${p.bx - 9},${p.by - 3.5} ${p.bx - 9},${p.by + 3.5}`}
+                                        points={`${tx2},${ty2} ${bx2 + px2 * AHW},${by2 + py2 * AHW} ${bx2 - px2 * AHW},${by2 - py2 * AHW}`}
                                         fill={stroke}
-                                        transform={`rotate(${ang} ${p.bx} ${p.by})`}
                                     />
                                 )}
                                 {e.weight !== undefined && e.weight !== 1 && (

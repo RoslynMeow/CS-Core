@@ -1,6 +1,13 @@
 import { T, type Text } from "../../i18n/lang";
 import type { Frame, ModuleDef } from "../../engine/types";
-import { dijkstraSteps, DIJKSTRA_CODE, type DijkstraStep } from "../../lib/graph";
+import {
+  primSteps,
+  kruskalSteps,
+  PRIM_CODE,
+  KRUSKAL_CODE,
+  type PrimStep,
+  type KruskalStep,
+} from "../../lib/graph";
 import type { GraphCanvasScene } from "../../components/canvas/GraphCanvas";
 import { type ImportedGraph } from "../tree/source";
 import {
@@ -9,80 +16,75 @@ import {
   randomCfg,
   fromImport,
   graphScene,
-  algoStateTables,
   importPreviewFrames,
   GraphCanvasWrap,
   GraphSourcePanel,
 } from "./source";
 
-type Cfg = GraphCfg;
+type Mode = "prim" | "kruskal";
+type Cfg = GraphCfg & { mode: Mode };
 const DEFAULT: Cfg = {
   source: "random",
   imp: null,
   confirmed: true,
   n: 7,
-  p: 0.25,
+  p: 0.28,
   directed: false,
-  weighted: true, // 最短路须加权才显眼
-  connected: true, // 连通保证从起点可达（否则展示“不可达即结束”分支）
-  seed: 21,
+  weighted: true, // MST 须加权（最小权重和）
+  connected: true, // MST 须连通（否则展示不连通分支）
+  seed: 33,
   root: 0,
+  mode: "prim",
 };
 
-/** 邻接串：v(权重), … */
-function adjTextOf(g: Awaited<ReturnType<typeof randGraph>>): (u: number) => string {
-  const adj = g.adj();
-  return (u: number) =>
-    adj[u]
-      .map(([v, w]) =>
-        g.weighted && w !== 1 ? `${g.labels[v]}(${w})` : g.labels[v],
-      )
-      .join(", ") || "—";
-}
-
-/** DijkstraStep → 场景：已确定(S) = 绿色已访问环 + 节点下方 annotate 显示 dist */
-function stepScene(
-  s: DijkstraStep,
+/** PrimStep → 场景：T 中节点 = 绿环（inTree），候选 cand = 天蓝，annotate = key；picked = 树边 */
+function primScene(
+  s: PrimStep,
   g: Awaited<ReturnType<typeof randGraph>>,
   root: number,
   importGraph: ImportedGraph | null,
 ): GraphCanvasScene {
   const ann: Record<number, string> = {};
   for (let i = 0; i < g.n; i++)
-    ann[i] = Number.isFinite(s.dist[i]) ? String(s.dist[i]) : "∞";
-  const settled = new Set(s.visited);
-  return {
-    ...graphScene(
-      g,
-      {
-        current: s.current,
-        exploring: s.exploring,
-        visited: [...s.visited], // = settled 已确定集 → 绿环
-        frontier: [...s.frontier], // 候选 cand（有限 dist 未确定）→ 天蓝
-        order: [...s.order],
-        edge: s.edge,
-      },
-      {
-        root,
-        annotate: ann,
-        import: importGraph,
-      },
-    ),
-    stateTables: algoStateTables({
-      labels: g.labels,
-      adjText: adjTextOf(g),
-      arrays: [
-        {
-          name: "dist",
-          values: [...s.dist],
-          hl: g.labels.map((_, i) =>
-            settled.has(i) ? 1 : s.frontier.includes(i) ? 2 : s.current === i ? 3 : 0,
-          ),
-        },
-        { name: "prev", values: s.prev.map((p) => (p < 0 ? "-" : g.labels[p])) },
-      ],
-    }),
-  };
+    ann[i] = Number.isFinite(s.key[i]) ? `k:${s.key[i]}` : "∞";
+  const picked: Array<[number, number]> = [];
+  for (let v = 0; v < g.n; v++)
+    if (s.inTree[v] && s.parent[v] >= 0 && s.parent[v] !== v)
+      picked.push([s.parent[v], v]);
+  return graphScene(
+    g,
+    {
+      current: s.current,
+      exploring: s.exploring,
+      visited: [...s.visited], // = inTree → 绿环
+      frontier: [...s.frontier], // 候选 cand → 天蓝
+      order: [...s.order],
+      edge: s.edge,
+    },
+    { root, annotate: ann, picked, ...(importGraph ? { import: importGraph } : {}) },
+  );
+}
+
+/** KruskalStep → 场景：MST 已接受边 = picked（绿色加粗），正在检查边 = edge */
+function kruskalScene(
+  s: KruskalStep,
+  g: Awaited<ReturnType<typeof randGraph>>,
+  root: number,
+  importGraph: ImportedGraph | null,
+): GraphCanvasScene {
+  const picked: Array<[number, number]> = s.picked as Array<[number, number]>;
+  return graphScene(
+    g,
+    {
+      current: s.current,
+      exploring: s.exploring,
+      visited: [...s.visited],
+      frontier: [...s.frontier],
+      order: [...s.order],
+      edge: s.edge,
+    },
+    { root, picked, ...(importGraph ? { import: importGraph } : {}) },
+  );
 }
 
 function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
@@ -113,7 +115,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
     return [
       {
         line: 0,
-        caption: T("空图：请先随机生成或导入一张加权图", "empty graph"),
+        caption: T("空图：请先随机生成或导入一张无权/无向图", "empty graph"),
         scene: {
           current: null,
           exploring: null,
@@ -127,35 +129,37 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
       },
     ];
   }
-  const root = Math.min(Math.max(0, cfg.root), g.n - 1);
-  const steps: DijkstraStep[] = dijkstraSteps(g, root, g.labels);
-  return steps.map((s) => ({
+  const importGraph =
+    cfg.source === "graph" ? (cfg.imp as ImportedGraph | null) : null;
+  if (cfg.mode === "prim") {
+    const root = Math.min(Math.max(0, res.root), g.n - 1);
+    return primSteps(g, root, g.labels).map((s) => ({
+      line: s.line,
+      caption: s.msg,
+      scene: primScene(s as PrimStep, g, root, importGraph),
+    }));
+  }
+  return kruskalSteps(g, g.labels).map((s) => ({
     line: s.line,
     caption: s.msg,
-    scene: stepScene(
-      s,
-      g,
-      root,
-      cfg.source === "graph" ? cfg.imp : null,
-    ),
+    scene: kruskalScene(s as KruskalStep, g, res.root, importGraph),
   }));
 }
 
-export const graphDijkstraModule: ModuleDef<GraphCanvasScene, Cfg> = {
-  id: "graph-dijkstra",
-  title: T("Dijkstra 最短路径", "Dijkstra Shortest Path"),
+export const graphMstModule: ModuleDef<GraphCanvasScene, Cfg> = {
+  id: "graph-mst",
+  title: T("最小生成树 MST", "Minimum Spanning Tree"),
   desc: T(
-    "贪心单源最短路：维护已确定集 S，每次取未确定中 dist 最小者入 S 并松弛邻边；节点下标注 dist，绿色=已确定，天蓝=候选",
-    "greedy single-source shortest paths: settle the min-dist unsettled vertex and relax its edges; dist under nodes, settled=green, candidates=cyan",
+    "Prim（贪心 + 已确定集）与 Kruskal（按权重升序 + 并查集）两种求最小生成树；绿色加粗边 = 已选入 MST",
+    "Prim (greedy settled set) vs Kruskal (sort by weight + union-find); green bold edges = picked into the MST",
   ),
   tags: ["data-structures"],
   defaultConfig: DEFAULT,
   randomize(c) {
-    return randomCfg(c);
+    return { ...randomCfg(c), mode: c.mode };
   },
   Controls({ config, onChange, t }) {
     const isZh = t(T("中文", "en")) !== "en";
-    const n = config.n;
     return (
       <div style={{ display: "grid", gap: 8, width: "100%" }}>
         <div
@@ -178,25 +182,18 @@ export const graphDijkstraModule: ModuleDef<GraphCanvasScene, Cfg> = {
               letterSpacing: ".04em",
             }}
           >
-            {isZh ? "起点" : "START"}
+            {isZh ? "算法" : "ALGO"}
           </span>
           <select
             className="txt"
-            style={{ minWidth: 70 }}
-            value={config.root}
+            value={config.mode}
             onChange={(e) =>
-              onChange({ ...config, root: Number(e.target.value) })
+              onChange({ ...config, mode: e.target.value as Mode })
             }
           >
-            {Array.from({ length: n }, (_, i) => (
-              <option key={i} value={i}>
-                {resLabel(config, i)}
-              </option>
-            ))}
+            <option value="prim">{t(T("Prim（贪心）", "Prim"))}</option>
+            <option value="kruskal">{t(T("Kruskal（并查集）", "Kruskal"))}</option>
           </select>
-          <span style={{ fontSize: 11, color: "#64748b" }}>
-            {isZh ? "也可直接点画布顶点换起点" : "or click a vertex on canvas"}
-          </span>
         </div>
         <div
           style={{
@@ -266,8 +263,8 @@ export const graphDijkstraModule: ModuleDef<GraphCanvasScene, Cfg> = {
       </div>
     ) as unknown as never;
   },
-  codeFor() {
-    return DIJKSTRA_CODE;
+  codeFor(cfg) {
+    return cfg.mode === "prim" ? PRIM_CODE : KRUSKAL_CODE;
   },
   generate(config) {
     return buildFrames(config);
@@ -278,20 +275,8 @@ export const graphDijkstraModule: ModuleDef<GraphCanvasScene, Cfg> = {
         scene={scene}
         t={t}
         config={config}
-        selected={config ? config.root : null}
-        onNodeClick={
-          config && onChange
-            ? (id) => onChange({ ...config, root: id })
-            : undefined
-        }
         onChange={onChange ? ((c: GraphCfg) => onChange(c as Cfg)) : undefined}
       />
     );
   },
 };
-
-function resLabel(cfg: Cfg, i: number): string {
-  if (cfg.source === "graph" && cfg.imp && i < cfg.imp.labels.length)
-    return cfg.imp.labels[i];
-  return String.fromCharCode(65 + (i % 26));
-}

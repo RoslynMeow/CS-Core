@@ -1,15 +1,18 @@
 import { T, type Text } from "../../i18n/lang";
 import type { Frame, ModuleDef } from "../../engine/types";
-import { dijkstraSteps, DIJKSTRA_CODE, type DijkstraStep } from "../../lib/graph";
+import {
+  bellmanFordSteps,
+  BELLMAN_CODE,
+  type BellmanStep,
+} from "../../lib/graph";
 import type { GraphCanvasScene } from "../../components/canvas/GraphCanvas";
-import { type ImportedGraph } from "../tree/source";
+import type { ImportedGraph } from "../tree/source";
 import {
   type GraphCfg,
   randGraph,
   randomCfg,
   fromImport,
   graphScene,
-  algoStateTables,
   importPreviewFrames,
   GraphCanvasWrap,
   GraphSourcePanel,
@@ -20,29 +23,18 @@ const DEFAULT: Cfg = {
   source: "random",
   imp: null,
   confirmed: true,
-  n: 7,
-  p: 0.25,
+  n: 6,
+  p: 0.3,
   directed: false,
-  weighted: true, // 最短路须加权才显眼
-  connected: true, // 连通保证从起点可达（否则展示“不可达即结束”分支）
-  seed: 21,
+  weighted: true,
+  connected: true,
+  seed: 44,
   root: 0,
 };
 
-/** 邻接串：v(权重), … */
-function adjTextOf(g: Awaited<ReturnType<typeof randGraph>>): (u: number) => string {
-  const adj = g.adj();
-  return (u: number) =>
-    adj[u]
-      .map(([v, w]) =>
-        g.weighted && w !== 1 ? `${g.labels[v]}(${w})` : g.labels[v],
-      )
-      .join(", ") || "—";
-}
-
-/** DijkstraStep → 场景：已确定(S) = 绿色已访问环 + 节点下方 annotate 显示 dist */
-function stepScene(
-  s: DijkstraStep,
+/** BellmanStep → 场景：已更新 dist 的节点 = 绿环 + 节点下方 annotate 显示 dist；frontier = 当前轮已收敛集 */
+function bellmanScene(
+  s: BellmanStep,
   g: Awaited<ReturnType<typeof randGraph>>,
   root: number,
   importGraph: ImportedGraph | null,
@@ -50,39 +42,22 @@ function stepScene(
   const ann: Record<number, string> = {};
   for (let i = 0; i < g.n; i++)
     ann[i] = Number.isFinite(s.dist[i]) ? String(s.dist[i]) : "∞";
-  const settled = new Set(s.visited);
-  return {
-    ...graphScene(
-      g,
-      {
-        current: s.current,
-        exploring: s.exploring,
-        visited: [...s.visited], // = settled 已确定集 → 绿环
-        frontier: [...s.frontier], // 候选 cand（有限 dist 未确定）→ 天蓝
-        order: [...s.order],
-        edge: s.edge,
-      },
-      {
-        root,
-        annotate: ann,
-        import: importGraph,
-      },
-    ),
-    stateTables: algoStateTables({
-      labels: g.labels,
-      adjText: adjTextOf(g),
-      arrays: [
-        {
-          name: "dist",
-          values: [...s.dist],
-          hl: g.labels.map((_, i) =>
-            settled.has(i) ? 1 : s.frontier.includes(i) ? 2 : s.current === i ? 3 : 0,
-          ),
-        },
-        { name: "prev", values: s.prev.map((p) => (p < 0 ? "-" : g.labels[p])) },
-      ],
-    }),
-  };
+  return graphScene(
+    g,
+    {
+      current: s.current,
+      exploring: s.exploring,
+      visited: [...s.visited], // 已更新（有限 dist）
+      frontier: [...s.frontier],
+      order: [...s.order],
+      edge: s.edge,
+    },
+    {
+      root,
+      annotate: ann,
+      ...(importGraph ? { import: importGraph } : {}),
+    },
+  );
 }
 
 function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
@@ -128,25 +103,22 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
     ];
   }
   const root = Math.min(Math.max(0, cfg.root), g.n - 1);
-  const steps: DijkstraStep[] = dijkstraSteps(g, root, g.labels);
+  const importGraph =
+    cfg.source === "graph" ? (cfg.imp as ImportedGraph | null) : null;
+  const steps: BellmanStep[] = bellmanFordSteps(g, root, g.labels);
   return steps.map((s) => ({
     line: s.line,
     caption: s.msg,
-    scene: stepScene(
-      s,
-      g,
-      root,
-      cfg.source === "graph" ? cfg.imp : null,
-    ),
+    scene: bellmanScene(s, g, root, importGraph),
   }));
 }
 
-export const graphDijkstraModule: ModuleDef<GraphCanvasScene, Cfg> = {
-  id: "graph-dijkstra",
-  title: T("Dijkstra 最短路径", "Dijkstra Shortest Path"),
+export const graphBellmanModule: ModuleDef<GraphCanvasScene, Cfg> = {
+  id: "graph-bellman",
+  title: T("Bellman-Ford 最短路径", "Bellman-Ford Shortest Path"),
   desc: T(
-    "贪心单源最短路：维护已确定集 S，每次取未确定中 dist 最小者入 S 并松弛邻边；节点下标注 dist，绿色=已确定，天蓝=候选",
-    "greedy single-source shortest paths: settle the min-dist unsettled vertex and relax its edges; dist under nodes, settled=green, candidates=cyan",
+    "对全部边做 |V|−1 轮全量松弛后得到单源最短路；支持负权边（Dijkstra 不支持），能用第 |V| 轮检测负环",
+    "relax every edge for |V|-1 passes to get single-source shortest paths; supports negative weights (Dijkstra doesn't), uses pass #|V| to detect negative cycles",
   ),
   tags: ["data-structures"],
   defaultConfig: DEFAULT,
@@ -195,7 +167,7 @@ export const graphDijkstraModule: ModuleDef<GraphCanvasScene, Cfg> = {
             ))}
           </select>
           <span style={{ fontSize: 11, color: "#64748b" }}>
-            {isZh ? "也可直接点画布顶点换起点" : "or click a vertex on canvas"}
+            {isZh ? "也可点画布顶点换起点" : "or click a vertex on canvas"}
           </span>
         </div>
         <div
@@ -250,16 +222,6 @@ export const graphDijkstraModule: ModuleDef<GraphCanvasScene, Cfg> = {
                   }
                 />
               </label>
-              <label className="chk">
-                <input
-                  type="checkbox"
-                  checked={config.weighted}
-                  onChange={(e) =>
-                    onChange({ ...config, weighted: e.target.checked })
-                  }
-                />
-                {isZh ? "加权" : "weighted"}
-              </label>
             </>
           )}
         </div>
@@ -267,7 +229,7 @@ export const graphDijkstraModule: ModuleDef<GraphCanvasScene, Cfg> = {
     ) as unknown as never;
   },
   codeFor() {
-    return DIJKSTRA_CODE;
+    return BELLMAN_CODE;
   },
   generate(config) {
     return buildFrames(config);

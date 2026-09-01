@@ -7,6 +7,12 @@ import {
   type GraphCanvasScene,
 } from "../../components/canvas/GraphCanvas";
 import {
+  StateBar,
+  type AlgoCellState,
+  type AlgoStateRow,
+  type AlgoTable,
+} from "../../components/canvas/StateBar";
+import {
   loadGraphStudio,
   type ImportedGraph,
 } from "../tree/source";
@@ -188,6 +194,8 @@ export function graphScene(
     layout?: "auto" | "tree" | "force" | "circle";
     /** 从图创建导入：按保存的 layout+manual 精确定位（与图创建所见一致） */
     import?: ImportedGraph | null;
+    /** MST 已选边（Prim 的 T 边 / Kruskal accepted）：绿色加粗 */
+    picked?: Array<[number, number]>;
   } = {},
 ): GraphCanvasScene {
   const root = opts.root ?? 0;
@@ -251,6 +259,7 @@ export function graphScene(
     root: isTree ? root : null,
     annotate: opts.annotate,
     ...(opts.tone ? { tone: opts.tone } : {}),
+    ...(opts.picked && opts.picked.length ? { picked: opts.picked } : {}),
   };
 }
 
@@ -299,6 +308,36 @@ export function importPreviewFrames(
   return null;
 }
 
+/** 构建算法帧带的状态数组面板：邻接表 + 一个按顶点分列的值表（dist/prev/key…）
+ *  每个算法帧把快照放进 scene.stateTables，GraphCanvasWrap 会渲染在画布下方。 */
+export function algoStateTables(opts: {
+  labels: string[];      // 顶点标签
+  adjText?: (u: number) => string; // 每顶点邻接串（如 “B(5), C(2)”）；缺省自动生成
+  /** 顶点对齐数组行，如 [{ name: "dist", values: [0,3,∞], hl: [3,1,0] }] */
+  arrays?: { name: string; values: (number | string)[]; hl?: AlgoCellState[] }[];
+}): AlgoTable[] {
+  const tables: AlgoTable[] = [];
+  const rows: AlgoStateRow[] = opts.labels.map((lab, u) => ({
+    name: lab,
+    text: opts.adjText ? opts.adjText(u) : "—",
+  }));
+  tables.push({ title: "邻接", rows });
+  if (opts.arrays && opts.arrays.length) {
+    tables.push({
+      title: "数值",
+      header: opts.labels,
+      rows: opts.arrays.map((a) => ({
+        name: a.name,
+        cells: a.values.map((v) =>
+          typeof v === "number" && !Number.isFinite(v) ? "∞" : String(v),
+        ),
+        ...(a.hl ? { hl: a.hl } : {}),
+      })),
+    });
+  }
+  return tables;
+}
+
 /** 图模块共用画布：虚化预览（点击导入）· 无效图红色横幅（原因 + 去图创建） */
 export function GraphCanvasWrap({
   scene,
@@ -320,55 +359,59 @@ export function GraphCanvasWrap({
   const isGraph = config?.source === "graph";
   const importing = scene.blurred && isGraph && !!config;
   return (
-    <GraphCanvas
-      scene={scene}
-      t={t}
-      selected={selected}
-      onNodeClick={onNodeClick}
-      hint={
-        scene.blurred
-          ? t(T("虚化预览 · 点击画布导入", "Blurred preview · click the canvas to import"))
-          : undefined
-      }
-      onClick={
-        importing ? () => onChange?.({ ...config, confirmed: true }) : undefined
-      }
-      notice={
-        scene.error && isGraph ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-            <span>{scene.error}</span>
-            <a
-              href="#/graph"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
-                color: "#b91c1c",
-                background: "#fff",
-                border: "1px solid #fecaca",
-                borderRadius: 8,
-                padding: "4px 10px",
-                fontSize: 12,
-                fontWeight: 700,
-                textDecoration: "none",
-              }}
-            >
-              ✎ {t(T("去图创建修改", "Edit in Graph Studio"))}
-            </a>
-            <button
-              className="ghost"
-              style={{ color: "#b91c1c", borderColor: "#fecaca", padding: "4px 10px", borderRadius: 8, fontSize: 12, fontWeight: 700 }}
-              onClick={() => {
-                const imp = loadGraph();
-                onChange?.({ ...config, source: "graph", imp, confirmed: !!imp });
-              }}
-            >
-              ↻ {t(T("重新载入", "Reload"))}
-            </button>
-          </div>
-        ) : undefined
-      }
-    />
+    <>
+      <GraphCanvas
+        scene={scene}
+        t={t}
+        selected={selected}
+        onNodeClick={onNodeClick}
+        hint={
+          scene.blurred
+            ? t(T("虚化预览 · 点击画布导入", "Blurred preview · click the canvas to import"))
+            : undefined
+        }
+        onClick={
+          importing ? () => onChange?.({ ...config, confirmed: true }) : undefined
+        }
+        notice={
+          scene.error && isGraph ? (
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <span>{scene.error}</span>
+              <a
+                href="#/graph"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  color: "#b91c1c",
+                  background: "#fff",
+                  border: "1px solid #fecaca",
+                  borderRadius: 8,
+                  padding: "4px 10px",
+                  fontSize: 12,
+                  fontWeight: 700,
+                  textDecoration: "none",
+                }}
+              >
+                ✎ {t(T("去图创建修改", "Edit in Graph Studio"))}
+              </a>
+              <button
+                className="ghost"
+                style={{ color: "#b91c1c", borderColor: "#fecaca", padding: "4px 10px", borderRadius: 8, fontSize: 12, fontWeight: 700 }}
+                onClick={() => {
+                  const imp = loadGraph();
+                  onChange?.({ ...config, source: "graph", imp, confirmed: !!imp });
+                }}
+              >
+                ↻ {t(T("重新载入", "Reload"))}
+              </button>
+            </div>
+          ) : undefined
+        }
+      />
+      {/* 存储数组面板：邻接表 + dist/prev/key/uf 等，随帧刷新 */}
+      <StateBar tables={scene.stateTables} />
+    </>
   );
 }
 
