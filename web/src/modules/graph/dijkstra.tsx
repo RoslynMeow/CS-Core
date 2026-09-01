@@ -1,13 +1,8 @@
 import { T, type Text } from "../../i18n/lang";
 import type { Frame, ModuleDef } from "../../engine/types";
-import {
-  bfsSteps,
-  dfsSteps,
-  BFS_CODE,
-  DFS_CODE,
-  type AlgoStep,
-} from "../../lib/graph";
+import { dijkstraSteps, DIJKSTRA_CODE, type DijkstraStep } from "../../lib/graph";
 import type { GraphCanvasScene } from "../../components/canvas/GraphCanvas";
+import { type ImportedGraph } from "../tree/source";
 import {
   type GraphCfg,
   randGraph,
@@ -19,38 +14,77 @@ import {
   GraphSourcePanel,
 } from "./source";
 
-type Mode = "bfs" | "dfs";
-type Cfg = GraphCfg & { mode: Mode };
+type Cfg = GraphCfg;
 const DEFAULT: Cfg = {
   source: "random",
   imp: null,
   confirmed: true,
-  n: 8,
-  p: 0.2,
+  n: 7,
+  p: 0.25,
   directed: false,
-  weighted: false,
-  connected: true,
-  seed: 12,
+  weighted: true, // 最短路须加权才显眼
+  connected: true, // 连通保证从起点可达（否则展示“不可达即结束”分支）
+  seed: 21,
   root: 0,
-  mode: "bfs",
 };
+
+/** DijkstraStep → 场景：已确定(S) = 绿色已访问环 + 节点下方 annotate 显示 dist */
+function stepScene(
+  s: DijkstraStep,
+  g: Awaited<ReturnType<typeof randGraph>>,
+  root: number,
+  importGraph: ImportedGraph | null,
+): GraphCanvasScene {
+  const ann: Record<number, string> = {};
+  for (let i = 0; i < g.n; i++)
+    ann[i] = Number.isFinite(s.dist[i]) ? String(s.dist[i]) : "∞";
+  return graphScene(
+    g,
+    {
+      current: s.current,
+      exploring: s.exploring,
+      visited: [...s.visited], // = settled 已确定集 → 绿环
+      frontier: [...s.frontier], // 候选 cand（有限 dist 未确定）→ 天蓝
+      order: [...s.order],
+      edge: s.edge,
+    },
+    {
+      root,
+      annotate: ann,
+      import: importGraph,
+    },
+  );
+}
 
 function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
   const pv = importPreviewFrames(cfg);
   if (pv) return pv;
-  const res =
-    cfg.source === "random"
-      ? (() => {
-          const g = randGraph(cfg);
-          return { ok: true, g, labels: g.labels, root: cfg.root };
-        })()
-      : fromImport(cfg.imp);
-  if (!res.ok) throw new Error("no-unreachable"); // not reached; preview handles
-  if (res.g.n === 0) {
+  const res = fromImport(cfg.imp);
+  const g = cfg.source === "random" ? randGraph(cfg) : res.g;
+  if (!g || !res.ok) {
     return [
       {
         line: 0,
-        caption: T("空图：请先随机生成或从图创建导入一张图", "empty graph"),
+        caption: T(res.error ?? "请先选择来源", res.error ?? "pick a source"),
+        scene: {
+          current: null,
+          exploring: null,
+          visited: [],
+          frontier: [],
+          order: [],
+          edge: null,
+          nodes: [],
+          edges: [],
+          ...(cfg.source === "graph" ? { error: res.error ?? "" } : {}),
+        },
+      },
+    ];
+  }
+  if (g.n === 0) {
+    return [
+      {
+        line: 0,
+        caption: T("空图：请先随机生成或导入一张加权图", "empty graph"),
         scene: {
           current: null,
           exploring: null,
@@ -64,43 +98,31 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
       },
     ];
   }
-  const root = Math.min(Math.max(0, res.root), res.g.n - 1);
-  const steps: AlgoStep[] =
-    cfg.mode === "bfs"
-      ? bfsSteps(res.g, root, res.labels)
-      : dfsSteps(res.g, root, res.labels);
+  const root = Math.min(Math.max(0, cfg.root), g.n - 1);
+  const steps: DijkstraStep[] = dijkstraSteps(g, root, g.labels);
   return steps.map((s) => ({
     line: s.line,
     caption: s.msg,
-    scene: graphScene(
-      res.g,
-      {
-        current: s.current,
-        exploring: s.exploring,
-        visited: s.visited,
-        frontier: s.frontier,
-        order: s.order,
-        edge: s.edge,
-      },
-      {
-        root,
-        ...(cfg.source === "graph" ? { import: cfg.imp } : {}),
-      },
+    scene: stepScene(
+      s,
+      g,
+      root,
+      cfg.source === "graph" ? cfg.imp : null,
     ),
   }));
 }
 
-export const graphTraverseModule: ModuleDef<GraphCanvasScene, Cfg> = {
-  id: "graph-bfs-dfs",
-  title: T("图的遍历", "Graph Traversal"),
+export const graphDijkstraModule: ModuleDef<GraphCanvasScene, Cfg> = {
+  id: "graph-dijkstra",
+  title: T("Dijkstra 最短路径", "Dijkstra Shortest Path"),
   desc: T(
-    "广度优先 (BFS) / 深度优先 (DFS) 遍历图；可随机生成或从图创建导入任意图（有向/无向均可）",
-    "BFS / DFS traversal on a graph; random or imported from Graph Studio (directed or undirected)",
+    "贪心单源最短路：维护已确定集 S，每次取未确定中 dist 最小者入 S 并松弛邻边；节点下标注 dist，绿色=已确定，天蓝=候选",
+    "greedy single-source shortest paths: settle the min-dist unsettled vertex and relax its edges; dist under nodes, settled=green, candidates=cyan",
   ),
   tags: ["data-structures"],
   defaultConfig: DEFAULT,
   randomize(c) {
-    return { ...(randomCfg(c) as GraphCfg), mode: c.mode };
+    return randomCfg(c);
   },
   Controls({ config, onChange, t }) {
     const isZh = t(T("中文", "en")) !== "en";
@@ -127,35 +149,25 @@ export const graphTraverseModule: ModuleDef<GraphCanvasScene, Cfg> = {
               letterSpacing: ".04em",
             }}
           >
-            {isZh ? "遍历" : "TRAVERSE"}
+            {isZh ? "起点" : "START"}
           </span>
           <select
             className="txt"
-            value={config.mode}
+            style={{ minWidth: 70 }}
+            value={config.root}
             onChange={(e) =>
-              onChange({ ...config, mode: e.target.value as Mode })
+              onChange({ ...config, root: Number(e.target.value) })
             }
           >
-            <option value="bfs">{t(T("BFS 广度", "BFS"))}</option>
-            <option value="dfs">{t(T("DFS 深度", "DFS"))}</option>
+            {Array.from({ length: n }, (_, i) => (
+              <option key={i} value={i}>
+                {resLabel(config, i)}
+              </option>
+            ))}
           </select>
-          <label className="txt-label">
-            {isZh ? "起点" : "start"}
-            <select
-              className="txt"
-              style={{ minWidth: 60 }}
-              value={config.root}
-              onChange={(e) =>
-                onChange({ ...config, root: Number(e.target.value) })
-              }
-            >
-              {Array.from({ length: n }, (_, i) => (
-                <option key={i} value={i}>
-                  {resLabel(config, i)}
-                </option>
-              ))}
-            </select>
-          </label>
+          <span style={{ fontSize: 11, color: "#64748b" }}>
+            {isZh ? "也可直接点画布顶点换起点" : "or click a vertex on canvas"}
+          </span>
         </div>
         <div
           style={{
@@ -182,12 +194,12 @@ export const graphTraverseModule: ModuleDef<GraphCanvasScene, Cfg> = {
                   className="txt"
                   type="number"
                   min={2}
-                  max={24}
+                  max={20}
                   value={config.n}
                   onChange={(e) =>
                     onChange({
                       ...config,
-                      n: Math.max(2, Math.min(24, Number(e.target.value))),
+                      n: Math.max(2, Math.min(20, Number(e.target.value))),
                     })
                   }
                 />
@@ -202,29 +214,22 @@ export const graphTraverseModule: ModuleDef<GraphCanvasScene, Cfg> = {
                   step={0.05}
                   value={config.p}
                   onChange={(e) =>
-                    onChange({ ...config, p: Math.min(1, Math.max(0, Number(e.target.value))) })
+                    onChange({
+                      ...config,
+                      p: Math.min(1, Math.max(0, Number(e.target.value))),
+                    })
                   }
                 />
               </label>
               <label className="chk">
                 <input
                   type="checkbox"
-                  checked={config.directed}
+                  checked={config.weighted}
                   onChange={(e) =>
-                    onChange({ ...config, directed: e.target.checked })
+                    onChange({ ...config, weighted: e.target.checked })
                   }
                 />
-                {isZh ? "有向" : "directed"}
-              </label>
-              <label className="chk">
-                <input
-                  type="checkbox"
-                  checked={config.connected}
-                  onChange={(e) =>
-                    onChange({ ...config, connected: e.target.checked })
-                  }
-                />
-                {isZh ? "连通" : "connected"}
+                {isZh ? "加权" : "weighted"}
               </label>
             </>
           )}
@@ -232,8 +237,8 @@ export const graphTraverseModule: ModuleDef<GraphCanvasScene, Cfg> = {
       </div>
     ) as unknown as never;
   },
-  codeFor(cfg) {
-    return cfg.mode === "bfs" ? BFS_CODE : DFS_CODE;
+  codeFor() {
+    return DIJKSTRA_CODE;
   },
   generate(config) {
     return buildFrames(config);
@@ -250,18 +255,14 @@ export const graphTraverseModule: ModuleDef<GraphCanvasScene, Cfg> = {
             ? (id) => onChange({ ...config, root: id })
             : undefined
         }
-        onChange={
-          onChange ? ((c: GraphCfg) => onChange(c as Cfg)) : undefined
-        }
+        onChange={onChange ? ((c: GraphCfg) => onChange(c as Cfg)) : undefined}
       />
     );
   },
 };
 
-/** 起点标签：有向/无向后可用字母标签；取图中实际标签 */
 function resLabel(cfg: Cfg, i: number): string {
   if (cfg.source === "graph" && cfg.imp && i < cfg.imp.labels.length)
     return cfg.imp.labels[i];
-  // 随机图：字母序（与 randGraph 的 graphLabels 一致）
   return String.fromCharCode(65 + (i % 26));
 }

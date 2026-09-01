@@ -105,6 +105,48 @@ export function randomCfg(cfg: GraphCfg): GraphCfg {
   };
 }
 
+/**
+ * 确定性随机 DAG（有向无环；仅拓扑排序用）：
+ *  随机排列 + 脊链保证连通，再按密度 p 加“前向边”（拓扑序下标小→大，天然无环）。
+ *  同 seed → 同图；仅换 seed 才换新图。
+ */
+export function randDag(cfg: GraphCfg): Graph {
+  const n = cfg.n;
+  const g = new Graph(n, {
+    directed: true,
+    weighted: cfg.weighted,
+    labels: graphLabels(n),
+  });
+  const rand = mulberry32(cfg.seed);
+  const w = () => (cfg.weighted ? 1 + Math.floor(rand() * 9) : 1);
+  // 随机排列作为拓扑序
+  const perm = Array.from({ length: n }, (_, i) => i);
+  for (let i = n - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [perm[i], perm[j]] = [perm[j], perm[i]];
+  }
+  const used = new Set<string>();
+  const addFwd = (a: number, b: number) => {
+    const k = `${a},${b}`;
+    if (used.has(k)) return;
+    used.add(k);
+    g.addEdge(a, b, w());
+  };
+  // 脊链：perm[0]→perm[1]→… 保证弱连通
+  for (let i = 0; i + 1 < n; i++) addFwd(perm[i], perm[i + 1]);
+  // 前向边（概率 p）：拓扑序下标小→大，不会成环
+  for (let i = 0; i < n; i++)
+    for (let j = i + 1; j < n; j++)
+      if (rand() < cfg.p) addFwd(perm[i], perm[j]);
+  return g;
+}
+
+/** 是否为有向无环图（DAG）：拓扑排序前置校验 */
+export function isDag(g: Graph): boolean {
+  if (!g.directed) return false; // 拓扑排序只针对有向图
+  return !g.hasDirectedCycle();
+}
+
 /** 从图创建导入：构建 Graph，不做树校验（任意图皆可） */
 export function fromImport(imp: ImportedGraph | null): GraphResolved {
   if (!imp) return err("请先在“图创建”页保存一张图，再点“导入当前图”");
@@ -127,7 +169,8 @@ export function loadGraph(): ImportedGraph | null {
   return loadGraphStudio();
 }
 
-/** 布局 + 场景：图（可选树形/力导向/环形）→ GraphCanvasScene */
+/** 布局 + 场景：图（可选树形/力导向/环形）→ GraphCanvasScene
+ *  opts.import：给定时无视 layout，完全复刻用户在图创建选的布局 + 手动位置 */
 export function graphScene(
   g: Graph,
   hl: {
@@ -143,6 +186,8 @@ export function graphScene(
     annotate?: Record<number, string>;
     tone?: Record<number, number>;
     layout?: "auto" | "tree" | "force" | "circle";
+    /** 从图创建导入：按保存的 layout+manual 精确定位（与图创建所见一致） */
+    import?: ImportedGraph | null;
   } = {},
 ): GraphCanvasScene {
   const root = opts.root ?? 0;
@@ -152,17 +197,35 @@ export function graphScene(
   };
   const isTree = g.isTree();
   let pos: Vec2[];
-  const layout = opts.layout ?? "auto";
-  if (layout === "tree" || (layout === "auto" && isTree)) {
-    pos = g.layoutTree(root, GRAPH_BOX).pos;
-  } else if (layout === "circle") {
-    pos = g.layoutCircle(
-      center.x,
-      center.y,
-      Math.min(GRAPH_BOX.w, GRAPH_BOX.h) / 2 - 50,
-    );
+  const imp = opts.import;
+  if (imp && imp.layout) {
+    // 复刻 GraphStudio：tree→layoutTree / force→layoutForce / circle·free→layoutCircle，手动位置覆盖
+    const layout = imp.layout;
+    if (layout === "tree")
+      pos = g.layoutTree(root, {
+        x0: 20,
+        y0: 10,
+        w: 720,
+        h: 420,
+      }).pos;
+    else if (layout === "force")
+      pos = g.layoutForce(380, 220, 760, 440, 160);
+    else
+      pos = g.layoutCircle(380, 220, 174);
+    if (imp.manual) {
+      pos = pos.map((p, i) => imp.manual![i] ?? p);
+    }
   } else {
-    pos = g.layoutForce(center.x, center.y, GRAPH_BOX.w - 90, GRAPH_BOX.h - 90);
+    const layout = opts.layout ?? "auto";
+    if (layout === "tree" || (layout === "auto" && isTree))
+      pos = g.layoutTree(root, GRAPH_BOX).pos;
+    else if (layout === "circle")
+      pos = g.layoutCircle(
+        center.x,
+        center.y,
+        Math.min(GRAPH_BOX.w, GRAPH_BOX.h) / 2 - 50,
+      );
+    else pos = g.layoutForce(center.x, center.y, GRAPH_BOX.w - 90, GRAPH_BOX.h - 90);
   }
   const nodes = Array.from({ length: g.n }, (_, i) => ({
     id: i,
@@ -201,7 +264,11 @@ export function importPreviewFrames(
   cfg: GraphCfg,
 ): Frame<GraphCanvasScene>[] | null {
   if (cfg.source !== "graph") return null;
-  const scene = graphScene(fromImport(cfg.imp).g, {}, { root: cfg.root });
+  const scene = graphScene(
+    fromImport(cfg.imp).g,
+    {},
+    { root: cfg.root, ...(cfg.source === "graph" ? { import: cfg.imp } : {}) },
+  );
   if (!cfg.imp || cfg.imp.n <= 0) return null; // 图创建为空 → 走正常帧的“请先保存”提示
   const ok = cfg.imp.n > 0;
   if (!cfg.confirmed && ok) {

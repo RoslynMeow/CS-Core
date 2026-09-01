@@ -20,12 +20,11 @@ import { treeBstModule } from "./tree/bst";
 import { treeAvlModule } from "./tree/avl";
 import { treeHeapModule } from "./tree/heap";
 import { treeRbModule } from "./tree/rb";
-import { treeSplayModule } from "./tree/splay";
-import { TrieModule } from "./tree/trie";
 import { treeBTreeModule } from "./tree/btree";
-import { RadixModule } from "./tree/radix";
 import { BPlusModule } from "./tree/bplus";
 import { graphTraverseModule } from "./graph/bfsDfs";
+import { graphTopoModule } from "./graph/topo";
+import { graphDijkstraModule } from "./graph/dijkstra";
 
 // SAFETY: 所有模块实现同一 ModuleDef 契约;泛型形参仅约束模块内部实现,运行时结构一致
 const asModule = (m: unknown): ModuleDef => m as ModuleDef;
@@ -52,12 +51,11 @@ export const KNOWLEDGE: Record<string, ModuleDef> = {
   [treeAvlModule.id]: asModule(treeAvlModule),
   [treeHeapModule.id]: asModule(treeHeapModule),
   [treeRbModule.id]: asModule(treeRbModule),
-  [treeSplayModule.id]: asModule(treeSplayModule),
-  [TrieModule.id]: asModule(TrieModule),
   [treeBTreeModule.id]: asModule(treeBTreeModule),
-  [RadixModule.id]: asModule(RadixModule),
   [BPlusModule.id]: asModule(BPlusModule),
   [graphTraverseModule.id]: asModule(graphTraverseModule),
+  [graphTopoModule.id]: asModule(graphTopoModule),
+  [graphDijkstraModule.id]: asModule(graphDijkstraModule),
 };
 
 export const allModules = Object.values(KNOWLEDGE);

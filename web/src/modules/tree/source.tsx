@@ -17,13 +17,19 @@ import {
   type GraphCanvasScene,
 } from "../../components/canvas/GraphCanvas";
 
-/** 从“图创建”页导入的快照（GraphStudio 持久化的图状态） */
+/** 从“图创建”页导入的快照（GraphStudio 持久化的图状态）
+ *  layout / manual 在 GraphStudio 里可选（环形/树形/力导向/自由），
+ *  导入时尽量沿用，否则图模块用 `auto`（树→树形，非树→力导向）。 */
 export type ImportedGraph = {
   n: number;
   spec: string;
   labels: string[];
   directed: boolean;
   root: number;
+  /** GraphStudio 的布局选择：circle / tree / force / free（可能未保存） */
+  layout?: "circle" | "tree" | "force" | "free";
+  /** 手动拖动过的顶点位置（world 坐标），free 或用户拖动时保存 */
+  manual?: Record<number, { x: number; y: number }>;
 };
 /** 树的来源：随机生成 或 从图创建导入（导入需校验二叉树 / 完全二叉树） */
 export type TreeCfg = {
@@ -181,6 +187,12 @@ export function loadGraphStudio(): ImportedGraph | null {
         : Array.from({ length: s.n }, (_, i) => String(i)),
       directed: !!s.directed,
       root: typeof s.root === "number" ? s.root : 0,
+      // 沿用 GraphStudio 选择的布局 + 手动位置，让导入后仍是用户在“图创建”看到的形态
+      layout:
+        s.layout && ["circle", "tree", "force", "free"].includes(s.layout)
+          ? s.layout
+          : undefined,
+      manual: s.manual && typeof s.manual === "object" ? s.manual : undefined,
     };
   } catch {
     return null;

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faMaximize } from "@fortawesome/free-solid-svg-icons";
 import type { GraphAlgoScene } from "../../lib/graph";
 import type { Text } from "../../i18n/lang";
 
@@ -200,7 +202,7 @@ export function GraphCanvas({
                 justifyContent: "center",
             }}
         >
-            ⊩
+            <FontAwesomeIcon icon={faMaximize} />
         </button>
     ) : null;
 
@@ -219,6 +221,9 @@ export function GraphCanvas({
                     display: "block",
                     cursor: pan ? "grabbing" : viewActive ? "grab" : undefined,
                     touchAction: "none",
+                    // 防止拖拽/点击画布时选中节点名字文本
+                    userSelect: "none",
+                    WebkitUserSelect: "none",
                 }}
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
