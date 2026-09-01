@@ -13,6 +13,7 @@ import {
   randomCfg,
   fromImport,
   graphScene,
+  algoStateTables,
   importPreviewFrames,
   GraphCanvasWrap,
   GraphSourcePanel,
@@ -42,22 +43,46 @@ function bellmanScene(
   const ann: Record<number, string> = {};
   for (let i = 0; i < g.n; i++)
     ann[i] = Number.isFinite(s.dist[i]) ? String(s.dist[i]) : "∞";
-  return graphScene(
-    g,
-    {
-      current: s.current,
-      exploring: s.exploring,
-      visited: [...s.visited], // 已更新（有限 dist）
-      frontier: [...s.frontier],
-      order: [...s.order],
-      edge: s.edge,
-    },
-    {
-      root,
-      annotate: ann,
-      ...(importGraph ? { import: importGraph } : {}),
-    },
-  );
+  const adj = g.adj();
+  return {
+    ...graphScene(
+      g,
+      {
+        current: s.current,
+        exploring: s.exploring,
+        visited: [...s.visited], // 已更新（有限 dist）
+        frontier: [...s.frontier],
+        order: [...s.order],
+        edge: s.edge,
+      },
+      {
+        root,
+        annotate: ann,
+        ...(importGraph ? { import: importGraph } : {}),
+      },
+    ),
+    stateTables: algoStateTables({
+      labels: g.labels,
+      adjText: (u) =>
+        adj[u]
+          .map(([v, w]) => (g.weighted && w !== 1 ? `${g.labels[v]}(${w})` : g.labels[v]))
+          .join(", ") || "—",
+      arrays: [
+        {
+          name: "dist",
+          values: [...s.dist],
+          hl: g.labels.map((_, i) =>
+            Number.isFinite(s.dist[i])
+              ? s.current === i
+                ? 3
+                : 1
+              : 0,
+          ),
+        },
+        { name: "prev", values: s.prev.map((p) => (p < 0 ? "-" : g.labels[p])) },
+      ],
+    }),
+  };
 }
 
 function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {

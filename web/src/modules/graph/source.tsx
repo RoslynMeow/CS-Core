@@ -308,11 +308,16 @@ export function importPreviewFrames(
   return null;
 }
 
-/** 构建算法帧带的状态数组面板：邻接表 + 一个按顶点分列的值表（dist/prev/key…）
- *  每个算法帧把快照放进 scene.stateTables，GraphCanvasWrap 会渲染在画布下方。 */
+/** 构建算法帧带的状态数组面板：邻接表（含权重）+ 邻接矩阵（内存布局形态）+ 按顶点分列的值表（dist/prev/key…）
+ *  每个算法帧把快照放进 scene.stateTables，GraphCanvasWrap 会渲染在画布下方。
+ *  - adjText：(u)=>u 的邻接串（含权重，如 “B(5), C(2)”）；缺省自动从 g 生成
+ *  - matrix：邻接矩阵（每行每顶点一格：∞ / 0 / 权重），“内存布局”形态
+ *  - arrays：顶点对齐数值行，如 [{ name: "dist", values, hl }] */
 export function algoStateTables(opts: {
   labels: string[];      // 顶点标签
   adjText?: (u: number) => string; // 每顶点邻接串（如 “B(5), C(2)”）；缺省自动生成
+  /** 邻接矩阵（内存布局形态）：n×n，∞ / 0 / 权重 */
+  matrix?: (string | number)[][];
   /** 顶点对齐数组行，如 [{ name: "dist", values: [0,3,∞], hl: [3,1,0] }] */
   arrays?: { name: string; values: (number | string)[]; hl?: AlgoCellState[] }[];
 }): AlgoTable[] {
@@ -322,6 +327,21 @@ export function algoStateTables(opts: {
     text: opts.adjText ? opts.adjText(u) : "—",
   }));
   tables.push({ title: "邻接", rows });
+  // 邻接矩阵 = 内存布局形态（∞=无邻边，数字=权重）
+  if (opts.matrix) {
+    tables.push({
+      title: "邻接矩阵",
+      header: opts.labels,
+      rows: opts.matrix.map((row, u) => ({
+        name: opts.labels[u] ?? String(u),
+        cells: row.map((v, c) =>
+          typeof v === "number" && !Number.isFinite(v)
+            ? "∞"
+            : opts.labels[c] + "/" + (typeof v === "number" && !Number.isFinite(v) ? "∞" : v),
+        ),
+      })),
+    });
+  }
   if (opts.arrays && opts.arrays.length) {
     tables.push({
       title: "数值",
