@@ -83,10 +83,14 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
   const [menu, setMenu] = useState<{ x: number; y: number; sx: number; sy: number; target: number | null; edge: { u: number; v: number } | null } | null>(null);
   const [genOpen, setGenOpen] = useState(false);
 
-  // 约束：强制有向时锁定开关
+  // 约束：强制有向/树时锁定
   useEffect(() => {
     if (constraints?.mustBeDirected && !directed) setDirected(true);
-  }, [constraints?.mustBeDirected]);
+    if (constraints?.mustBeTree) {
+      if (directed) setDirected(false);
+      if (layout !== "tree") setLayout("tree");
+    }
+  }, [constraints?.mustBeDirected, constraints?.mustBeTree, directed, layout]);
 
   const pushHistory = () => {
     const snap: GraphSnap = { n, directed, edgeSpec, labels: [...labels], manual: { ...manual } };
@@ -512,13 +516,13 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
                 <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer" }} onClick={() => { pushHistory(); setEdgeSpec(""); setMenu(null); }}>清空边</div>
                 <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer" }} onClick={() => { menuReset(); setMenu(null); }}>重置布局</div>
                 <div style={{ height: 1, background: "#eef2f7", margin: "5px 6px" }} />
-                <label style={{ display: "flex", gap: 6, alignItems: "center", padding: "7px 12px", fontSize: 13 }}><input type="checkbox" checked={directed} disabled={!!constraints?.mustBeDirected} onChange={(e) => setDirected(e.target.checked)} /> 有向</label>
-                <div style={{ display: "flex", gap: 6, padding: "7px 12px" }}>{(["tree","circle","force","free"] as Layout[]).map((l) => <button key={l} className={`pill ${layout===l?"active":""}`} style={{ padding: "2px 8px", fontSize: 11 }} onClick={() => { setLayout(l); setMenu(null); }}>{l==="tree"?"树形":l==="circle"?"环形":l==="force"?"力导向":"自由"}</button>)}</div>
+                {!constraints?.mustBeTree && <label style={{ display: "flex", gap: 6, alignItems: "center", padding: "7px 12px", fontSize: 13 }}><input type="checkbox" checked={directed} disabled={!!constraints?.mustBeDirected} onChange={(e) => setDirected(e.target.checked)} /> 有向</label>}
+                <div style={{ display: "flex", gap: 6, padding: "7px 12px" }}>{((constraints?.mustBeTree ? ["tree"] : ["tree","circle","force","free"]) as Layout[]).map((l) => <button key={l} className={`pill ${layout===l?"active":""}`} style={{ padding: "2px 8px", fontSize: 11 }} onClick={() => { setLayout(l); setMenu(null); }}>{l==="tree"?"树形":l==="circle"?"环形":l==="force"?"力导向":"自由"}</button>)}</div>
               </>
             )}
           </div>
         )}
-        {genOpen && <GenModal onCancel={() => setGenOpen(false)} onGenerate={(cfg) => { genGraph(cfg); setGenOpen(false); }} />}
+        {genOpen && <GenModal constraints={constraints} onCancel={() => setGenOpen(false)} onGenerate={(cfg) => { genGraph(cfg); setGenOpen(false); }} />}
       </div>
       {!embedded && (
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
@@ -533,9 +537,13 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
 function ModalRow({ label, children }: { label: string; children: React.ReactNode }) {
   return <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, fontSize: 13 }}><span style={{ width: 76, flexShrink: 0, color: "#475569" }}>{label}</span><div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>{children}</div></div>;
 }
-function GenModal({ onCancel, onGenerate }: { onCancel: () => void; onGenerate: (cfg: GenCfg) => void }) {
-  const [cfg, setCfg] = useState<GenCfg>({ type: "tree", n: 10, p: 0.25, directed: false, alpha: true, weighted: "none", skewRandom: true, connected: true, k: 3 });
-  const info = GEN_TYPES.find((t) => t.k === cfg.type)!;
+function GenModal({ onCancel, onGenerate, constraints }: { onCancel: () => void; onGenerate: (cfg: GenCfg) => void; constraints?: { mustBeTree?: boolean; mustBeDirected?: boolean } }) {
+  const allowed = constraints?.mustBeTree ? GEN_TYPES.filter((t) => ["tree","binary","complete","skew","uacyclic"].includes(t.k)) : GEN_TYPES;
+  const [cfg, setCfg] = useState<GenCfg>(() => {
+    const initType = allowed[0]?.k ?? "tree";
+    return { type: initType, n: 10, p: 0.25, directed: !!constraints?.mustBeDirected, alpha: true, weighted: "none", skewRandom: true, connected: true, k: 3 };
+  });
+  const info = allowed.find((t) => t.k === cfg.type) ?? allowed[0];
   const isCyclic = cfg.type === "dcyclic" || cfg.type === "ucyclic";
   const hasDensity = cfg.type === "graph" || cfg.type === "dcyclic" || cfg.type === "dag" || cfg.type === "ucyclic";
   const minN = isCyclic ? 3 : 2;
@@ -546,7 +554,7 @@ function GenModal({ onCancel, onGenerate }: { onCancel: () => void; onGenerate: 
         <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 12 }}>随机生成</div>
         <div style={{ marginBottom: 8 }}>
           <select className="txt" value={cfg.type} onChange={(e) => set({ type: e.target.value as GenType })} style={{ width: "100%", fontSize: 13 }}>
-            {GEN_TYPES.map((t) => <option key={t.k} value={t.k}>{t.label}</option>)}
+            {allowed.map((t) => <option key={t.k} value={t.k}>{t.label}</option>)}
           </select>
           <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{info.desc}</div>
         </div>

@@ -29,18 +29,18 @@ export type AlgoTable = {
 const CELL_FILL: Record<AlgoCellState, string> = {
   0: "transparent",
   1: "rgba(16,185,129,0.15)",
-  2: "rgba(56,189,248,0.15)",
-  3: "rgba(245,158,11,0.2)",
+  2: "rgba(56,189,248,0.12)",
+  3: "rgba(245,158,11,0.14)",
 };
 const CELL_TEXT: Record<AlgoCellState, string> = {
-  0: "#cbd5e1",
-  1: "#34d399",
-  2: "#7dd3fc",
-  3: "#fbbf24",
+  0: "#475569",
+  1: "#059669",
+  2: "#0284c7",
+  3: "#b45309",
 };
 
 /** 渲染一张状态表（真 <table> 固定列宽，强制按列对齐） */
-export function StateTable({ table }: { table: AlgoTable }) {
+export function StateTable({ table, headerAction }: { table: AlgoTable; headerAction?: React.ReactNode }) {
   const ncol = table.header?.length ?? 0;
   const colW = ncol <= 8 ? 44 : Math.max(28, Math.floor(360 / ncol));
   const headCell = (h: string, i: number) => (
@@ -65,9 +65,9 @@ export function StateTable({ table }: { table: AlgoTable }) {
   return (
     <div
       style={{
-        border: "1px solid #26324d",
+        border: "1px solid #c7d2fe",
         borderRadius: 12,
-        background: "#101a30",
+        background: "#fff",
         padding: "12px 14px",
         minWidth: 180,
         maxWidth: "100%",
@@ -77,14 +77,19 @@ export function StateTable({ table }: { table: AlgoTable }) {
     >
       <div
         style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
           fontWeight: 800,
           fontSize: 13,
-          color: "#a5b4fc",
+          color: "#4338ca",
           letterSpacing: ".03em",
           marginBottom: 6,
         }}
       >
-        {table.title}
+        <span>{table.title}</span>
+        {headerAction}
       </div>
       <table
         style={{
@@ -173,7 +178,7 @@ export function StateTable({ table }: { table: AlgoTable }) {
 }
 
 /** 状态数组面板：横向排布多张表 */
-export function StateBar({ tables }: { tables?: AlgoTable[] }) {
+export function StateBar({ tables, headerAction }: { tables?: AlgoTable[]; headerAction?: React.ReactNode }) {
   if (!tables || tables.length === 0) return null;
   return (
     <div
@@ -187,7 +192,7 @@ export function StateBar({ tables }: { tables?: AlgoTable[] }) {
       }}
     >
       {tables.map((t, i) => (
-        <StateTable key={i} table={t} />
+        <StateTable key={i} table={t} headerAction={headerAction} />
       ))}
     </div>
   );

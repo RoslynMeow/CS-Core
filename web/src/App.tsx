@@ -76,26 +76,13 @@ export function App() {
                               内存可视化
                         </button>
                         <button
-                              className={`pill ${route.kind === "graph" ? "active" : ""}`}
-                              onClick={() => (location.hash = "#/graph")}
-                              title="通用图/树自由创建与探索"
-                        >
-                              图创建
-                        </button>
-                        <button
                               className={`pill ${route.kind === "settings" ? "active" : ""}`}
                               onClick={() => (location.hash = "#/settings")}
                         >
                               设置
                         </button>
                   </header>
-                  <main
-                        className={
-                              route.kind === "graph"
-                                    ? "main graph-fill"
-                                    : "main"
-                        }
-                  >
+                  <main className={route.kind === "graph" ? "main graph-fill" : "main"}>
                         {route.kind === "settings" ? (
                               <Settings />
                         ) : route.kind === "memory" ? (

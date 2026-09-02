@@ -170,11 +170,6 @@ export function Stage({ mod }: { mod: ModuleDef }) {
               onPlay: pb.play,
             } as never,
           )}
-          {!mod.randomize && (
-            <button className="ghost" onClick={() => pb.first()}>
-              ↻ {t({ zh: "重新生成", en: "Regenerate" })}
-            </button>
-          )}
         </div>
       )}
       <PlaybackBar pb={pb} />

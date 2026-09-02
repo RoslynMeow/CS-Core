@@ -54,6 +54,22 @@ const MODULE_ENTRIES: Entry[] = allModules.map((m) => ({
 
 const ALL_ENTRIES: Entry[] = [...FEATURE_ENTRIES, ...MODULE_ENTRIES];
 
+function ExperimentalZone() {
+  return (
+    <div className="stage" style={{ padding: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        <h3 style={{ margin: 0 }}>ExperimentalZone · 实验室</h3>
+        <span style={{ fontSize: 11, color: '#6366f1', border: '1px solid #c7d2fe', borderRadius: 999, padding: '2px 8px', background: '#eef2ff' }}>Beta</span>
+      </div>
+      <p style={{ color: '#64748b', margin: '6px 0 0', fontSize: 12 }}>实验性功能收纳 — 点击超链接进入独立页面</p>
+      <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <a href="#/graph" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 999, background: '#4f46e5', color: '#fff', fontWeight: 700, fontSize: 13, textDecoration: 'none' }}>图创建 · Graph Studio →</a>
+        <span style={{ fontSize: 12, color: '#94a3b8', alignSelf: 'center' }}>自由建图 / 拖拽 / 右键菜单 / 随机生成（独立页面）</span>
+      </div>
+    </div>
+  );
+}
+
 function hasAny(match: (k: string) => boolean): boolean {
   try {
     for (let i = 0; i < localStorage.length; i++) {
@@ -113,10 +129,14 @@ export function Settings() {
         <p style={{ color: '#64748b', margin: '6px 0 0' }}>所有全局设置在此集中管理</p>
         <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 13, color: '#475569' }}>语言 / Language</span>
-          <button className={`pill ${lang === 'zh' ? 'active' : ''}`} onClick={() => setLang('zh')}>中</button>
-          <button className={`pill ${lang === 'en' ? 'active' : ''}`} onClick={() => setLang('en')}>En</button>
+          <select className="txt" value={lang} onChange={(e) => setLang(e.target.value as any)} style={{ minWidth: 120 }}>
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+          </select>
+          <span style={{ fontSize: 11, color: '#94a3b8' }}>i18n · 下拉选择（后续扩展）</span>
         </div>
       </div>
+      <ExperimentalZone />
       <AlphabetStudio />
       <div className="stage" style={{ padding: 16, borderColor: '#fecaca' }}>
         <h3 style={{ margin: 0, color: '#b91c1c' }}>数据 · Data</h3>
