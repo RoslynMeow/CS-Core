@@ -278,7 +278,12 @@ export const baseConversionModule: ModuleDef<Scene, Cfg> = {
   },
   codeFor(cfg) { return CODE[cfg.mode] as never; },
   generate: generateByMode,
-  Render({ scene }) {
+  Render({ scene: _scene }) {
+    const scene = (_scene as any) ?? {};
+    scene.srcInt = scene.srcInt ?? [];
+    scene.srcFrac = scene.srcFrac ?? [];
+    scene.toInt = scene.toInt ?? [];
+    scene.toFrac = scene.toFrac ?? [];
     const srcInt = scene.srcInt;
     const srcFrac = scene.srcFrac;
     const toInt = scene.toInt;

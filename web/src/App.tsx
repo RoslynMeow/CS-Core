@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useLang } from "./i18n/LangContext";
 import { Stage } from "./components/Stage";
-import { findModule, searchModules } from "./modules/registry";
+import { allModules, findModule } from "./modules/registry";
 import { MathText } from "./lib/tex";
 import { Settings } from "./pages/Settings";
 import { MemoryVisualizer } from "./pages/MemoryVisualizer";
@@ -20,11 +20,6 @@ function getRoute(): Route {
       if (m) return { kind: "module", id: m[1] };
       return { kind: "home" };
 }
-const TAGS: { id: string | null; label: string }[] = [
-      { id: null, label: "全部" },
-      { id: "data-structures", label: "数据结构" },
-      { id: "computer-organization", label: "计算机组成" },
-];
 
 export function App() {
       useLang();
@@ -35,9 +30,6 @@ export function App() {
             return () => window.removeEventListener("hashchange", h);
       }, []);
       const mod = route.kind === "module" ? findModule(route.id) : null;
-      const [q, setQ] = useState("");
-      const [tag, setTag] = useState<string | null>(null);
-      const filtered = useMemo(() => searchModules(q, tag), [q, tag]);
 
       return (
             <div className="app">
@@ -48,22 +40,6 @@ export function App() {
                         >
                               计算机学习
                         </div>
-                        {route.kind === "home" && (
-                              <nav className="hdr-toolbar">
-                                    <label className="search">
-                                          <input
-                                                placeholder="搜索：进制 / 展开 / expansion / base"
-                                                value={q}
-                                                onChange={(e) =>
-                                                      setQ(e.target.value)
-                                                }
-                                          />
-                                    </label>
-                                    <span className="count">
-                                          {filtered.length} 个
-                                    </span>
-                              </nav>
-                        )}
                         <div className="spacer" />
                         <button
                               className={`pill ${route.kind === "memory" ? "active" : ""}`}
@@ -88,24 +64,11 @@ export function App() {
                               <Stage mod={mod as never} />
                         ) : (
                               <div className="home">
-                                    <div className="tagbar">
-                                          {TAGS.map((t) => (
-                                                <button
-                                                      key={String(t.id)}
-                                                      className={`chip ${tag === t.id ? "active" : ""}`}
-                                                      onClick={() =>
-                                                            setTag(t.id)
-                                                      }
-                                                >
-                                                      {t.label}
-                                                </button>
-                                          ))}
-                                    </div>
                                     <div
                                           className="grid"
                                           style={{ marginTop: 14 }}
                                     >
-                                          {filtered.map((m) => (
+                                          {allModules.map((m) => (
                                                 <button
                                                       key={m.id}
                                                       className="card"
@@ -157,11 +120,6 @@ export function App() {
                                                 </button>
                                           ))}
                                     </div>
-                                    {filtered.length === 0 && (
-                                          <div className="empty">
-                                                无匹配 · No results
-                                          </div>
-                                    )}
                               </div>
                         )}
                   </main>

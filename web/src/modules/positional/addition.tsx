@@ -75,7 +75,13 @@ export const additionModule: ModuleDef<Scene, Cfg> = {
     }
     return frames;
   },
-  Render({ scene }) {
+  Render({ scene: _scene }) {
+    const scene = (_scene as any) ?? {};
+    scene.aDigits = scene.aDigits ?? [];
+    scene.bDigits = scene.bDigits ?? [];
+    scene.res = scene.res ?? [];
+    scene.carry = scene.carry ?? 0;
+    scene.i = scene.i ?? null;
     const cols = Math.max(scene.aDigits.length, scene.bDigits.length, scene.res.length || 0);
     const pad = (arr: number[]) => {
       const cp = [...arr];

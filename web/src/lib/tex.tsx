@@ -10,10 +10,13 @@ const CJK_RUN = /[\u3000-\u303f\u3400-\u9fff\uf900-\ufaff\uff00-\uffef]+/g;
 // (https://katex.org/docs/security.html); `\(\href\)`/raw HTML only becomes
 // possible with `trust: true`, which we never pass. Same pattern as before.
 function mathHtml(m: string, display: boolean) {
+  // KaTeX strict "warn" 会对中文标点“—”（8212）报 unknownSymbol，虽不阻断但刷控制台；统一替换为 \text 形态并关闭 strict
+  const safe = m.replace(/—/g, "\\text{—}").replace(/–/g, "\\text{–}");
   const props = {
     dangerouslySetInnerHTML: {
-      __html: katex.renderToString(m, {
+      __html: katex.renderToString(safe, {
         throwOnError: false,
+        strict: false,
         displayMode: display,
       }),
     },

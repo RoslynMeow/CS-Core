@@ -203,7 +203,17 @@ export const positionalCoreModule: ModuleDef<Scene, Cfg> = {
     if (cfg.mode === 'addition') return additionFrames(cfg.base, cfg.numeral, cfg.numeralB);
     return successorInfinite(cfg.base, cfg.numeral);
   },
-  Render({ scene }) {
+  Render({ scene: _scene }) {
+    const scene = (_scene as any) ?? {};
+    scene.digits = scene.digits ?? [];
+    scene.partials = scene.partials ?? [];
+    scene.highlight = scene.highlight ?? null;
+    scene.base = scene.base ?? 10;
+    scene.value = scene.value ?? 0;
+    scene.digitsB = scene.digitsB ?? null;
+    scene.res = scene.res ?? [];
+    scene.carry = scene.carry ?? 0;
+    scene.i = scene.i ?? null;
     const digits = scene.digits;
     const defGlyphs = defaultGlyphs(digits, scene.base);
     // custom pool: shared global 64
@@ -267,9 +277,9 @@ export const positionalCoreModule: ModuleDef<Scene, Cfg> = {
         const pos = cols - 2 - (scene.i as number);
         if (pos >= 0 && pos < cols) carryDots[pos] = '•';
       }
-      const RowDefPad = ({ glyphs }: { glyphs: (string | null)[] }) => (
+      const RowDefPad = ({ glyphs, label }: { glyphs: (string | null)[]; label: string }) => (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
-          <span style={{ fontSize: 11, color: '#64748b', minWidth: 28 }}>数码</span>
+          <span style={{ fontSize: 11, color: '#64748b', minWidth: 28 }}>{label}</span>
           {glyphs.map((g, i) => {
             const active = scene.highlight === i;
             const isEmpty = g === null;
@@ -277,9 +287,9 @@ export const positionalCoreModule: ModuleDef<Scene, Cfg> = {
           })}
         </div>
       );
-      const RowCustPad = ({ glyphs }: { glyphs: (string | null | { img: string } | null)[] }) => (
+      const RowCustPad = ({ glyphs, label }: { glyphs: (string | null | { img: string } | null)[]; label: string }) => (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center' }}>
-          <span style={{ fontSize: 11, color: '#64748b', minWidth: 28 }}>手绘</span>
+          <span style={{ fontSize: 11, color: '#64748b', minWidth: 28 }}>{label}</span>
           {glyphs.map((g, i) => {
             const active = scene.highlight === i;
             const isEmpty = g === null;
@@ -289,15 +299,15 @@ export const positionalCoreModule: ModuleDef<Scene, Cfg> = {
       );
       return (
         <div style={{ display: 'grid', gap: 6 }}>
-          <RowDefPad glyphs={aDefP as never} /><RowCustPad glyphs={aCustP as never} />
+          <RowDefPad glyphs={aDefP as never} label="A" /><RowCustPad glyphs={aCustP as never} label="A" />
           <div style={{ height: 4 }} />
-          <RowDefPad glyphs={bDefP as never} /><RowCustPad glyphs={bCustP as never} />
+          <RowDefPad glyphs={bDefP as never} label="B" /><RowCustPad glyphs={bCustP as never} label="B" />
           <div style={{ display: 'flex', gap: 6, justifyContent: 'center', alignItems: 'center', height: 14 }}>
             <span style={{ fontSize: 11, color: '#64748b', minWidth: 28 }} />
             {carryDots.map((d, i) => <div key={i} style={{ width: 48, textAlign: 'center', fontSize: 16, lineHeight: '14px', color: '#ef4444', fontWeight: 900 }}>{d ?? ''}</div>)}
           </div>
           <div style={{ borderTop: '1px solid #cbd5e1', margin: '0 0 2px' }} />
-          {rDefP.some(v => v !== null) && <><RowDefPad glyphs={rDefP as never} /><RowCustPad glyphs={rCustP as never} /></>}
+          {rDefP.some(v => v !== null) && <><RowDefPad glyphs={rDefP as never} label="R" /><RowCustPad glyphs={rCustP as never} label="R" /></>}
           <div style={{ textAlign: 'center', fontSize: 12, color: '#64748b', marginTop: 6 }}><MathText text={`$c=${scene.carry ?? 0}$`} /></div>
         </div>
       ) as unknown as never;

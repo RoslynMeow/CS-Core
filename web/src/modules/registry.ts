@@ -1,19 +1,6 @@
 import type { ModuleDef } from "../engine/types";
-import { positionalCoreModule } from "./positional/core";
-import { baseConversionModule } from "./positional/baseConversion";
-import { unsignedIntModule } from "./numeric/unsignedInt";
-import { twosComplementModule } from "./numeric/twosComplement";
-import { ieee754Module } from "./numeric/ieee754";
-import { characterEncodingModule } from "./text/characterEncoding";
-import { stringOpsModule } from "./text/stringOps";
-import { sequentialListModule } from "./storage/sequentialList";
-import { linkedListModule } from "./storage/linkedList";
-import { circularLinkedListModule } from "./storage/circularLinkedList";
-import { doublyLinkedListModule } from "./storage/doublyLinkedList";
-import { hashTableModule } from "./storage/hashTable";
-import { matrixModule } from "./storage/matrix";
-import { stackModule } from "./storage/stack";
-import { queueModule } from "./storage/queue";
+import { dataUnifiedModule } from "./data/unified";
+import { storageUnifiedModule } from "./storage/unified";
 import { treeUnifiedModule } from "./tree/unified";
 import { graphUnifiedModule } from "./graph/unified";
 
@@ -21,21 +8,8 @@ import { graphUnifiedModule } from "./graph/unified";
 const asModule = (m: unknown): ModuleDef => m as ModuleDef;
 
 export const KNOWLEDGE: Record<string, ModuleDef> = {
-  [positionalCoreModule.id]: asModule(positionalCoreModule),
-  [baseConversionModule.id]: asModule(baseConversionModule),
-  [unsignedIntModule.id]: asModule(unsignedIntModule),
-  [twosComplementModule.id]: asModule(twosComplementModule),
-  [ieee754Module.id]: asModule(ieee754Module),
-  [characterEncodingModule.id]: asModule(characterEncodingModule),
-  [stringOpsModule.id]: asModule(stringOpsModule),
-  [sequentialListModule.id]: asModule(sequentialListModule),
-  [linkedListModule.id]: asModule(linkedListModule),
-  [circularLinkedListModule.id]: asModule(circularLinkedListModule),
-  [doublyLinkedListModule.id]: asModule(doublyLinkedListModule),
-  [hashTableModule.id]: asModule(hashTableModule),
-  [matrixModule.id]: asModule(matrixModule),
-  [stackModule.id]: asModule(stackModule),
-  [queueModule.id]: asModule(queueModule),
+  [dataUnifiedModule.id]: asModule(dataUnifiedModule),
+  [storageUnifiedModule.id]: asModule(storageUnifiedModule),
   [treeUnifiedModule.id]: asModule(treeUnifiedModule),
   [graphUnifiedModule.id]: asModule(graphUnifiedModule),
 };
