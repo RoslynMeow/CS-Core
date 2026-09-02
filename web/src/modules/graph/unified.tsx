@@ -9,6 +9,7 @@ import { buildGraphDump } from "../../lib/graph";
 import { buildMemoryUrl } from "../../lib/memoryDump";
 import { MathText } from "../../lib/tex";
 import { StateBar } from "../../components/canvas/StateBar";
+import { SplitPane } from "../../components/SplitPane";
 import {
   type GraphCfg,
   randGraph,
@@ -413,20 +414,24 @@ export const graphUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
       }
     };
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, height: "100%", minHeight: 0 }}>
-        <div style={{ flex: 1, minHeight: 380, border: "1px solid #c7d2fe", borderRadius: 12, overflow: "hidden", background: "#fff", display: "flex", flexDirection: "column" }}>
-          <GraphEditor
-            key={`editor-${cfg.subMode}-${currentImp?.n ?? 0}-${currentImp?.spec ?? ""}`}
-            initialGraph={currentImp}
-            constraints={constraintsFor(cfg.subMode, isZh)}
-            highlight={highlight}
-            embedded
-            onPickVertex={onPickVertex}
-            onConfirm={(g) => onChange?.({ ...cfg, imp: g, source: "graph", confirmed: true } as unknown as Cfg)}
-            title={isZh ? "图编辑器 · 点选即设参（高亮）· 右键菜单" : "Graph Editor · click to pick"}
-          />
-        </div>
-        <LeftMemoryPanel g={gForMem} isZh={isZh} />
+      <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+        <SplitPane
+          top={
+            <div style={{ flex: 1, minHeight: 0, border: "1px solid #c7d2fe", borderRadius: 12, overflow: "hidden", background: "#fff", display: "flex", flexDirection: "column" }}>
+              <GraphEditor
+                key={`editor-${cfg.subMode}-${currentImp?.n ?? 0}-${currentImp?.spec ?? ""}`}
+                initialGraph={currentImp}
+                constraints={constraintsFor(cfg.subMode, isZh)}
+                highlight={highlight}
+                embedded
+                onPickVertex={onPickVertex}
+                onConfirm={(g) => onChange?.({ ...cfg, imp: g, source: "graph", confirmed: true } as unknown as Cfg)}
+                title={isZh ? "图编辑器 · 点选即设参（高亮）· 右键菜单" : "Graph Editor · click to pick"}
+              />
+            </div>
+          }
+          bottom={<LeftMemoryPanel g={gForMem} isZh={isZh} />}
+        />
       </div>
     );
   },
@@ -510,7 +515,7 @@ function LeftMemoryPanel({ g, isZh }: { g: Graph | null; isZh: boolean }) {
     );
   }
   return (
-    <div style={{ border: "1px solid #c7d2fe", borderRadius: 12, overflow: "hidden", background: "#fff", display: "flex", flexDirection: "column", height: 220 }}>
+    <div style={{ border: "1px solid #c7d2fe", borderRadius: 12, overflow: "hidden", background: "#fff", display: "flex", flexDirection: "column", height: "100%" }}>
       <div style={{ padding: "8px 10px", fontSize: 11, fontWeight: 800, color: "#4338ca", display: "flex", gap: 6, alignItems: "center", borderBottom: "1px solid #c7d2fe" }}>
         <span>{isZh ? "内存表示" : "Memory"}</span>
         {(["adjlist", "adjmat", "array", "edges"] as const).map((v) => <button key={v} className={`pill ${repr === v ? "active" : ""}`} style={{ padding: "2px 8px", fontSize: 11 }} onClick={() => setRepr(v)}>{v === "adjlist" ? (isZh ? "邻接表" : "List") : v === "adjmat" ? (isZh ? "矩阵" : "Matrix") : v === "array" ? (isZh ? "父节点" : "parent") : (isZh ? "边集" : "Edges")}</button>)}

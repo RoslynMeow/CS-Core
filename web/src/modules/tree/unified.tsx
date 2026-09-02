@@ -8,6 +8,7 @@ import { Graph, buildGraphDump } from "../../lib/graph";
 import { buildMemoryUrl } from "../../lib/memoryDump";
 import { MathText } from "../../lib/tex";
 import { StateBar } from "../../components/canvas/StateBar";
+import { SplitPane } from "../../components/SplitPane";
 import { Graph as GraphCls } from "../../lib/graph";
 import {
   bstFromValues, completeTree, bstInsertSteps, bstSearchOnTree, bstInsertOne, bstDeleteOnTree,
@@ -186,19 +187,23 @@ export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
     const currentImp = cfg.treeImp;
     const highlight = { current: (scene as any).current ?? null, visited: (scene as any).visited ?? [], frontier: (scene as any).frontier ?? [], edge: (scene as any).edge ?? null, tone: (scene as any).tone };
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 10, height: "100%", minHeight: 0 }}>
-        <div style={{ flex: 1, minHeight: 380, border: "1px solid #c7d2fe", borderRadius: 12, overflow: "hidden", background: "#fff", display: "flex", flexDirection: "column" }}>
-          <GraphEditor
-            key={`tree-${cfg.subMode}-${currentImp?.n ?? 0}-${currentImp?.spec ?? ""}`}
-            initialGraph={currentImp ?? { n: 7, spec: "0-1,0-2,1-3,1-4,2-5,2-6", labels: ["4","2","6","1","3","5","7"], directed: false, root: 0, layout: "tree" }}
-            constraints={{ mustBeTree: true, hint: isZh ? "树需 n-1 边且无环" : "needs tree" }}
-            highlight={highlight}
-            embedded
-            onConfirm={(g) => onChange?.({ ...cfg, treeImp: g } as unknown as Cfg)}
-            title={isZh ? "树编辑器 · 直接编辑" : "Tree Editor"}
-          />
-        </div>
-        <LeftMemoryPanel g={gForMem} isZh={isZh} />
+      <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+        <SplitPane
+          top={
+            <div style={{ flex: 1, minHeight: 0, border: "1px solid #c7d2fe", borderRadius: 12, overflow: "hidden", background: "#fff", display: "flex", flexDirection: "column" }}>
+              <GraphEditor
+                key={`tree-${cfg.subMode}-${currentImp?.n ?? 0}-${currentImp?.spec ?? ""}`}
+                initialGraph={currentImp ?? { n: 7, spec: "0-1,0-2,1-3,1-4,2-5,2-6", labels: ["4","2","6","1","3","5","7"], directed: false, root: 0, layout: "tree" }}
+                constraints={{ mustBeTree: true, hint: isZh ? "树需 n-1 边且无环" : "needs tree" }}
+                highlight={highlight}
+                embedded
+                onConfirm={(g) => onChange?.({ ...cfg, treeImp: g } as unknown as Cfg)}
+                title={isZh ? "树编辑器 · 直接编辑" : "Tree Editor"}
+              />
+            </div>
+          }
+          bottom={<LeftMemoryPanel g={gForMem} isZh={isZh} />}
+        />
       </div>
     );
   },
@@ -282,7 +287,7 @@ function LeftMemoryPanel({ g, isZh }: { g: Graph | null; isZh: boolean }) {
     );
   }
   return (
-    <div style={{ border: "1px solid #c7d2fe", borderRadius: 12, overflow: "hidden", background: "#fff", display: "flex", flexDirection: "column", height: 220 }}>
+    <div style={{ border: "1px solid #c7d2fe", borderRadius: 12, overflow: "hidden", background: "#fff", display: "flex", flexDirection: "column", height: "100%" }}>
       <div style={{ padding: "8px 10px", fontSize: 11, fontWeight: 800, color: "#4338ca", display: "flex", gap: 6, alignItems: "center", borderBottom: "1px solid #c7d2fe" }}>
         <span>{isZh ? "内存表示" : "Memory"}</span>
         {(["adjlist", "adjmat", "array", "edges"] as const).map((v) => <button key={v} className={`pill ${repr === v ? "active" : ""}`} style={{ padding: "2px 8px", fontSize: 11 }} onClick={() => setRepr(v)}>{v === "adjlist" ? (isZh ? "邻接表" : "List") : v === "adjmat" ? (isZh ? "矩阵" : "Matrix") : v === "array" ? (isZh ? "父节点" : "parent") : (isZh ? "边集" : "Edges")}</button>)}
