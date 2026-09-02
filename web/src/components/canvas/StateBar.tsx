@@ -42,8 +42,7 @@ const CELL_TEXT: Record<AlgoCellState, string> = {
 /** 渲染一张状态表（真 <table> 固定列宽，强制按列对齐） */
 export function StateTable({ table }: { table: AlgoTable }) {
   const ncol = table.header?.length ?? 0;
-  // contrast: 每列统一宽度（含行名字段），列数少(≤8)用等宽，列多则压缩到不溢出
-  const colW = ncol <= 8 ? 34 : Math.max(18, Math.floor(240 / ncol));
+  const colW = ncol <= 8 ? 44 : Math.max(28, Math.floor(360 / ncol));
   const headCell = (h: string, i: number) => (
     <td
       key={i}
@@ -52,10 +51,10 @@ export function StateTable({ table }: { table: AlgoTable }) {
         minWidth: colW,
         maxWidth: colW,
         textAlign: "center",
-        fontSize: 10,
+        fontSize: 12,
         fontWeight: 800,
         color: "#64748b",
-        padding: "1px 4px",
+        padding: "2px 6px",
         whiteSpace: "nowrap",
         overflow: "hidden",
       }}
@@ -67,21 +66,22 @@ export function StateTable({ table }: { table: AlgoTable }) {
     <div
       style={{
         border: "1px solid #26324d",
-        borderRadius: 10,
+        borderRadius: 12,
         background: "#101a30",
-        padding: "8px 10px",
-        minWidth: 120,
+        padding: "12px 14px",
+        minWidth: 180,
         maxWidth: "100%",
         overflow: "auto",
+        flex: "1 1 320px",
       }}
     >
       <div
         style={{
           fontWeight: 800,
-          fontSize: 11,
+          fontSize: 13,
           color: "#a5b4fc",
           letterSpacing: ".03em",
-          marginBottom: 4,
+          marginBottom: 6,
         }}
       >
         {table.title}
@@ -90,12 +90,11 @@ export function StateTable({ table }: { table: AlgoTable }) {
         style={{
           borderCollapse: "collapse",
           tableLayout: "fixed",
-          width: ncol ? `${34 + ncol * colW}px` : "100%",
+          width: ncol ? `${44 + ncol * colW}px` : "100%",
         }}
       >
-        {/* 强制每列同宽：colgroup 里的 col 数 = 行名 + 顶点列 */}
         <colgroup>
-          <col style={{ width: 34 }} />
+          <col style={{ width: 44 }} />
           {Array.from({ length: ncol }, (_, i) => (
             <col key={i} style={{ width: colW }} />
           ))}
@@ -103,7 +102,7 @@ export function StateTable({ table }: { table: AlgoTable }) {
         {ncol > 0 && (
           <thead>
             <tr>
-              <td style={{ width: 34 }} />
+              <td style={{ width: 44 }} />
               {table.header!.map((h, i) => headCell(h, i))}
             </tr>
           </thead>
@@ -113,12 +112,12 @@ export function StateTable({ table }: { table: AlgoTable }) {
             <tr key={ri}>
               <td
                 style={{
-                  width: 34,
-                  fontSize: 11,
+                  width: 44,
+                  fontSize: 13,
                   fontWeight: 800,
                   color: "#64748b",
                   whiteSpace: "nowrap",
-                  padding: "2px 4px 2px 0",
+                  padding: "4px 6px 4px 0",
                 }}
               >
                 {r.name}
@@ -135,12 +134,12 @@ export function StateTable({ table }: { table: AlgoTable }) {
                         minWidth: colW,
                         maxWidth: colW,
                         textAlign: "center",
-                        fontSize: 11,
+                        fontSize: 13,
                         fontWeight: 700,
                         color: CELL_TEXT[st],
                         background: CELL_FILL[st],
-                        borderRadius: 4,
-                        padding: "1px 0",
+                        borderRadius: 6,
+                        padding: "4px 0",
                         whiteSpace: "nowrap",
                         overflow: "hidden",
                       }}

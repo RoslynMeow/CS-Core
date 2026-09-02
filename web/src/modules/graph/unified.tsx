@@ -16,8 +16,9 @@ import {
   randomCfg,
   fromImport,
   graphScene,
-  algoStateTables,
+  algoStateTables as _algoTables,
 } from "./source";
+const numTables: typeof _algoTables = ((opts: Parameters<typeof _algoTables>[0]) => _algoTables(opts).filter((t) => t.title !== "邻接")) as any;
 import {
   bfsSteps, dfsSteps, BFS_CODE, DFS_CODE,
   topoSteps, TOPO_CODE,
@@ -127,9 +128,9 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
       const steps = isB ? bfsSteps(g, start, g.labels) : dfsSteps(g, start, g.labels);
       return steps.map((s) => {
         const base = graphScene(g, { current: s.current, exploring: s.exploring, visited: s.visited, frontier: s.frontier, order: s.order, edge: s.edge }, { root: start, ...(importGraph ? { import: importGraph } : {}) });
-        // 伪代码存储：visited[], Q(即 frontier), order
-        (base as any).stateTables = algoStateTables({ labels: g.labels, arrays: [
-          { name: isB ? "Q" : "S", values: g.labels.map((_: string, i: number) => s.frontier.includes(i) ? "●" : "-"), hl: g.labels.map((_: string, i: number) => s.frontier.includes(i) ? 2 : 0) as any },
+        // 伪代码真实结构：visited[], Q/S(队列/栈含顺序), order
+        (base as any).stateTables = numTables({ labels: g.labels, arrays: [
+          { name: isB ? "Q" : "S", values: g.labels.map((_: string, i: number) => { const p = s.frontier.indexOf(i); return p >= 0 ? String(p+1) : "-"; }), hl: g.labels.map((_: string, i: number) => s.frontier.includes(i) ? 2 : 0) as any },
           { name: "visit", values: g.labels.map((_: string, i: number) => s.visited.includes(i) ? "T" : "F"), hl: g.labels.map((_: string, i: number) => s.visited.includes(i) ? 1 : 0) as any },
         ]});
         return toFrame(s, base);
@@ -145,7 +146,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
         const indeg = g.indegree();
         const base = graphScene(g, { current: s.current, exploring: s.exploring, visited: s.visited, frontier: s.frontier, order: s.order, edge: s.edge }, { root: start, ...(importGraph ? { import: importGraph } : { layout: "force" }) });
         // 伪代码：in[], Q, order
-        (base as any).stateTables = algoStateTables({ labels: g.labels, arrays: [
+        (base as any).stateTables = numTables({ labels: g.labels, arrays: [
           { name: "in", values: indeg.map(String) },
           { name: "Q", values: g.labels.map((_: string, i: number) => s.frontier.includes(i) ? "●" : "-") },
           { name: "order", values: g.labels.map((_: string, i: number) => s.order.includes(i) ? String(s.order.indexOf(i)+1) : "-") },
@@ -160,8 +161,8 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
         for (let i = 0; i < n; i++) ann[i] = Number.isFinite(s.dist[i]) ? String(s.dist[i]) : "∞";
         const visited = [...s.visited];
         const base = graphScene(g, { current: s.current, exploring: s.exploring, visited, frontier: [...s.frontier], order: [...s.order], edge: s.edge }, { root: start, annotate: ann, ...(importGraph ? { import: importGraph } : {}) });
-        // 伪代码：dist[], prev[], S(visited)
-        (base as any).stateTables = algoStateTables({ labels: g.labels, adjText: (u: number) => g.adj()[u].map(([v,w]: number[]) => `${g.labels[v]}${w!==1?`(${w})`:""}`).join(", ") || "—", arrays: [
+        // 伪代码真实结构：dist[], prev[], S
+        (base as any).stateTables = numTables({ labels: g.labels, arrays: [
           { name: "dist", values: s.dist.map((v:any) => Number.isFinite(v) ? String(v) : "∞"), hl: g.labels.map((_: string, i: number) => s.visited.includes(i) ? 1 : s.frontier.includes(i) ? 2 : 0) as any },
           { name: "prev", values: s.prev.map((p:any) => p<0 ? "-" : g.labels[p]) },
           { name: "S", values: g.labels.map((_: string, i: number) => s.visited.includes(i) ? "●" : "-") },
@@ -176,7 +177,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
         for (let i = 0; i < n; i++) ann[i] = Number.isFinite(s.dist[i]) ? String(s.dist[i]) : "∞";
         const base = graphScene(g, { current: s.current, exploring: s.exploring, visited: [...s.visited], frontier: [...s.frontier], order: [...s.order], edge: s.edge }, { root: start, annotate: ann, ...(importGraph ? { import: importGraph } : {}) });
         // 伪代码：dist[], prev[]
-        (base as any).stateTables = algoStateTables({ labels: g.labels, arrays: [
+        (base as any).stateTables = numTables({ labels: g.labels, arrays: [
           { name: "dist", values: s.dist.map((v:any) => Number.isFinite(v) ? String(v) : "∞") },
           { name: "prev", values: s.prev.map((p:any) => p<0 ? "-" : g.labels[p]) },
         ]});
@@ -189,7 +190,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
         const base = graphScene(g, { current: s.current, exploring: s.exploring, visited: [], frontier: [], order: [], edge: s.edge }, { root: s.k >= 0 && s.k < n ? s.k : start, annotate: s.k >= 0 && s.k < n ? Object.fromEntries(g.labels.map((_: string, i: number) => [i, s.dist[s.k][i] === Infinity ? "∞" : String(s.dist[s.k][i])])) : undefined, ...(importGraph ? { import: importGraph } : { layout: "force" }) });
         // 伪代码：dist[][], next[][]
         if (s.k >= 0 && s.k < n) {
-          (base as any).stateTables = algoStateTables({ labels: g.labels, arrays: [
+          (base as any).stateTables = numTables({ labels: g.labels, arrays: [
             { name: `dist`, values: s.dist[s.k].map((v:any) => Number.isFinite(v) ? String(v) : "∞") },
             { name: `next`, values: s.next[s.k].map((v:any) => v<0 ? "-" : g.labels[v]) },
           ]});
@@ -208,7 +209,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
         const picked: [number, number][] = path.length > 1 ? path.slice(0, -1).map((u, i) => [u, path[i + 1]] as [number, number]) : [];
         const base = graphScene(g, { current: s.current, exploring: s.exploring, visited: [...s.closedSet], frontier: [...s.openSet], order: path, edge: s.edge }, { root: start, annotate, picked, ...(importGraph ? { import: importGraph } : {}) });
         // 伪代码：openSet, closedSet, g[], f[] (=g+h)
-        (base as any).stateTables = algoStateTables({ labels: g.labels, arrays: [
+        (base as any).stateTables = numTables({ labels: g.labels, arrays: [
           { name: "open", values: g.labels.map((_: string, i: number) => s.openSet.includes(i) ? "●" : "-") },
           { name: "closed", values: g.labels.map((_: string, i: number) => s.closedSet.includes(i) ? "●" : "-") },
           { name: "g", values: s.dist.map((v:any) => Number.isFinite(v) ? String(v) : "∞") },
@@ -226,7 +227,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
         for (let v = 0; v < n; v++) if (s.inTree[v] && s.parent[v] >= 0) picked.push([s.parent[v], v]);
         const base = graphScene(g, { current: s.current, exploring: s.exploring, visited: [...s.visited], frontier: [...s.frontier], order: [...s.order], edge: s.edge }, { root: start, annotate: ann, picked, ...(importGraph ? { import: importGraph } : {}) });
         // 伪代码：key[], parent[], T
-        (base as any).stateTables = algoStateTables({ labels: g.labels, arrays: [
+        (base as any).stateTables = numTables({ labels: g.labels, arrays: [
           { name: "key", values: s.key.map((v:any) => Number.isFinite(v) ? String(v) : "∞") },
           { name: "parent", values: s.parent.map((p:any) => p<0 ? "-" : g.labels[p]) },
           { name: "inT", values: g.labels.map((_: string, i: number) => s.inTree[i] ? "●" : "-") },
@@ -239,7 +240,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
       return steps.map((s) => {
         const base = graphScene(g, { current: s.current, exploring: s.exploring, visited: [...s.visited], frontier: [...s.frontier], order: [...s.order], edge: s.edge }, { root: start, picked: s.picked as [number, number][], ...(importGraph ? { import: importGraph } : {}) });
         // 伪代码：E' sorted, uf[], MST
-        (base as any).stateTables = algoStateTables({ labels: g.labels, arrays: [
+        (base as any).stateTables = numTables({ labels: g.labels, arrays: [
           { name: "uf", values: s.uf.map((v:any) => g.labels[v] ?? String(v)) },
           { name: "picked", values: g.labels.map((_: string, i: number) => s.picked.some(([a,b]: number[]) => a===i||b===i) ? "●" : "-") },
         ]});
@@ -256,7 +257,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
         const tone: Record<number, number> = s.comp.reduce((acc: Record<number, number>, c, i) => { if (c !== -1) acc[i] = c; return acc; }, {});
         const base = graphScene(g, { current: s.current, exploring: s.exploring, visited: s.visited, frontier: s.frontier, order: s.order, edge: s.edge }, { root: start, annotate, tone, ...(importGraph ? { import: importGraph } : { layout: "force" }) });
         // 伪代码：comp[], index[], low[], stack
-        (base as any).stateTables = algoStateTables({ labels: g.labels, arrays: [
+        (base as any).stateTables = numTables({ labels: g.labels, arrays: [
           { name: "comp", values: s.comp.map((c:any) => c<0 ? "-" : String(c)) },
           { name: "index", values: s.index.map((v:any) => v<0 ? "-" : String(v)) },
           { name: "low", values: s.lowlink.map((v:any) => v<0 ? "-" : String(v)) },
@@ -277,7 +278,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
         for (let u = 0; u < n; u++) for (let v = 0; v < n; v++) if (step.flow[u][v] > 0) picked.push([u, v]);
         const base = graphScene(g, { current: step.current, exploring: step.exploring, visited: step.visited, frontier: step.frontier, order: step.path, edge: step.edge }, { root: s, annotate, picked, ...(importGraph ? { import: importGraph } : { layout: "force" }) });
         // 伪代码：level[], iter[], flow
-        (base as any).stateTables = algoStateTables({ labels: g.labels, arrays: [
+        (base as any).stateTables = numTables({ labels: g.labels, arrays: [
           { name: "level", values: step.level.map((v:any) => v<0 ? "-" : String(v)) },
           { name: "iter", values: step.iter.map((v:any) => String(v)) },
           { name: "flow", values: g.labels.map((_: string, i: number) => String(step.flow[s][i] ?? 0)) },
@@ -294,7 +295,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
         s.depth.forEach((d, i) => { annotate[i] = `d=${d}`; });
         const base = graphScene(g, { current: s.current, exploring: s.exploring, visited: s.lca !== null ? [s.lca] : [], frontier: [], order: [], edge: s.edge }, { root: start, annotate, ...(importGraph ? { import: importGraph } : { layout: "tree" }) });
         // 伪代码：depth[], up[][j]
-        (base as any).stateTables = algoStateTables({ labels: g.labels, arrays: [
+        (base as any).stateTables = numTables({ labels: g.labels, arrays: [
           { name: "depth", values: s.depth.map((v:any) => String(v)) },
           { name: "up0", values: s.up.map((row:any) => row[0] < 0 ? "-" : g.labels[row[0]]) },
           { name: "up1", values: s.up.map((row:any) => row[1] < 0 ? "-" : g.labels[row[1]] ?? "-") },
