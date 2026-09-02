@@ -131,7 +131,7 @@ export const graphMaxFlowModule: ModuleDef<GraphCanvasScene, Cfg> = {
           <span style={{ fontSize: 11, color: "#64748b" }}>{isZh ? "汇点" : "sink"}</span>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-          <GraphSourcePanel cfg={config} onChange={(c) => onChange({ ...config, ...c })} t={t} />
+          <GraphSourcePanel cfg={config} onChange={(c) => onChange({ ...config, ...c })} t={t} constraints={{ mustBeDirected: true, hint: isZh ? "最大流需有向图，权重 = 容量" : "Max flow needs directed, weight = capacity" }} />
           {config.source === "random" && (
             <>
               <label className="txt-label">{isZh ? "顶点数" : "V"}<input className="txt" type="number" min={2} max={14} value={config.n} onChange={(e) => onChange({ ...config, n: Math.max(2, Math.min(14, Number(e.target.value))) })} /></label>

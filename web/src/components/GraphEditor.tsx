@@ -1,0 +1,518 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Graph, alphaLabels } from "../lib/graph";
+import type { ImportedGraph } from "../modules/tree/source";
+
+type Layout = "circle" | "tree" | "force" | "free";
+type Tool = "move" | "addEdge" | "addVertex" | "delete";
+const SVG_W = 760;
+const SVG_H = 440;
+const V_R = 17;
+
+export type GraphEditorProps = {
+  initialGraph?: ImportedGraph | null;
+  onConfirm: (g: ImportedGraph) => void;
+  onCancel?: () => void;
+  constraints?: {
+    mustBeDirected?: boolean;
+    mustBeTree?: boolean;
+    hint?: string;
+  };
+  title?: string;
+  highlight?: {
+    current?: number | null;
+    visited?: number[];
+    frontier?: number[];
+    edge?: [number, number] | null;
+    tone?: Record<number, number>;
+  };
+  /** 嵌入模式：隐藏顶部工具栏与底部确认按钮，右键菜单即全部操作，即改即同步 */
+  embedded?: boolean;
+  onPickVertex?: (id: number) => void;
+};
+
+type GenType = "tree" | "graph" | "dag";
+type GraphSnap = {
+  n: number;
+  directed: boolean;
+  edgeSpec: string;
+  labels: string[];
+  manual: Record<number, { x: number; y: number }>;
+};
+
+export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, title, highlight, embedded, onPickVertex }: GraphEditorProps) {
+  const init = initialGraph;
+  const [n, setN] = useState(init ? init.n : 4);
+  const [directed, setDirected] = useState(init ? init.directed : false);
+  const [edgeSpec, setEdgeSpec] = useState(init ? init.spec : "0-1,1-2,2-3");
+  const [labels, setLabels] = useState<string[]>(init ? init.labels : ["A", "B", "C", "D"]);
+  const [layout, setLayout] = useState<Layout>(init?.layout ?? "tree");
+  const [root, setRoot] = useState(init ? init.root : 0);
+  const [tool, setTool] = useState<Tool>("move");
+  const [selected, setSelected] = useState<number | null>(null);
+  const [pending, setPending] = useState<number | null>(null);
+  const [drag, setDrag] = useState<number | null>(null);
+  const [manual, setManual] = useState<Record<number, { x: number; y: number }>>(init?.manual ?? {});
+  const [msg, setMsg] = useState("");
+  const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
+  const [hoverV, setHoverV] = useState<number | null>(null);
+  const [view, setView] = useState({ tx: 0, ty: 0, s: 1 });
+  const [pan, setPan] = useState<{ startX: number; startY: number; tx: number; ty: number } | null>(null);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
+  const [dragPointer, setDragPointer] = useState<{ x: number; y: number } | null>(null);
+  const [editing, setEditing] = useState<number | null>(null);
+  const [editVal, setEditVal] = useState("");
+  const [hist, setHist] = useState<GraphSnap[]>([]);
+  const [redoStack, setRedoStack] = useState<GraphSnap[]>([]);
+  const histRef = useRef({ hist: [] as GraphSnap[], redo: [] as GraphSnap[] });
+  histRef.current = { hist, redo: redoStack };
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; sx: number; sy: number; target: number | null; edge: { u: number; v: number } | null } | null>(null);
+  const [genOpen, setGenOpen] = useState(false);
+
+  // 约束：强制有向时锁定开关
+  useEffect(() => {
+    if (constraints?.mustBeDirected && !directed) setDirected(true);
+  }, [constraints?.mustBeDirected]);
+
+  const pushHistory = () => {
+    const snap: GraphSnap = { n, directed, edgeSpec, labels: [...labels], manual: { ...manual } };
+    setHist((h) => (h.length > 80 ? h.slice(-80) : h).concat(snap));
+    setRedoStack([]);
+  };
+  const applySnapshot = (snap: GraphSnap) => {
+    setN(snap.n);
+    setDirected(snap.directed);
+    setEdgeSpec(snap.edgeSpec);
+    setLabels([...snap.labels]);
+    setManual({ ...snap.manual });
+  };
+  const undo = () => {
+    const h = histRef.current.hist;
+    if (h.length === 0) return;
+    const prev = h[h.length - 1];
+    setRedoStack((r) => [...r, { n, directed, edgeSpec, labels: [...labels], manual: { ...manual } }]);
+    applySnapshot(prev);
+    setHist((hh) => hh.slice(0, -1));
+    setSelected(null);
+    setPending(null);
+    setMsg("撤销");
+  };
+  const redo = () => {
+    const rs = histRef.current.redo;
+    if (rs.length === 0) return;
+    const next = rs[rs.length - 1];
+    pushHistory();
+    applySnapshot(next);
+    setRedoStack((r) => r.slice(0, -1));
+    setSelected(null);
+    setPending(null);
+    setMsg("重做");
+  };
+
+  const g = useMemo(() => {
+    const graph = new Graph(n, { directed: constraints?.mustBeDirected ? true : directed, labels });
+    graph.fromSpec(edgeSpec);
+    return graph;
+  }, [n, directed, edgeSpec, labels, constraints?.mustBeDirected]);
+
+  // 嵌入模式：即改即同步，无需确认按钮
+  const firstSync = useRef(true);
+  useEffect(() => {
+    if (!embedded) return;
+    if (firstSync.current) { firstSync.current = false; return; }
+    const spec = g.edges.map((e) => `${e.u}-${e.v}${e.weight !== undefined && e.weight !== 1 ? ":" + e.weight : ""}`).join(",");
+    const out: ImportedGraph = { n: g.n, spec, labels: [...g.labels], directed: g.directed, root, layout, manual: { ...manual } };
+    onConfirm(out);
+  }, [g.n, g.edges, g.labels, g.directed, root, layout, manual, embedded]);
+
+  const autoPos = useMemo(() => {
+    if (layout === "tree") return g.layoutTree(root, { x0: 20, y0: 10, w: SVG_W - 40, h: SVG_H - 20 }).pos;
+    if (layout === "force") return g.layoutForce(SVG_W / 2, SVG_H / 2, SVG_W, SVG_H, 160);
+    return g.layoutCircle(SVG_W / 2, SVG_H / 2, Math.min(SVG_W, SVG_H) / 2 - 46);
+  }, [g, layout, root]);
+
+  const pos = useMemo(() => {
+    const m: Record<number, { x: number; y: number }> = {};
+    for (let i = 0; i < g.n; i++) m[i] = manual[i] ?? autoPos[i] ?? { x: 100 + i * 30, y: 200 };
+    return m;
+  }, [g, autoPos, manual]);
+
+  const worldToSvg = (p: { x: number; y: number }) => ({ x: p.x * view.s + view.tx, y: p.y * view.s + view.ty });
+  const svgToWorld = (p: { x: number; y: number }) => ({ x: (p.x - view.tx) / view.s, y: (p.y - view.ty) / view.s });
+  const svgPoint = (e: React.PointerEvent | React.MouseEvent): { x: number; y: number } => {
+    const svg = svgRef.current!;
+    const rect = svg.getBoundingClientRect();
+    const contentW = rect.width;
+    const contentH = contentW * (SVG_H / SVG_W);
+    const padY = Math.max(0, (rect.height - contentH) / 2);
+    return { x: ((e.clientX - rect.left) / contentW) * SVG_W, y: ((e.clientY - rect.top - padY) / contentH) * SVG_H };
+  };
+  const hitVertex = (p: { x: number; y: number }): number | null => {
+    for (let i = g.n - 1; i >= 0; i--) {
+      const v = pos[i];
+      if (v && Math.hypot(p.x - v.x, p.y - v.y) <= V_R + 6) return i;
+    }
+    return null;
+  };
+  const specFromEdges = (es: { u: number; v: number; weight?: number }[]): string =>
+    es.map((e) => `${e.u}-${e.v}${e.weight !== undefined && e.weight !== 1 ? ":" + e.weight : ""}`).join(",");
+  const distToSeg = (px: number, py: number, ax: number, ay: number, bx: number, by: number): number => {
+    const dx = bx - ax, dy = by - ay; const L2 = dx*dx+dy*dy; if (L2===0) return Math.hypot(px-ax, py-ay);
+    let t = ((px-ax)*dx + (py-ay)*dy)/L2; t = Math.max(0, Math.min(1,t)); return Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
+  };
+  const hitEdge = (p: { x:number; y:number }): { u:number; v:number } | null => {
+    for (const e of g.edges) { const a = pos[e.u], b = pos[e.v]; if (!a||!b) continue; if (distToSeg(p.x,p.y,a.x,a.y,b.x,b.y) <= 8) return { u:e.u, v:e.v }; }
+    return null;
+  };
+  const removeEdge = (u:number,v:number) => { pushHistory(); const kept = g.edges.filter((e)=>{ const a=e.u===u&&e.v===v; const b=!g.directed&&e.u===v&&e.v===u; return !(a||b); }); setEdgeSpec(specFromEdges(kept)); setMsg(`取消边 ${g.labels[u]??u}—${g.labels[v]??v}`); };
+  const setEdgeWeight = (u:number,v:number,w:number) => { pushHistory(); const gg = new Graph(n, { directed: g.directed, labels: [...labels] }); gg.fromSpec(edgeSpec); gg.setWeight(u,v,w); setEdgeSpec(specFromEdges(gg.edges)); setMsg(`权重 ${w}`); };
+  const menuReset = () => { setManual({}); setView({ tx:0, ty:0, s:1 }); setMsg("重置布局"); };
+
+  const removeVertex = (v: number) => {
+    pushHistory();
+    const keep = g.edges.filter((e) => e.u !== v && e.v !== v).map((e) => `${e.u > v ? e.u - 1 : e.u}-${e.v > v ? e.v - 1 : e.v}${e.weight !== undefined && e.weight !== 1 ? ":" + e.weight : ""}`);
+    setN((nn) => Math.max(1, nn - 1));
+    setEdgeSpec(keep.join(","));
+    setLabels((ls) => ls.filter((_, i) => i !== v));
+    setManual((m) => {
+      const nm: Record<number, { x: number; y: number }> = {};
+      for (const [k, pv] of Object.entries(m)) {
+        const kk = +k;
+        if (kk === v) continue;
+        nm[kk > v ? kk - 1 : kk] = pv;
+      }
+      return nm;
+    });
+    setSelected(null);
+    setMsg(`删除顶点 ${g.labels[v] ?? v}`);
+  };
+  const addVertexAt = (p: { x: number; y: number }) => {
+    pushHistory();
+    setN(g.n + 1);
+    setManual((m) => ({ ...m, [g.n]: p }));
+    setLabels((ls) => [...ls, String.fromCharCode(65 + (ls.length % 26))]);
+    setSelected(g.n);
+    setMsg(`新建顶点 ${g.labels[g.n] ?? g.n}`);
+  };
+  const link = (a: number, b: number) => {
+    pushHistory();
+    const exists = g.edges.some((x) => (x.u === a && x.v === b) || (!g.directed && x.u === b && x.v === a));
+    if (!exists) setEdgeSpec((s) => (s ? s + "," : "") + `${a}-${b}`);
+    setPending(null);
+    setSelected(null);
+    setTool("move");
+    setMsg(exists ? "边已存在" : `连线 ${g.labels[a] ?? a}—${g.labels[b] ?? b}`);
+  };
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (e.button === 2) return;
+    setMenu(null);
+    svgRef.current?.setPointerCapture?.(e.pointerId);
+    const svgP = svgPoint(e);
+    const p = svgToWorld(svgP);
+    const v = hitVertex(p);
+    if (tool === "addVertex") {
+      if (v === null) addVertexAt(p);
+      else setSelected(v);
+      return;
+    }
+    if (tool === "delete") {
+      if (v !== null) removeVertex(v);
+      return;
+    }
+    if (tool === "addEdge") {
+      if (v !== null) {
+        if (pending === null) {
+          setPending(v);
+          setSelected(v);
+          setMsg(`起点 ${g.labels[v] ?? v}，再点第二个顶点`);
+        } else if (pending === v) {
+          setPending(null);
+          setMsg("");
+        } else link(pending, v);
+      }
+      return;
+    }
+    if (v !== null) {
+      if (e.shiftKey) {
+        if (pending === null) {
+          setPending(v);
+          setSelected(v);
+          setTool("addEdge");
+          setMsg(`起点 ${g.labels[v] ?? v}，再点第二个顶点`);
+        } else link(pending, v);
+        return;
+      }
+      setSelected(v);
+      if (tool === "move") {
+        setDrag(v);
+        const vpos = pos[v];
+        if (vpos) setDragStart({ x: vpos.x, y: vpos.y });
+      }
+    } else if (tool === "move") {
+      setSelected(null);
+      setPan({ startX: svgP.x, startY: svgP.y, tx: view.tx, ty: view.ty });
+    } else setSelected(null);
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    const svgP = svgPoint(e);
+    if (pan) {
+      setView((v) => ({ ...v, tx: pan.tx + (svgP.x - pan.startX), ty: pan.ty + (svgP.y - pan.startY) }));
+      return;
+    }
+    if (drag !== null && dragStart) {
+      const p = svgToWorld(svgP);
+      if (!dragPointer) {
+        setDragPointer(p);
+        return;
+      }
+      const dx = p.x - dragPointer.x, dy = p.y - dragPointer.y;
+      const np = { x: dragStart.x + dx, y: dragStart.y + dy };
+      setManual((m) => ({ ...m, [drag]: np }));
+    }
+    if (tool === "addEdge" && pending !== null) setHover(svgP);
+    if (drag === null) {
+      const p = svgToWorld(svgP);
+      setHoverV(hitVertex(p));
+    }
+  };
+  const onPointerUp = (e: React.PointerEvent) => {
+    svgRef.current?.releasePointerCapture?.(e.pointerId);
+    setDrag(null);
+    setDragStart(null);
+    setDragPointer(null);
+    setHover(null);
+    setPan(null);
+  };
+
+  const commitRename = () => {
+    if (editing !== null) {
+      const val = editVal.trim() || String(editing);
+      setLabels((ls) => ls.map((x, i) => (i === editing ? val : x)));
+    }
+    setEditing(null);
+  };
+
+  const genRandom = (type: GenType) => {
+    pushHistory();
+    const nn = Math.max(4, Math.min(12, n));
+    let gg: Graph;
+    if (type === "tree") gg = Graph.randomTree(nn, { labels: alphaLabels(nn) });
+    else if (type === "dag") gg = Graph.randomDAG(nn, 0.3, { labels: alphaLabels(nn) });
+    else gg = Graph.randomGraph(nn, 0.25, { directed, labels: alphaLabels(nn) });
+    setN(gg.n);
+    setLabels([...gg.labels]);
+    setEdgeSpec(specFromEdges(gg.edges));
+    setManual({});
+    setDirected(gg.directed);
+    setLayout(type === "tree" ? "tree" : "force");
+    setMsg(`已随机生成 ${type}`);
+  };
+
+  const handleConfirm = () => {
+    const out: ImportedGraph = {
+      n: g.n,
+      spec: specFromEdges(g.edges),
+      labels: [...g.labels],
+      directed: g.directed,
+      root,
+      layout,
+      manual: { ...manual },
+    };
+    // 校验
+    if (constraints?.mustBeTree && !g.isTree()) {
+      setMsg("当前图不是树（需 n-1 条边且无环）");
+      return;
+    }
+    if (g.n === 0) {
+      setMsg("图不能为空");
+      return;
+    }
+    onConfirm(out);
+  };
+
+  const edgePos = (u: number, v: number) => {
+    const wa = pos[u], wb = pos[v];
+    if (!wa || !wb) return { ax: 0, ay: 0, bx: 0, by: 0, mx: 0, my: 0 };
+    const a = worldToSvg(wa), b = worldToSvg(wb);
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len, uy = dy / len;
+    const off = 4;
+    return { ax: a.x + ux * (V_R + off), ay: a.y + uy * (V_R + off), bx: b.x - ux * (V_R + off), by: b.y - uy * (V_R + off), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 8, height: "100%", minHeight: 0 }}>
+      {title && !embedded && <div style={{ fontSize: 14, fontWeight: 800 }}>{title}</div>}
+      {constraints?.hint && <div style={{ fontSize: 11, color: "#b45309", background: "#fffbeb", border: "1px solid #fde68a", padding: "6px 10px", borderRadius: 8 }}>{constraints.hint}</div>}
+      {!embedded && (
+        <>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", padding: "6px 10px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
+            <span style={{ fontSize: 10, fontWeight: 800, color: "#4338ca" }}>工具</span>
+            {(["move", "addVertex", "addEdge", "delete"] as Tool[]).map((t) => (
+              <button key={t} className={`pill ${tool === t ? "active" : ""}`} style={{ padding: "3px 10px", fontSize: 12 }} onClick={() => { setTool(t); setPending(null); }}>
+                {t === "move" ? "移动" : t === "addVertex" ? "加顶点" : t === "addEdge" ? "连线" : "删除"}
+              </button>
+            ))}
+            <span style={{ width: 1, height: 18, background: "#c7d2fe" }} />
+            <label style={{ fontSize: 12, display: "flex", alignItems: "center", gap: 4 }}>
+              <input type="checkbox" checked={directed} disabled={!!constraints?.mustBeDirected} onChange={(e) => setDirected(e.target.checked)} /> 有向
+            </label>
+            <select className="txt" value={layout} onChange={(e) => setLayout(e.target.value as Layout)} style={{ fontSize: 12 }}>
+              <option value="tree">树形</option>
+              <option value="circle">环形</option>
+              <option value="force">力导向</option>
+              <option value="free">自由</option>
+            </select>
+            <button className="ghost" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => { pushHistory(); setEdgeSpec(""); setMsg("已清空边"); }}>清空边</button>
+            <button className="ghost" style={{ padding: "4px 10px", fontSize: 12 }} onClick={menuReset}>重置布局</button>
+            <span style={{ marginLeft: "auto", fontSize: 12, color: "#475569" }}>{g.n} 顶点 · {g.edges.length} 边 {g.isTree() ? "· 树" : g.isForest() ? "· 森林" : g.hasCycle() ? "· 含环" : ""}</span>
+          </div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
+            <button className="ghost" style={{ padding: "4px 10px", fontSize: 12 }} onClick={undo} disabled={hist.length === 0}>撤销</button>
+            <button className="ghost" style={{ padding: "4px 10px", fontSize: 12 }} onClick={redo} disabled={redoStack.length === 0}>重做</button>
+            <span style={{ fontSize: 11, color: "#64748b" }}>拖拽顶点 · Shift+点连线 · 空白新建(加顶点模式) · 右键重命名/删点</span>
+            <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+              <button className="ghost" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => genRandom("tree")}>随机树</button>
+              <button className="ghost" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => genRandom("graph")}>随机图</button>
+              <button className="ghost" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => genRandom("dag")}>随机DAG</button>
+            </div>
+            {msg && <span style={{ fontSize: 11, color: "#059669" }}>{msg}</span>}
+          </div>
+        </>
+      )}
+      {embedded && msg && <div style={{ fontSize: 11, color: "#059669", textAlign: "center" }}>{msg}</div>}
+      <div style={{ flex: 1, minHeight: 320, border: "1px solid #c7d2fe", borderRadius: 12, overflow: "hidden", background: "#fff", position: "relative" }}>
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+          style={{ display: "block", width: "100%", height: "100%", cursor: tool === "delete" ? "not-allowed" : tool === "addVertex" ? "copy" : tool === "addEdge" ? "crosshair" : "default", touchAction: "none", userSelect: "none" }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerLeave={onPointerUp}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            const p = svgToWorld(svgPoint(e));
+            const v = hitVertex(p);
+            const ed = v === null ? hitEdge(p) : null;
+            if (v !== null) { setSelected(v); if (onPickVertex) onPickVertex(v); }
+            if (embedded) {
+              setMenu({ x: e.clientX, y: e.clientY, sx: p.x, sy: p.y, target: v, edge: ed });
+            } else {
+              if (v !== null) { setEditing(v); setEditVal(g.labels[v] ?? String(v)); }
+            }
+          }}
+        >
+          {g.edges.map((e, i) => {
+            const p = edgePos(e.u, e.v);
+            const isSel = selected !== null && (e.u === selected || e.v === selected);
+            const isHlEdge = highlight?.edge && ((highlight.edge[0] === e.u && highlight.edge[1] === e.v) || (!g.directed && highlight.edge[0] === e.v && highlight.edge[1] === e.u));
+            const stroke = isHlEdge ? "#f59e0b" : isSel ? "#4f46e5" : "#94a3b8";
+            return (
+              <g key={i}>
+                <line x1={p.ax} y1={p.ay} x2={p.bx} y2={p.by} stroke={stroke} strokeWidth={isHlEdge ? 3 : isSel ? 2.4 : 1.6} />
+                {g.directed && <polygon points={`${p.bx},${p.by} ${p.bx - 9},${p.by - 3.5} ${p.bx - 9},${p.by + 3.5}`} fill={stroke} transform={`rotate(${(Math.atan2(p.by - p.ay, p.bx - p.ax) * 180) / Math.PI} ${p.bx} ${p.by})`} />}
+                {e.weight !== undefined && e.weight !== 1 && <g><circle cx={p.mx} cy={p.my} r={9} fill={isHlEdge ? "#f59e0b" : "#0f172a"} /><text x={p.mx} y={p.my + 3} textAnchor="middle" fontSize={10} fontWeight={800} fill="#fff">{e.weight}</text></g>}
+              </g>
+            );
+          })}
+          {tool === "addEdge" && pending !== null && pos[pending] && hover && <line x1={worldToSvg(pos[pending]).x} y1={worldToSvg(pos[pending]).y} x2={hover.x} y2={hover.y} stroke="#6366f1" strokeWidth={1.6} strokeDasharray="6 4" />}
+          {Array.from({ length: g.n }, (_, i) => i).map((i) => {
+            const p = worldToSvg(pos[i]);
+            const isSel = selected === i;
+            const isPending = pending === i;
+            const isHover = hoverV === i;
+            const isRoot = i === root;
+            const isCurrent = highlight?.current === i;
+            const isVisited = highlight?.visited?.includes(i);
+            const isFrontier = highlight?.frontier?.includes(i);
+            const hasTone = highlight?.tone?.[i] !== undefined;
+            let fill = "#eef2ff";
+            let stroke = "#6366f1";
+            if (isCurrent) { fill = "#a78bfa"; stroke = "#6d28d9"; }
+            else if (isVisited) { fill = "#bbf7d0"; stroke = "#059669"; }
+            else if (isFrontier) { fill = "#bae6fd"; stroke = "#0284c7"; }
+            else if (hasTone) { const t = highlight!.tone![i] % 6; const cols = ["#fecaca","#bfdbfe","#bbf7d0","#fef08a","#ddd6fe","#fed7aa"]; fill = cols[t]; stroke = "#475569"; }
+            else if (isHover) { fill = "#ddd6fe"; stroke = "#7c3aed"; }
+            else if (isSel) { fill = "#4f46e5"; stroke = "#312e81"; }
+            else if (isRoot) { fill = "#fee2e2"; stroke = "#b91c1c"; }
+            return (
+              <g key={i} onDoubleClick={() => { setEditing(i); setEditVal(g.labels[i]); }}>
+                <circle cx={p.x} cy={p.y} r={V_R} fill={fill} stroke={stroke} strokeWidth={isCurrent || isRoot || isSel ? 2.6 : isPending ? 2.2 : 1.4} />
+                <text x={p.x} y={p.y + 4} textAnchor="middle" fontSize={11} fontWeight={700} fill={isVisited || isFrontier || isCurrent ? "#0f172a" : isSel ? "#fff" : "#1e293b"}>{g.labels[i]}</text>
+                {isRoot && <text x={p.x} y={p.y - V_R - 3} textAnchor="middle" fontSize={9} fontWeight={800} fill="#dc2626">根</text>}
+              </g>
+            );
+          })}
+        </svg>
+        {editing !== null && pos[editing] && (() => {
+          const sp = worldToSvg(pos[editing]);
+          return (
+            <div style={{ position: "absolute", left: `calc(${(sp.x / SVG_W) * 100}% - 44px)`, top: `calc(${(sp.y / SVG_H) * 100}% - 38px)`, zIndex: 40 }}>
+              <input className="txt" autoFocus value={editVal} onChange={(e) => setEditVal(e.target.value)} onBlur={commitRename} onKeyDown={(e) => { if (e.key === "Enter") commitRename(); else if (e.key === "Escape") setEditing(null); }} style={{ width: 80, fontSize: 13, textAlign: "center" }} />
+            </div>
+          );
+        })()}
+        {!embedded && selected !== null && (
+          <div style={{ position: "absolute", top: 8, right: 8, display: "flex", gap: 6 }}>
+            <button className="ghost" style={{ padding: "4px 8px", fontSize: 11 }} onClick={() => { setEditing(selected); setEditVal(g.labels[selected]); }}>重命名</button>
+            <button className="ghost" style={{ padding: "4px 8px", fontSize: 11 }} onClick={() => setRoot(selected)}>设为根</button>
+            <button className="ghost" style={{ padding: "4px 8px", fontSize: 11, color: "#dc2626" }} onClick={() => removeVertex(selected)}>删除顶点</button>
+          </div>
+        )}
+        {menu && (
+          <div style={{ position: "fixed", left: menu.x, top: menu.y, zIndex: 50, minWidth: 180, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12, boxShadow: "0 12px 32px rgba(15,23,42,.18)", padding: 6 }} onPointerDown={(e) => e.stopPropagation()}>
+            {menu.target !== null ? (
+              <>
+                <div style={{ padding: "6px 12px", fontSize: 11, fontWeight: 800, color: "#64748b" }}>顶点 {g.labels[menu.target]}</div>
+                <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer" }} onClick={() => { setEditing(menu.target!); setEditVal(g.labels[menu.target!] ?? String(menu.target)); setMenu(null); }}>重命名</div>
+                <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer" }} onClick={() => { setRoot(menu.target!); setMsg(`根设为 ${g.labels[menu.target!]}`); setMenu(null); }}>设为根</div>
+                <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer" }} onClick={() => { setPending(menu.target!); setSelected(menu.target!); setTool("addEdge"); setMsg(`起点 ${g.labels[menu.target!]}`); setMenu(null); }}>从此连线</div>
+                <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer", color: "#dc2626" }} onClick={() => { removeVertex(menu.target!); setMenu(null); }}>删除顶点</div>
+              </>
+            ) : menu.edge ? (
+              <>
+                <div style={{ padding: "6px 12px", fontSize: 11, fontWeight: 800, color: "#64748b" }}>边 {g.labels[menu.edge.u]} — {g.labels[menu.edge.v]}</div>
+                <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer" }} onClick={() => { const w = prompt("权重:", String(g.edges.find((e) => (e.u===menu.edge!.u&&e.v===menu.edge!.v)||(!g.directed&&e.u===menu.edge!.v&&e.v===menu.edge!.u))?.weight ?? 1)); if (w!==null) { const nw = Math.trunc(Number(w)); if (Number.isFinite(nw)&&nw>0) setEdgeWeight(menu.edge!.u, menu.edge!.v, nw); } setMenu(null); }}>修改权重</div>
+                <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer", color: "#dc2626" }} onClick={() => { removeEdge(menu.edge!.u, menu.edge!.v); setMenu(null); }}>删除边</div>
+              </>
+            ) : (
+              <>
+                <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer" }} onClick={() => { const p = { x: menu.sx, y: menu.sy }; const nn = g.n + 1; pushHistory(); setN(nn); setManual((m) => ({ ...m, [g.n]: p })); setLabels((ls) => [...ls, String.fromCharCode(65 + (ls.length % 26))]); setMenu(null); }}>新建顶点</div>
+                <div style={{ height: 1, background: "#eef2f7", margin: "5px 6px" }} />
+                <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer" }} onClick={() => { setGenOpen(true); setMenu(null); }}>随机生成…</div>
+                <div style={{ height: 1, background: "#eef2f7", margin: "5px 6px" }} />
+                <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer" }} onClick={() => { pushHistory(); setEdgeSpec(""); setMenu(null); }}>清空边</div>
+                <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer" }} onClick={() => { menuReset(); setMenu(null); }}>重置布局</div>
+                <div style={{ height: 1, background: "#eef2f7", margin: "5px 6px" }} />
+                <label style={{ display: "flex", gap: 6, alignItems: "center", padding: "7px 12px", fontSize: 13 }}><input type="checkbox" checked={directed} disabled={!!constraints?.mustBeDirected} onChange={(e) => setDirected(e.target.checked)} /> 有向</label>
+                <div style={{ display: "flex", gap: 6, padding: "7px 12px" }}>{(["tree","circle","force","free"] as Layout[]).map((l) => <button key={l} className={`pill ${layout===l?"active":""}`} style={{ padding: "2px 8px", fontSize: 11 }} onClick={() => { setLayout(l); setMenu(null); }}>{l==="tree"?"树形":l==="circle"?"环形":l==="force"?"力导向":"自由"}</button>)}</div>
+              </>
+            )}
+          </div>
+        )}
+        {genOpen && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.45)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center" }} onPointerDown={(e) => { if (e.target===e.currentTarget) setGenOpen(false); }}>
+            <div style={{ background: "#fff", borderRadius: 14, padding: 16, width: 320 }} onPointerDown={(e) => e.stopPropagation()}>
+              <div style={{ fontWeight: 800, marginBottom: 12 }}>随机生成</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button className="pill active" style={{ padding: "6px 12px" }} onClick={() => { genRandom("tree"); setGenOpen(false); }}>树</button>
+                <button className="pill active" style={{ padding: "6px 12px" }} onClick={() => { genRandom("graph"); setGenOpen(false); }}>图</button>
+                <button className="pill active" style={{ padding: "6px 12px" }} onClick={() => { genRandom("dag"); setGenOpen(false); }}>DAG</button>
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}><button className="ghost" onClick={() => setGenOpen(false)}>关闭</button></div>
+            </div>
+          </div>
+        )}
+      </div>
+      {!embedded && (
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          {onCancel && <button className="ghost" style={{ padding: "8px 16px", fontSize: 13 }} onClick={onCancel}>取消</button>}
+          <button className="pill active" style={{ padding: "8px 16px", fontSize: 13 }} onClick={handleConfirm}>确认使用此图</button>
+        </div>
+      )}
+    </div>
+  );
+}

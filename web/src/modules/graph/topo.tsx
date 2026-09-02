@@ -176,6 +176,7 @@ export const graphTopoModule: ModuleDef<GraphCanvasScene, Cfg> = {
             cfg={config}
             onChange={(c) => onChange({ ...config, ...c })}
             t={t}
+            constraints={{ mustBeDirected: true, hint: isZh ? "拓扑排序需 DAG（有向无环）" : "Topo needs DAG" }}
           />
           {config.source === "random" && (
             <>

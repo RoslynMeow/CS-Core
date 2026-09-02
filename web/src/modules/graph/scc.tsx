@@ -100,7 +100,7 @@ export const graphSCCModule: ModuleDef<GraphCanvasScene, Cfg> = {
           <span style={{ fontSize: 11, color: "#64748b" }}>{isZh ? "仅有向图；颜色标记不同 SCC" : "directed only; colors = SCC ids"}</span>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-          <GraphSourcePanel cfg={config} onChange={(c) => onChange({ ...config, ...c })} t={t} />
+          <GraphSourcePanel cfg={config} onChange={(c) => onChange({ ...config, ...c })} t={t} constraints={{ mustBeDirected: true, hint: isZh ? "SCC 仅适用于有向图" : "SCC needs directed graph" }} />
           {config.source === "random" && (
             <>
               <label className="txt-label">{isZh ? "顶点数" : "V"}<input className="txt" type="number" min={2} max={16} value={config.n} onChange={(e) => onChange({ ...config, n: Math.max(2, Math.min(16, Number(e.target.value))) })} /></label>

@@ -16,6 +16,7 @@ import {
   loadGraphStudio,
   type ImportedGraph,
 } from "../tree/source";
+import { GraphEditorModal } from "../../components/GraphEditorModal";
 
 /** 图的来源：随机生成 或 从图创建导入（导入不要求树，任意图皆可） */
 export type GraphCfg = {
@@ -440,13 +441,16 @@ export function GraphSourcePanel({
   cfg,
   onChange,
   t,
+  constraints,
 }: {
   cfg: GraphCfg;
   onChange: (c: GraphCfg) => void;
   t: (x: Text) => string;
+  constraints?: { mustBeDirected?: boolean; mustBeTree?: boolean; hint?: string };
 }) {
   const isZh = t(T("中文", "en")) !== "en";
   const [err, setErr] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
   const importGraph = (confirm: boolean) => {
     const imp = loadGraph();
     if (!imp) {
@@ -463,8 +467,11 @@ export function GraphSourcePanel({
       <span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca", letterSpacing: ".04em" }}>
         {isZh ? "来源" : "SRC"}
       </span>
-      <button className="ghost" onClick={() => importGraph(true)} title={isZh ? "立即导入图创建里保存的图" : "Import saved graph now"}>
-        ⤓ {t(T("从图编辑中导入", "Import graph"))}
+      <button className="ghost" onClick={() => importGraph(false)} title={isZh ? "先虚影预览，点击画布再确认导入" : "Preview then click canvas to confirm"}>
+        ⤓ {t(T("从图创建导入", "Import graph"))}
+      </button>
+      <button className="ghost" onClick={() => setEditorOpen(true)} title={isZh ? "在当前页直接编辑图，无需跳转" : "Edit graph in place"}>
+        ✎ {t(T("在当前页编辑", "Edit here"))}
       </button>
       <button className="ghost" onClick={random} title={isZh ? "随机生成一张新图" : "Generate a random graph"}>
         ↻ {t(T("随机生成", "Randomize"))}
@@ -475,6 +482,16 @@ export function GraphSourcePanel({
         </span>
       )}
       {err && <span style={{ fontSize: 11, color: "#dc2626" }}>{err}</span>}
+      {editorOpen && (
+        <GraphEditorModal
+          open={editorOpen}
+          onClose={() => setEditorOpen(false)}
+          initialGraph={cfg.source === "graph" && cfg.imp ? cfg.imp : (() => { try { const raw = localStorage.getItem("graph-studio:last"); if (raw) { const s = JSON.parse(raw); return { n: s.n, spec: s.edgeSpec, labels: s.labels, directed: !!s.directed, root: s.root ?? 0, layout: s.layout, manual: s.manual }; } } catch {} return null; })()}
+          constraints={constraints}
+          onConfirm={(g) => onChange({ ...cfg, source: "graph", imp: g, confirmed: true })}
+          title={isZh ? "图编辑器 · 当前算法" : "Graph Editor"}
+        />
+      )}
     </div>
   );
 }

@@ -190,24 +190,25 @@ export function Stage({ mod }: { mod: ModuleDef }) {
               onInspect={(id) => setInspected(id ?? null)}
             />
           )}
+        </div>
+        <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10, minHeight: 0 }}>
           {pb.frame && (
-            <div className="caption">
+            <div className="caption" style={{ marginBottom: 4, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "8px 10px" }}>
               <MathText text={t(pb.frame.caption)} />
             </div>
           )}
+          {code.length > 0 && <Pseudocode code={code} active={pb.frame?.line} />}
+          {mod.Side && pb.frame && (
+            <mod.Side
+              scene={pb.frame.scene}
+              t={t}
+              config={config as never}
+              onChange={handleChange as never}
+              inspected={inspected as never}
+              onInspect={(id) => setInspected(id ?? null)}
+            />
+          )}
         </div>
-        {code.length > 0 ? (
-          <Pseudocode code={code} active={pb.frame?.line} />
-        ) : mod.Side && pb.frame ? (
-          <mod.Side
-            scene={pb.frame.scene}
-            t={t}
-            config={config as never}
-            onChange={handleChange as never}
-            inspected={inspected as never}
-            onInspect={(id) => setInspected(id ?? null)}
-          />
-        ) : null}
       </div>
     </div>
   );

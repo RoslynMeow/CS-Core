@@ -16,6 +16,7 @@ import {
   GraphCanvas,
   type GraphCanvasScene,
 } from "../../components/canvas/GraphCanvas";
+import { GraphEditorModal } from "../../components/GraphEditorModal";
 
 /** 从“图创建”页导入的快照（GraphStudio 持久化的图状态）
  *  layout / manual 在 GraphStudio 里可选（环形/树形/力导向/自由），
@@ -407,6 +408,7 @@ export function SourcePanel({
 }) {
   const isZh = t(T("中文", "en")) !== "en";
   const [err, setErr] = useState<string | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
   const importGraph = (confirm: boolean) => {
     const imp = loadGraphStudio();
     if (!imp) {
@@ -448,10 +450,17 @@ export function SourcePanel({
       </span>
       <button
         className="ghost"
-        onClick={() => importGraph(true)}
-        title={isZh ? "立即导入图创建里保存的图" : "Import saved graph now"}
+        onClick={() => importGraph(false)}
+        title={isZh ? "先虚影预览，点击画布再确认导入" : "Preview then click canvas to confirm"}
       >
-        ⤓ {t(T("从图编辑中导入", "Import graph"))}
+        ⤓ {t(T("从图创建导入", "Import graph"))}
+      </button>
+      <button
+        className="ghost"
+        onClick={() => setEditorOpen(true)}
+        title={isZh ? "在当前页直接编辑树/图，无需跳转" : "Edit graph in place"}
+      >
+        ✎ {t(T("在当前页编辑", "Edit here"))}
       </button>
       <button
         className="ghost"
@@ -471,6 +480,16 @@ export function SourcePanel({
         </span>
       )}
       {err && <span style={{ fontSize: 11, color: "#dc2626" }}>{err}</span>}
+      {editorOpen && (
+        <GraphEditorModal
+          open={editorOpen}
+          onClose={() => setEditorOpen(false)}
+          initialGraph={cfg.source === "graph" && cfg.imp ? cfg.imp : (() => { try { const raw = localStorage.getItem("graph-studio:last"); if (raw) { const s = JSON.parse(raw); return { n: s.n, spec: s.edgeSpec, labels: s.labels, directed: false, root: s.root ?? 0, layout: s.layout, manual: s.manual }; } } catch {} return null; })()}
+          constraints={{ mustBeTree: true, hint: isZh ? "树需 n-1 条边且无环；二叉树要求每节点 ≤2 子" : "Tree needs n-1 edges & acyclic; binary ≤2 children" }}
+          onConfirm={(g) => onChange({ ...cfg, source: "graph", imp: g, confirmed: true, work: null })}
+          title={isZh ? "树编辑器 · 当前算法" : "Tree Editor"}
+        />
+      )}
     </div>
   );
 }

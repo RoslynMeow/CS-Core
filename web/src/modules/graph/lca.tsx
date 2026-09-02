@@ -139,7 +139,7 @@ export const graphLCAModule: ModuleDef<GraphCanvasScene, Cfg> = {
           <span style={{ fontSize: 11, color: "#64748b" }}>{isZh ? "可点画布顶点切换" : "click vertex on canvas"}</span>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-          <GraphSourcePanel cfg={config} onChange={(c) => onChange({ ...config, ...c })} t={t} />
+          <GraphSourcePanel cfg={config} onChange={(c) => onChange({ ...config, ...c })} t={t} constraints={{ mustBeTree: true, hint: isZh ? "LCA 要求树（无环连通）" : "LCA needs a tree" }} />
           {config.source === "random" && (
             <>
               <label className="txt-label">{isZh ? "顶点数" : "V"}<input className="txt" type="number" min={2} max={20} value={config.n} onChange={(e) => onChange({ ...config, n: Math.max(2, Math.min(20, Number(e.target.value))) })} /></label>

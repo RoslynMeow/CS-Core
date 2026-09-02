@@ -99,11 +99,15 @@ a {
  cursor: pointer;
  font-weight: 600;
 }
-/* main */
+/* main — 90% 居中，左右各 5% */
 .main {
- max-width: 1440px;
+ width: 90%;
+ max-width: none;
  margin: 0 auto;
- padding: 20px 10px 40px;
+ padding: 20px 0 40px;
+}
+@media (max-width: 900px) {
+ .main { width: 100%; padding: 12px 10px 24px; }
 }
 /* header 内嵌搜索工具条（首页） */
 .hdr-toolbar {
@@ -239,13 +243,15 @@ a {
  border-radius: var(--radius);
  background: #fff;
 }
-/* stage template */
+/* stage template — 填满 main（main 已 90%） */
 .stage {
  background: var(--card);
  border: 1px solid var(--border);
  border-radius: 16px;
  box-shadow: var(--shadow);
  overflow: hidden;
+ width: 100%;
+ margin: 16px 0;
 }
 .stage-head {
  padding: 16px 16px 12px;
