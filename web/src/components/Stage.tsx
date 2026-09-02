@@ -124,9 +124,23 @@ export function Stage({ mod }: { mod: ModuleDef }) {
     if (pb.playing) return;
     setConfig(c as never);
   };
+  const [toast, setToast] = useState<string | null>(null);
+  useEffect(() => {
+    const err = (pb.frame?.scene as any)?.error as string | undefined;
+    if (err) {
+      setToast(err);
+      const id = setTimeout(() => setToast(null), 3000);
+      return () => clearTimeout(id);
+    } else setToast(null);
+  }, [pb.frame]);
 
   return (
-    <div className="stage">
+    <div className="stage" style={{ position: "relative" }}>
+      {toast && (
+        <div style={{ position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", background: "#92400e", color: "#fff", padding: "8px 16px", borderRadius: 999, fontSize: 13, fontWeight: 700, zIndex: 100, boxShadow: "0 8px 24px rgba(0,0,0,.2)", maxWidth: "90vw", textAlign: "center" }}>
+          ⚠ {toast}
+        </div>
+      )}
       <div className="stage-head">
         <h1 className="mod-title">{t(mod.title)}</h1>
         {mod.desc && (
@@ -187,6 +201,12 @@ export function Stage({ mod }: { mod: ModuleDef }) {
           )}
         </div>
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10, minHeight: 0 }}>
+          {(pb.frame?.scene as any)?.error && (
+            <div style={{ fontSize: 12, color: "#92400e", background: "#fffbeb", border: "1px solid #fde68a", padding: "8px 10px", borderRadius: 10, display: "flex", alignItems: "center", gap: 8 }}>
+              <span>⚠ {(pb.frame.scene as any).error}</span>
+              <button onClick={() => setToast(null)} style={{ marginLeft: "auto", background: "transparent", border: "none", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
+            </div>
+          )}
           {pb.frame && (
             <div className="caption" style={{ marginBottom: 4, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "8px 10px" }}>
               <MathText text={t(pb.frame.caption)} />

@@ -17,6 +17,8 @@ html,
 body {
  margin: 0;
  padding: 0;
+ height: 100%;
+ overflow: hidden;
 }
 body {
  font:
@@ -33,11 +35,22 @@ body {
 a {
  color: var(--primary);
 }
+.app {
+ min-height: 100dvh;
+ height: 100dvh;
+ display: flex;
+ flex-direction: column;
+ padding: 2px;
+ box-sizing: border-box;
+ overflow: hidden;
+}
+html, body {
+ height: 100%;
+ overflow: hidden;
+}
 /* header */
 .hdr {
- position: sticky;
- top: 0;
- z-index: 20;
+ flex-shrink: 0;
  display: flex;
  align-items: center;
  gap: 12px;
@@ -99,12 +112,19 @@ a {
  cursor: pointer;
  font-weight: 600;
 }
-/* main — 90% 居中，左右各 5% */
+/* main — 90% 居中，左右各 5%，占满 header 剩余视口 */
 .main {
  width: 90%;
  max-width: none;
+ flex: 1;
+ min-height: 0;
  margin: 0 auto;
- padding: 20px 0 40px;
+ padding: 2px 0;
+ box-sizing: border-box;
+ display: flex;
+ flex-direction: column;
+ gap: 8px;
+ overflow: auto;
 }
 @media (max-width: 900px) {
  .main { width: 100%; padding: 12px 10px 24px; }
@@ -521,3 +541,8 @@ a {
 .tree-beam {
  animation: treeBeamFlow 0.8s linear infinite;
 }
+
+/* fix: main height calc viewport minus nav */
+.stage { flex: 1; min-height: 0; display: flex; flex-direction: column; width: 100%; margin: 0; }
+.stage-body { flex: 1; min-height: 0; overflow: hidden; }
+

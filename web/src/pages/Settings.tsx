@@ -61,11 +61,8 @@ function ExperimentalZone() {
         <h3 style={{ margin: 0 }}>ExperimentalZone · 实验室</h3>
         <span style={{ fontSize: 11, color: '#6366f1', border: '1px solid #c7d2fe', borderRadius: 999, padding: '2px 8px', background: '#eef2ff' }}>Beta</span>
       </div>
-      <p style={{ color: '#64748b', margin: '6px 0 0', fontSize: 12 }}>实验性功能收纳 — 点击超链接进入独立页面</p>
-      <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <a href="#/graph" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 999, background: '#4f46e5', color: '#fff', fontWeight: 700, fontSize: 13, textDecoration: 'none' }}>图创建 · Graph Studio →</a>
-        <span style={{ fontSize: 12, color: '#94a3b8', alignSelf: 'center' }}>自由建图 / 拖拽 / 右键菜单 / 随机生成（独立页面）</span>
-      </div>
+      <p style={{ color: '#64748b', margin: '6px 0 0', fontSize: 12 }}>实验性功能收纳 — 图/树综合已内建编辑器，原独立图创建已整合移除</p>
+      <div style={{ marginTop: 12, fontSize: 12, color: '#94a3b8' }}>暂无独立实验页面，图/树编辑在各自综合章节内右键完成</div>
     </div>
   );
 }

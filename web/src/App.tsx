@@ -5,20 +5,17 @@ import { findModule, searchModules } from "./modules/registry";
 import { MathText } from "./lib/tex";
 import { Settings } from "./pages/Settings";
 import { MemoryVisualizer } from "./pages/MemoryVisualizer";
-import { GraphStudio } from "./pages/GraphStudio";
 
 type Route =
       | { kind: "home" }
       | { kind: "module"; id: string }
       | { kind: "settings" }
-      | { kind: "memory" }
-      | { kind: "graph" };
+      | { kind: "memory" };
 function getRoute(): Route {
       const h = location.hash;
       if (h.startsWith("#/settings") || h.startsWith("#/alphabet"))
             return { kind: "settings" };
       if (h.startsWith("#/memory")) return { kind: "memory" };
-      if (h.startsWith("#/graph")) return { kind: "graph" };
       const m = h.match(/^#\/module\/(.+)/);
       if (m) return { kind: "module", id: m[1] };
       return { kind: "home" };
@@ -82,13 +79,11 @@ export function App() {
                               设置
                         </button>
                   </header>
-                  <main className={route.kind === "graph" ? "main graph-fill" : "main"}>
+                  <main className="main">
                         {route.kind === "settings" ? (
                               <Settings />
                         ) : route.kind === "memory" ? (
                               <MemoryVisualizer />
-                        ) : route.kind === "graph" ? (
-                              <GraphStudio />
                         ) : mod ? (
                               <Stage mod={mod as never} />
                         ) : (

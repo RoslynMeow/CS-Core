@@ -372,7 +372,7 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8, height: "100%", minHeight: 0 }}>
       {title && !embedded && <div style={{ fontSize: 14, fontWeight: 800 }}>{title}</div>}
-      {constraints?.hint && <div style={{ fontSize: 11, color: "#b45309", background: "#fffbeb", border: "1px solid #fde68a", padding: "6px 10px", borderRadius: 8 }}>{constraints.hint}</div>}
+      {constraints?.hint && !embedded && <div style={{ fontSize: 11, color: "#b45309", background: "#fffbeb", border: "1px solid #fde68a", padding: "6px 10px", borderRadius: 8 }}>{constraints.hint}</div>}
       {!embedded && (
         <>
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", padding: "6px 10px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
