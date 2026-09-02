@@ -66,7 +66,8 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
   const [pending, setPending] = useState<number | null>(null);
   const [drag, setDrag] = useState<number | null>(null);
   const [manual, setManual] = useState<Record<number, { x: number; y: number }>>(init?.manual ?? {});
-  const [msg, setMsg] = useState("");
+  const [toast, setToast] = useState<string | null>(null);
+  const showToast = (s: string) => { setToast(s); setTimeout(() => setToast(null), 2000); };
   const [hover, setHover] = useState<{ x: number; y: number } | null>(null);
   const [hoverV, setHoverV] = useState<number | null>(null);
   const [view, setView] = useState({ tx: 0, ty: 0, s: 1 });
@@ -113,7 +114,7 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
     setHist((hh) => hh.slice(0, -1));
     setSelected(null);
     setPending(null);
-    setMsg("撤销");
+    showToast("撤销");
   };
   const redo = () => {
     const rs = histRef.current.redo;
@@ -124,7 +125,7 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
     setRedoStack((r) => r.slice(0, -1));
     setSelected(null);
     setPending(null);
-    setMsg("重做");
+    showToast("重做");
   };
 
   const g = useMemo(() => {
@@ -182,9 +183,9 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
     for (const e of g.edges) { const a = pos[e.u], b = pos[e.v]; if (!a||!b) continue; if (distToSeg(p.x,p.y,a.x,a.y,b.x,b.y) <= 8) return { u:e.u, v:e.v }; }
     return null;
   };
-  const removeEdge = (u:number,v:number) => { pushHistory(); const kept = g.edges.filter((e)=>{ const a=e.u===u&&e.v===v; const b=!g.directed&&e.u===v&&e.v===u; return !(a||b); }); setEdgeSpec(specFromEdges(kept)); setMsg(`取消边 ${g.labels[u]??u}—${g.labels[v]??v}`); };
-  const setEdgeWeight = (u:number,v:number,w:number) => { pushHistory(); const gg = new Graph(n, { directed: g.directed, labels: [...labels] }); gg.fromSpec(edgeSpec); gg.setWeight(u,v,w); setEdgeSpec(specFromEdges(gg.edges)); setMsg(`权重 ${w}`); };
-  const menuReset = () => { setManual({}); setView({ tx:0, ty:0, s:1 }); setMsg("重置布局"); };
+  const removeEdge = (u:number,v:number) => { pushHistory(); const kept = g.edges.filter((e)=>{ const a=e.u===u&&e.v===v; const b=!g.directed&&e.u===v&&e.v===u; return !(a||b); }); setEdgeSpec(specFromEdges(kept)); showToast(`取消边 ${g.labels[u]??u}—${g.labels[v]??v}`); };
+  const setEdgeWeight = (u:number,v:number,w:number) => { pushHistory(); const gg = new Graph(n, { directed: g.directed, labels: [...labels] }); gg.fromSpec(edgeSpec); gg.setWeight(u,v,w); setEdgeSpec(specFromEdges(gg.edges)); showToast(`权重 ${w}`); };
+  const menuReset = () => { setManual({}); setView({ tx:0, ty:0, s:1 }); showToast("重置布局"); };
 
   const removeVertex = (v: number) => {
     pushHistory();
@@ -202,7 +203,7 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
       return nm;
     });
     setSelected(null);
-    setMsg(`删除顶点 ${g.labels[v] ?? v}`);
+    showToast(`删除顶点 ${g.labels[v] ?? v}`);
   };
   const addVertexAt = (p: { x: number; y: number }) => {
     pushHistory();
@@ -210,7 +211,7 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
     setManual((m) => ({ ...m, [g.n]: p }));
     setLabels((ls) => [...ls, String.fromCharCode(65 + (ls.length % 26))]);
     setSelected(g.n);
-    setMsg(`新建顶点 ${g.labels[g.n] ?? g.n}`);
+    showToast(`新建顶点 ${g.labels[g.n] ?? g.n}`);
   };
   const link = (a: number, b: number) => {
     pushHistory();
@@ -219,7 +220,7 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
     setPending(null);
     setSelected(null);
     setTool("move");
-    setMsg(exists ? "边已存在" : `连线 ${g.labels[a] ?? a}—${g.labels[b] ?? b}`);
+    showToast(exists ? "边已存在" : `连线 ${g.labels[a] ?? a}—${g.labels[b] ?? b}`);
   };
 
   const onPointerDown = (e: React.PointerEvent) => {
@@ -243,10 +244,10 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
         if (pending === null) {
           setPending(v);
           setSelected(v);
-          setMsg(`起点 ${g.labels[v] ?? v}，再点第二个顶点`);
+          showToast(`起点 ${g.labels[v] ?? v}，再点第二个顶点`);
         } else if (pending === v) {
           setPending(null);
-          setMsg("");
+          showToast("");
         } else link(pending, v);
       }
       return;
@@ -257,7 +258,7 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
           setPending(v);
           setSelected(v);
           setTool("addEdge");
-          setMsg(`起点 ${g.labels[v] ?? v}，再点第二个顶点`);
+          showToast(`起点 ${g.labels[v] ?? v}，再点第二个顶点`);
         } else link(pending, v);
         return;
       }
@@ -332,7 +333,7 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
     }
     pushHistory();
     setN(gg.n); setLabels([...gg.labels]); setEdgeSpec(specFromEdges(gg.edges)); setManual({}); setDirected(gg.directed); setLayout(ly); setRoot(0); setSelected(null); setPending(null);
-    setMsg(`已随机生成：${GEN_TYPE_LABEL[cfg.type]}（${gg.n} 顶点 · ${gg.edges.length} 边）`);
+    showToast(`已随机生成：${GEN_TYPE_LABEL[cfg.type]}（${gg.n} 顶点 · ${gg.edges.length} 边）`);
   };
   const genRandom = (type: GenType) => genGraph({ type, n, p: 0.25, directed, alpha: true, weighted: "none", skewRandom: true, connected: true, k: 3 });
 
@@ -348,11 +349,11 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
     };
     // 校验
     if (constraints?.mustBeTree && !g.isTree()) {
-      setMsg("当前图不是树（需 n-1 条边且无环）");
+      showToast("当前图不是树（需 n-1 条边且无环）");
       return;
     }
     if (g.n === 0) {
-      setMsg("图不能为空");
+      showToast("图不能为空");
       return;
     }
     onConfirm(out);
@@ -392,7 +393,7 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
               <option value="force">力导向</option>
               <option value="free">自由</option>
             </select>
-            <button className="ghost" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => { pushHistory(); setEdgeSpec(""); setMsg("已清空边"); }}>清空边</button>
+            <button className="ghost" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => { pushHistory(); setEdgeSpec(""); showToast("已清空边"); }}>清空边</button>
             <button className="ghost" style={{ padding: "4px 10px", fontSize: 12 }} onClick={menuReset}>重置布局</button>
             <span style={{ marginLeft: "auto", fontSize: 12, color: "#475569" }}>{g.n} 顶点 · {g.edges.length} 边 {g.isTree() ? "· 树" : g.isForest() ? "· 森林" : g.hasCycle() ? "· 含环" : ""}</span>
           </div>
@@ -405,11 +406,11 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
               <button className="ghost" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => genRandom("graph")}>随机图</button>
               <button className="ghost" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => genRandom("dag")}>随机DAG</button>
             </div>
-            {msg && <span style={{ fontSize: 11, color: "#059669" }}>{msg}</span>}
+
           </div>
         </>
       )}
-      {embedded && msg && <div style={{ fontSize: 11, color: "#059669", textAlign: "center" }}>{msg}</div>}
+
       <div style={{ flex: 1, minHeight: 320, border: "1px solid #c7d2fe", borderRadius: 12, overflow: "hidden", background: "#fff", position: "relative" }}>
         <svg
           ref={svgRef}
@@ -474,6 +475,11 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
             );
           })}
         </svg>
+        {toast && (
+          <div style={{ position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)", background: "#059669", color: "#fff", padding: "6px 14px", borderRadius: 999, fontSize: 12, fontWeight: 700, zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,.15)", pointerEvents: "none" }}>
+            {toast}
+          </div>
+        )}
         {editing !== null && pos[editing] && (() => {
           const sp = worldToSvg(pos[editing]);
           return (
@@ -495,10 +501,10 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
             {menu.target !== null ? (
               <>
                 <div style={{ padding: "6px 12px", fontSize: 11, fontWeight: 800, color: "#64748b" }}>顶点 {g.labels[menu.target]}</div>
-                {embedded && onPickVertex && <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer", color: "#4f46e5", fontWeight: 700 }} onClick={() => { onPickVertex(menu.target!); setMsg(`已选 ${g.labels[menu.target!]}`); setMenu(null); }}>★ 选择此点</div>}
+                {embedded && onPickVertex && <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer", color: "#4f46e5", fontWeight: 700 }} onClick={() => { onPickVertex(menu.target!); showToast(`已选 ${g.labels[menu.target!]}`); setMenu(null); }}>★ 选择此点</div>}
                 <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer" }} onClick={() => { setEditing(menu.target!); setEditVal(g.labels[menu.target!] ?? String(menu.target)); setMenu(null); }}>重命名</div>
-                {!embedded && <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer" }} onClick={() => { setRoot(menu.target!); setMsg(`根设为 ${g.labels[menu.target!]}`); setMenu(null); }}>设为根</div>}
-                <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer" }} onClick={() => { setPending(menu.target!); setSelected(menu.target!); setTool("addEdge"); setMsg(`起点 ${g.labels[menu.target!]}`); setMenu(null); }}>从此连线</div>
+                {!embedded && <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer" }} onClick={() => { setRoot(menu.target!); showToast(`根设为 ${g.labels[menu.target!]}`); setMenu(null); }}>设为根</div>}
+                <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer" }} onClick={() => { setPending(menu.target!); setSelected(menu.target!); setTool("addEdge"); showToast(`起点 ${g.labels[menu.target!]}`); setMenu(null); }}>从此连线</div>
                 <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer", color: "#dc2626" }} onClick={() => { removeVertex(menu.target!); setMenu(null); }}>删除顶点</div>
               </>
             ) : menu.edge ? (

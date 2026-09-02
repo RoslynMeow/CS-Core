@@ -398,6 +398,7 @@ export const graphUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
     const sceneTone = (scene as any).tone as Record<number, number> | undefined;
     const mergedTone = { ...pickTone, ...(sceneTone ?? {}) };
     const highlight = { current: (scene as any).current ?? null, visited: (scene as any).visited ?? [], frontier: (scene as any).frontier ?? [], edge: (scene as any).edge ?? null, tone: mergedTone };
+    const [memOpen, setMemOpen] = useState(false);
     const onPickVertex = (id: number) => {
       const pick = cfg.pick ?? "root";
       if (cfg.subMode === "astar") {
@@ -414,24 +415,28 @@ export const graphUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
       }
     };
     return (
-      <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
-        <SplitPane
-          top={
-            <div style={{ flex: 1, minHeight: 0, border: "1px solid #c7d2fe", borderRadius: 12, overflow: "hidden", background: "#fff", display: "flex", flexDirection: "column" }}>
-              <GraphEditor
-                key={`editor-${cfg.subMode}-${currentImp?.n ?? 0}-${currentImp?.spec ?? ""}`}
-                initialGraph={currentImp}
-                constraints={constraintsFor(cfg.subMode, isZh)}
-                highlight={highlight}
-                embedded
-                onPickVertex={onPickVertex}
-                onConfirm={(g) => onChange?.({ ...cfg, imp: g, source: "graph", confirmed: true } as unknown as Cfg)}
-                title={isZh ? "图编辑器 · 点选即设参（高亮）· 右键菜单" : "Graph Editor · click to pick"}
-              />
-            </div>
-          }
-          bottom={<LeftMemoryPanel g={gForMem} isZh={isZh} />}
-        />
+      <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, position: "relative" }}>
+        <div style={{ flex: memOpen ? "0 0 50%" : "1", minHeight: 0, border: "1px solid #c7d2fe", borderRadius: 12, overflow: "hidden", background: "#fff", display: "flex", flexDirection: "column" }}>
+          <GraphEditor
+            key={`editor-${cfg.subMode}-${currentImp?.n ?? 0}-${currentImp?.spec ?? ""}`}
+            initialGraph={currentImp}
+            constraints={constraintsFor(cfg.subMode, isZh)}
+            highlight={highlight}
+            embedded
+            onPickVertex={onPickVertex}
+            onConfirm={(g) => onChange?.({ ...cfg, imp: g, source: "graph", confirmed: true } as unknown as Cfg)}
+            title={isZh ? "图编辑器 · 点选即设参（高亮）· 右键菜单" : "Graph Editor · click to pick"}
+          />
+        </div>
+        <div onClick={() => setMemOpen(!memOpen)} style={{ height: 28, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#eef2ff", border: "1px solid #c7d2fe", borderRadius: 8, cursor: "pointer", marginTop: 6 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: "#4338ca" }}>{memOpen ? (isZh ? "收起内存表示 ▾" : "Hide Memory ▾") : (isZh ? "展开内存表示 ▸" : "Show Memory ▸")}</span>
+          <span style={{ fontSize: 10, color: "#64748b", marginLeft: 6 }}>{memOpen ? (isZh ? "占画布 50%" : "50%") : (isZh ? "默认折叠" : "collapsed")}</span>
+        </div>
+        {memOpen && (
+          <div style={{ height: "50%", minHeight: 0, border: "1px solid #c7d2fe", borderRadius: 12, overflow: "hidden", background: "#fff", display: "flex", flexDirection: "column", marginTop: 6 }}>
+            <LeftMemoryPanel g={gForMem} isZh={isZh} />
+          </div>
+        )}
       </div>
     );
   },
