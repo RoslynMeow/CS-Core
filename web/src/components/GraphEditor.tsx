@@ -81,7 +81,8 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
   const histRef = useRef({ hist: [] as GraphSnap[], redo: [] as GraphSnap[] });
   histRef.current = { hist, redo: redoStack };
   const svgRef = useRef<SVGSVGElement>(null);
-  const [menu, setMenu] = useState<{ x: number; y: number; sx: number; sy: number; target: number | null; edge: { u: number; v: number } | null } | null>(null);
+  const [menu, setMenu] = useState<{ x: number; y: number; sx: number; sy: number; target: number | null; edge: { u: number; v: number } | null; edgeList: { u: number; v: number }[] } | null>(null);
+  const [edgeChoice, setEdgeChoice] = useState(0);
   const [genOpen, setGenOpen] = useState(false);
 
   // 约束：强制有向/树时锁定
@@ -179,10 +180,13 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
     const dx = bx - ax, dy = by - ay; const L2 = dx*dx+dy*dy; if (L2===0) return Math.hypot(px-ax, py-ay);
     let t = ((px-ax)*dx + (py-ay)*dy)/L2; t = Math.max(0, Math.min(1,t)); return Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
   };
-  const hitEdge = (p: { x:number; y:number }): { u:number; v:number } | null => {
-    for (const e of g.edges) { const a = pos[e.u], b = pos[e.v]; if (!a||!b) continue; if (distToSeg(p.x,p.y,a.x,a.y,b.x,b.y) <= 8) return { u:e.u, v:e.v }; }
-    return null;
+  const hitEdges = (p: { x:number; y:number }): { u:number; v:number }[] => {
+    const out: { u:number; v:number }[] = [];
+    for (const e of g.edges) { const a = pos[e.u], b = pos[e.v]; if (!a||!b) continue; if (distToSeg(p.x,p.y,a.x,a.y,b.x,b.y) <= 8) { if (!out.some((o)=>o.u===e.u&&o.v===e.v)) out.push({ u:e.u, v:e.v }); } }
+    return out;
   };
+  const hitEdge = (p: { x:number; y:number }): { u:number; v:number } | null => hitEdges(p)[0] ?? null;
+  const findEdge = (u:number,v:number) => g.edges.find((e)=>(e.u===u&&e.v===v)||(!g.directed&&e.u===v&&e.v===u));
   const removeEdge = (u:number,v:number) => { pushHistory(); const kept = g.edges.filter((e)=>{ const a=e.u===u&&e.v===v; const b=!g.directed&&e.u===v&&e.v===u; return !(a||b); }); setEdgeSpec(specFromEdges(kept)); showToast(`取消边 ${g.labels[u]??u}—${g.labels[v]??v}`); };
   const setEdgeWeight = (u:number,v:number,w:number) => { pushHistory(); const gg = new Graph(n, { directed: g.directed, labels: [...labels] }); gg.fromSpec(edgeSpec); gg.setWeight(u,v,w); setEdgeSpec(specFromEdges(gg.edges)); showToast(`权重 ${w}`); };
   const menuReset = () => { setManual({}); setView({ tx:0, ty:0, s:1 }); showToast("重置布局"); };
@@ -424,10 +428,12 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
             e.preventDefault();
             const p = svgToWorld(svgPoint(e));
             const v = hitVertex(p);
-            const ed = v === null ? hitEdge(p) : null;
+            const eds = v === null ? hitEdges(p) : [];
+            const ed = eds[0] ?? null;
             if (v !== null) setSelected(v);
             if (embedded) {
-              setMenu({ x: e.clientX, y: e.clientY, sx: p.x, sy: p.y, target: v, edge: ed });
+              setEdgeChoice(0);
+              setMenu({ x: e.clientX, y: e.clientY, sx: p.x, sy: p.y, target: v, edge: ed, edgeList: eds });
             } else {
               if (v !== null) { setEditing(v); setEditVal(g.labels[v] ?? String(v)); }
             }
@@ -508,11 +514,27 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
                 <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer", color: "#dc2626" }} onClick={() => { removeVertex(menu.target!); setMenu(null); }}>删除顶点</div>
               </>
             ) : menu.edge ? (
-              <>
-                <div style={{ padding: "6px 12px", fontSize: 11, fontWeight: 800, color: "#64748b" }}>边 {g.labels[menu.edge.u]} — {g.labels[menu.edge.v]}</div>
-                <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer" }} onClick={() => { const w = prompt("权重:", String(g.edges.find((e) => (e.u===menu.edge!.u&&e.v===menu.edge!.v)||(!g.directed&&e.u===menu.edge!.v&&e.v===menu.edge!.u))?.weight ?? 1)); if (w!==null) { const nw = Math.trunc(Number(w)); if (Number.isFinite(nw)&&nw>0) setEdgeWeight(menu.edge!.u, menu.edge!.v, nw); } setMenu(null); }}>修改权重</div>
-                <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer", color: "#dc2626" }} onClick={() => { removeEdge(menu.edge!.u, menu.edge!.v); setMenu(null); }}>删除边</div>
-              </>
+              (() => {
+                const choices = menu.edgeList.length > 0 ? menu.edgeList : [menu.edge];
+                const cur = choices[Math.min(edgeChoice, choices.length - 1)];
+                return (
+                  <>
+                    <div style={{ padding: "6px 12px", fontSize: 11, fontWeight: 800, color: "#64748b" }}>边 {g.labels[cur.u]} {g.directed ? "→" : "—"} {g.labels[cur.v]}（权 {findEdge(cur.u, cur.v)?.weight ?? 1}）</div>
+                    {choices.length > 1 && (
+                      <div style={{ padding: "4px 12px 7px" }}>
+                        <select className="txt" value={Math.min(edgeChoice, choices.length - 1)} onChange={(e) => setEdgeChoice(Number(e.target.value))} style={{ width: "100%", fontSize: 13 }}>
+                          {choices.map((c, i) => (
+                            <option key={`${c.u}-${c.v}-${i}`} value={i}>{g.labels[c.u]} {g.directed ? "→" : "—"} {g.labels[c.v]}（权 {findEdge(c.u, c.v)?.weight ?? 1}）</option>
+                          ))}
+                        </select>
+                        <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>此处有多条重合边，请先选一条</div>
+                      </div>
+                    )}
+                    <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer" }} onClick={() => { const w = prompt("权重:", String(findEdge(cur.u, cur.v)?.weight ?? 1)); if (w !== null) { const nw = Math.trunc(Number(w)); if (Number.isFinite(nw) && nw > 0) setEdgeWeight(cur.u, cur.v, nw); } setMenu(null); }}>修改权重</div>
+                    <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer", color: "#dc2626" }} onClick={() => { removeEdge(cur.u, cur.v); setMenu(null); }}>删除边</div>
+                  </>
+                );
+              })()
             ) : (
               <>
                 <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer" }} onClick={() => { const p = { x: menu.sx, y: menu.sy }; const nn = g.n + 1; pushHistory(); setN(nn); setManual((m) => ({ ...m, [g.n]: p })); setLabels((ls) => [...ls, String.fromCharCode(65 + (ls.length % 26))]); setMenu(null); }}>新建顶点</div>
