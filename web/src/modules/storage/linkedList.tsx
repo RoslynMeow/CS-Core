@@ -182,7 +182,18 @@ export const linkedListModule: ModuleDef<Scene, Cfg> = {
   },
   codeFor(cfg) { return CODE[cfg.op] as never; },
   generate: gen,
-  Render({ scene }) {
+  Render({ scene: _scene }) {
+    // 防错位：切 subMode 后首帧可能仍是旧模块的 scene，先兜底再渲染
+    const scene = ((_scene as any) ?? {}) as Scene;
+    scene.nodes = Array.isArray(scene.nodes)
+      ? (scene.nodes as any[]).filter((n) => n && typeof n.addr === "number" && Array.isArray(n.bytes))
+      : [];
+    scene.head = scene.head ?? null;
+    scene.focus = scene.focus ?? null;
+    scene.heapBase = Number.isFinite(scene.heapBase) ? scene.heapBase : 0;
+    scene.elemSize = Number.isFinite(scene.elemSize) ? scene.elemSize : 4;
+    scene.ptrSize = Number.isFinite(scene.ptrSize) ? scene.ptrSize : 4;
+    scene.nodeSize = Number.isFinite(scene.nodeSize) ? scene.nodeSize : scene.elemSize + scene.ptrSize;
     const empty = scene.nodes.length === 0;
     // 竖向排列：head 在上，逐节点向下，箭头用 ↓，避免横向滚动
     return (

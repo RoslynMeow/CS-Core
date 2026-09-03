@@ -211,7 +211,19 @@ export const matrixModule: ModuleDef<Scene, Cfg> = {
   },
   codeFor(cfg) { return CODE[cfg.op] as never; },
   generate: gen,
-  Render({ scene }) {
+  Render({ scene: _scene }) {
+    // 防错位：切 subMode 后首帧可能仍是旧模块的 scene，先兜底再渲染
+    const scene = ((_scene as any) ?? {}) as Scene;
+    scene.inited = !!scene.inited;
+    scene.rows = Number.isFinite(scene.rows) ? scene.rows : 0;
+    scene.cols = Number.isFinite(scene.cols) ? scene.cols : 0;
+    scene.order = (scene.order === 'row' || scene.order === 'col' ? scene.order : 'row') as Scene['order'];
+    scene.cells = Array.isArray(scene.cells) ? scene.cells : [];
+    scene.base = Number.isFinite(scene.base) ? scene.base : 0;
+    scene.total = Number.isFinite(scene.total) ? scene.total : 0;
+    scene.elemSize = Number.isFinite(scene.elemSize) ? scene.elemSize : 4;
+    scene.used = Number.isFinite(scene.used) ? scene.used : 0;
+    scene.focus = scene.focus && Number.isFinite(scene.focus.i) && Number.isFinite(scene.focus.j) ? scene.focus : null;
     const { rows: R, cols: C, order } = scene;
     if (!scene.inited) {
       return (

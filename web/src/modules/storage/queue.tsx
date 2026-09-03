@@ -221,7 +221,23 @@ export const queueModule: ModuleDef<Scene, Cfg> = {
   },
   codeFor(cfg) { return CODE[cfg.op] as never; },
   generate: gen,
-  Render({ scene }) {
+  Render({ scene: _scene }) {
+    // 防错位：切 subMode 后首帧可能仍是旧模块的 scene，先兜底再渲染
+    const scene = ((_scene as any) ?? {}) as Scene;
+    scene.cells = Array.isArray(scene.cells) ? scene.cells : [];
+    scene.nodes = Array.isArray(scene.nodes)
+      ? (scene.nodes as any[]).filter((n) => n && typeof n.addr === "number")
+      : [];
+    scene.capacity = Number.isFinite(scene.capacity) ? scene.capacity : Math.max(scene.cells.length, 1);
+    scene.base = Number.isFinite(scene.base) ? scene.base : 0;
+    scene.elemSize = Number.isFinite(scene.elemSize) ? scene.elemSize : 4;
+    scene.front = Number.isFinite(scene.front) ? scene.front : 0;
+    scene.rear = Number.isFinite(scene.rear) ? scene.rear : 0;
+    scene.frontAddr = scene.frontAddr ?? null;
+    scene.rearAddr = scene.rearAddr ?? null;
+    scene.head = scene.head ?? null;
+    scene.tail = scene.tail ?? null;
+    scene.inited = !!scene.inited;
     const arrayMode = scene.impl === 'array';
     if (arrayMode && !scene.inited) {
       return <div style={{ padding: '10px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, fontSize: 13, color: '#b91c1c', textAlign: 'center' }}>未初始化 — 设置容量后点「初始化」；只有清空后才能重新初始化大小。</div> as unknown as never;

@@ -301,7 +301,17 @@ export const sequentialListModule: ModuleDef<Scene, Cfg> = {
   },
   codeFor(cfg) { return CODE[cfg.op] as never; },
   generate: gen,
-  Render({ scene }) {
+  Render({ scene: _scene }) {
+    // 防错位：切 subMode 后首帧可能仍是旧模块的 scene，先兜底再渲染
+    const scene = ((_scene as any) ?? {}) as Scene;
+    scene.inited = !!scene.inited;
+    scene.cells = Array.isArray(scene.cells) ? scene.cells : [];
+    scene.capacity = Number.isFinite(scene.capacity) ? scene.capacity : Math.max(scene.cells.length, 1);
+    scene.used = Number.isFinite(scene.used) ? scene.used : 0;
+    scene.base = Number.isFinite(scene.base) ? scene.base : 0;
+    scene.total = Number.isFinite(scene.total) ? scene.total : 0;
+    scene.elemSize = Number.isFinite(scene.elemSize) ? scene.elemSize : 4;
+    scene.focus = scene.focus ?? null;
     if (!scene.inited) {
       return (
         <div style={{ display: 'grid', gap: 10 }}>

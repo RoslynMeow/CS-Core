@@ -148,7 +148,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
 export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
   id: "tree",
   title: T("树", "Tree"),
-  desc: T("通用/遍历/BST/AVL/堆/红黑/B/B+", "General / Traverse / BST / AVL / Heap / RB / B-Tree"),
+  desc: T("通用 / 遍历 / BST / AVL / 堆 / 红黑 / B / B+", "General / Traverse / BST / AVL / Heap / RB / B-Tree"),
   tags: ["data-structures"],
   defaultConfig: DEFAULT,
   Controls({ config, onChange, t }) {

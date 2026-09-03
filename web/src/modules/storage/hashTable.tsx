@@ -284,7 +284,20 @@ export const hashTableModule: ModuleDef<Scene, Cfg> = {
   },
   codeFor(cfg) { return CODE[cfg.op] as never; },
   generate: gen,
-  Render({ scene }) {
+  Render({ scene: _scene }) {
+    // 防错位：切 subMode 后首帧可能仍是旧模块的 scene，先兜底再渲染
+    const scene = ((_scene as any) ?? {}) as Scene;
+    scene.inited = !!scene.inited;
+    scene.method = (scene.method === 'division' || scene.method === 'multiplication' || scene.method === 'midsquare')
+      ? scene.method
+      : ('division' as Scene['method']);
+    scene.bucketM = Number.isFinite(scene.bucketM) ? scene.bucketM : 10;
+    scene.nodes = Array.isArray(scene.nodes) ? scene.nodes : [];
+    scene.buckets = Array.isArray(scene.buckets) ? scene.buckets : [];
+    scene.bucketHeads = Array.isArray(scene.bucketHeads) ? scene.bucketHeads : [];
+    scene.tableAddr = Number.isFinite(scene.tableAddr) ? scene.tableAddr : 0;
+    scene.focusH = scene.focusH ?? null;
+    scene.focusKey = scene.focusKey ?? null;
     if (!scene.inited) {
       return <div style={{ padding: '10px 12px', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, fontSize: 13, color: '#b91c1c', textAlign: 'center' }}>未初始化 — 设置桶数与散列方法后点「初始化」；节点随后自动增长，只有清空后才能改桶数。</div> as unknown as never;
     }

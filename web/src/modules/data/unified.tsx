@@ -72,7 +72,7 @@ function safeCfg(sub: unknown, config: Cfg): Cfg {
 export const dataUnifiedModule: ModuleDef<any, Cfg> = {
   id: "data-representation",
   title: T("数据的表示", "Data Representation"),
-  desc: T("位权/展开/后继/加法/进制转换/无符号/补码/IEEE754/字符编码/字符串", "Positional / unsigned / twos-comp / IEEE754 / encoding / string"),
+  desc: T("位权 / 展开 / 后继 / 加法 / 进制转换 / 无符号 / 补码 / IEEE754 / 字符编码 / 字符串", "Positional / unsigned / twos-comp / IEEE754 / encoding / string"),
   tags: ["computer-organization"],
   defaultConfig: DEFAULT,
   randomize(c) {
