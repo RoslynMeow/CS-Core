@@ -41,8 +41,8 @@ const DEFAULT: Cfg = { subMode: "sequential-list", ...(sequentialListModule as a
 
 export const storageUnifiedModule: ModuleDef<any, Cfg> = {
   id: "storage",
-  title: T("存储结构 · 综合", "Storage · Comprehensive"),
-  desc: T("一站式存储：顺序表/链表(单/循环/双向)/栈/队列/哈希/矩阵，下拉切换", "All-in-one storage"),
+  title: T("存储结构", "Storage"),
+  desc: T("顺序表/链表(单/循环/双向)/栈/队列/哈希/矩阵", "SeqList / Linked / Stack / Queue / Hash / Matrix"),
   tags: ["data-structures"],
   defaultConfig: DEFAULT,
   randomize(c) {

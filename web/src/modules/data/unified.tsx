@@ -28,9 +28,6 @@ const MAP: Record<SubMode, ModuleDef> = {
 const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
   { label: "位置制", opts: [
     { v: "positional-system", zh: "位权", en: "Positional" },
-    { v: "positional-expansion", zh: "展开", en: "Expansion" },
-    { v: "positional-successor", zh: "后继", en: "Successor" },
-    { v: "positional-addition", zh: "加法", en: "Addition" },
     { v: "base-conversion", zh: "进制转换", en: "BaseConv" },
   ]},
   { label: "数值", opts: [
@@ -47,28 +44,57 @@ const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[
 type Cfg = { subMode: SubMode; [k: string]: any };
 const DEFAULT: Cfg = { subMode: "positional-system", ...(positionalCoreModule as any).defaultConfig };
 
+// 兜底：历史存档可能缺 subMode 或缺子模块字段（旧版“清空”曾丢 subMode）。
+// 未知 subMode 回退到位权，缺失字段用子模块默认值补齐，保证页面永不白屏。
+function activeOf(sub: unknown): ModuleDef {
+  return ((MAP as Record<string, ModuleDef>)[sub as string] ?? positionalCoreModule) as unknown as ModuleDef;
+}
+function subKeyOf(sub: unknown): SubMode {
+  return (MAP as Record<string, ModuleDef>)[sub as string] ? (sub as SubMode) : "positional-system";
+}
+function safeCfg(sub: unknown, config: Cfg): Cfg {
+  const m = activeOf(sub) as any;
+  const d = ((m.defaultConfig as any) ?? {}) as any;
+  const out = { ...d, ...(config as any), subMode: subKeyOf(sub) } as Cfg;
+  // 陈旧 mode（如别模块残留的 successor/encode）会取不到伪代码甚至走错分支；探测失败则回退本模块默认 mode
+  if (typeof d.mode === "string" && typeof out.mode === "string" && out.mode !== d.mode && m.codeFor) {
+    let ok = true;
+    try {
+      if (m.codeFor(out) == null) ok = false;
+    } catch {
+      ok = false;
+    }
+    if (!ok) out.mode = d.mode;
+  }
+  return out;
+}
+
 export const dataUnifiedModule: ModuleDef<any, Cfg> = {
   id: "data-representation",
-  title: T("数据的表示 · 综合", "Data Representation · Comprehensive"),
-  desc: T("一站式数据的表示：位权/展开/后继/加法/进制转换/无符号/补码/IEEE754/字符编码/字符串，下拉切换", "All-in-one data representation"),
+  title: T("数据的表示", "Data Representation"),
+  desc: T("位权/展开/后继/加法/进制转换/无符号/补码/IEEE754/字符编码/字符串", "Positional / unsigned / twos-comp / IEEE754 / encoding / string"),
   tags: ["computer-organization"],
   defaultConfig: DEFAULT,
   randomize(c) {
-    const m = MAP[c.subMode] as any;
-    return m.randomize ? { ...c, ...m.randomize(c) } : c;
+    const safe = safeCfg(c.subMode, c);
+    const m = activeOf(c.subMode) as any;
+    if (!m.randomize) return safe;
+    return { ...safe, ...m.randomize(safe), subMode: safe.subMode };
   },
   onPlayEnd: ((cfg: Cfg) => {
-    const m = MAP[cfg.subMode] as any;
-    return m.onPlayEnd ? m.onPlayEnd(cfg) : null;
+    const m = activeOf(cfg.subMode) as any;
+    return m.onPlayEnd ? m.onPlayEnd(safeCfg(cfg.subMode, cfg)) : null;
   }) as any,
   Controls({ config, onChange, t }) {
     const isZh = t(T("中文", "en")) !== "en";
-    const active = MAP[config.subMode] as any;
+    const sub = subKeyOf(config.subMode);
+    const active = activeOf(sub) as any;
+    const safe = safeCfg(sub, config);
     return (
       <div style={{ display: "grid", gap: 8, width: "100%" }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
           <span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca" }}>数据的表示</span>
-          <select className="txt" value={config.subMode} onChange={(e) => { const m = MAP[e.target.value as SubMode] as any; onChange({ ...config, ...(m.defaultConfig as any), subMode: e.target.value as SubMode } as any); }} style={{ minWidth: 200, fontWeight: 700 }}>
+          <select className="txt" value={sub} onChange={(e) => { const key = subKeyOf(e.target.value); const m = activeOf(key) as any; onChange({ ...config, ...((m.defaultConfig as any) ?? {}), subMode: key } as any); }} style={{ minWidth: 200, fontWeight: 700 }}>
             {GROUPS.map((g) => (
               <optgroup key={g.label} label={g.label}>
                 {g.opts.map((o) => <option key={o.v} value={o.v}>{isZh ? o.zh : o.en}</option>)}
@@ -77,24 +103,29 @@ export const dataUnifiedModule: ModuleDef<any, Cfg> = {
           </select>
           <span style={{ fontSize: 11, color: "#64748b" }}>{isZh ? "一章覆盖全部数据的表示" : "one chapter"}</span>
         </div>
-        {active?.Controls && createElement(active.Controls as any, { config: config as any, onChange: onChange as any, t })}
+        {active?.Controls && createElement(active.Controls as any, { config: safe as any, onChange: onChange as any, t })}
       </div>
     ) as unknown as never;
   },
   codeFor(cfg) {
-    const m = MAP[(cfg as Cfg).subMode] as any;
-    return m.codeFor ? m.codeFor(cfg) : m.code ?? [];
+    const safe = safeCfg((cfg as Cfg).subMode, cfg as Cfg);
+    const m = activeOf((cfg as Cfg).subMode) as any;
+    const r = m.codeFor ? m.codeFor(safe) : m.code;
+    return r ?? [];
   },
   generate(config) {
-    const m = MAP[(config as Cfg).subMode] as any;
-    return m.generate(config);
+    const safe = safeCfg((config as Cfg).subMode, config as Cfg);
+    const m = activeOf((config as Cfg).subMode) as any;
+    return m.generate(safe);
   },
   Render(props) {
-    const m = MAP[(props.config as Cfg).subMode] as any;
-    return createElement(m.Render as any, props as any);
+    const safe = safeCfg((props.config as Cfg).subMode, props.config as Cfg);
+    const m = activeOf((props.config as Cfg).subMode) as any;
+    return createElement(m.Render as any, { ...(props as any), config: safe } as any);
   },
   Side: ((props: any) => {
-    const m = MAP[(props.config as Cfg).subMode] as any;
-    return m.Side ? createElement(m.Side as any, props as any) : null;
+    const safe = safeCfg((props.config as Cfg).subMode, props.config as Cfg);
+    const m = activeOf((props.config as Cfg).subMode) as any;
+    return m.Side ? createElement(m.Side as any, { ...props, config: safe } as any) : null;
   }) as any,
 };

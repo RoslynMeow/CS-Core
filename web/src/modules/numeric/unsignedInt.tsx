@@ -144,7 +144,7 @@ export const unsignedIntModule: ModuleDef<Scene, Cfg> = {
           <button className="ghost" onClick={() => onChange({ ...config, bits: randBits(config.width) })}>
             ↻ {t(T('重新生成', 'Regenerate'))}
           </button>
-          <button className="ghost" onClick={() => onChange(DEFAULT_CFG as Cfg)}>{t(T('清空', 'Clear'))}</button>
+          <button className="ghost" onClick={() => onChange({ ...config, ...DEFAULT_CFG } as Cfg)}>{t(T('清空', 'Clear'))}</button>
         </div>
       </div>
     ) as unknown as never;
@@ -156,7 +156,16 @@ export const unsignedIntModule: ModuleDef<Scene, Cfg> = {
     T('return $y$ // $y\\in[0,2^n-1]$', 'return $y$ // $y\\in[0,2^n-1]$'),
   ],
   generate(cfg) { return expandFrames(cfg.width, cfg.bits); },
-  Render({ scene }) {
+  Render({ scene: _scene }) {
+    // 防错位：切 subMode 后首帧可能仍是旧模块的 scene，先兜底再渲染（位权/进制转换亦如此）
+    const scene = ((_scene as any) ?? {}) as Scene;
+    scene.bits = Array.isArray(scene.bits) ? scene.bits : [];
+    scene.partials = Array.isArray(scene.partials) ? scene.partials : [];
+    scene.highlight = scene.highlight ?? null;
+    scene.width = Number.isFinite(scene.width) ? scene.width : Math.max(scene.bits.length, 2);
+    scene.max = Number.isFinite(scene.max) ? scene.max : 2 ** scene.width - 1;
+    scene.value = typeof scene.value === 'number' && Number.isFinite(scene.value) ? scene.value : 0;
+    scene.overflow = !!scene.overflow;
     const global = loadGlobal();
     const defFor = (vals: number[]) => vals.map(v => (defaultAlphabet(2)[v] ?? String(v)));
     const custFor = (vals: number[]) => vals.map(v => {

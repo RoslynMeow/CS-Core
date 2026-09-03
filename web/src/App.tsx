@@ -22,7 +22,7 @@ function getRoute(): Route {
 }
 
 export function App() {
-      useLang();
+      const { t } = useLang();
       const [route, setRoute] = useState<Route>(getRoute());
       useEffect(() => {
             const h = () => setRoute(getRoute());
@@ -30,6 +30,16 @@ export function App() {
             return () => window.removeEventListener("hashchange", h);
       }, []);
       const mod = route.kind === "module" ? findModule(route.id) : null;
+      const headerTitle =
+            route.kind === "module"
+                  ? mod
+                        ? t(mod.title)
+                        : null
+                  : route.kind === "settings"
+                        ? "设置"
+                        : route.kind === "memory"
+                              ? "内存可视化"
+                              : null;
 
       return (
             <div className="app">
@@ -40,6 +50,32 @@ export function App() {
                         >
                               计算机学习
                         </div>
+                        {headerTitle && (
+                              <div
+                                    style={{ fontSize: 14, fontWeight: 800 }}
+                              >
+                                    {headerTitle}
+                              </div>
+                        )}
+                        {mod && (
+                              <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                                    {(mod.tags ?? []).map((x) => (
+                                          <span key={x} className="tag">
+                                                {x}
+                                          </span>
+                                    ))}
+                                    <span
+                                          className="tag"
+                                          style={{
+                                                background: "#f8fafc",
+                                                color: "#475569",
+                                                borderColor: "#e2e8f0",
+                                          }}
+                                    >
+                                          {mod.id}
+                                    </span>
+                              </div>
+                        )}
                         <div className="spacer" />
                         <button
                               className={`pill ${route.kind === "memory" ? "active" : ""}`}

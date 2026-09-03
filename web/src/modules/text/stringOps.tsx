@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { T } from '../../i18n/lang';
 import type { Frame, ModuleDef } from '../../engine/types';
 import { buildMemoryUrl, hexFromBytes, toHexByte } from '../../lib/memoryDump';
@@ -159,15 +158,12 @@ export const stringOpsModule: ModuleDef<Scene, Cfg> = {
   },
   Controls({ config, onChange, t }: any) {
     const isZh = t(T('中文', 'en')) !== 'en';
-    const [draft, setDraft] = useState<Cfg>(config);
-    const set = (p: Partial<Cfg>) => setDraft(s => ({ ...s, ...p }));
-    useEffect(() => { if (draft.s1 !== config.s1 || draft.s2 !== config.s2 || draft.mode !== config.mode) setDraft(config); }, [config]);
     return (
       <div style={{ display: 'grid', gap: 8, width: '100%' }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 12, background: '#eef2ff', border: '1px solid #c7d2fe', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, fontWeight: 800, color: '#4338ca' }}>{isZh ? '模式' : 'MODE'}</span>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('运算', 'Op'))}</span>
-            <select className="txt" value={draft.mode} onChange={e => set({ mode: e.target.value as Mode })}>
+            <select className="txt" value={config.mode} onChange={e => onChange({ ...config, mode: e.target.value as Mode })}>
               <option value="layout">{t(T('物理存储', 'Layout'))}</option>
               <option value="strlen">{t(T('strlen 求长', 'strlen'))}</option>
               <option value="strcat">{t(T('strcat 拼接', 'strcat'))}</option>
@@ -177,19 +173,32 @@ export const stringOpsModule: ModuleDef<Scene, Cfg> = {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
           <span style={{ fontSize: 11, fontWeight: 800, color: '#475569' }}>{isZh ? '参数' : 'PARAMS'}</span>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span><MathText text="$s_1$" /></span>
-            <input className="txt" value={draft.s1} onChange={e => set({ s1: sanitize(e.target.value, 12) })} style={{ width: 90 }} placeholder="Hi" /></label>
-          {(draft.mode === 'strcmp' || draft.mode === 'strcat') && <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span><MathText text="$s_2$" /></span>
-            <input className="txt" value={draft.s2} onChange={e => set({ s2: sanitize(e.target.value, 8) })} style={{ width: 70 }} placeholder="!" /></label>}
-          <button className="ghost" onClick={() => onChange(stringOpsModule.randomize!(draft))}>↻ {t(T('重新生成', 'Regenerate'))}</button>
-          <button className="ghost" onClick={() => onChange({ ...stringOpsModule.defaultConfig } as Cfg)}>{t(T('清空', 'Clear'))}</button>
-          <button className="pill" onClick={() => { location.href = buildMemoryUrl(buildDump({ ...draft, execTick: config.execTick } as Cfg) as any); }}>查看内存 ↗</button>
+            <input className="txt" value={config.s1} onChange={e => onChange({ ...config, s1: sanitize(e.target.value, 12) })} style={{ width: 90 }} placeholder="Hi" /></label>
+          {(config.mode === 'strcmp' || config.mode === 'strcat') && <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span><MathText text="$s_2$" /></span>
+            <input className="txt" value={config.s2} onChange={e => onChange({ ...config, s2: sanitize(e.target.value, 8) })} style={{ width: 70 }} placeholder="!" /></label>}
+          <button className="ghost" onClick={() => onChange(stringOpsModule.randomize!(config))}>↻ {t(T('重新生成', 'Regenerate'))}</button>
+          <button className="ghost" onClick={() => onChange({ ...config, ...stringOpsModule.defaultConfig } as Cfg)}>{t(T('清空', 'Clear'))}</button>
+          <button className="pill" onClick={() => { location.href = buildMemoryUrl(buildDump(config as Cfg) as any); }}>查看内存 ↗</button>
         </div>
       </div>
     ) as unknown as never;
   },
   codeFor(cfg) { return CODE[cfg.mode] as never; },
   generate: gen,
-  Render({ scene }) {
+  Render({ scene: _scene }) {
+    // 防错位：切 subMode 后首帧可能仍是旧模块的 scene，先兜底再渲染（位权/进制转换亦如此）
+    const scene = ((_scene as any) ?? {}) as Scene;
+    scene.s1 = Array.isArray(scene.s1) ? scene.s1 : [];
+    scene.s2 = Array.isArray(scene.s2) ? scene.s2 : [];
+    scene.concat = Array.isArray(scene.concat) ? scene.concat : [];
+    scene.base1 = Number.isFinite(scene.base1) ? scene.base1 : 0;
+    scene.base2 = Number.isFinite(scene.base2) ? scene.base2 : 0;
+    scene.focus1 = scene.focus1 ?? null;
+    scene.focus2 = scene.focus2 ?? null;
+    scene.phase = (typeof scene.phase === 'string' ? scene.phase : 'idle') as Scene['phase'];
+    scene.mode = (typeof scene.mode === 'string' ? scene.mode : 'layout') as Scene['mode'];
+    scene.len1 = Number.isFinite(scene.len1) ? scene.len1 : 0;
+    scene.diff = Number.isFinite(scene.diff) ? scene.diff : 0;
     const row = (label: string, cells: Cell[], base: number, focus: number | null, tag: string) => (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         <div style={{ fontSize: 11, fontWeight: 800, color: '#475569' }}><MathText text={label} /> · @0x{base.toString(16)}</div>

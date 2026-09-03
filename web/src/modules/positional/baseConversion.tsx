@@ -271,7 +271,7 @@ export const baseConversionModule: ModuleDef<Scene, Cfg> = {
           <button className="ghost" onClick={() => onChange({ ...config, numeral: randNumeral(config.fromBase, config.mode) })}>
             ↻ {t(T('重新生成', 'Regenerate'))}
           </button>
-          <button className="ghost" onClick={() => onChange(DEFAULT_CFG as Cfg)}>{t(T('清空', 'Clear'))}</button>
+          <button className="ghost" onClick={() => onChange({ ...config, ...DEFAULT_CFG } as Cfg)}>{t(T('清空', 'Clear'))}</button>
         </div>
       </div>
     ) as unknown as never;

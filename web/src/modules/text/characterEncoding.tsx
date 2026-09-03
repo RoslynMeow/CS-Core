@@ -168,15 +168,22 @@ export const characterEncodingModule: ModuleDef<Scene, Cfg> = {
             const pool = ['A', 'a', '0', '好', '中', 'é', 'Ω', '𝄞'];
             onChange({ ...config, char: pool[Math.floor(Math.random() * pool.length)] });
           }}>↻ {t(T('重新生成', 'Regenerate'))}</button>
-          <button className="ghost" onClick={() => onChange(DEFAULT_CFG as Cfg)}>{t(T('清空', 'Clear'))}</button>
+          <button className="ghost" onClick={() => onChange({ ...config, ...DEFAULT_CFG } as Cfg)}>{t(T('清空', 'Clear'))}</button>
         </div>
       </div>
     ) as unknown as never;
   },
   codeFor(cfg) { return CODE[cfg.mode] as never; },
   generate: gen,
-  Render({ scene }) {
-    if (scene.cp === null) return <div style={{ textAlign: 'center', color: '#94a3b8', padding: 20 }}>输入一个字符</div> as unknown as never;
+  Render({ scene: _scene }) {
+    // 防错位：切 subMode 后首帧可能仍是旧模块的 scene，先兜底再渲染（位权/进制转换亦如此）
+    const scene = ((_scene as any) ?? {}) as Scene;
+    if (scene.cp == null) return <div style={{ textAlign: 'center', color: '#94a3b8', padding: 20 }}>输入一个字符</div> as unknown as never;
+    scene.utf8Bytes = Array.isArray(scene.utf8Bytes) ? scene.utf8Bytes : [];
+    scene.bytesHex = Array.isArray(scene.bytesHex) ? scene.bytesHex : [];
+    scene.cpHex = scene.cpHex ?? '';
+    scene.cpBin = scene.cpBin ?? '';
+    scene.char = scene.char ?? '';
     const isAscii = scene.mode === 'ascii';
     return (
       <div style={{ display: 'grid', gap: 10 }}>

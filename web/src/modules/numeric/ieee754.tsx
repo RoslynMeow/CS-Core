@@ -885,7 +885,7 @@ export const ieee754Module: ModuleDef<Scene, Cfg> = {
           </button>
           <button
             className="ghost"
-            onClick={() => onChange(DEFAULT_CFG as Cfg)}
+            onClick={() => onChange({ ...config, ...DEFAULT_CFG } as Cfg)}
           >
             {t(T("清空", "Clear"))}
           </button>
@@ -900,7 +900,21 @@ export const ieee754Module: ModuleDef<Scene, Cfg> = {
     if (cfg.mode === "encode") return genEncode(cfg.decimal, cfg.prec);
     return genDecode(cfg.s, cfg.e, cfg.m, cfg.prec);
   },
-  Render({ scene }) {
+  Render({ scene: _scene }) {
+    // 防错位：切 subMode 后首帧可能仍是旧模块的 scene，先兜底再渲染（位权/进制转换亦如此）
+    const scene = ((_scene as any) ?? {}) as Scene;
+    scene.eBits = typeof scene.eBits === "string" ? scene.eBits : "";
+    scene.mBits = typeof scene.mBits === "string" ? scene.mBits : "";
+    scene.bits = typeof scene.bits === "string" ? scene.bits : "";
+    scene.prec = scene.prec === 64 ? 64 : 32;
+    scene.s = scene.s === 1 ? 1 : 0;
+    scene.kind = (typeof scene.kind === "string" ? scene.kind : "invalid") as Scene["kind"];
+    if (scene.value === undefined) scene.value = null;
+    scene.decimal = scene.decimal ?? "—";
+    scene.Eraw = Number.isFinite(scene.Eraw) ? scene.Eraw : 0;
+    scene.exp = Number.isFinite(scene.exp) ? scene.exp : 0;
+    scene.mant = Number.isFinite(scene.mant) ? scene.mant : 0;
+    scene.mode = scene.mode === "decode" ? "decode" : "encode";
     const eStr = scene.eBits;
     const sColor = "#f59e0b",
       eColor = "#6366f1",
@@ -942,114 +956,115 @@ export const ieee754Module: ModuleDef<Scene, Cfg> = {
         >
           <div
             style={{
-              display: "flex",
-              gap: 2,
-              padding: "4px 6px",
-              background: "#fffbeb",
-              border: `1px solid ${sColor}`,
-              borderRadius: 8,
+            display: "flex",
+            gap: 2,
+            padding: "6px 8px",
+            background: "#fffbeb",
+            border: `1px solid ${sColor}`,
+            borderRadius: 8,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 12,
+              color: sColor,
+              fontWeight: 800,
+              marginRight: 4,
             }}
           >
+            S
+          </span>
+          <span
+            style={{
+              width: 24,
+              textAlign: "center",
+              fontWeight: 800,
+              fontSize: 14,
+              background: "#fff",
+              border: "1px solid #e2e8f0",
+              borderRadius: 4,
+            }}
+          >
+            {scene.s}
+          </span>
+          </div>
+          <div
+            style={{
+            display: "flex",
+            gap: 2,
+            padding: "6px 8px",
+            background: "#eef2ff",
+            border: `1px solid ${eColor}`,
+            borderRadius: 8,
+            flexWrap: "wrap",
+            maxWidth: eLen === 11 ? 280 : 220,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 12,
+              color: eColor,
+              fontWeight: 800,
+              marginRight: 4,
+            }}
+          >
+            E {scene.prec === 64 ? "(11)" : "(8)"}
+          </span>
+          {eStr.split("").map((ch, i) => (
             <span
+              key={i}
               style={{
-                fontSize: 10,
-                color: sColor,
-                fontWeight: 800,
-                marginRight: 4,
-              }}
-            >
-              S
-            </span>
-            <span
-              style={{
-                width: 18,
+                width: 17,
                 textAlign: "center",
-                fontWeight: 800,
+                fontWeight: 700,
                 background: "#fff",
                 border: "1px solid #e2e8f0",
-                borderRadius: 4,
+                borderRadius: 3,
+                fontSize: 13,
               }}
             >
-              {scene.s}
+              {ch}
             </span>
+          ))}
           </div>
           <div
             style={{
-              display: "flex",
-              gap: 1,
-              padding: "4px 6px",
-              background: "#eef2ff",
-              border: `1px solid ${eColor}`,
-              borderRadius: 8,
-              flexWrap: "wrap",
-              maxWidth: eLen === 11 ? 220 : 170,
-            }}
-          >
-            <span
-              style={{
-                fontSize: 10,
-                color: eColor,
-                fontWeight: 800,
-                marginRight: 4,
-              }}
-            >
-              E {scene.prec === 64 ? "(11)" : "(8)"}
-            </span>
-            {eStr.split("").map((ch, i) => (
-              <span
-                key={i}
-                style={{
-                  width: 13,
-                  textAlign: "center",
-                  fontWeight: 700,
-                  background: "#fff",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: 3,
-                  fontSize: 10,
-                }}
-              >
-                {ch}
-              </span>
-            ))}
-          </div>
-          <div
+            display: "flex",
+            gap: 2,
+            padding: "6px 8px",
+            background: "#ecfeff",
+            border: `1px solid ${mColor}`,
+            borderRadius: 8,
+            maxWidth: scene.prec === 64 ? 720 : 420,
+            overflow: "hidden",
+            flexWrap: "wrap",
+          }}
+        >
+          <span
             style={{
-              display: "flex",
-              gap: 1,
-              padding: "4px 6px",
-              background: "#ecfeff",
-              border: `1px solid ${mColor}`,
-              borderRadius: 8,
-              maxWidth: scene.prec === 64 ? 520 : 360,
-              overflow: "hidden",
-              flexWrap: "wrap",
+              fontSize: 12,
+              color: mColor,
+              fontWeight: 800,
+              marginRight: 4,
             }}
           >
+            M {scene.prec === 64 ? "(52)" : "(23)"}
+          </span>
+          {scene.mBits.split("").map((ch, i) => (
             <span
+              key={i}
               style={{
-                fontSize: 10,
-                color: mColor,
-                fontWeight: 800,
-                marginRight: 4,
+                minWidth: 13,
+                textAlign: "center",
+                fontSize: 12,
+                background: "#fff",
+                border: "1px solid #e2e8f0",
+                borderRadius: 2,
               }}
             >
-              M {scene.prec === 64 ? "(52)" : "(23)"}
+              {ch}
             </span>
-            {scene.mBits.split("").map((ch, i) => (
-              <span
-                key={i}
-                style={{
-                  minWidth: 9,
-                  textAlign: "center",
-                  fontSize: 9,
-                  background: "#fff",
-                  border: "1px solid #e2e8f0",
-                  borderRadius: 2,
-                }}
-              >
-                {ch}
-              </span>
-            ))}
+          ))}
           </div>
         </div>
 

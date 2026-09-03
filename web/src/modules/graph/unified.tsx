@@ -315,8 +315,8 @@ function constraintsFor(mode: SubMode, isZh: boolean): { mustBeDirected?: boolea
 
 export const graphUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
   id: "graph",
-  title: T("图 · 综合", "Graph · Comprehensive"),
-  desc: T("一站式图章节：遍历 / 最短路 / 拓扑 / MST / SCC / 最大流 / LCA，下拉切换，伪代码与画布联动", "All-in-one graph chapter: traverse / shortest paths / topo / MST / SCC / max flow / LCA via dropdown"),
+  title: T("图", "Graph"),
+  desc: T("遍历 / 最短路 / 拓扑 / MST / SCC / 最大流 / LCA", "Traverse / Shortest / Topo / MST / SCC / Flow / LCA"),
   tags: ["data-structures"],
   defaultConfig: DEFAULT,
   randomize(c) { return { ...randomCfg(c as GraphCfg) as Cfg, target: clampV(c.target, c.n), sourceNode: 0, sinkNode: Math.max(1, c.n - 1), lcaU: 2, lcaV: Math.max(3, c.n - 1), subMode: c.subMode, heuristic: c.heuristic } as unknown as Cfg; },

@@ -141,33 +141,6 @@ export function Stage({ mod }: { mod: ModuleDef }) {
           ⚠ {toast}
         </div>
       )}
-      <div className="stage-head">
-        <h1 className="mod-title">{t(mod.title)}</h1>
-        {mod.desc && (
-          <p className="mod-desc">
-            <MathText text={t(mod.desc)} />
-          </p>
-        )}
-        {mod.tags && (
-          <div className="tags">
-            {mod.tags.map((x) => (
-              <span key={x} className="tag">
-                {x}
-              </span>
-            ))}
-            <span
-              className="tag"
-              style={{
-                background: "#f8fafc",
-                color: "#475569",
-                borderColor: "#e2e8f0",
-              }}
-            >
-              {mod.id}
-            </span>
-          </div>
-        )}
-      </div>
       {mod.Controls && (
         <div
           className="stage-controls"
