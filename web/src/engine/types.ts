@@ -50,4 +50,6 @@ export interface ModuleDef<S = unknown, C = unknown> {
   }>;
   code?: Text[];
   codeFor?: (config: C) => Text[];
+  /** 纯画布模式：隐藏讲解条与右侧栏（伪代码/Side），只留画布全宽（如排序 PK） */
+  bare?: boolean;
 }

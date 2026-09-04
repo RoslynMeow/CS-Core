@@ -116,10 +116,20 @@ export function ArrayControls({ config, onChange, t, extra }: any) {
   ) as unknown as never;
 }
 
+/** 柱宽随 n 自适应：一行放下不滚动（n 越大柱越窄） */
+export function barSize(n: number): { w: number; gap: number; font: number } {
+  if (n <= 12) return { w: 28, gap: 6, font: 10 };
+  if (n <= 16) return { w: 22, gap: 5, font: 10 };
+  if (n <= 20) return { w: 18, gap: 4, font: 9 };
+  if (n <= 24) return { w: 14, gap: 3, font: 8 };
+  return { w: 11, gap: 3, font: 8 };
+}
+
 /** 通用柱状渲染：hl 高亮蓝，done 置绿；柱子按值身份 key，FLIP 真实换位（只动位置不动高度） */
 export function ArrayRender({ scene: _scene }: any) {
   const scene = normScene(_scene);
   const mx = Math.max(...scene.arr, 1);
+  const bs = barSize(scene.arr.length);
   // 值身份：同值按出现序号区分，交换时 DOM 节点随身份走，FLIP 补位移
   const seen = new Map<number, number>();
   const keys = scene.arr.map((v) => {
@@ -147,7 +157,7 @@ export function ArrayRender({ scene: _scene }: any) {
   });
   return (
     <div style={{ display: 'grid', gap: 10 }}>
-      <div className="bars" style={{ overflowX: 'auto' }}>
+      <div className="bars" style={{ overflowX: 'auto', gap: bs.gap }}>
         {scene.arr.length === 0 ? (
           <span style={{ color: '#94a3b8', fontSize: 12 }}>空数组 — 输入 2~30 个 0~999 的整数</span>
         ) : (
@@ -163,7 +173,11 @@ export function ArrayRender({ scene: _scene }: any) {
                 }}
                 className={`bar ${active ? 'hl' : ''}`}
                 style={{
+                  width: bs.w,
+                  minWidth: bs.w,
                   height: `${(v / mx) * 140 + 14}px`,
+                  fontSize: bs.font,
+                  overflow: 'hidden',
                   transition: 'height .3s, background-color .35s',
                   ...(settled && !active ? { background: '#10b981', borderColor: '#059669' } : {}),
                 }}

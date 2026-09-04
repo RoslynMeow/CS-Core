@@ -1,6 +1,6 @@
 import { T } from '../../i18n/lang';
 import type { Frame, ModuleDef } from '../../engine/types';
-import { ArrayControls, parseArr, blankScene, type ArrayScene } from './shared';
+import { ArrayControls, barSize, parseArr, blankScene, type ArrayScene } from './shared';
 
 type SearchScene = ArrayScene & { target: number; found: number | null };
 type SearchCfg = { n: number; valuesStr: string; target: string };
@@ -46,9 +46,10 @@ function SearchControls({ config, onChange, t }: any) {
 function SearchRender({ scene: _scene }: any) {
   const scene = normSearch(_scene);
   const mx = Math.max(...scene.arr, 1);
+  const bs = barSize(scene.arr.length);
   return (
     <div style={{ display: 'grid', gap: 10 }}>
-      <div className="bars">
+      <div className="bars" style={{ overflowX: 'auto', gap: bs.gap }}>
         {scene.arr.length === 0 ? (
           <span style={{ color: '#94a3b8', fontSize: 12 }}>空数组</span>
         ) : (
@@ -61,7 +62,11 @@ function SearchRender({ scene: _scene }: any) {
                 key={i}
                 className={`bar ${active && !isFound ? 'hl' : ''}`}
                 style={{
+                  width: bs.w,
+                  minWidth: bs.w,
                   height: `${(v / mx) * 140 + 14}px`,
+                  fontSize: bs.font,
+                  overflow: 'hidden',
                   transition: 'height .3s, background-color .35s, opacity .35s',
                   ...(isFound ? { background: '#10b981', borderColor: '#059669' } : out && !active ? { opacity: 0.35 } : {}),
                 }}

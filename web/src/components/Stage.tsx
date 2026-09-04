@@ -160,29 +160,47 @@ export function Stage({ mod }: { mod: ModuleDef }) {
         </div>
       )}
       <PlaybackBar pb={pb} />
+      {mod.bare ? (
+        <div className="stage-body" style={{ gridTemplateColumns: "1fr" }}>
+          <div className="canvas">
+            {pb.frame && (
+              <mod.Render
+                scene={pb.frame.scene}
+                t={t}
+                config={config as never}
+                onChange={handleChange as never}
+                inspected={inspected as never}
+                onInspect={(id) => setInspected(id ?? null)}
+              />
+            )}
+          </div>
+        </div>
+      ) : (
       <div className="stage-body">
-        <div className="canvas">
+        <div style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 10, minHeight: 0 }}>
           {pb.frame && (
-            <mod.Render
-              scene={pb.frame.scene}
-              t={t}
-              config={config as never}
-              onChange={handleChange as never}
-              inspected={inspected as never}
-              onInspect={(id) => setInspected(id ?? null)}
-            />
+            <div className="caption" style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "8px 10px" }}>
+              <MathText text={t(pb.frame.caption)} />
+            </div>
           )}
+          <div className="canvas">
+            {pb.frame && (
+              <mod.Render
+                scene={pb.frame.scene}
+                t={t}
+                config={config as never}
+                onChange={handleChange as never}
+                inspected={inspected as never}
+                onInspect={(id) => setInspected(id ?? null)}
+              />
+            )}
+          </div>
         </div>
         <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 10, minHeight: 0 }}>
           {(pb.frame?.scene as any)?.error && (
             <div style={{ fontSize: 12, color: "#92400e", background: "#fffbeb", border: "1px solid #fde68a", padding: "8px 10px", borderRadius: 10, display: "flex", alignItems: "center", gap: 8 }}>
               <span>⚠ {(pb.frame.scene as any).error}</span>
               <button onClick={() => setToast(null)} style={{ marginLeft: "auto", background: "transparent", border: "none", cursor: "pointer", fontSize: 16, lineHeight: 1 }}>×</button>
-            </div>
-          )}
-          {pb.frame && (
-            <div className="caption" style={{ marginBottom: 4, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 10, padding: "8px 10px" }}>
-              <MathText text={t(pb.frame.caption)} />
             </div>
           )}
           {code.length > 0 && <Pseudocode code={code} active={pb.frame?.line} />}
@@ -198,6 +216,7 @@ export function Stage({ mod }: { mod: ModuleDef }) {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }
