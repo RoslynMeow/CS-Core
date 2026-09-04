@@ -17,6 +17,42 @@
     \item \textbf{贪心选择性}：局部最优序列可拼接为全局最优。
 \end{enumerate}
 
+\subsection{动态规划 (Dynamic Programming)}
+\begin{itemize}
+    \item \textbf{对象}：问题 $P$ 具最优子结构与重叠子问题，状态 $dp$ 递推。
+    \item \textbf{不变式}：$dp$ 按拓扑序填表，已算子问题 $dp[s']$ 不重复计算。
+    \item \textbf{定理}：填表顺序保证 $dp[P]$ 即最优，时间常为状态数 $\times$ 转移代价。
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{01 背包 DP 规约}
+\begin{algorithmic}[1]
+\State $dp[0..n][0..W]\gets0$
+\For{$i\gets1$ \textbf{to} $n$}
+    \For{$w\gets0$ \textbf{to} $W$}
+        \If{$wt[i]>w$} $dp[i][w]\gets dp[i-1][w]$
+        \Else $dp[i][w]\gets\max(dp[i-1][w], dp[i-1][w-wt[i]]+val[i])$ \EndIf
+    \EndFor
+\EndFor
+\State \Return $dp[n][W]$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{LCS DP 规约}
+\begin{algorithmic}[1]
+\State $c[0..m][0..n]\gets0$
+\For{$i\gets1$ \textbf{to} $m$}
+    \For{$j\gets1$ \textbf{to} $n$}
+        \If{$X[i]=Y[j]$} $c[i][j]\gets c[i-1][j-1]+1$
+        \ElsIf{$c[i-1][j]\ge c[i][j-1]$} $c[i][j]\gets c[i-1][j]$
+        \Else $c[i][j]\gets c[i][j-1]$ \EndIf
+    \EndFor
+\EndFor
+\State \Return $c[m][n]$
+\end{algorithmic}
+\end{algorithm}
+
 \newpage
 
 \section{排序算法算子 (Sort)}
@@ -57,6 +93,68 @@
     \item \textbf{桶排序}：值域 $[Min,Max]$ 分 $k$ 区间 $B_1\dots B_k$，桶内排序后串联。
     \item \textbf{基数排序}：按位 $d=0\dots D-1$ 稳定排序（以计数为子程序）。
 \end{enumerate}
+
+\begin{algorithm}[H]
+\caption{归并排序规约}
+\begin{algorithmic}[1]
+\Procedure{MergeSort}{$A,l,r$}
+    \If{$l\ge r$} \Return \EndIf
+    \State $m\gets\lfloor(l+r)/2\rfloor$; $\text{MergeSort}(A,l,m)$; $\text{MergeSort}(A,m+1,r)$; $\text{Merge}(A,l,m,r)$
+\EndProcedure
+\Procedure{Merge}{$A,l,m,r$}
+    \State $B\gets A[l..r]$; $i\gets l; j\gets m+1; k\gets l$
+    \While{$i\le m\land j\le r$} \If{$B[i-l]\le B[j-l]$} $A[k]\gets B[i-l]; i\gets i+1$ \Else $A[k]\gets B[j-l]; j\gets j+1$ \EndIf; $k\gets k+1$ \EndWhile
+    \While{$i\le m$} $A[k]\gets B[i-l]; i\gets i+1; k\gets k+1$ \EndWhile
+    \While{$j\le r$} $A[k]\gets B[j-l]; j\gets j+1; k\gets k+1$ \EndWhile
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{堆排序规约}
+\begin{algorithmic}[1]
+\Procedure{HeapSort}{$A$}
+    \State $\text{BuildMaxHeap}(A)$ \Comment{自底向上 $O(n)$}
+    \For{$i\gets|A|-1$ \textbf{downto} $1$}
+        \State \textbf{Swap}($A[0],A[i]$); $\text{SiftDown}(A,0,i)$
+    \EndFor
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{计数排序规约}
+\begin{algorithmic}[1]
+\Procedure{CountingSort}{$A,k$}
+    \State $C[0..k]\gets0$; \ForAll{$x\in A$} $C[x]\gets C[x]+1$ \EndFor
+    \For{$i\gets1$ \textbf{to} $k$} $C[i]\gets C[i]+C[i-1]$ \EndFor
+    \State $B\gets A$; \For{$i\gets|A|-1$ \textbf{downto} $0$} $C[B[i]]\gets C[B[i]]-1$; $A[C[B[i]]]\gets B[i]$ \EndFor
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{桶排序规约}
+\begin{algorithmic}[1]
+\Procedure{BucketSort}{$A,k$}
+    \State 将 $[Min,Max]$ 划分为 $k$ 个区间 $B_0..B_{k-1}$
+    \ForAll{$x\in A$} 将 $x$ 插入 $B_{\lfloor k\cdot(x-Min)/(Max-Min+1)\rfloor}$ \EndFor
+    \For{$i\gets0$ \textbf{to} $k-1$} 排序 $B_i$ \Comment{桶内插排} \EndFor
+    \State 串联 $B_0,\dots,B_{k-1}$ 回 $A$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{基数排序规约}
+\begin{algorithmic}[1]
+\Procedure{RadixSort}{$A,D$}
+    \For{$d\gets0$ \textbf{to} $D-1$}
+        \State 按第 $d$ 位稳定计数排序 $A$ \Comment{低位到高位}
+    \EndFor
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
 
 
 
@@ -129,6 +227,33 @@
     \State $u\gets\text{ExtractMin}(Q)$; $S\gets S\cup\{u\}$
     \ForAll{$v\in N(u)$} \If{$D[u]+w(u,v)<D[v]$} $D[v]\gets D[u]+w(u,v)$; $\text{DecreaseKey}(Q,v,D[v])$ \EndIf \EndFor
 \EndWhile
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{Bellman-Ford 规约}
+\begin{algorithmic}[1]
+\State \textbf{输入}: $G=(V,E),s,w$; $\forall v,D[v]\gets\infty,D[s]\gets0$
+\For{$i\gets1$ \textbf{to} $|V|-1$}
+    \ForAll{$(u,v)\in E$} \If{$D[u]+w(u,v)<D[v]$} $D[v]\gets D[u]+w(u,v); parent[v]\gets u$ \EndIf \EndFor
+\EndFor
+\ForAll{$(u,v)\in E$} \If{$D[u]+w(u,v)<D[v]$} \Return “存在负环” \EndIf \EndFor
+\State \Return $D$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{Floyd-Warshall 规约}
+\begin{algorithmic}[1]
+\State $D^{(0)}[i][j]\gets w(i,j)$ 若 $(i,j)\in E$ 否则 $\infty$, $D^{(0)}[i][i]\gets0$
+\For{$k\gets1$ \textbf{to} $|V|$}
+    \For{$i\gets1$ \textbf{to} $|V|$}
+        \For{$j\gets1$ \textbf{to} $|V|$}
+            \State $D^{(k)}[i][j]\gets\min(D^{(k-1)}[i][j], D^{(k-1)}[i][k]+D^{(k-1)}[k][j])$
+        \EndFor
+    \EndFor
+\EndFor
+\State 若 $\exists i, D^{(|V|)}[i][i]<0$ 则存在负环
 \end{algorithmic}
 \end{algorithm}
 

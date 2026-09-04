@@ -301,6 +301,29 @@
 \end{algorithmic}
 \end{algorithm}
 
+\section{Huffman 最优树}
+
+\begin{itemize}
+    \item \textbf{对象}：字母表 $\Sigma$，频次 $freq: \Sigma\to\mathbb{N}$，带权路径 $WPL(T)=\sum_{c} freq(c)\cdot depth(c)$。
+    \item \textbf{不变式（最优）}：无前缀码，合并两最小频次节点得新子树，频次为和。
+    \item \textbf{定理}：Huffman 贪心构造的树 $WPL$ 最小，时间 $O(n\log n)$。
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{Huffman 构造规约}
+\begin{algorithmic}[1]
+\State $Q\gets$ 按 $freq$ 建最小堆，叶节点为 $(c,freq(c))$
+\For{$i\gets1$ \textbf{to} $|\Sigma|-1$}
+    \State $x\gets\text{ExtractMin}(Q)$; $y\gets\text{ExtractMin}(Q)$
+    \State $z\gets\text{node}(freq\gets freq(x)+freq(y), left\gets x, right\gets y)$
+    \State $\text{Insert}(Q,z)$
+\EndFor
+\State \Return $\text{ExtractMin}(Q)$
+\end{algorithmic}
+\end{algorithm}
+
+\section{堆体系 (Heap)}
+
 \begin{itemize}
     \item \textbf{定义}：完全二叉树 $T$ 满足堆序性质。
     \item \textbf{大顶堆 (Max Heap)}：$\forall v \in V, v.val \ge \text{leftChild}(v).val \land v.val \ge \text{rightChild}(v).val$。
