@@ -69,6 +69,33 @@
 \label{fig:graph_connectivity}
 \end{figure}
 
+\section{割点与双连通}
+
+\begin{itemize}
+    \item \textbf{对象}：无向图 $G$，DFS 树 $DFN[u]$、$LOW[u]=\min\{DFN[u], \min_{v \text{为返祖边}} DFN[v], \min_{w\text{为子}} LOW[w]\}$。
+    \item \textbf{不变式（割点）}：(1) 根为割点 $\iff$ 子女数 $\ge2$；(2) 非根 $u$ 为割点 $\iff$ 存在子女 $v$ 使 $LOW[v]\ge DFN[u]$。
+    \item \textbf{定理}：DFS 一遍 $O(|V|+|E|)$ 可求全部割点/桥，移除割点使连通分量增加。
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{割点判定规约（Tarjan 扩展）}
+\begin{algorithmic}[1]
+\State $timer\gets0$
+\Procedure{DFS}{$u,parent$}
+    \State $DFN[u]\gets LOW[u]\gets timer\gets timer+1$; $children\gets0$
+    \ForAll{$v\in N(u), v\neq parent$}
+        \If{$DFN[v]=\text{nil}$}
+            \State $children\gets children+1$; $\text{DFS}(v,u)$; $LOW[u]\gets\min(LOW[u],LOW[v])$
+            \If{$parent=\text{nil}\land children\ge2$} $u$ 为割点 \EndIf
+            \If{$parent\neq\text{nil}\land LOW[v]\ge DFN[u]$} $u$ 为割点 \EndIf
+        \Else
+            \State $LOW[u]\gets\min(LOW[u],DFN[v])$
+        \EndIf
+    \EndFor
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
 \section{图的遍历与降维}
 
 \subsection{遍历规约}

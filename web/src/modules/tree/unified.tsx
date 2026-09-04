@@ -17,6 +17,7 @@ import {
   avlInsertSteps, AVL_CODE,
   heapBuildSteps, heapInsertSteps as heapInsertSteps2, heapDeleteTopSteps, HEAP_BUILD_CODE, HEAP_INSERT_CODE, HEAP_DELETE_CODE,
   inorderOf,
+  lcaBinaryLiftingSteps, LCA_CODE, type LCAStep,
 } from "../../lib/graph";
 import {
   rbInsertSteps, rbInsertOne, rbDeleteOnTree, rbSearchOnTree,
@@ -33,9 +34,10 @@ import { resolveTree, type TreeCfg } from "./source";
 import { TRAVERSE_CODES } from "./binary";
 import { fromImport as graphFromImport, graphScene, algoStateTables } from "../graph/source";
 
-type SubMode = "general" | "traverse" | "bst" | "avl" | "heap" | "rb" | "btree" | "bplus";
+type SubMode = "general" | "traverse" | "lca" | "bst" | "avl" | "heap" | "rb" | "btree" | "bplus";
 const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
   { label: "基础", opts: [{ v: "general", zh: "通用树", en: "General" }, { v: "traverse", zh: "二叉遍历", en: "Traverse" }] },
+  { label: "查询", opts: [{ v: "lca", zh: "LCA 倍增", en: "LCA" }] },
   { label: "BST/平衡", opts: [{ v: "bst", zh: "BST", en: "BST" }, { v: "avl", zh: "AVL", en: "AVL" }, { v: "rb", zh: "红黑", en: "RB" }] },
   { label: "堆/B树", opts: [{ v: "heap", zh: "堆", en: "Heap" }, { v: "btree", zh: "B 树", en: "B-Tree" }, { v: "bplus", zh: "B+ 树", en: "B+ Tree" }] },
 ];
@@ -51,6 +53,9 @@ type Cfg = {
   heapVal: number;
   btreeOrder: number;
   btreeVal: number;
+  lcaU: number;
+  lcaV: number;
+  pick?: "u" | "v";
 };
 
 const DEFAULT: Cfg = {
@@ -64,11 +69,15 @@ const DEFAULT: Cfg = {
   heapVal: 10,
   btreeOrder: 3,
   btreeVal: 5,
+  lcaU: 3,
+  lcaV: 5,
+  pick: "u",
 };
 
 const CODE_MAP: Record<SubMode, any> = {
   general: BFS_CODE,
   traverse: LEVEL_CODE,
+  lca: LCA_CODE,
   bst: BST_INSERT_CODE,
   avl: AVL_CODE,
   heap: HEAP_BUILD_CODE as any,
@@ -102,6 +111,25 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
       return steps.map((s: any) => {
         const base = graphScene(g, { current: s.current, exploring: s.exploring, visited: s.visited, frontier: s.frontier, order: s.order, edge: s.edge }, { root: 0, layout: "tree" });
         (base as any).stateTables = [{ title: "数值", header: g.labels, rows: [{ name: "order", cells: g.labels.map((_: string, i: number) => { const p = s.order.indexOf(i); return p >=0 ? String(p+1) : "-"; }) }] }];
+        return toFrame(s, base);
+      });
+    }
+    case "lca": {
+      if (!g.isTree()) return [{ line: 0, caption: T("LCA 需树：当前不是树", "LCA needs tree"), scene: graphScene(g, {}, { root: 0, layout: "tree" }) as GraphCanvasScene }];
+      const n = g.n;
+      const clamp = (x: number) => Math.min(Math.max(0, x), n - 1);
+      const root = clamp(imp?.root ?? 0);
+      const u = clamp(cfg.lcaU), v = clamp(cfg.lcaV);
+      const steps: LCAStep[] = lcaBinaryLiftingSteps(g, root, u, v, g.labels);
+      return steps.map((s) => {
+        const annotate: Record<number, string> = {};
+        s.depth.forEach((d, i) => { annotate[i] = `d=${d}`; });
+        const base = graphScene(g, { current: s.current, exploring: s.exploring, visited: s.lca !== null ? [s.lca] : [], frontier: [], order: [], edge: s.edge }, { root, annotate, layout: "tree" });
+        (base as any).stateTables = [{ title: "数值", header: g.labels, rows: [
+          { name: "depth", cells: s.depth.map((x: any) => String(x)) },
+          { name: "up0", cells: s.up.map((row: any) => row[0] < 0 ? "-" : g.labels[row[0]]) },
+          { name: "up1", cells: s.up.map((row: any) => row[1] < 0 ? "-" : g.labels[row[1]] ?? "-") },
+        ] }];
         return toFrame(s, base);
       });
     }
@@ -335,12 +363,17 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
 export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
   id: "tree",
   title: T("树", "Tree"),
-  desc: T("通用 / 遍历 / BST / AVL / 堆 / 红黑 / B / B+", "General / Traverse / BST / AVL / Heap / RB / B-Tree"),
+  desc: T("通用 / 遍历 / LCA / BST / AVL / 堆 / 红黑 / B / B+", "General / Traverse / LCA / BST / AVL / Heap / RB / B-Tree"),
   tags: ["data-structures"],
   defaultConfig: DEFAULT,
   Controls({ config, onChange, t }) {
     const isZh = t(T("中文", "en")) !== "en";
     const set = (p: Partial<Cfg>) => onChange({ ...config, ...p });
+    const lab = (i: number) => {
+      const ls = config.treeImp?.labels;
+      if (ls && ls[i] !== undefined) return ls[i];
+      return String.fromCharCode(65 + ((i % 26 + 26) % 26));
+    };
     return (
       <div style={{ display: "grid", gap: 8, width: "100%" }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
@@ -353,6 +386,7 @@ export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
             ))}
           </select>
           {(config.subMode === "traverse") && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><select className="txt" value={config.traverseMode} onChange={(e) => set({ traverseMode: e.target.value as any })}><option value="pre">前序</option><option value="in">中序</option><option value="post">后序</option><option value="level">层序</option></select></>}
+          {(config.subMode === "lca") && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca" }}>{isZh ? "选点" : "PICK"}</span><button className={`pill ${(config.pick ?? "u") === "u" ? "active" : ""}`} style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => set({ pick: "u" })}>u: <b>{lab(config.lcaU)}</b></button><button className={`pill ${(config.pick ?? "u") === "v" ? "active" : ""}`} style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => set({ pick: "v" })}>v: <b>{lab(config.lcaV)}</b></button><span style={{ fontSize: 11, color: "#64748b" }}>{isZh ? "右键·选择此点" : "right-click"}</span></>}
           {(config.subMode === "bst" || config.subMode === "avl" || config.subMode === "rb") && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><select className="txt" value={config.bstMode} onChange={(e) => set({ bstMode: e.target.value as any })}><option value="build">建树</option><option value="search">查找</option><option value="insert">插入</option><option value="delete">删除</option></select><input className="txt" type="number" placeholder={isZh ? "键" : "key"} style={{ width: 70 }} value={Number.isNaN(config.target) ? "" : config.target} onChange={(e) => set({ target: e.target.value===""?NaN:Number(e.target.value) })} /><input className="txt" type="number" placeholder={isZh ? "插值" : "x"} style={{ width: 70 }} value={Number.isNaN(config.x) ? "" : config.x} onChange={(e) => set({ x: e.target.value===""?NaN:Number(e.target.value) })} /></>}
           {config.subMode === "heap" && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><select className="txt" value={config.heapMode} onChange={(e) => set({ heapMode: e.target.value as any })}><option value="build">建堆</option><option value="insert">插入</option><option value="pop">弹出</option></select><input className="txt" type="number" style={{ width: 70 }} value={config.heapVal} onChange={(e) => set({ heapVal: Number(e.target.value) })} /></>}
           {(config.subMode === "btree" || config.subMode === "bplus") && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><label className="txt-label">阶<input className="txt" type="number" style={{ width: 60 }} value={config.btreeOrder} onChange={(e) => set({ btreeOrder: Math.max(3, Number(e.target.value)) })} /></label><input className="txt" type="number" style={{ width: 70 }} value={config.btreeVal} onChange={(e) => set({ btreeVal: Number(e.target.value) })} /></>}
@@ -394,6 +428,18 @@ export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
     return ((CODE_MAP as any)[c.subMode] ?? []) as never;
   },
   generate(config) { return buildFrames(config as Cfg); },
+  blockedReason(cfg) {
+    const c = cfg as Cfg;
+    if (c.subMode !== "lca") return null;
+    try {
+      if (c.treeImp) {
+        const gg = new Graph(c.treeImp.n, { directed: false, labels: c.treeImp.labels });
+        gg.fromSpec(c.treeImp.spec);
+        if (!gg.isTree()) return "LCA 要求无环连通图（树）。可点随机树或手动改成树";
+      }
+    } catch {}
+    return null;
+  },
   Render({ scene, t, config, onChange }) {
     const isZh = t(T("中文", "en")) !== "en";
     const cfg = config as Cfg;
@@ -404,9 +450,26 @@ export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
       return new Graph(7, { labels: ["4","2","6","1","3","5","7"] });
     })();
     const currentImp = cfg.treeImp;
-    const highlight = { current: (scene as any).current ?? null, visited: (scene as any).visited ?? [], frontier: (scene as any).frontier ?? [], edge: (scene as any).edge ?? null, tone: (scene as any).tone };
+    const pickTone: Record<number, number> = {};
+    if (cfg.subMode === "lca") { pickTone[cfg.lcaU] = 0; pickTone[cfg.lcaV] = 1; }
+    const sceneTone = (scene as any).tone as Record<number, number> | undefined;
+    const highlight = { current: (scene as any).current ?? null, visited: (scene as any).visited ?? [], frontier: (scene as any).frontier ?? [], edge: (scene as any).edge ?? null, tone: { ...pickTone, ...(sceneTone ?? {}) } };
     const [memOpen, setMemOpen] = useState(false);
-    return (
+    const needTree = cfg.subMode === "lca" && !gForMem.isTree();
+    const applyRandomTreeFix = () => {
+      const n = Math.max(2, Math.min(20, gForMem?.n ?? 7));
+      const labels = gForMem && gForMem.labels.length === n ? [...gForMem.labels] : undefined;
+      const tree = labels ? Graph.randomTree(n, { labels }) : Graph.randomTree(n);
+      const spec = tree.edges.map((e) => `${e.u}-${e.v}`).join(",");
+      const imp: ImportedGraph = { n, spec, labels: [...tree.labels], directed: false, root: 0, layout: "tree" };
+      onChange?.({ ...cfg, treeImp: imp, lcaU: Math.min(Math.max(0, cfg.lcaU), n - 1), lcaV: Math.min(Math.max(0, cfg.lcaV), n - 1) } as unknown as Cfg);
+    };
+    const onPickVertex = (id: number) => {
+      if (cfg.subMode !== "lca") return;
+      if ((cfg.pick ?? "u") === "v") onChange?.({ ...cfg, lcaV: id } as unknown as Cfg);
+      else onChange?.({ ...cfg, lcaU: id } as unknown as Cfg);
+    };
+    const body = (
       <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, position: "relative" }}>
         <div style={{ flex: memOpen ? "0 0 50%" : "1", minHeight: 0, border: "1px solid #c7d2fe", borderRadius: 12, overflow: "hidden", background: "#fff", display: "flex", flexDirection: "column" }}>
           <GraphEditor
@@ -415,6 +478,7 @@ export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
             constraints={{ mustBeTree: true, hint: isZh ? "树需 n-1 边且无环" : "needs tree" }}
             highlight={highlight}
             embedded
+            onPickVertex={onPickVertex}
             onConfirm={(g) => onChange?.({ ...cfg, treeImp: g } as unknown as Cfg)}
             title={isZh ? "树编辑器 · 直接编辑" : "Tree Editor"}
           />
@@ -430,12 +494,30 @@ export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
         )}
       </div>
     );
+    if (!needTree) return body;
+    // LCA 门禁：输入恒为树时无感；手动改坏时虚化 + 一键随机树
+    return (
+      <div style={{ position: "relative" }}>
+        <div style={{ filter: "blur(5px)", userSelect: "none" }}>{body}</div>
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", padding: 16 }}>
+          <div style={{ pointerEvents: "auto", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "14px 18px", maxWidth: 360, boxShadow: "0 12px 32px rgba(15,23,42,.18)", textAlign: "center" }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: "#b91c1c" }}>⚠ {isZh ? "LCA 要求无环连通图（树）" : "LCA needs a tree"}</div>
+            <button className="pill active" style={{ marginTop: 10, padding: "6px 16px", fontSize: 13 }} onClick={applyRandomTreeFix}>
+              {isZh ? "随机一棵树" : "Random tree"}
+            </button>
+            <div style={{ marginTop: 8, fontSize: 11, color: "#64748b" }}>
+              {isZh ? "可手动改树后重试，或切换到其它算法" : "Edit the tree or switch algorithm"}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   },
   Side({ scene, t }) {
     const isZh = t(T("中文", "en")) !== "en";
     const tables = (scene as any).stateTables as any;
     if (!tables || tables.length === 0) return <div style={{ fontSize: 12, color: "#64748b", padding: 12 }}>{isZh ? "当前帧无额外内存" : "No extra memory"}</div>;
-    return <StateBar tables={tables} headerAction={<button className="pill" style={{ padding: "2px 8px", fontSize: 11 }} onClick={() => location.href = "#/memory"}>{isZh ? "查看内存 ↗" : "Memory ↗"}</button>} />;
+    return <StateBar tables={tables} />;
   },
 };
 

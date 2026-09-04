@@ -93,6 +93,19 @@
     \item \textbf{嵌套}：$O(a)\cdot O(b)=O(a\cdot b)$。
 \end{itemize}
 
+\subsection{主定理（递归树证明）}
+
+\begin{itemize}
+    \item \textbf{对象}：$T(n) = aT(n/b) + f(n)$，$a\ge1$，$b>1$，$f$ 渐进正。
+    \item \textbf{递归树}：深度 $L=\log_b n$，第 $j$ 层 $a^j$ 个节点，单节点代价 $f(n/b^j)$，层代价 $a^j f(n/b^j)$，叶 $a^L = n^{\log_b a}$ 个 $\Theta(1)$。
+    \item \textbf{定理（主定理）}：记 $n^{\log_b a}$ 与 $f(n)$ 比较：
+    \begin{enumerate}
+        \item 若 $f(n) = O(n^{\log_b a-\epsilon})$，则 $T(n) = \Theta(n^{\log_b a})$（叶主导）。
+        \item 若 $f(n) = \Theta(n^{\log_b a})$，则 $T(n) = \Theta(n^{\log_b a}\log n)$（每层等量）。
+        \item 若 $f(n) = \Omega(n^{\log_b a+\epsilon})$ 且 $af(n/b)\le cf(n)$（$c<1$，正则），则 $T(n) = \Theta(f(n))$（根主导）。
+    \end{enumerate}
+\end{itemize}
+
 \section{算法的空间复杂度 (Space Complexity)}
 
 衡量随 $n$ 增长的\textbf{辅助空间}增幅（含递归栈）。

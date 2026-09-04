@@ -149,6 +149,35 @@
 \label{fig:linked_circular}
 \end{figure}
 
+\subsection{线性表操作规约}
+
+\begin{algorithm}[H]
+\caption{顺序表插入/删除规约}
+\begin{algorithmic}[1]
+\Procedure{SeqInsert}{$A,n,i,x$}
+    \State \textbf{requires} $0\le i\le n < m$
+    \For{$k\gets n$ \textbf{downto} $i+1$} $A[k]\gets A[k-1]$ \EndFor
+    \State $A[i]\gets x$
+\EndProcedure
+\Procedure{SeqDelete}{$A,n,i$}
+    \State \textbf{requires} $0\le i < n$
+    \For{$k\gets i$ \textbf{to} $n-2$} $A[k]\gets A[k+1]$ \EndFor
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{链式插入/删除规约（单向）}
+\begin{algorithmic}[1]
+\Procedure{LinkInsert}{$prev,x$}
+    \State $node\gets\text{new}(x)$; $node.next\gets prev.next$; $prev.next\gets node$
+\EndProcedure
+\Procedure{LinkDelete}{$prev$}
+    \State $prev.next\gets prev.next.next$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
 \section{核心矛盾对比：顺序表 vs 链表}
 
 \begin{table}[htbp]
@@ -333,6 +362,35 @@
 \label{fig:queue_circular}
 \end{figure}
 
+\section{双端队列 (Deque)}
+
+\begin{itemize}
+    \item \textbf{对象}：元素集 $E$ 上的双端序列 $D$，两端分别记 $L, R$。
+    \item \textbf{构造算子}：$\text{emptyD}: \to D$，$\text{pushL}, \text{pushR}: D \times E \to D$。
+    \item \textbf{观测算子}：$\text{popL}, \text{popR}: D \to D \cup \{\bot\}$，$\text{frontL}, \text{frontR}: D \to E \cup \{\bot\}$，均为偏函数。
+\end{itemize}
+
+\textbf{公理}：$\text{popL}(\text{pushL}(d,e)) = d$，$\text{popR}(\text{pushR}(d,e)) = d$，$\text{frontL}(\text{pushL}(d,e)) = e$，空队操作得 $\bot$。栈与队列均为其限制：仅用一端得栈，两端异侧得队列。
+
+\begin{algorithm}[H]
+\caption{双端队列规约（循环数组实现）}
+\begin{algorithmic}[1]
+\State \textbf{状态}: $A[0..m-1]$, $f,r\in\mathbb{Z}_m$, $sz$
+\Procedure{PushL}{$e$} \Comment{requires $sz<m$}
+    \State $f\gets(f-1+m)\bmod m$; $A[f]\gets e$; $sz\gets sz+1$
+\EndProcedure
+\Procedure{PushR}{$e$} \Comment{requires $sz<m$}
+    \State $A[r]\gets e$; $r\gets(r+1)\bmod m$; $sz\gets sz+1$
+\EndProcedure
+\Procedure{PopL}{} \Comment{requires $sz>0$}
+    \State $e\gets A[f]$; $f\gets(f+1)\bmod m$; $sz\gets sz-1$; \Return $e$
+\EndProcedure
+\Procedure{PopR}{} \Comment{requires $sz>0$}
+    \State $r\gets(r-1+m)\bmod m$; $sz\gets sz-1$; \Return $A[r]$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
 \section{字符串 (String)}
 
 \subsection{形式化定义}
@@ -396,6 +454,44 @@
         \While{$q>0 \land P[q]\neq T[i]$} $q\gets\pi[q-1]$ \EndWhile
         \If{$P[q]=T[i]$} $q\gets q+1$ \EndIf
         \If{$q=m$} \Return $i-m+1$ \Comment{命中} \EndIf
+    \EndFor
+    \State \Return $-1$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{BM 与 Rabin-Karp}
+\begin{itemize}
+    \item \textbf{对象}：同 KMP 的 $T[0..n-1]$、$P[0..m-1]$。
+    \item \textbf{BM 不变式}：自右向左比对，坏字符 $bc[c] = \max\{k < m-1 \mid P[k]=c\}$（不存在取 $-1$），好后缀按 $P$ 内部重合右移；每轮跳跃 $\max(bc, gs)$，最优 $O(n/m)$，最坏 $O(nm)$。
+    \item \textbf{RK 不变式}：滚动哈希 $H_{i+1} = (H_i - T[i]B^{m-1})B + T[i+m]$，$H_i = H(P) \implies$ 逐字验证；期望 $O(n+m)$，哈希碰撞时退化验证。
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{BM 坏字符规约}
+\begin{algorithmic}[1]
+\State 预处理 $bc[c]\gets P$ 中 $c$ 最右位置（$<m$，无则 $-1$）
+\Procedure{BMMatch}{$T,P$}
+    \State $s\gets0$
+    \While{$s\le n-m$}
+        \State $j\gets m-1$
+        \While{$j\ge0 \land P[j]=T[s+j]$} $j\gets j-1$ \EndWhile
+        \If{$j<0$} \Return $s$ \EndIf
+        \State $s\gets s+\max(1, j-bc[T[s+j]])$
+    \EndWhile
+    \State \Return $-1$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{Rabin-Karp 滚动哈希规约}
+\begin{algorithmic}[1]
+\Procedure{RKMatch}{$T,P,B,q$}
+    \State $hp\gets H(P)$; $ht\gets H(T[0..m-1])$; $h\gets B^{m-1}\bmod q$
+    \For{$s\gets0$ \textbf{to} $n-m$}
+        \If{$ht=hp \land T[s..s+m-1]=P$} \Return $s$ \EndIf
+        \If{$s<n-m$} $ht\gets((ht-T[s]h)B+T[s+m])\bmod q$ \EndIf
     \EndFor
     \State \Return $-1$
 \EndProcedure

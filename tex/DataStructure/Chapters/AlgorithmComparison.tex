@@ -24,7 +24,7 @@
 \textbf{基数} & $O(d(n+k))$ & $O(d(n+k))$ & $O(d(n+k))$ & $O(n+k)$ & 稳定 & 按位稳定排序 \\
 \bottomrule
 \end{tabulary}
-\caption{核心排序算法算子对比（同步网页 \texttt{array-algorithms}）}
+\caption{核心排序算法算子对比}
 \label{tab:sort_compare}
 \end{table}
 
@@ -46,7 +46,6 @@
 \textbf{A*} & 单源启发 & $O(|E|)$ 期望 & $O(|V|)$ & $f=g+h$ & $h$ 可采纳则最优 \\
 \textbf{Bellman-Ford} & 单源带权 & $O(|V||E|)$ & $O(|V|)$ & $|V|-1$ 轮松弛 & 负环判据 \\
 \textbf{Floyd-Warshall} & 多源最短路 & $O(|V|^3)$ & $O(|V|^2)$ & 动态规划 & $D[i][i]<0\implies$负环 \\
-\textbf{LCA 倍增} & 树上祖先 & $O(\log|V|)$ 查询 & $O(|V|\log|V|)$ & $up[v][j]$ & 仅树 \\
 \textbf{Prim} & MST & $O(|E|\log|V|)$ & $O(|V|)$ & 割定理 & 稠密优 \\
 \textbf{Kruskal} & MST & $O(|E|\log|E|)$ & $O(|E|)$ & 并查集 & 稀疏优 \\
 \textbf{Kahn} & 拓扑序 & $O(|V|+|E|)$ & $O(|V|)$ & 入度集 & $|\sigma|<|V|\implies$有环 \\
@@ -54,7 +53,31 @@
 \textbf{Dinic} & 最大流 & $O(|V|^2|E|)$ & $O(|V|+|E|)$ & 分层+阻塞流 & 残量无 $s\to t$ 即最优 \\
 \bottomrule
 \end{tabulary}
-\caption{高级图论与检索算子对比（同步网页 \texttt{graph-*}）}
+\caption{高级图论与检索算子对比}
 \label{tab:graph_compare}
+\end{table}
+
+\section{树算子对比}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\textwidth}{@{}CCCCCC@{}}
+\toprule
+\textbf{算子} & \textbf{目标} & \textbf{时间} & \textbf{空间} & \textbf{核心依赖} & \textbf{限制/判据} \\
+\midrule
+\textbf{二叉遍历} & 全树访问 & $O(n)$ & $O(H)$ & 递归/显式栈 & 线索化可降至 $O(1)$ \\
+\textbf{BST} & 有序检索维护 & $O(H)$ & $O(n)$ & BST 序性质 & 偏斜退化 $O(n)$ \\
+\textbf{AVL} & 平衡检索维护 & $O(\log n)$ & $O(n)$ & 平衡因子+旋转 & 旋转恢复不变式 \\
+\textbf{红黑树} & 近似平衡维护 & $O(\log n)$ & $O(n)$ & 黑高+变色 & 插入至多两次旋转 \\
+\textbf{B/B+ 树} & 外存索引 & $O(\log_m n)$ & $O(n)$ & 分裂/合并 & 叶层等深 \\
+\textbf{Huffman} & 最优前缀码 & $O(n\log n)$ & $O(n)$ & 最小堆贪心 & 需已知频次 \\
+\textbf{堆} & 最值维护 & 建堆 $O(n)$，操作 $O(\log n)$ & $O(n)$ & 上滤/下滤 & 完全二叉树 \\
+\textbf{LCA 倍增} & 树上祖先查询 & $O(\log|V|)$ 查询 & $O(|V|\log|V|)$ & $up[v][j]$ & 仅树 \\
+\bottomrule
+\end{tabulary}
+\caption{树算子对比}
+\label{tab:tree_compare}
 \end{table}
 

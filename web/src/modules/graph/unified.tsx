@@ -30,9 +30,10 @@ import {
   floydWarshallSteps, FLOYD_CODE,
   kosarajuSteps, tarjanSteps, KOSARAJU_CODE, TARJAN_CODE,
   dinicSteps, DINIC_CODE,
-  lcaBinaryLiftingSteps, LCA_CODE,
+  // 兼容旧配置：LCA 已移至树模块；此处仅保留码表/提示，不再作为子模式
+  LCA_CODE,
   reconstructPathFromParent,
-  type AStarStep, type FloydStep, type SCCStep, type MaxFlowStep, type LCAStep,
+  type AStarStep, type FloydStep, type SCCStep, type MaxFlowStep,
 } from "../../lib/graph";
 
 // ── 子模式：一个下拉覆盖全部图知识点 ──
@@ -42,8 +43,7 @@ type SubMode =
   | "topo"
   | "prim" | "kruskal"
   | "kosaraju" | "tarjan"
-  | "dinic"
-  | "lca";
+  | "dinic";
 
 const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
   { label: "遍历", opts: [{ v: "bfs", zh: "BFS 广度优先", en: "BFS" }, { v: "dfs", zh: "DFS 深度优先", en: "DFS" }] },
@@ -58,11 +58,10 @@ const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[
     { v: "prim", zh: "Prim MST", en: "Prim" },
     { v: "kruskal", zh: "Kruskal MST", en: "Kruskal" },
   ]},
-  { label: "连通 / 流 / 树", opts: [
+  { label: "连通 / 流", opts: [
     { v: "kosaraju", zh: "Kosaraju SCC", en: "Kosaraju" },
     { v: "tarjan", zh: "Tarjan SCC", en: "Tarjan" },
     { v: "dinic", zh: "Dinic 最大流", en: "Dinic" },
-    { v: "lca", zh: "LCA 倍增", en: "LCA" },
   ]},
 ];
 
@@ -71,17 +70,15 @@ type Cfg = GraphCfg & {
   target: number;
   sourceNode: number;
   sinkNode: number;
-  lcaU: number;
-  lcaV: number;
   heuristic: "zero" | "manhattan" | "euclidean";
-  pick?: "root" | "target" | "source" | "sink" | "u" | "v";
+  pick?: "root" | "target" | "source" | "sink";
 };
 
 const DEFAULT: Cfg = {
   source: "random", imp: null, confirmed: true,
   n: 8, p: 0.28, directed: false, weighted: true, connected: true, seed: 42, root: 0,
   subMode: "bfs",
-  target: 5, sourceNode: 0, sinkNode: 7, lcaU: 3, lcaV: 6, heuristic: "zero", pick: "root",
+  target: 5, sourceNode: 0, sinkNode: 7, heuristic: "zero", pick: "root",
 };
 
 function heuristicFn(heuristic: Cfg["heuristic"]): (u: number, v: number) => number {
@@ -125,13 +122,14 @@ function requirementOf(cfg: Cfg): GraphGate {
   if (cfg.subMode === "topo" && g.hasDirectedCycle()) {
     return { ok: false, reason: "检测到有向环：仅 DAG 可拓扑。请手动删除成环边后重试", reasonEn: "cycle detected: DAG only", fixable: false };
   }
-  if (cfg.subMode === "lca" && !g.isTree()) {
-    return { ok: false, reason: "LCA 要求无环连通图（树）。请手动改成树后重试", reasonEn: "LCA needs a tree", fixable: false };
-  }
   return { ok: true };
 }
 
 function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
+  // 兼容旧配置：LCA 已移至树模块（树上查询）
+  if ((cfg as any).subMode === "lca") {
+    return [{ line: 0, caption: T("LCA 已移至树模块（树上查询），请前往树模块查看", "LCA moved to the Tree module"), scene: { current: null, exploring: null, visited: [], frontier: [], order: [], edge: null, nodes: [], edges: [] } as GraphCanvasScene }];
+  }
   // 本页即编辑：图直接来自 GraphEditor 的 imp，无随机/导入分支
   // 兼容旧配置：若仍为 random 则按随机生成，否则用 imp
   const { g, importGraph, err } = resolveGraph(cfg);
@@ -322,40 +320,22 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
         return toFrame(step, base);
       });
     }
-    case "lca": {
-      if (!g.isTree()) return [{ line: 0, caption: T("LCA 需树", "LCA needs tree"), scene: graphScene(g, {}, { root: start, layout: "tree" }) as GraphCanvasScene }];
-      const u = clamp(cfg.lcaU), v = clamp(cfg.lcaV);
-      const steps: LCAStep[] = lcaBinaryLiftingSteps(g, start, u, v, g.labels);
-      return steps.map((s) => {
-        const annotate: Record<number, string> = {};
-        s.depth.forEach((d, i) => { annotate[i] = `d=${d}`; });
-        const base = graphScene(g, { current: s.current, exploring: s.exploring, visited: s.lca !== null ? [s.lca] : [], frontier: [], order: [], edge: s.edge }, { root: start, annotate, ...(importGraph ? { import: importGraph } : { layout: "tree" }) });
-        // 伪代码：depth[], up[][j]
-        (base as any).stateTables = numTables({ labels: g.labels, arrays: [
-          { name: "depth", values: s.depth.map((v:any) => String(v)) },
-          { name: "up0", values: s.up.map((row:any) => row[0] < 0 ? "-" : g.labels[row[0]]) },
-          { name: "up1", values: s.up.map((row:any) => row[1] < 0 ? "-" : g.labels[row[1]] ?? "-") },
-        ]});
-        return toFrame(s, base);
-      });
-    }
   }
 }
 
 function constraintsFor(mode: SubMode, isZh: boolean): { mustBeDirected?: boolean; mustBeTree?: boolean; hint?: string } | undefined {
   // 只给提示，不再强行切换开关/布局：图是什么样就是什么样，不满足时走虚化门禁
   if (mode === "tarjan" || mode === "kosaraju" || mode === "dinic" || mode === "topo") return { hint: isZh ? "该算法需有向图" : "needs directed" };
-  if (mode === "lca") return { hint: isZh ? "LCA 需树" : "needs tree" };
   return undefined;
 }
 
 export const graphUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
   id: "graph",
   title: T("图", "Graph"),
-  desc: T("遍历 / 最短路 / 拓扑 / MST / SCC / 最大流 / LCA", "Traverse / Shortest / Topo / MST / SCC / Flow / LCA"),
+  desc: T("遍历 / 最短路 / 拓扑 / MST / SCC / 最大流", "Traverse / Shortest / Topo / MST / SCC / Flow"),
   tags: ["data-structures"],
   defaultConfig: DEFAULT,
-  randomize(c) { return { ...randomCfg(c as GraphCfg) as Cfg, target: clampV(c.target, c.n), sourceNode: 0, sinkNode: Math.max(1, c.n - 1), lcaU: 2, lcaV: Math.max(3, c.n - 1), subMode: c.subMode, heuristic: c.heuristic } as unknown as Cfg; },
+  randomize(c) { return { ...randomCfg(c as GraphCfg) as Cfg, target: clampV(c.target, c.n), sourceNode: 0, sinkNode: Math.max(1, c.n - 1), subMode: c.subMode, heuristic: c.heuristic } as unknown as Cfg; },
   Controls({ config, onChange, t }) {
     const isZh = t(T("中文", "en")) !== "en";
     const set = (p: Partial<Cfg>) => onChange({ ...config, ...p });
@@ -387,13 +367,14 @@ export const graphUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
           {mode === "topo" && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><Chip label={isZh ? "起点" : "src"} value={config.root} active={pick === "root"} onClick={() => set({ pick: "root" })} /><span style={{ fontSize: 11, color: "#64748b" }}>{isZh ? "右键点图选" : "right-click"}</span></>}
           {(mode === "kosaraju" || mode === "tarjan" || mode === "floyd" || mode === "kruskal") && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><span style={{ fontSize: 11, color: "#64748b" }}>{isZh ? "无需选点" : "no pick"}</span></>}
           {mode === "dinic" && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><Chip label="S" value={config.sourceNode} active={pick === "source"} onClick={() => set({ pick: "source" })} /><Chip label="T" value={config.sinkNode} active={pick === "sink"} onClick={() => set({ pick: "sink" })} /><span style={{ fontSize: 11, color: "#64748b" }}>{isZh ? "右键·选择此点" : "right-click"}</span></>}
-          {mode === "lca" && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><Chip label="u" value={config.lcaU} active={pick === "u"} onClick={() => set({ pick: "u" })} /><Chip label="v" value={config.lcaV} active={pick === "v"} onClick={() => set({ pick: "v" })} /><span style={{ fontSize: 11, color: "#64748b" }}>{isZh ? "右键·选择此点" : "right-click"}</span></>}
           {showHeuristic && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><label className="txt-label">{isZh ? "启发式" : "h"}<select className="txt" value={config.heuristic} onChange={(e) => set({ heuristic: e.target.value as Cfg["heuristic"] })}><option value="zero">h=0</option><option value="manhattan">manhattan</option><option value="euclidean">euclidean</option></select></label></>}
         </div>
       </div>
     ) as unknown as never;
   },
   codeFor(cfg) {
+    // 兼容旧配置：LCA 已移至树模块
+    if ((cfg as any).subMode === "lca") return LCA_CODE;
     switch (cfg.subMode) {
       case "bfs": return BFS_CODE;
       case "dfs": return DFS_CODE;
@@ -407,7 +388,6 @@ export const graphUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
       case "kosaraju": return KOSARAJU_CODE;
       case "tarjan": return TARJAN_CODE;
       case "dinic": return DINIC_CODE;
-      case "lca": return LCA_CODE;
     }
   },
   generate(config) { return buildFrames(config); },
@@ -433,7 +413,6 @@ export const graphUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
     const pickTone: Record<number, number> = {};
     if (cfg.subMode === "astar") { pickTone[cfg.root] = 0; pickTone[cfg.target] = 1; }
     else if (cfg.subMode === "dinic") { pickTone[cfg.sourceNode] = 0; pickTone[cfg.sinkNode] = 1; }
-    else if (cfg.subMode === "lca") { pickTone[cfg.lcaU] = 0; pickTone[cfg.lcaV] = 1; }
     else { pickTone[cfg.root] = 0; }
     const sceneTone = (scene as any).tone as Record<number, number> | undefined;
     const mergedTone = { ...pickTone, ...(sceneTone ?? {}) };
@@ -451,9 +430,6 @@ export const graphUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
       } else if (cfg.subMode === "dinic") {
         if (pick === "sink") onChange?.({ ...cfg, sinkNode: id } as unknown as Cfg);
         else onChange?.({ ...cfg, sourceNode: id } as unknown as Cfg);
-      } else if (cfg.subMode === "lca") {
-        if (pick === "v") onChange?.({ ...cfg, lcaV: id } as unknown as Cfg);
-        else onChange?.({ ...cfg, lcaU: id } as unknown as Cfg);
       } else {
         onChange?.({ ...cfg, root: id } as unknown as Cfg);
       }
@@ -508,7 +484,7 @@ export const graphUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
     const isZh = t(T("中文", "en")) !== "en";
     const tables = (scene as any).stateTables as import("../../components/canvas/StateBar").AlgoTable[] | undefined;
     if (!tables || tables.length === 0) return <div style={{ fontSize: 12, color: "#64748b", padding: 12 }}>{isZh ? "当前帧无额外内存" : "No extra memory"}</div>;
-    return <StateBar tables={tables} headerAction={<button className="pill" style={{ padding: "2px 8px", fontSize: 11 }} onClick={() => { const g = (() => { try { const cfg = (t as any)?.config ?? null; } catch {} return null; })(); location.href = "#/memory"; }}>{isZh ? "查看内存 ↗" : "Memory ↗"}</button>} />;
+    return <StateBar tables={tables} />;
   },
 };
 

@@ -26,10 +26,12 @@ $$\mathcal{I}_{\mathbb{N}}(b) = \sum_{i=0}^{n-1} b_i 2^i, \quad \mathcal{I}_{\ma
 
 \begin{itemize}
     \item \textbf{对象}：$\mathbb{Z} = \{\dots, -2, -1, 0, 1, 2, \dots\}$。
+    \item \textbf{原码}：$b = s\,m_{n-2}\dots m_0$，$s$ 为符号位，$\mathcal{I}_{\text{sign}}(b) = (-1)^s \sum_{i=0}^{n-2} m_i 2^i$。值域 $[-(2^{n-1}-1), 2^{n-1}-1]$，$s\,0\dots0$ 与 $s\,0\dots0$ 给出 $+0 \neq -0$ 双零。
+    \item \textbf{反码}：负数按位取反，$\mathcal{I}_{\text{ones}}(b) = \mathcal{I}_{\text{sign}}(b)$ 调整，仍有 $+0 = 0\dots0 \neq 1\dots1 = -0$ 双零；加法需循环进位（末位进位回加）。
     \item \textbf{不变式（补码）}：$b = b_{n-1}\dots b_0 \in \mathbb{B}^n$，
 $$\mathcal{I}_{\mathbb{Z}}(b) = -b_{n-1}2^{n-1} + \sum_{i=0}^{n-2} b_i2^i$$
 符号位负权消除 $+0/-0$ 二义性。
-    \item \textbf{定理}：$\mathcal{I}_{\mathbb{Z}}: \mathbb{B}^n \to [-2^{n-1}, 2^{n-1}-1]$ 为双射；同一比特加法器对 $\mathcal{I}_{\mathbb{N}}$ 与 $\mathcal{I}_{\mathbb{Z}}$ 均正确（模 $2^n$ 同构）。
+    \item \textbf{定理}：$\mathcal{I}_{\mathbb{Z}}: \mathbb{B}^n \to [-2^{n-1}, 2^{n-1}-1]$ 为双射；同一比特加法器对 $\mathcal{I}_{\mathbb{N}}$ 与 $\mathcal{I}_{\mathbb{Z}}$ 均正确（模 $2^n$ 同构），而原码加减需判符号、反码需循环进位。
 \end{itemize}
 
 \subsection{\texorpdfstring{实数/有理数 ($\mathbb{R} \to \mathbb{Q}_{\text{discrete}}$)}{实数/有理数 (R 到 Q discrete)}}

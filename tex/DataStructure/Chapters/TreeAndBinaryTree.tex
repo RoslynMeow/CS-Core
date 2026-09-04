@@ -353,3 +353,42 @@
 \EndProcedure
 \end{algorithmic}
 \end{algorithm}
+
+\begin{algorithm}[H]
+\caption{建堆规约 (BuildHeap)}
+\begin{algorithmic}[1]
+\Procedure{BuildMaxHeap}{$A$}
+    \State $n\gets|A|$
+    \For{$i\gets\lfloor n/2\rfloor-1$ \textbf{downto} $0$}
+        \State $\text{SiftDown}(A,i,n)$
+    \EndFor
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\begin{itemize}
+    \item \textbf{定理}：建堆时间为 $O(n)$。高度 $h$ 层至多 $\lceil n/2^{h+1}\rceil$ 个节点下滤 $O(h)$，总和 $\sum_{h\ge0} n h/2^{h+1} = O(n)$。
+\end{itemize}
+
+\section{树上查询：LCA 倍增}
+\begin{itemize}
+    \item \textbf{对象}：有根树 $T$，$depth[v]$，$up[v][j]=v$ 的 $2^j$ 祖先，$LOG=\lceil\log_2|V|\rceil$。
+    \item \textbf{不变式}：$up[v][0]=parent(v)$，$up[v][j]=up[up[v][j-1]][j-1]$。
+    \item \textbf{规约}：查询 $(u,v)$：(1) 提深者至同深；(2) 同步上跳至分叉点之子，父即 LCA。预处理 $O(|V|\log|V|)$，查询 $O(\log|V|)$。
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{LCA 倍增规约}
+\begin{algorithmic}[1]
+\State 预处理: $depth[root]\gets0$, DFS 求 $up[v][0]$, $up[v][j]\gets up[up[v][j-1]][j-1]$
+\Procedure{LCA}{$u,v$}
+    \If{$depth[u]<depth[v]$} $\text{swap}(u,v)$ \EndIf
+    \State 将 $u$ 上提至 $depth[u]=depth[v]$ \Comment{二进制分解差值}
+    \If{$u=v$} \Return $u$ \EndIf
+    \For{$j\gets LOG-1$ \textbf{downto} $0$}
+        \If{$up[u][j]\neq up[v][j]$} $u\gets up[u][j]; v\gets up[v][j]$ \EndIf
+    \EndFor
+    \State \Return $parent[u]$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
