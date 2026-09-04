@@ -2,11 +2,11 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBackward, faBackwardStep, faForward, faForwardStep, faPause, faPlay } from '@fortawesome/free-solid-svg-icons';
 import type { Playback } from '../engine/usePlayback';
 
-export function PlaybackBar({ pb }: { pb: Playback }) {
-  const atFirst = pb.index <= 0;
-  const atLast = !pb.infinite && pb.index >= pb.count - 1;
+export function PlaybackBar({ pb, disabled }: { pb: Playback; disabled?: boolean }) {
+  const atFirst = disabled || pb.index <= 0;
+  const atLast = disabled || (!pb.infinite && pb.index >= pb.count - 1);
   return (
-    <div className="playback">
+    <div className="playback" style={disabled ? { opacity: 0.55 } : undefined}>
       <button disabled={atFirst} onClick={pb.first}>
         <FontAwesomeIcon icon={faBackwardStep} style={{ width: 11, marginRight: 4 }} />
         首帧
@@ -15,7 +15,7 @@ export function PlaybackBar({ pb }: { pb: Playback }) {
         <FontAwesomeIcon icon={faBackward} style={{ width: 11, marginRight: 4 }} />
         上一步
       </button>
-      <button className="primary" onClick={pb.toggle}>
+      <button className="primary" disabled={disabled} onClick={pb.toggle}>
         <FontAwesomeIcon icon={pb.playing ? faPause : faPlay} style={{ width: 11, marginRight: 4 }} />
         {pb.playing ? '暂停' : '播放'}
       </button>

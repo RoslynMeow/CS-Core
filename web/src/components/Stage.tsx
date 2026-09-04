@@ -159,7 +159,7 @@ export function Stage({ mod }: { mod: ModuleDef }) {
           )}
         </div>
       )}
-      <PlaybackBar pb={pb} />
+      <PlaybackBar pb={pb} disabled={!!mod.blockedReason?.(config as never)} />
       {mod.bare ? (
         <div className="stage-body" style={{ gridTemplateColumns: "1fr" }}>
           <div className="canvas">

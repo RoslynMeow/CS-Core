@@ -29,6 +29,13 @@ export function weightArrow(w: number): { len: number; half: number; font: numbe
   return { len: half * 2.1, half, font: digits >= 3 ? 8 : 10 };
 }
 
+/** 箭头按边长封顶：对子边各分一半可用跨度，单边可用近全跨度，两三角永不互盖 */
+export function fitArrowLen(want: number, dist: number, paired: boolean): number {
+  const free = Math.max(0, dist - 32);
+  const cap = paired ? free * 0.5 : free * 0.95;
+  return Math.max(8, Math.min(want, cap));
+}
+
 /** 图是否算有权图：任一边带显式权重（含显式 1；新建默认边不存权重，保持无权图干净） */
 export function graphHasWeight(edges: { weight?: number }[]): boolean {
   return edges.some((e) => e.weight !== undefined);

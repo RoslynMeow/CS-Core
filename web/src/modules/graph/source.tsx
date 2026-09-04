@@ -176,7 +176,7 @@ export function loadGraph(): ImportedGraph | null {
   return loadGraphStudio();
 }
 
-/** 布局 + 场景：图（可选树形/力导向/环形）→ GraphCanvasScene
+/** 布局 + 场景：图（可选树形/环形）→ GraphCanvasScene
  *  opts.import：给定时无视 layout，完全复刻用户在图创建选的布局 + 手动位置 */
 export function graphScene(
   g: Graph,
@@ -208,8 +208,8 @@ export function graphScene(
   let pos: Vec2[];
   const imp = opts.import;
   if (imp && imp.layout) {
-    // 复刻 GraphStudio：tree→layoutTree / force→layoutForce / circle·free→layoutCircle，手动位置覆盖
-    const layout = imp.layout;
+    // 复刻 GraphStudio：tree→layoutTree / circle·free→layoutCircle（力导向已下线，旧存档 force 按环形），手动位置覆盖
+    const layout = (imp.layout as string) === "force" ? "circle" : imp.layout;
     if (layout === "tree")
       pos = g.layoutTree(root, {
         x0: 20,
@@ -217,8 +217,6 @@ export function graphScene(
         w: 720,
         h: 420,
       }).pos;
-    else if (layout === "force")
-      pos = g.layoutForce(380, 220, 760, 440, 160);
     else
       pos = g.layoutCircle(380, 220, 174);
     if (imp.manual) {
@@ -228,13 +226,12 @@ export function graphScene(
     const layout = opts.layout ?? "auto";
     if (layout === "tree" || (layout === "auto" && isTree))
       pos = g.layoutTree(root, GRAPH_BOX).pos;
-    else if (layout === "circle")
+    else
       pos = g.layoutCircle(
         center.x,
         center.y,
         Math.min(GRAPH_BOX.w, GRAPH_BOX.h) / 2 - 50,
       );
-    else pos = g.layoutForce(center.x, center.y, GRAPH_BOX.w - 90, GRAPH_BOX.h - 90);
   }
   const nodes = Array.from({ length: g.n }, (_, i) => ({
     id: i,

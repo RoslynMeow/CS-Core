@@ -52,4 +52,6 @@ export interface ModuleDef<S = unknown, C = unknown> {
   codeFor?: (config: C) => Text[];
   /** 纯画布模式：隐藏讲解条与右侧栏（伪代码/Side），只留画布全宽（如排序 PK） */
   bare?: boolean;
+  /** 门禁：当前配置跑不动本模块时返回原因（展示虚化罩），返回 null 表示可跑 */
+  blockedReason?: (config: C) => string | null;
 }

@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { Graph, alphaLabels } from "../lib/graph";
 import type { ImportedGraph } from "../modules/tree/source";
 import {
+  fitArrowLen,
   getUndirectedBadgeColor,
   graphHasWeight,
   weightArrow,
 } from "../lib/graphTheme";
 
-type Layout = "circle" | "tree" | "force" | "free";
+type Layout = "circle" | "tree" | "free";
 type Tool = "move" | "addEdge" | "addVertex" | "delete";
 const SVG_W = 760;
 const SVG_H = 440;
@@ -35,21 +37,17 @@ export type GraphEditorProps = {
   onPickVertex?: (id: number) => void;
 };
 
-type GenType = "tree" | "binary" | "complete" | "skew" | "graph" | "dcyclic" | "dag" | "ucyclic" | "uacyclic";
+type GenType = "tree" | "binary" | "complete" | "skew" | "graph";
 type WeightMode = "none" | "random";
-type GenCfg = { type: GenType; n: number; p: number; directed: boolean; alpha: boolean; weighted: WeightMode; skewRandom: boolean; connected: boolean; k: number; };
+type GenCfg = { type: GenType; n: number; p: number; directed: boolean; alpha: boolean; weighted: WeightMode; skewRandom: boolean; };
 const GEN_TYPES: Array<{ k: GenType; label: string; desc: string }> = [
   { k: "tree", label: "树（通用）", desc: "连通无向树 · n−1 条边" },
   { k: "binary", label: "二叉树", desc: "每个节点至多 2 个子" },
   { k: "complete", label: "完全二叉树", desc: "严格层序填补（堆结构）" },
   { k: "skew", label: "偏二叉树", desc: "退化链：每个节点至多 1 个子" },
-  { k: "graph", label: "图（通用）", desc: "随机边 · 概率 p" },
-  { k: "dcyclic", label: "有向有环图", desc: "先构造环保证有环" },
-  { k: "dag", label: "有向无环图", desc: "随机拓扑序 + 前向边（保证无环）" },
-  { k: "ucyclic", label: "无向有环图", desc: "先构造环保证有环" },
-  { k: "uacyclic", label: "无向无环图", desc: "森林（可勾选连通成树）" },
+  { k: "graph", label: "图（通用）", desc: "随机边 · 概率 p，可调有向" },
 ];
-const GEN_TYPE_LABEL: Record<GenType, string> = { tree: "树", binary: "二叉树", complete: "完全二叉树", skew: "偏二叉树", graph: "图", dcyclic: "有向有环图", dag: "有向无环图", ucyclic: "无向有环图", uacyclic: "无向无环图" };
+const GEN_TYPE_LABEL: Record<GenType, string> = { tree: "树", binary: "二叉树", complete: "完全二叉树", skew: "偏二叉树", graph: "图" };
 type GraphSnap = {
   n: number;
   directed: boolean;
@@ -64,7 +62,7 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
   const [directed, setDirected] = useState(init ? init.directed : false);
   const [edgeSpec, setEdgeSpec] = useState(init ? init.spec : "0-1,1-2,2-3");
   const [labels, setLabels] = useState<string[]>(init ? init.labels : ["A", "B", "C", "D"]);
-  const [layout, setLayout] = useState<Layout>(init?.layout ?? "tree");
+  const [layout, setLayout] = useState<Layout>((init?.layout as string) === "force" || init?.layout === undefined ? "circle" : (init.layout as Layout));
   const [root, setRoot] = useState(init ? init.root : 0);
   const [tool, setTool] = useState<Tool>("move");
   const [selected, setSelected] = useState<number | null>(null);
@@ -88,6 +86,8 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
   const svgRef = useRef<SVGSVGElement>(null);
   const [menu, setMenu] = useState<{ x: number; y: number; sx: number; sy: number; target: number | null; edge: { u: number; v: number } | null; edgeList: { u: number; v: number }[] } | null>(null);
   const [edgeChoice, setEdgeChoice] = useState(0);
+  // 数字层：统一最后绘制，保证数字不被对向箭头盖住
+  const edgeNumLayer: ReactNode[] = [];
   const [genOpen, setGenOpen] = useState(false);
 
   // 约束：强制有向/树时锁定
@@ -152,7 +152,6 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
 
   const autoPos = useMemo(() => {
     if (layout === "tree") return g.layoutTree(root, { x0: 20, y0: 10, w: SVG_W - 40, h: SVG_H - 20 }).pos;
-    if (layout === "force") return g.layoutForce(SVG_W / 2, SVG_H / 2, SVG_W, SVG_H, 160);
     return g.layoutCircle(SVG_W / 2, SVG_H / 2, Math.min(SVG_W, SVG_H) / 2 - 46);
   }, [g, layout, root]);
 
@@ -342,7 +341,7 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
   };
 
   const genGraph = (cfg: GenCfg) => {
-    const minN = cfg.type === "dcyclic" || cfg.type === "ucyclic" ? 3 : 2;
+    const minN = 2;
     const nn = Math.max(minN, Math.min(80, Math.floor(cfg.n) || minN));
     const labs = cfg.alpha ? alphaLabels(nn) : Array.from({ length: nn }, (_, i) => String(i));
     const lopts = { labels: labs };
@@ -353,18 +352,14 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
       case "binary": gg = Graph.randomBinaryTree(nn, { ...lopts, weighted }); break;
       case "complete": gg = Graph.randomCompleteBinaryTree(nn, { ...lopts, weighted }); break;
       case "skew": gg = Graph.randomSkewTree(nn, { ...lopts, weighted, random: cfg.skewRandom }); break;
-      case "graph": gg = Graph.randomGraph(nn, cfg.p, { directed: cfg.directed, ...lopts, weighted }); ly = "force"; break;
-      case "dcyclic": gg = Graph.randomGraphWithCycle(nn, cfg.p, { directed: true, ...lopts, weighted }); ly = "force"; break;
-      case "dag": gg = Graph.randomDAG(nn, cfg.p, { ...lopts, weighted }); ly = "force"; break;
-      case "ucyclic": gg = Graph.randomGraphWithCycle(nn, cfg.p, { directed: false, ...lopts, weighted }); ly = "force"; break;
-      case "uacyclic": gg = cfg.connected ? Graph.randomTree(nn, { ...lopts, weighted }) : Graph.randomForest(nn, Math.max(1, Math.min(cfg.k, nn)), { ...lopts, weighted }); break;
-      default: gg = Graph.randomGraph(nn, cfg.p, { ...lopts, weighted }); ly = "force";
+      case "graph": gg = Graph.randomGraph(nn, cfg.p, { directed: cfg.directed, ...lopts, weighted }); ly = "circle"; break;
+      default: gg = Graph.randomGraph(nn, cfg.p, { ...lopts, weighted }); ly = "circle";
     }
     pushHistory();
     setN(gg.n); setLabels([...gg.labels]); setEdgeSpec(specFromEdges(gg.edges)); setManual({}); setDirected(gg.directed); setLayout(ly); setRoot(0); setSelected(null); setPending(null);
     showToast(`已随机生成：${GEN_TYPE_LABEL[cfg.type]}（${gg.n} 顶点 · ${gg.edges.length} 边）`);
   };
-  const genRandom = (type: GenType) => genGraph({ type, n, p: 0.25, directed, alpha: true, weighted: "none", skewRandom: true, connected: true, k: 3 });
+  const genRandom = (type: GenType) => genGraph({ type, n, p: 0.25, directed, alpha: true, weighted: "none", skewRandom: true });
 
   const handleConfirm = () => {
     const out: ImportedGraph = {
@@ -419,7 +414,6 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
             <select className="txt" value={layout} onChange={(e) => setLayout(e.target.value as Layout)} style={{ fontSize: 12 }}>
               <option value="tree">树形</option>
               <option value="circle">环形</option>
-              <option value="force">力导向</option>
               <option value="free">自由</option>
             </select>
             <button className="ghost" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => { pushHistory(); setEdgeSpec(""); showToast("已清空边"); }}>清空边</button>
@@ -433,7 +427,6 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
             <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
               <button className="ghost" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => genRandom("tree")}>随机树</button>
               <button className="ghost" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => genRandom("graph")}>随机图</button>
-              <button className="ghost" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => genRandom("dag")}>随机DAG</button>
             </div>
 
           </div>
@@ -477,8 +470,12 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
             const ux = dx / dl, uy = dy / dl;
             const wa = weightArrow(wVal);
             // 有权箭头：数字写进放大的三角形里；无权箭头保持可见尺寸
-            const AL = showW && g.directed ? wa.len : 15;
-            const AH = showW && g.directed ? wa.half : 7;
+            // A：按边长封顶（对子边各分一半跨度），两三角永不互盖
+            const needLen = showW && g.directed ? wa.len : 15;
+            const AL = fitArrowLen(needLen, dl, g.directed && g.edges.some((o) => o.u === e.v && o.v === e.u));
+            const asc = needLen > 0 ? AL / needLen : 1;
+            const AH = (showW && g.directed ? wa.half : 7) * asc;
+            const afont = showW && g.directed ? Math.max(7, Math.round(wa.font * asc)) : wa.font;
             // 箭尖贴到节点圆（从线端再往前 3px，正好内嵌 1px 相接）
             const tx2 = p.bx + ux * 3, ty2 = p.by + uy * 3;
             const bx2 = tx2 - ux * AL, by2 = ty2 - uy * AL;
@@ -500,6 +497,12 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
               setMenu({ x: ev.clientX, y: ev.clientY, sx: worldP.x, sy: worldP.y, target: null, edge: cur, edgeList: eds });
             };
             const badgeColor = getUndirectedBadgeColor();
+            // 数字进顶层数字层（C），箭头本体留在原处
+            if (showW && g.directed) {
+              edgeNumLayer.push(
+                <text key={`num-${i}`} x={tx2 - ux * AL * 0.55} y={ty2 - uy * AL * 0.55} textAnchor="middle" dominantBaseline="central" fontSize={afont} fontWeight={800} fill="#fff" stroke="rgba(15,23,42,.8)" strokeWidth={2.5} paintOrder="stroke">{wVal}</text>,
+              );
+            }
             return (
               <g key={i}>
                 <line x1={p.ax} y1={p.ay} x2={ex2} y2={ey2} stroke={stroke} strokeWidth={isHlEdge ? 3 : isSel ? 2.4 : 1.6} />
@@ -510,9 +513,6 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
                     style={embedded ? { cursor: "pointer" } : undefined}
                   >
                     <polygon points={`${tx2},${ty2} ${bx2 + px * AH},${by2 + py * AH} ${bx2 - px * AH},${by2 - py * AH}`} fill={stroke} />
-                    {showW && (
-                      <text x={nx} y={ny} textAnchor="middle" dominantBaseline="central" fontSize={wa.font} fontWeight={800} fill="#fff" stroke="rgba(15,23,42,.8)" strokeWidth={2.5} paintOrder="stroke">{wVal}</text>
-                    )}
                   </g>
                 ) : (
                   showW && (
@@ -558,6 +558,8 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
               </g>
             );
           })}
+          {/* 数字层最后绘制：权重数字永远在最上，不被对向箭头盖住 */}
+          {edgeNumLayer}
         </svg>
         {toast && (
           <div style={{ position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)", background: "#059669", color: "#fff", padding: "6px 14px", borderRadius: 999, fontSize: 12, fontWeight: 700, zIndex: 10, boxShadow: "0 4px 12px rgba(0,0,0,.15)", pointerEvents: "none" }}>
@@ -622,8 +624,7 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
                 <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer" }} onClick={() => { pushHistory(); setEdgeSpec(""); setMenu(null); }}>清空边</div>
                 <div style={{ padding: "7px 12px", borderRadius: 8, fontSize: 13, cursor: "pointer" }} onClick={() => { menuReset(); setMenu(null); }}>重置布局</div>
                 <div style={{ height: 1, background: "#eef2f7", margin: "5px 6px" }} />
-                {!constraints?.mustBeTree && <label style={{ display: "flex", gap: 6, alignItems: "center", padding: "7px 12px", fontSize: 13 }}><input type="checkbox" checked={directed} disabled={!!constraints?.mustBeDirected} onChange={(e) => setDirected(e.target.checked)} /> 有向</label>}
-                <div style={{ display: "flex", gap: 6, padding: "7px 12px" }}>{((constraints?.mustBeTree ? ["tree"] : ["tree","circle","force","free"]) as Layout[]).map((l) => <button key={l} className={`pill ${layout===l?"active":""}`} style={{ padding: "2px 8px", fontSize: 11 }} onClick={() => { setLayout(l); setMenu(null); }}>{l==="tree"?"树形":l==="circle"?"环形":l==="force"?"力导向":"自由"}</button>)}</div>
+                <div style={{ display: "flex", gap: 6, padding: "7px 12px" }}>{((constraints?.mustBeTree ? ["tree"] : ["tree","circle","free"]) as Layout[]).map((l) => <button key={l} className={`pill ${layout===l?"active":""}`} style={{ padding: "2px 8px", fontSize: 11 }} onClick={() => { setLayout(l); setMenu(null); }}>{l==="tree"?"树形":l==="circle"?"环形":"自由"}</button>)}</div>
               </>
             )}
           </div>
@@ -644,15 +645,14 @@ function ModalRow({ label, children }: { label: string; children: React.ReactNod
   return <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8, fontSize: 13 }}><span style={{ width: 76, flexShrink: 0, color: "#475569" }}>{label}</span><div style={{ flex: 1, display: "flex", alignItems: "center", gap: 8 }}>{children}</div></div>;
 }
 function GenModal({ onCancel, onGenerate, constraints }: { onCancel: () => void; onGenerate: (cfg: GenCfg) => void; constraints?: { mustBeTree?: boolean; mustBeDirected?: boolean } }) {
-  const allowed = constraints?.mustBeTree ? GEN_TYPES.filter((t) => ["tree","binary","complete","skew","uacyclic"].includes(t.k)) : GEN_TYPES;
+  const allowed = constraints?.mustBeTree ? GEN_TYPES.filter((t) => ["tree","binary","complete","skew"].includes(t.k)) : GEN_TYPES;
   const [cfg, setCfg] = useState<GenCfg>(() => {
     const initType = allowed[0]?.k ?? "tree";
-    return { type: initType, n: 10, p: 0.25, directed: !!constraints?.mustBeDirected, alpha: true, weighted: "none", skewRandom: true, connected: true, k: 3 };
+    return { type: initType, n: 10, p: 0.25, directed: !!constraints?.mustBeDirected, alpha: true, weighted: "none", skewRandom: true };
   });
   const info = allowed.find((t) => t.k === cfg.type) ?? allowed[0];
-  const isCyclic = cfg.type === "dcyclic" || cfg.type === "ucyclic";
-  const hasDensity = cfg.type === "graph" || cfg.type === "dcyclic" || cfg.type === "dag" || cfg.type === "ucyclic";
-  const minN = isCyclic ? 3 : 2;
+  const hasDensity = cfg.type === "graph";
+  const minN = 2;
   const set = (p: Partial<GenCfg>) => setCfg((c) => ({ ...c, ...p }));
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.45)", zIndex: 60, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }} onPointerDown={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) onCancel(); }} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); }}>
@@ -664,13 +664,12 @@ function GenModal({ onCancel, onGenerate, constraints }: { onCancel: () => void;
           </select>
           <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{info.desc}</div>
         </div>
-        <ModalRow label="顶点数"><input type="number" min={minN} max={80} value={cfg.n} onChange={(e) => set({ n: Math.floor(Number(e.target.value)) || minN })} className="txt" style={{ width: 72, fontSize: 13 }} /><span style={{ fontSize: 11, color: "#94a3b8" }}>{minN}–80{isCyclic ? "（有环需 ≥3）" : ""}</span></ModalRow>
+        <ModalRow label="顶点数"><input type="number" min={minN} max={80} value={cfg.n} onChange={(e) => set({ n: Math.floor(Number(e.target.value)) || minN })} className="txt" style={{ width: 72, fontSize: 13 }} /><span style={{ fontSize: 11, color: "#94a3b8" }}>{minN}–80</span></ModalRow>
         {hasDensity && <ModalRow label="边密度 p"><input type="range" min={0.05} max={1} step={0.05} value={cfg.p} onChange={(e) => set({ p: Number(e.target.value) })} style={{ flex: 1 }} /><span style={{ fontSize: 12, color: "#475569", width: 38, textAlign: "right" }}>{cfg.p.toFixed(2)}</span></ModalRow>}
         {cfg.type === "graph" && <ModalRow label="方向"><label style={{ display: "flex", gap: 4, alignItems: "center" }}><input type="checkbox" checked={cfg.directed} onChange={(e) => set({ directed: e.target.checked })} /> 有向</label></ModalRow>}
         <ModalRow label="标签"><button className={`pill ${cfg.alpha ? "" : "active"}`} style={{ padding: "3px 10px", fontSize: 12 }} onClick={() => set({ alpha: false })}>数字 0,1…</button><button className={`pill ${cfg.alpha ? "active" : ""}`} style={{ padding: "3px 10px", fontSize: 12 }} onClick={() => set({ alpha: true })}>字母 A,B…</button></ModalRow>
         <ModalRow label="权重"><select className="txt" value={cfg.weighted} onChange={(e) => set({ weighted: e.target.value as WeightMode })} style={{ width: 170, fontSize: 13 }}><option value="none">全 1（无权重）</option><option value="random">随机 1–10</option></select></ModalRow>
         {cfg.type === "skew" && <ModalRow label="偏斜序"><label style={{ display: "flex", gap: 4, alignItems: "center" }}><input type="checkbox" checked={cfg.skewRandom} onChange={(e) => set({ skewRandom: e.target.checked })} /> 随机排列</label></ModalRow>}
-        {cfg.type === "uacyclic" && <><ModalRow label="连通"><label style={{ display: "flex", gap: 4, alignItems: "center" }}><input type="checkbox" checked={cfg.connected} onChange={(e) => set({ connected: e.target.checked })} /> 保证连通</label></ModalRow>{!cfg.connected && <ModalRow label="树数 k"><input type="number" min={1} max={Math.max(1, cfg.n)} value={cfg.k} onChange={(e) => set({ k: Math.max(1, Math.floor(Number(e.target.value)) || 1)})} className="txt" style={{ width: 72 }} /></ModalRow>}</>}
         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 14 }}><button className="ghost" style={{ padding: "6px 14px", fontSize: 13 }} onClick={onCancel}>取消</button><button className="pill active" style={{ padding: "6px 14px", fontSize: 13 }} onClick={() => onGenerate(cfg)}>生成</button></div>
       </div>
     </div>

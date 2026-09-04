@@ -89,10 +89,8 @@ function heuristicFn(heuristic: Cfg["heuristic"]): (u: number, v: number) => num
   return (u: number, v: number) => Math.abs(u - v);
 }
 
-function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
-  // 本页即编辑：图直接来自 GraphEditor 的 imp，无随机/导入分支
-  // 兼容旧配置：若仍为 random 则按随机生成，否则用 imp
-  let g;
+function resolveGraph(cfg: Cfg): { g: Graph | undefined; importGraph: ImportedGraph | null; err: string | null } {
+  let g: Graph | undefined;
   let importGraph: ImportedGraph | null = null;
   let err: string | null = null;
   if (cfg.source === "graph" && cfg.imp) {
@@ -107,6 +105,36 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
     // 首次进入无 imp：用随机图占位，编辑器会覆盖
     g = cfg.subMode === "topo" ? randDag(cfg) : randGraph(cfg);
   }
+  return { g, importGraph, err };
+}
+
+export type GraphGate =
+  | { ok: true }
+  | { ok: false; reason: string; reasonEn: string; fixable: boolean };
+
+/** 算法门禁：图不满足要求时返回原因；只有“无向→有向”是可一键修复的，其余只给提示 */
+function requirementOf(cfg: Cfg): GraphGate {
+  const { g, err } = resolveGraph(cfg);
+  if (err || !g || g.n === 0) return { ok: true }; // 解析/空图走原有报错通道，不管制
+  const needDirected = cfg.subMode === "topo" || cfg.subMode === "kosaraju" || cfg.subMode === "tarjan" || cfg.subMode === "dinic";
+  if (needDirected && !g.directed) {
+    const names: Record<string, string> = { topo: "拓扑排序", kosaraju: "SCC", tarjan: "SCC", dinic: "最大流" };
+    const nm = names[cfg.subMode] ?? cfg.subMode;
+    return { ok: false, reason: `${nm}需有向图：当前是无向图`, reasonEn: `${nm} needs directed graph`, fixable: true };
+  }
+  if (cfg.subMode === "topo" && g.hasDirectedCycle()) {
+    return { ok: false, reason: "检测到有向环：仅 DAG 可拓扑。请手动删除成环边后重试", reasonEn: "cycle detected: DAG only", fixable: false };
+  }
+  if (cfg.subMode === "lca" && !g.isTree()) {
+    return { ok: false, reason: "LCA 要求无环连通图（树）。请手动改成树后重试", reasonEn: "LCA needs a tree", fixable: false };
+  }
+  return { ok: true };
+}
+
+function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
+  // 本页即编辑：图直接来自 GraphEditor 的 imp，无随机/导入分支
+  // 兼容旧配置：若仍为 random 则按随机生成，否则用 imp
+  const { g, importGraph, err } = resolveGraph(cfg);
   if (err) {
     return [{ line: 0, caption: T(err, err), scene: { current: null, exploring: null, visited: [], frontier: [], order: [], edge: null, nodes: [], edges: [], error: err } as GraphCanvasScene }];
   }
@@ -140,7 +168,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
     case "topo": {
       if (!g.directed || g.hasDirectedCycle()) {
         const reason = !g.directed ? "拓扑排序需有向图" : "检测到有向环：仅 DAG 可拓扑";
-        return [{ line: 0, caption: T(reason, !g.directed ? "needs directed" : "cycle detected"), scene: { ...graphScene(g, {}, { root: start, ...(importGraph ? { import: importGraph } : { layout: "force" }) }), error: reason } as GraphCanvasScene }];
+        return [{ line: 0, caption: T(reason, !g.directed ? "needs directed" : "cycle detected"), scene: graphScene(g, {}, { root: start, ...(importGraph ? { import: importGraph } : { layout: "force" }) }) as GraphCanvasScene }];
       }
       const steps = topoSteps(g, g.labels);
       return steps.map((s) => {
@@ -220,13 +248,17 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
       });
     }
     case "prim": {
-      const steps = primSteps(g, start, g.labels);
-      return steps.map((s) => {
+      // MST 按无向图语义跑：有向图先转无向副本，避免有向邻接导致 picked 为空
+      const gPrim = g.directed ? (() => { const gg = new Graph(g.n, { directed: false, labels: [...g.labels] }); gg.fromSpec(g.edges.map((e) => `${e.u}-${e.v}${e.weight !== undefined ? `:${e.weight}` : ""}`).join(",")); return gg; })() : g;
+      const steps = primSteps(gPrim, start, gPrim.labels);
+      return steps.map((s, idx) => {
         const ann: Record<number, string> = {};
         for (let i = 0; i < n; i++) ann[i] = Number.isFinite(s.key[i]) ? `k:${s.key[i]}` : "∞";
         const picked: [number, number][] = [];
         for (let v = 0; v < n; v++) if (s.inTree[v] && s.parent[v] >= 0) picked.push([s.parent[v], v]);
         const base = graphScene(g, { current: s.current, exploring: s.exploring, visited: [...s.visited], frontier: [...s.frontier], order: [...s.order], edge: s.edge }, { root: start, annotate: ann, picked, ...(importGraph ? { import: importGraph } : {}) });
+        // 末帧定稿：未选入树的边压暗，只留 MST 高亮（无向匹配，兼容有向原图）
+        if (idx === steps.length - 1 && picked.length > 0) (base as any).dimUnpicked = true;
         // 伪代码：key[], parent[], T
         (base as any).stateTables = numTables({ labels: g.labels, arrays: [
           { name: "key", values: s.key.map((v:any) => Number.isFinite(v) ? String(v) : "∞") },
@@ -237,9 +269,12 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
       });
     }
     case "kruskal": {
-      const steps = kruskalSteps(g, g.labels);
-      return steps.map((s) => {
+      const gKruskal = g.directed ? (() => { const gg = new Graph(g.n, { directed: false, labels: [...g.labels] }); gg.fromSpec(g.edges.map((e) => `${e.u}-${e.v}${e.weight !== undefined ? `:${e.weight}` : ""}`).join(",")); return gg; })() : g;
+      const steps = kruskalSteps(gKruskal, gKruskal.labels);
+      return steps.map((s, idx) => {
         const base = graphScene(g, { current: s.current, exploring: s.exploring, visited: [...s.visited], frontier: [...s.frontier], order: [...s.order], edge: s.edge }, { root: start, picked: s.picked as [number, number][], ...(importGraph ? { import: importGraph } : {}) });
+        // 末帧定稿：未选入树的边压暗，只留 MST 高亮（无向匹配）
+        if (idx === steps.length - 1 && (s.picked as [number, number][]).length > 0) (base as any).dimUnpicked = true;
         // 伪代码：E' sorted, uf[], MST
         (base as any).stateTables = numTables({ labels: g.labels, arrays: [
           { name: "uf", values: s.uf.map((v:any) => g.labels[v] ?? String(v)) },
@@ -250,7 +285,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
     }
     case "kosaraju":
     case "tarjan": {
-      if (!g.directed) return [{ line: 0, caption: T("SCC 需有向图", "SCC needs directed"), scene: { ...graphScene(g, {}, { root: start, ...(importGraph ? { import: importGraph } : { layout: "force" }) }), error: "SCC 仅适用于有向图" } as GraphCanvasScene }];
+      if (!g.directed) return [{ line: 0, caption: T("SCC 需有向图", "SCC needs directed"), scene: graphScene(g, {}, { root: start, ...(importGraph ? { import: importGraph } : { layout: "force" }) }) as GraphCanvasScene }];
       const steps: SCCStep[] = cfg.subMode === "kosaraju" ? kosarajuSteps(g, g.labels) : tarjanSteps(g, g.labels);
       return steps.map((s) => {
         const annotate: Record<number, string> = {};
@@ -268,7 +303,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
       });
     }
     case "dinic": {
-      if (!g.directed) return [{ line: 0, caption: T("最大流需有向图", "Max flow needs directed"), scene: { ...graphScene(g, {}, { root: clamp(cfg.sourceNode), ...(importGraph ? { import: importGraph } : { layout: "force" }) }), error: "Dinic 仅适用于有向图" } as GraphCanvasScene }];
+      if (!g.directed) return [{ line: 0, caption: T("最大流需有向图", "Max flow needs directed"), scene: graphScene(g, {}, { root: clamp(cfg.sourceNode), ...(importGraph ? { import: importGraph } : { layout: "force" }) }) as GraphCanvasScene }];
       const s = clamp(cfg.sourceNode), t = clamp(cfg.sinkNode);
       if (s === t) return [{ line: 0, caption: T("源点≠汇点", "source != sink"), scene: graphScene(g, {}, { root: s }) }];
       const steps: MaxFlowStep[] = dinicSteps(g, s, t, g.labels);
@@ -288,7 +323,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
       });
     }
     case "lca": {
-      if (!g.isTree()) return [{ line: 0, caption: T("LCA 需树", "LCA needs tree"), scene: { ...graphScene(g, {}, { root: start, layout: "tree" }), error: "LCA 要求无环连通图（树）" } as GraphCanvasScene }];
+      if (!g.isTree()) return [{ line: 0, caption: T("LCA 需树", "LCA needs tree"), scene: graphScene(g, {}, { root: start, layout: "tree" }) as GraphCanvasScene }];
       const u = clamp(cfg.lcaU), v = clamp(cfg.lcaV);
       const steps: LCAStep[] = lcaBinaryLiftingSteps(g, start, u, v, g.labels);
       return steps.map((s) => {
@@ -308,8 +343,9 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
 }
 
 function constraintsFor(mode: SubMode, isZh: boolean): { mustBeDirected?: boolean; mustBeTree?: boolean; hint?: string } | undefined {
-  if (mode === "tarjan" || mode === "kosaraju" || mode === "dinic" || mode === "topo") return { mustBeDirected: true, hint: isZh ? "该算法需有向图" : "needs directed" };
-  if (mode === "lca") return { mustBeTree: true, hint: isZh ? "LCA 需树" : "needs tree" };
+  // 只给提示，不再强行切换开关/布局：图是什么样就是什么样，不满足时走虚化门禁
+  if (mode === "tarjan" || mode === "kosaraju" || mode === "dinic" || mode === "topo") return { hint: isZh ? "该算法需有向图" : "needs directed" };
+  if (mode === "lca") return { hint: isZh ? "LCA 需树" : "needs tree" };
   return undefined;
 }
 
@@ -375,6 +411,10 @@ export const graphUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
     }
   },
   generate(config) { return buildFrames(config); },
+  blockedReason(cfg) {
+    const gate = requirementOf(cfg as Cfg);
+    return !gate.ok ? gate.reason : null;
+  },
   // 左侧画布：图创建同款编辑器（伪代码左侧），点选即设参，高亮同步
   Render({ scene, t, config, onChange }) {
     const isZh = t(T("中文", "en")) !== "en";
@@ -399,6 +439,10 @@ export const graphUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
     const mergedTone = { ...pickTone, ...(sceneTone ?? {}) };
     const highlight = { current: (scene as any).current ?? null, visited: (scene as any).visited ?? [], frontier: (scene as any).frontier ?? [], edge: (scene as any).edge ?? null, tone: mergedTone };
     const [memOpen, setMemOpen] = useState(false);
+    const gate = requirementOf(cfg);
+    const applyDirectedFix = () => {
+      onChange?.({ ...cfg, directed: true, imp: cfg.imp ? { ...cfg.imp, directed: true } : cfg.imp } as unknown as Cfg);
+    };
     const onPickVertex = (id: number) => {
       const pick = cfg.pick ?? "root";
       if (cfg.subMode === "astar") {
@@ -414,7 +458,7 @@ export const graphUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
         onChange?.({ ...cfg, root: id } as unknown as Cfg);
       }
     };
-    return (
+    const body = (
       <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, position: "relative" }}>
         <div style={{ flex: memOpen ? "0 0 50%" : "1", minHeight: 0, border: "1px solid #c7d2fe", borderRadius: 12, overflow: "hidden", background: "#fff", display: "flex", flexDirection: "column" }}>
           <GraphEditor
@@ -437,6 +481,26 @@ export const graphUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
             <LeftMemoryPanel g={gForMem} isZh={isZh} />
           </div>
         )}
+      </div>
+    );
+    if (gate.ok) return body;
+    // 门禁：虚化 + 原因 + 可一键修复的给按钮；罩子不拦截事件，仍可手改图或切算法
+    return (
+      <div style={{ position: "relative" }}>
+        <div style={{ filter: "blur(5px)", userSelect: "none" }}>{body}</div>
+        <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", padding: 16 }}>
+          <div style={{ pointerEvents: "auto", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 14, padding: "14px 18px", maxWidth: 360, boxShadow: "0 12px 32px rgba(15,23,42,.18)", textAlign: "center" }}>
+            <div style={{ fontSize: 14, fontWeight: 800, color: "#b91c1c" }}>⚠ {isZh ? gate.reason : gate.reasonEn}</div>
+            {gate.fixable && (
+              <button className="pill active" style={{ marginTop: 10, padding: "6px 16px", fontSize: 13 }} onClick={applyDirectedFix}>
+                {isZh ? "改为有向图" : "Make directed"}
+              </button>
+            )}
+            <div style={{ marginTop: 8, fontSize: 11, color: "#64748b" }}>
+              {isZh ? "可手动改图后重试，或切换到能用的算法" : "Edit the graph or switch algorithm"}
+            </div>
+          </div>
+        </div>
       </div>
     );
   },

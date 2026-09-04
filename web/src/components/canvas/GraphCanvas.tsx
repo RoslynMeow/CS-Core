@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faMaximize } from "@fortawesome/free-solid-svg-icons";
 import type { GraphAlgoScene } from "../../lib/graph";
 import type { Text } from "../../i18n/lang";
 import type { AlgoTable } from "./StateBar";
 import {
+    fitArrowLen,
     getUndirectedBadgeColor,
     graphHasWeight,
     weightArrow,
@@ -101,8 +103,12 @@ export function GraphCanvas({
 }) {
     const { nodes, edges, directed = false } = scene;
     const pos = new Map(nodes.map((n) => [n.id, n]));
+    // MST 定稿帧：未选入树的边压暗，只留结果高亮
+    const dimUnpicked = !!(scene as any).dimUnpicked;
     // 无向权重牌颜色（设置页可改，每帧渲染时读取）
     const undirectedColor = getUndirectedBadgeColor();
+    // 数字层：统一最后绘制，保证数字不被对向箭头盖住
+    const numLayer: ReactNode[] = [];
     // 边端点直接落在节点圆心（连接两个节点圆的中心）；节点圆/矩形后绘会盖住穿心线段，视觉上自然衔接
     const edgePos = (u: number, v: number) => {
         const a = pos.get(u),
@@ -320,11 +326,12 @@ export function GraphCanvas({
                                     (a === e.v && b === e.u),
                             ) ?? false;
                         const stroke = mstPicked
-                            ? "#059669"
+                            ? "#dc2626"
                             : active
                               ? "#f59e0b"
                               : "#64748b";
-                        const sw = mstPicked ? 3.2 : active ? 3 : 1.6;
+                        const sw = mstPicked ? 3.8 : active ? 3 : 1.6;
+                        const dimmed = dimUnpicked && !mstPicked;
                         const elb = scene.edgeLabels?.[`${e.u}-${e.v}`];
                         // 有向边：箭头画在目标节点外沿，线止于外沿，避免被后绘的实心节点圆盖住
                         // 直线用起终点方向；弧线用终点切线方向（P1 - C）
@@ -351,8 +358,15 @@ export function GraphCanvas({
                         }
                         // 权重数字直接写进箭头三角形里；无权边用稍大的箭头保证可见
                         const wa = weightArrow(wVal);
-                        const AL = showW && directed ? wa.len : 15;
-                        const AH = showW && directed ? wa.half : 7;
+                        const needLen = showW && directed ? wa.len : 15;
+                        // A：按边长封顶（对子边各分一半跨度），两三角永不互盖
+                        const AL = fitArrowLen(needLen, dl, curved);
+                        const asc = needLen > 0 ? AL / needLen : 1;
+                        const AH = (showW && directed ? wa.half : 7) * asc;
+                        const afont =
+                            showW && directed
+                                ? Math.max(7, Math.round(wa.font * asc))
+                                : wa.font;
                         const tx2 = p.bx - tx * (R - 1); // 目标外沿内嵌 1px，保证与节点圆视觉相接
                         const ty2 = p.by - ty * (R - 1);
                         const bx2 = tx2 - tx * AL,
@@ -368,10 +382,31 @@ export function GraphCanvas({
                         // 数字放在三角形视觉中心（约 0.55 倍箭长处），白字加深色描边保证可读
                         const nx = tx2 - tx * AL * 0.55;
                         const ny = ty2 - ty * AL * 0.55;
-                        // 无向有权边：中点牌子（主题色区分无向），数字写牌子里
-                        const badgeFill = directed ? stroke : undirectedColor;
+                        // 无向有权边：中点牌子（主题色区分无向），数字写牌子里；定稿 MST 边同样变红
+                        const badgeFill = mstPicked ? (dimUnpicked ? "#dc2626" : "#059669") : directed ? stroke : undirectedColor;
+                        // 数字层统一最后绘制（C）：push 无返回值渲染问题，提前 imperative 收集
+                        if (showW && directed) {
+                            numLayer.push(
+                                <text
+                                    key={`num-${i}`}
+                                    x={nx}
+                                    y={ny}
+                                    textAnchor="middle"
+                                    dominantBaseline="central"
+                                    fontSize={afont}
+                                    fontWeight={800}
+                                    fill="#fff"
+                                    stroke="rgba(15,23,42,.8)"
+                                    strokeWidth={2.5}
+                                    paintOrder="stroke"
+                                    opacity={dimmed ? 0.25 : undefined}
+                                >
+                                    {wVal}
+                                </text>,
+                            );
+                        }
                         return (
-                            <g key={i}>
+                            <g key={i} opacity={dimmed ? 0.22 : undefined}>
                                 {curved ? (
                                     <path
                                         d={edgePath}
@@ -396,31 +431,13 @@ export function GraphCanvas({
                                     />
                                 )}
                                 {directed ? (
-                                    <g>
-                                        <polygon
-                                            points={`${tx2},${ty2} ${bx2 + px2 * AH},${by2 + py2 * AH} ${bx2 - px2 * AH},${by2 - py2 * AH}`}
-                                            fill={stroke}
-                                        />
-                                        {showW && (
-                                            <text
-                                                x={nx}
-                                                y={ny}
-                                                textAnchor="middle"
-                                                dominantBaseline="central"
-                                                fontSize={wa.font}
-                                                fontWeight={800}
-                                                fill="#fff"
-                                                stroke="rgba(15,23,42,.8)"
-                                                strokeWidth={2.5}
-                                                paintOrder="stroke"
-                                            >
-                                                {wVal}
-                                            </text>
-                                        )}
-                                    </g>
+                                    <polygon
+                                        points={`${tx2},${ty2} ${bx2 + px2 * AH},${by2 + py2 * AH} ${bx2 - px2 * AH},${by2 - py2 * AH}`}
+                                        fill={stroke}
+                                    />
                                 ) : (
                                     showW && (
-                                        <g>
+                                        <g opacity={dimmed ? 0.25 : undefined}>
                                             <circle
                                                 cx={lx}
                                                 cy={ly}
@@ -731,6 +748,8 @@ export function GraphCanvas({
                             </g>
                         );
                     })}
+                    {/* 数字层最后绘制：权重数字永远在最上，不被对向箭头盖住 */}
+                    {numLayer}
                 </g>
             </svg>
         );
