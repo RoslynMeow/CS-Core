@@ -395,12 +395,19 @@ html, body {
  background: linear-gradient(180deg, #fff, #fbfdff);
 }
 .caption {
- margin-top: 10px;
- padding: 10px 12px;
- background: #f8fafc;
- border: 1px solid var(--border);
- border-radius: 10px;
- font-size: 13px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #f8fafc;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.caption .katex {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-all;
 }
 .panel.pseudo {
  border: 1px solid #0f172a;

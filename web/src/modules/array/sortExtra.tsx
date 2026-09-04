@@ -1,17 +1,17 @@
 import { T } from '../../i18n/lang';
 import type { Frame, ModuleDef } from '../../engine/types';
-import { ArrayControls, ArrayRender, parseArr, blankScene, type ArrayCfg, type ArrayScene } from './shared';
+import { ArrayControls, ArrayRender, normScene, parseArr, blankScene, type ArrayCfg, type ArrayScene } from './shared';
 
 function badInput(): Frame<ArrayScene>[] {
-  return [{ line: 0, caption: T('! 数组不合法：1~16 个 0~999 的整数，逗号/空格分隔', '! Invalid: 1-16 ints 0-999'), scene: blankScene() }];
+  return [{ line: 0, caption: T('! 数组不合法：2~30 个 0~999 的整数，逗号/空格分隔', '! Invalid: 2-30 ints 0-999'), scene: blankScene() }];
 }
 
 type St = { a: number[]; done: boolean[]; cmp: number; mov: number };
 function base(arr: number[]): St {
   return { a: [...arr], done: arr.map(() => false), cmp: 0, mov: 0 };
 }
-function snap(s: St, hl: number[], aux?: number[] | null, note?: string): ArrayScene {
-  return { arr: [...s.a], hl: [...hl], done: [...s.done], cmp: s.cmp, mov: s.mov, aux: aux ? [...aux] : null, note };
+function snap(s: St, hl: number[], aux?: (number | null)[] | null, note?: string, extra?: Partial<ArrayScene>): ArrayScene {
+  return { arr: [...s.a], hl: [...hl], done: [...s.done], cmp: s.cmp, mov: s.mov, aux: aux ? [...aux] : null, note, ...extra };
 }
 
 // ── 堆排 ──
@@ -19,7 +19,7 @@ const HEAP_CODE = [
   T('建堆：for $i\\gets\\lfloor n/2\\rfloor-1$ down to $0$: $\\text{siftDown}(i)$', 'Build heap bottom-up'),
   T('  $\\text{siftDown}(i)$：与较大孩子比，大则交换下沉', '  sift down larger child'),
   T('for $end\\gets n-1$ down to $1$: $swap(A[0],A[end])$ 就位；$\\text{siftDown}(0)$', 'Extract max to end; sift down'),
-  T('完成：堆结构详见“树”章节', 'Done (see Tree chapter for heap)'),
+  T('$\\text{done}$ // 堆结构见“树”章节', '$\\text{done}$ // heap: see Tree chapter'),
 ];
 
 function heapGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
@@ -51,7 +51,7 @@ function heapGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
         return;
       }
       swap(i, big);
-      frames.push({ line: 1, caption: T(`交换下沉 $A[${i}]\\leftrightarrow A[${big}]$`, `swap down`), scene: snap(s, [i, big]) });
+      frames.push({ line: 1, caption: T(`$A[${i}]\\leftrightarrow A[${big}]$ 互换下沉`, `swap down`), scene: snap(s, [i, big]) });
       i = big;
     }
   };
@@ -64,7 +64,7 @@ function heapGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
   for (let end = n - 1; end >= 1; end--) {
     swap(0, end);
     s.done[end] = true;
-    frames.push({ line: 2, caption: T(`$swap(A[0],A[${end}])$，$A[${end}]=${s.a[end]}$ 就位`, `max to ${end}$`), scene: snap(s, [0, end]) });
+    frames.push({ line: 2, caption: T(`$A[0]\\leftrightarrow A[${end}]$ 互换，$A[${end}]=${s.a[end]}$ 就位`, `max to ${end}$`), scene: snap(s, [0, end]) });
     sift(0, end - 1);
   }
   s.done[0] = true;
@@ -81,8 +81,58 @@ export const heapModule: ModuleDef<ArrayScene, ArrayCfg> = {
   Controls(p) { return ArrayControls(p as any) as never; },
   code: HEAP_CODE,
   generate: heapGen,
-  Render(p: any) { return ArrayRender(p) as never; },
+  Render(p: any) { return HeapRender(p) as never; },
 };
+
+/** 堆数组同步画小树：完全二叉树按层布局，hl 走下沉路径，done 为已就位 */
+function HeapRender({ scene: _scene }: any) {
+  const scene = normScene(_scene);
+  const n = scene.arr.length;
+  const maxLevel = n > 0 ? Math.floor(Math.log2(n)) : 0;
+  const W = Math.max(300, 2 ** maxLevel * 56);
+  const H = (maxLevel + 1) * 52 + 16;
+  const xy = (i: number) => {
+    const lv = Math.floor(Math.log2(i + 1));
+    const p = i - (2 ** lv - 1);
+    return { x: ((p + 0.5) / 2 ** lv) * W, y: 24 + lv * 52 };
+  };
+  return (
+    <div style={{ display: 'grid', gap: 10 }}>
+      {ArrayRender({ scene }) as unknown as never}
+      {n > 0 && (
+        <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, background: '#f8fafc', padding: 6 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#475569', textAlign: 'center', marginBottom: 2 }}>堆视图（父 $i$ ↔ 孩子 $2i+1,2i+2$）</div>
+          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block' }}>
+            {scene.arr.map((_, i) => {
+              const l = 2 * i + 1, r = 2 * i + 2;
+              const a = xy(i);
+              return (
+                <g key={`e${i}`}>
+                  {l < n && <line x1={a.x} y1={a.y} x2={xy(l).x} y2={xy(l).y} stroke="#cbd5e1" strokeWidth={1.5} />}
+                  {r < n && <line x1={a.x} y1={a.y} x2={xy(r).x} y2={xy(r).y} stroke="#cbd5e1" strokeWidth={1.5} />}
+                </g>
+              );
+            })}
+            {scene.arr.map((v, i) => {
+              const a = xy(i);
+              const active = scene.hl.includes(i);
+              const settled = scene.done[i];
+              const fill = active ? '#4f46e5' : settled ? '#10b981' : '#fff';
+              const stroke = active ? '#312e81' : settled ? '#059669' : '#6366f1';
+              return (
+                <g key={i}>
+                  <circle cx={a.x} cy={a.y} r={15} fill={fill} stroke={stroke} strokeWidth={2} style={{ transition: 'fill .35s' }} />
+                  <text x={a.x} y={a.y + 4} textAnchor="middle" fontSize={11} fontWeight={800} fill={active || settled ? '#fff' : '#0f172a'}>{v}</text>
+                  <text x={a.x} y={a.y + 27} textAnchor="middle" fontSize={9} fill="#94a3b8">{i}</text>
+                </g>
+              );
+            })}
+          </svg>
+        </div>
+      )}
+    </div>
+  ) as unknown as never;
+}
 
 // ── 计数 ──
 const COUNT_CODE = [
@@ -138,9 +188,9 @@ export const countingModule: ModuleDef<ArrayScene, ArrayCfg> = {
 
 // ── 基数 LSD ──
 const RADIX_CODE = [
-  T('for $d \\gets$ 个位 $\\to$ 最高位：', 'for each digit LSD→MSD:'),
-  T('  按第 $d$ 位稳定分入 $0..9$ 号桶', '  distribute by digit to buckets'),
-  T('  按桶号 $0\\to9$ 依次收回', '  collect buckets in order'),
+  T('$d\\gets0,1,\\dots$ // 从个位到最高位', '$d\\gets0,1,\\dots$ // LSD to MSD'),
+  T('  $distribute(A,d)\\to B[0..9]$ // 按第$d$位稳定分桶', '  $distribute(A,d)\\to B[0..9]$'),
+  T('  $A\\gets concat(B[0..9])$ // 按桶号收回', '  $A\\gets concat(B[0..9])$'),
 ];
 
 function radixGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
@@ -157,16 +207,18 @@ function radixGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
     const nm = names[d] ?? `10^${d}位`;
     frames.push({ line: 0, caption: T(`第 ${d + 1} 轮：看${nm}`, `Round ${d + 1}: ${nm}`), scene: snap(s, []) });
     const buckets: number[][] = Array.from({ length: 10 }, () => []);
+    const snapBuckets = () => buckets.map((x) => [...x]);
     for (let i = 0; i < n; i++) {
       const b = digit(s.a[i], d);
       buckets[b].push(s.a[i]);
-      frames.push({ line: 1, caption: T(`$A[${i}]=${s.a[i]}$ ${nm}是 ${b}$ → ${b} 号桶`, `${s.a[i]} → bucket ${b}$`), scene: snap(s, [i], undefined, `桶${b}:[${buckets[b].join(',')}]`) });
+      frames.push({ line: 1, caption: T(`$A[${i}]=${s.a[i]}$ ${nm}是 ${b}$ → ${b} 号桶`, `${s.a[i]} → bucket ${b}$`), scene: snap(s, [i], undefined, undefined, { buckets: snapBuckets() }) });
     }
     let k = 0;
     for (let b = 0; b < 10; b++) {
-      for (const v of buckets[b]) {
+      while (buckets[b].length > 0) {
+        const v = buckets[b].shift() as number;
         s.a[k] = v; s.mov++;
-        frames.push({ line: 2, caption: T(`收回 ${b} 号桶 $v=${v}$ → $A[${k}]$`, `collect ${v}$ to ${k}$`), scene: snap(s, [k]) });
+        frames.push({ line: 2, caption: T(`收回 ${b} 号桶 $v=${v}$ → $A[${k}]$`, `collect ${v}$ to ${k}$`), scene: snap(s, [k], undefined, undefined, { buckets: snapBuckets() }) });
         k++;
       }
     }
@@ -190,9 +242,9 @@ export const radixModule: ModuleDef<ArrayScene, ArrayCfg> = {
 
 // ── 桶 ──
 const BUCKET_CODE = [
-  T('按值域分入 $B$ 个桶：$b=\\lfloor x\\cdot B/(max+1)\\rfloor$', 'Distribute into $B$ buckets'),
-  T('桶内插入排序', 'Insertion sort each bucket'),
-  T('按桶号依次拼接', 'Concatenate buckets'),
+  T('$b(x)\\gets\\lfloor x\\cdot B/(max+1)\\rfloor$ // 按值域分桶', '$b(x)\\gets\\lfloor x\\cdot B/(max+1)\\rfloor$'),
+  T('  $\\text{InsertionSort}(B[b])$ // 桶内排序', '  $\\text{InsertionSort}(B[b])$'),
+  T('$A\\gets concat(B)$ // 按桶拼接', '$A\\gets concat(B)$'),
 ];
 
 function bucketGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
@@ -204,21 +256,23 @@ function bucketGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
   const B = Math.min(5, n);
   const mx = Math.max(...s.a);
   const buckets: number[][] = Array.from({ length: B }, () => []);
+  const snapBuckets = () => buckets.map((x) => [...x]);
   frames.push({ line: 0, caption: T(`开始：$B=${B}$ 个桶，$max=${mx}$`, `$B=${B}$ buckets`), scene: snap(s, []) });
   for (let i = 0; i < n; i++) {
     const b = Math.min(B - 1, Math.floor((s.a[i] * B) / (mx + 1)));
     buckets[b].push(s.a[i]);
-    frames.push({ line: 0, caption: T(`$A[${i}]=${s.a[i]}$ → ${b} 号桶`, `${s.a[i]} → bucket ${b}$`), scene: snap(s, [i], undefined, `桶${b}:[${buckets[b].join(',')}]`) });
+    frames.push({ line: 0, caption: T(`$A[${i}]=${s.a[i]}$ → ${b} 号桶`, `${s.a[i]} → bucket ${b}$`), scene: snap(s, [i], undefined, undefined, { buckets: snapBuckets() }) });
   }
   for (let b = 0; b < B; b++) {
     buckets[b].sort((x, y) => x - y);
-    frames.push({ line: 1, caption: T(`${b} 号桶内排好：$[${buckets[b].join(',')}]$`, `bucket ${b}$ sorted`), scene: snap(s, [], undefined, `桶${b}:[${buckets[b].join(',')}]`) });
+    frames.push({ line: 1, caption: T(`${b} 号桶内排好：$[${buckets[b].join(',')}]$`, `bucket ${b}$ sorted`), scene: snap(s, [], undefined, undefined, { buckets: snapBuckets() }) });
   }
   let k = 0;
   for (let b = 0; b < B; b++) {
-    for (const v of buckets[b]) {
+    while (buckets[b].length > 0) {
+      const v = buckets[b].shift() as number;
       s.a[k] = v; s.mov++;
-      frames.push({ line: 2, caption: T(`拼接 $v=${v}$ → $A[${k}]$`, `concat ${v}$`), scene: snap(s, [k]) });
+      frames.push({ line: 2, caption: T(`拼接 $v=${v}$ → $A[${k}]$`, `concat ${v}$`), scene: snap(s, [k], undefined, undefined, { buckets: snapBuckets() }) });
       k++;
     }
   }

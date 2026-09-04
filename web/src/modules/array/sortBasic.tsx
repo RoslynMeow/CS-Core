@@ -3,20 +3,20 @@ import type { Frame, ModuleDef } from '../../engine/types';
 import { ArrayControls, ArrayRender, parseArr, blankScene, type ArrayCfg, type ArrayScene } from './shared';
 
 function badInput(): Frame<ArrayScene>[] {
-  return [{ line: 0, caption: T('! 数组不合法：1~16 个 0~999 的整数，逗号/空格分隔', '! Invalid: 1-16 ints 0-999'), scene: blankScene() }];
+  return [{ line: 0, caption: T('! 数组不合法：2~30 个 0~999 的整数，逗号/空格分隔', '! Invalid: 2-30 ints 0-999'), scene: blankScene() }];
 }
 
 function base(arr: number[]): { a: number[]; done: boolean[]; cmp: number; mov: number } {
   return { a: [...arr], done: arr.map(() => false), cmp: 0, mov: 0 };
 }
 
-function snap(s: { a: number[]; done: boolean[]; cmp: number; mov: number }, hl: number[]): ArrayScene {
-  return { arr: [...s.a], hl: [...hl], done: [...s.done], cmp: s.cmp, mov: s.mov };
+function snap(s: { a: number[]; done: boolean[]; cmp: number; mov: number }, hl: number[], extra?: Partial<ArrayScene>): ArrayScene {
+  return { arr: [...s.a], hl: [...hl], done: [...s.done], cmp: s.cmp, mov: s.mov, ...extra };
 }
 
 // ── 冒泡 ──
 const BUBBLE_CODE = [
-  T('$\\text{Bubble}(A)$，$n=|A|$', '$\\text{Bubble}(A)$, $n=|A|$'),
+  T('$\\text{Bubble}(A);\\; n\\gets|A|$', '$\\text{Bubble}(A);\\; n\\gets|A|$'),
   T('for $i \\gets 0$ to $n-2$:', 'for $i \\gets 0$ to $n-2$:'),
   T('  for $j \\gets 0$ to $n-i-2$:', '  for $j \\gets 0$ to $n-i-2$:'),
   T('    if $A[j] > A[j+1]$:', '    if $A[j] > A[j+1]$:'),
@@ -37,7 +37,7 @@ function bubbleGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
       s.cmp++;
       if (s.a[j] > s.a[j + 1]) {
         const t = s.a[j]; s.a[j] = s.a[j + 1]; s.a[j + 1] = t; s.mov += 3;
-        frames.push({ line: 4, caption: T(`$A[${j}]>A[${j + 1}]$，交换 → $[${s.a.join(',')}]$`, `swap → $[${s.a.join(',')}]$`), scene: snap(s, [j, j + 1]) });
+        frames.push({ line: 4, caption: T(`$A[${j}]\\leftrightarrow A[${j + 1}]$ 互换`, `swap`), scene: snap(s, [j, j + 1]) });
       } else {
         frames.push({ line: 3, caption: T(`$A[${j}]\\le A[${j + 1}]$，不动`, `no swap`), scene: snap(s, [j, j + 1]) });
       }
@@ -65,7 +65,7 @@ export const bubbleModule: ModuleDef<ArrayScene, ArrayCfg> = {
 const SELECT_CODE = [
   T('for $i \\gets 0$ to $n-2$:', 'for $i \\gets 0$ to $n-2$:'),
   T('  $m \\gets i$ // 假设最小', '  $m \\gets i$'),
-  T('  for $j \\gets i+1$ to $n-1$: $A[j]<A[m] \\implies m\\gets j$', '  for $j$: $A[j]<A[m] \\implies m\\gets j$'),
+  T('  for $j \\gets i+1$ to $n-1$: $A[j]<A[m] \\implies m\\gets j$', '  for $j\\gets i+1$ to $n-1$: $A[j]<A[m]\\implies m\\gets j$'),
   T('  $\\text{swap}(A[i],A[m])$', '$\\text{swap}(A[i],A[m])$'),
 ];
 
@@ -90,7 +90,7 @@ function selectGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
     }
     if (m !== i) {
       const t = s.a[i]; s.a[i] = s.a[m]; s.a[m] = t; s.mov += 3;
-      frames.push({ line: 3, caption: T(`交换 $A[${i}]\\leftrightarrow A[${m}]$`, `swap $A[${i}]\\leftrightarrow A[${m}]$`), scene: snap(s, [i, m]) });
+      frames.push({ line: 3, caption: T(`最小在 ${m}，$A[${i}]\\leftrightarrow A[${m}]$ 互换`, `swap min into place`), scene: snap(s, [i, m]) });
     } else {
       frames.push({ line: 3, caption: T(`$m=i$，无需交换`, `no swap`), scene: snap(s, [i]) });
     }
@@ -133,15 +133,16 @@ function insertGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
     const x = s.a[i];
     let j = i - 1;
     frames.push({ line: 0, caption: T(`$i=${i}$，前 ${i} 个有序`, `$i=${i}$`), scene: snap(s, [i]) });
-    frames.push({ line: 1, caption: T(`$x\\gets A[${i}]=${x}$，$j\\gets${j}$`, `$x=${x}$, $j=${j}$`), scene: snap(s, [i, j]) });
+    frames.push({ line: 1, caption: T(`$x\\gets A[${i}]=${x}$，$j\\gets${j}$`, `$x=${x}$, $j=${j}$`), scene: snap(s, [i, j], { note: `x=${x}` }) });
     while (j >= 0) {
       s.cmp++;
       if (s.a[j] <= x) {
-        frames.push({ line: 2, caption: T(`$A[${j}]=${s.a[j]}\\le x$，停止后移`, `stop shifting`), scene: snap(s, [j]) });
+        frames.push({ line: 2, caption: T(`$A[${j}]=${s.a[j]}\\le x$，停止后移`, `stop shifting`), scene: snap(s, [j], { note: `x=${x}` }) });
         break;
       }
-      s.a[j + 1] = s.a[j]; s.mov++;
-      frames.push({ line: 2, caption: T(`$A[${j}]=${s.a[j]}>x$，后移 → $A[${j + 1}]$`, `shift $A[${j}]$ right`), scene: snap(s, [j, j + 1]) });
+      const w = s.a[j];
+      s.a[j + 1] = w; s.mov++;
+      frames.push({ line: 2, caption: T(`$${w}>x$，右移一格`, `slide ${w} right`), scene: snap(s, [j + 1], { note: `x=${x}` }) });
       j--;
     }
     s.a[j + 1] = x; s.mov++;

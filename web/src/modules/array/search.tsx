@@ -6,7 +6,7 @@ type SearchScene = ArrayScene & { target: number; found: number | null };
 type SearchCfg = { n: number; valuesStr: string; target: string };
 
 function badInput(): Frame<SearchScene>[] {
-  return [{ line: 0, caption: T('! 数组不合法：1~16 个 0~999 的整数', '! Invalid array'), scene: { ...blankScene(), target: 0, found: null } }];
+  return [{ line: 0, caption: T('! 数组不合法：2~30 个 0~999 的整数', '! Invalid array'), scene: { ...blankScene(), target: 0, found: null } }];
 }
 
 function normSearch(s: any): SearchScene {
@@ -62,6 +62,7 @@ function SearchRender({ scene: _scene }: any) {
                 className={`bar ${active && !isFound ? 'hl' : ''}`}
                 style={{
                   height: `${(v / mx) * 140 + 14}px`,
+                  transition: 'height .3s, background-color .35s, opacity .35s',
                   ...(isFound ? { background: '#10b981', borderColor: '#059669' } : out && !active ? { opacity: 0.35 } : {}),
                 }}
                 title={`A[${i}]=${v}`}
@@ -117,7 +118,7 @@ function seqGen(cfg: SearchCfg): Frame<SearchScene>[] {
 export const seqSearchModule: ModuleDef<SearchScene, SearchCfg> = {
   id: 'sequential-search',
   title: T('顺序查找', 'Sequential Search'),
-  desc: T('从头逐个比对，命中即返。', 'Scan and compare one by one.'),
+  desc: T('从头逐个比对，命中即返回', 'Scan and compare one by one.'),
   tags: ['algorithms'],
   defaultConfig: { n: 8, valuesStr: '38,27,43,3,9,82,10,15', target: '27' },
   Controls: SearchControls as never,
@@ -128,7 +129,7 @@ export const seqSearchModule: ModuleDef<SearchScene, SearchCfg> = {
 
 // ── 二分 ──
 const BIN_CODE = [
-  T('前提有序；$lo\\gets0,\\;hi\\gets n-1$', 'Sorted; $lo=0,hi=n-1$'),
+  T('前提有序：$lo\\gets0,\\;hi\\gets n-1$', 'Sorted; $lo=0,hi=n-1$'),
   T('while $lo\\le hi$:', 'while $lo\\le hi$:'),
   T('  $mid\\gets\\lfloor(lo+hi)/2\\rfloor$；比 $A[mid]$ 与 $target$', '  $mid$; compare'),
   T('  小则 $hi\\gets mid-1$，大则 $lo\\gets mid+1$，等则返回', '  narrow or return'),
@@ -142,7 +143,7 @@ function binGen(cfg: SearchCfg): Frame<SearchScene>[] {
   const done = arr.map(() => false);
   let cmp = 0;
   const frames: Frame<SearchScene>[] = [];
-  frames.push({ line: 0, caption: T(`前提有序：$[${arr.join(',')}]$，找 $${target}$`, `Sorted, find ${target}$`), scene: mkScene(arr, [], done, cmp, target) });
+  frames.push({ line: 0, caption: T(`前提有序：[${arr.join(',')}]$，找 $${target}$`, `Sorted, find ${target}$`), scene: mkScene(arr, [], done, cmp, target) });
   let lo = 0, hi = arr.length - 1;
   while (lo <= hi) {
     const mid = Math.floor((lo + hi) / 2);
@@ -181,7 +182,7 @@ export const binSearchModule: ModuleDef<SearchScene, SearchCfg> = {
 
 // ── 插值 ──
 const INTERP_CODE = [
-  T('前提有序均匀；$lo\\gets0,\\;hi\\gets n-1$', 'Sorted uniform; init ends'),
+  T('$lo\\gets0,\\;hi\\gets n-1$ // 前提有序均匀', '$lo\\gets0,\\;hi\\gets n-1$ // sorted uniform'),
   T('while $lo\\le hi$ 且 $target\\in[A[lo],A[hi]]$:', 'while in range:'),
   T('  $pos\\gets lo+\\lfloor(target-A[lo])(hi-lo)/(A[hi]-A[lo])\\rfloor$', '  probe by proportion'),
   T('  比对后收缩到左/右段', '  narrow left/right'),
@@ -195,7 +196,7 @@ function interpGen(cfg: SearchCfg): Frame<SearchScene>[] {
   const done = arr.map(() => false);
   let cmp = 0;
   const frames: Frame<SearchScene>[] = [];
-  frames.push({ line: 0, caption: T(`前提有序均匀：$[${arr.join(',')}]$，找 $${target}$`, `Sorted, find ${target}$`), scene: mkScene(arr, [], done, cmp, target) });
+  frames.push({ line: 0, caption: T(`前提有序均匀：[${arr.join(',')}]$，找 $${target}$`, `Sorted, find ${target}$`), scene: mkScene(arr, [], done, cmp, target) });
   let lo = 0, hi = arr.length - 1;
   let guard = 0;
   while (lo <= hi && target >= arr[lo] && target <= arr[hi] && guard++ < 32) {
@@ -238,9 +239,9 @@ export const interpSearchModule: ModuleDef<SearchScene, SearchCfg> = {
 
 // ── 分块 ──
 const BLOCK_CODE = [
-  T('块内有序、块间有序；块大小 $s$，块 $b$ 存最大值', 'Blocks sorted within & between'),
-  T('先定块：$target$ 落在首个“块最大 $\\ge target$”的块', 'Locate block by block-max'),
-  T('块内顺序找', 'Sequential scan inside block'),
+  T('$s\\gets\\lceil n/3\\rceil$ // 块大小；块内块间有序', '$s\\gets\\lceil n/3\\rceil$ // block size'),
+  T('  $b\\gets\\min\\{b:B_{max}[b]\\ge target\\}$ // 先定块', '  $b\\gets\\min\\{b:B_{max}[b]\\ge target\\}$'),
+  T('  $\\text{SeqSearch}(B[b])$ // 块内顺序找', '  $\\text{SeqSearch}(B[b])$'),
 ];
 
 function blockGen(cfg: SearchCfg): Frame<SearchScene>[] {

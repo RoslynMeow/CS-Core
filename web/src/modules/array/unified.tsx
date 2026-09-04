@@ -1,6 +1,7 @@
 import { createElement } from "react";
 import { T } from "../../i18n/lang";
 import type { ModuleDef } from "../../engine/types";
+import { parseArr, randArray } from "./shared";
 import { bubbleModule, selectionModule, insertionModule } from "./sortBasic";
 import { shellModule, mergeModule, quickModule } from "./sortFast";
 import { heapModule, countingModule, radixModule, bucketModule } from "./sortExtra";
@@ -52,7 +53,7 @@ const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[
 type Cfg = { subMode: SubMode; [k: string]: any };
 const DEFAULT: Cfg = { subMode: "bubble-sort", ...(bubbleModule as any).defaultConfig };
 
-// 兜底：未知 subMode 回退冒泡，缺失字段用子模块默认值补齐，保证页面永不白屏
+// 兜底：未知subMode 回退冒泡，缺失字段用子模块默认值补齐，保证页面永不白屏
 function activeOf(sub: unknown): ModuleDef {
   return ((MAP as Record<string, ModuleDef>)[sub as string] ?? bubbleModule) as unknown as ModuleDef;
 }
@@ -89,7 +90,7 @@ export const arrayUnifiedModule: ModuleDef<any, Cfg> = {
       <div style={{ display: "grid", gap: 8, width: "100%" }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
           <span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca" }}>数组算法</span>
-          <select className="txt" value={sub} onChange={(e) => { const key = subKeyOf(e.target.value); const m = activeOf(key) as any; onChange({ ...config, ...((m.defaultConfig as any) ?? {}), subMode: key } as any); }} style={{ minWidth: 180, fontWeight: 700 }}>
+          <select className="txt" value={sub} onChange={(e) => { const key = subKeyOf(e.target.value); const m = activeOf(key) as any; const d = ((m.defaultConfig as any) ?? {}) as any; const n = Number.isFinite((config as any).n) ? (config as any).n : d.n; const parsed = parseArr(String((config as any).valuesStr ?? "")); const valuesStr = parsed && parsed.length === n ? (config as any).valuesStr : randArray(n).join(","); onChange({ ...config, ...d, n, valuesStr, subMode: key } as any); }} style={{ minWidth: 180, fontWeight: 700 }}>
             {GROUPS.map((g) => (
               <optgroup key={g.label} label={g.label}>
                 {g.opts.map((o) => <option key={o.v} value={o.v}>{isZh ? o.zh : o.en}</option>)}

@@ -3,15 +3,15 @@ import type { Frame, ModuleDef } from '../../engine/types';
 import { ArrayControls, ArrayRender, parseArr, blankScene, type ArrayCfg, type ArrayScene } from './shared';
 
 function badInput(): Frame<ArrayScene>[] {
-  return [{ line: 0, caption: T('! 数组不合法：1~16 个 0~999 的整数，逗号/空格分隔', '! Invalid: 1-16 ints 0-999'), scene: blankScene() }];
+  return [{ line: 0, caption: T('! 数组不合法：2~30 个 0~999 的整数，逗号/空格分隔', '! Invalid: 2-30 ints 0-999'), scene: blankScene() }];
 }
 
 type St = { a: number[]; done: boolean[]; cmp: number; mov: number };
 function base(arr: number[]): St {
   return { a: [...arr], done: arr.map(() => false), cmp: 0, mov: 0 };
 }
-function snap(s: St, hl: number[], aux?: number[] | null): ArrayScene {
-  return { arr: [...s.a], hl: [...hl], done: [...s.done], cmp: s.cmp, mov: s.mov, aux: aux ? [...aux] : null };
+function snap(s: St, hl: number[], aux?: (number | null)[] | null, extra?: Partial<ArrayScene>): ArrayScene {
+  return { arr: [...s.a], hl: [...hl], done: [...s.done], cmp: s.cmp, mov: s.mov, aux: aux ? [...aux] : null, ...extra };
 }
 
 // ── 希尔 ──
@@ -35,16 +35,19 @@ function shellGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
     for (let i = gap; i < n; i++) {
       const x = s.a[i];
       let j = i - gap;
-      frames.push({ line: 1, caption: T(`$i=${i}$`, `$i=${i}$`), scene: snap(s, [i]) });
-      frames.push({ line: 2, caption: T(`$x\\gets A[${i}]=${x}$，$j\\gets${j}$`, `$x=${x}$, $j=${j}$`), scene: snap(s, [i, j]) });
+      const group: number[] = [];
+      for (let k = i % gap; k < n; k += gap) group.push(k);
+      frames.push({ line: 1, caption: T(`$i=${i}$（同组 ${group.join(',')}）`, `$i=${i}$`), scene: snap(s, [i], undefined, { note: `gap=${gap} 组[${group.join(',')}] x=${x}` }) });
+      frames.push({ line: 2, caption: T(`$x\\gets A[${i}]=${x}$，$j\\gets${j}$`, `$x=${x}$, $j=${j}$`), scene: snap(s, [i, j], undefined, { note: `x=${x}` }) });
       while (j >= 0) {
         s.cmp++;
         if (s.a[j] <= x) {
-          frames.push({ line: 3, caption: T(`$A[${j}]\\le x$，停`, `stop`), scene: snap(s, [j]) });
+          frames.push({ line: 3, caption: T(`$A[${j}]\\le x$，停`, `stop`), scene: snap(s, [j], undefined, { note: `x=${x}` }) });
           break;
         }
-        s.a[j + gap] = s.a[j]; s.mov++;
-        frames.push({ line: 3, caption: T(`$A[${j}]>x$，后移 $gap$ 格`, `shift by $gap$`), scene: snap(s, [j, j + gap]) });
+        const w = s.a[j];
+        s.a[j + gap] = w; s.mov++;
+        frames.push({ line: 3, caption: T(`$${w}>x$，右移 $gap$ 格`, `shift ${w} by $gap$`), scene: snap(s, [j + gap], undefined, { note: `x=${x}` }) });
         j -= gap;
       }
       s.a[j + gap] = x; s.mov++;
@@ -83,7 +86,13 @@ function mergeGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
   const n = s.a.length;
   const frames: Frame<ArrayScene>[] = [];
   const tmp: number[] = new Array(n).fill(0);
-  const showTmp = () => tmp.slice();
+  let seg: [number, number] | null = null; // 当前已合并段（tmp 行只显示该段，其余留空）
+  const showTmp = (): (number | null)[] => {
+    if (!seg) return [];
+    const out: (number | null)[] = new Array(n).fill(null);
+    for (let t = seg[0]; t <= seg[1]; t++) out[t] = tmp[t];
+    return out;
+  };
   frames.push({ line: 0, caption: T(`开始：分治 $n=${n}$`, `Start divide-and-conquer`), scene: snap(s, [], showTmp()) });
   const sort = (l: number, r: number): void => {
     if (l >= r) {
@@ -107,9 +116,13 @@ function mergeGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
     }
     while (i <= m) { tmp[k] = s.a[i]; i++; k++; }
     while (j <= r) { tmp[k] = s.a[j]; j++; k++; }
-    for (let t = l; t <= r; t++) { s.a[t] = tmp[t]; s.mov++; }
+    seg = [l, r];
+    for (let t = l; t <= r; t++) {
+      s.a[t] = tmp[t]; s.mov++;
+      frames.push({ line: 3, caption: T(`拷回 $A[${t}]\\gets tmp[${t}]=${tmp[t]}$`, `copy back ${tmp[t]}$`), scene: snap(s, [t], showTmp()) });
+    }
     for (let t = l; t <= r; t++) s.done[t] = true;
-    frames.push({ line: 3, caption: T(`拷回：$[${l},${r}]$ 有序`, `copied back $[${l},${r}]$`), scene: snap(s, [], showTmp()) });
+    frames.push({ line: 3, caption: T(`$[${l},${r}]$ 有序`, `$[${l},${r}]$ sorted`), scene: snap(s, [], showTmp()) });
   };
   sort(0, n - 1);
   frames.push({ line: 0, caption: T(`完成：$A=[${s.a.join(',')}]$，比较 ${s.cmp} 次，写回 ${s.mov} 次`, `Sorted, ${s.cmp} cmps`), scene: snap(s, [], showTmp()) });
@@ -128,9 +141,9 @@ export const mergeModule: ModuleDef<ArrayScene, ArrayCfg> = {
   Render(p: any) { return ArrayRender(p) as never; },
 };
 
-// ── 快排（Lomuto） ──
+// ── 快排（Lomuto）──
 const QUICK_CODE = [
-  T('$\\text{QuickSort}(A,l,r)$，取 $pivot=A[r]$:', '$\\text{QuickSort}$, $pivot=A[r]$:'),
+  T('$\\text{QuickSort}(A,l,r);\\; pivot\\gets A[r]$:', '$\\text{QuickSort}(A,l,r);\\; pivot\\gets A[r]$:'),
   T('  if $l\\ge r$: return', '  if $l\\ge r$: return'),
   T('  $i\\gets l-1$；for $j=l..r-1$：$A[j]<pivot\\implies i{+}{+},swap(A[i],A[j])$', '  partition: $A[j]<pivot \\implies$ swap'),
   T('  $swap(A[i+1],A[r])$；递归两边', '  place pivot; recurse'),
@@ -160,7 +173,7 @@ function quickGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
         i++;
         if (i !== j) {
           const t = s.a[i]; s.a[i] = s.a[j]; s.a[j] = t; s.mov += 3;
-          frames.push({ line: 2, caption: T(`小！$i\\gets${i}$，交换 $A[${i}]\\leftrightarrow A[${j}]$`, `swap $A[${i}],A[${j}]$`), scene: snap(s, [i, j]) });
+          frames.push({ line: 2, caption: T(`小！$i\\gets${i}$，$A[${i}]\\leftrightarrow A[${j}]$ 互换`, `swap into left part`), scene: snap(s, [i, j]) });
         } else {
           frames.push({ line: 2, caption: T(`小！$i\\gets${i}$（自交换，跳过）`, `$i=${i}$ skip`), scene: snap(s, [i]) });
         }
@@ -169,6 +182,7 @@ function quickGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
     const p = i + 1;
     if (p !== r) {
       const t = s.a[p]; s.a[p] = s.a[r]; s.a[r] = t; s.mov += 3;
+      frames.push({ line: 3, caption: T(`主元 $A[${p}]\\leftrightarrow A[${r}]$ 互换`, `swap pivot into place`), scene: snap(s, [p, r]) });
     }
     s.done[p] = true;
     frames.push({ line: 3, caption: T(`主元就位 $A[${p}]=${pivot}$，左小右大`, `pivot placed at ${p}$`), scene: snap(s, [p]) });
