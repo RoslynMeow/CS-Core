@@ -130,9 +130,9 @@ function gen(cfg: Cfg): Frame<Scene>[] {
   return gen({ ...cfg, op: 'idle', execTick: 0 });
 }
 const CODE: Record<Op, any> = {
-  idle: [T('$base \\gets malloc(R\\cdot C\\cdot elemSize)$', '$base\\gets malloc$'), T('$M[i][j]$ 线性化', '$M[i][j]$'), T('等待执行…', 'pending')] as never,
-  get: [T('$idx = i\\cdot C+j$（行优先）/ $j\\cdot R+i$（列优先）', 'idx = row/col-major'), T('$addr \\gets base + idx\\cdot elemSize$', '$addr$'), T('return $mem[addr]$ // $O(1)$', 'return')] as never,
-  set: [T('$idx = i\\cdot C+j$（行优先）', 'idx'), T('$mem[base+idx\\cdot elemSize] \\gets val$', 'mem[idx] = val'), T('done // 连续线性地址', 'done')] as never,
+  idle: [T('$base \\gets malloc(R\\cdot C\\cdot elemSize)$', '$base\\gets malloc$'), T('$M[i][j]$ // 线性化存连续内存', '$M[i][j]$ linearized'), T('$pending$ // 等待执行', '$pending$')] as never,
+  get: [T('$idx\\gets lin(i,j)$ // 行优先 $i\\cdot C+j$，列优先 $j\\cdot R+i$', '$idx\\gets lin(i,j)$'), T('$addr \\gets base + idx\\cdot elemSize$', '$addr$'), T('return $mem[addr]$ // $O(1)$', 'return')] as never,
+  set: [T('$idx\\gets lin(i,j)$; $addr\\gets base+idx\\cdot elemSize$ // 行/列优先', '$idx,addr\\gets lin$'), T('$mem[addr] \\gets val$ // 写入', 'mem[addr] = val'), T('return $M[i][j]$ // 写入完成', 'return $M[i][j]$')] as never,
 };
 function toHex(b: number) { return b.toString(16).padStart(2, '0').toUpperCase(); }
 

@@ -156,10 +156,10 @@ function gen(cfg: Cfg): Frame<Scene>[] {
     frames.push({ line: 0, caption: T(`$h(${k})=${h}$（${HASH_METHOD_LABEL[cfg.method].zh}）$\\to$ 桶 $${h}$`, `h(${k})=${h}`), scene: { ...target, focusH: h } });
     let found = false;
     for (const o of bucketIdx) {
-      frames.push({ line: 1, caption: T(`遍历桶 $${h}$：$key=${o.x}$ @0x${target.nodes.find(n => n.idx === o.i)?.addr.toString(16)}`, `bucket${h} key=${o.x}`), scene: { ...buildScene(cfg, h, o.i, 'traverse', origKeys), focusH: h, focusKey: o.x } });
+      frames.push({ line: 2, caption: T(`遍历桶 $${h}$：$key=${o.x}$ @0x${target.nodes.find(n => n.idx === o.i)?.addr.toString(16)}`, `bucket${h} key=${o.x}`), scene: { ...buildScene(cfg, h, o.i, 'traverse', origKeys), focusH: h, focusKey: o.x } });
       if (o.x === k) { found = true; break; }
     }
-    frames.push({ line: 2, caption: found ? T(`命中：$key=${k}$ 在桶 $${h}$`, `found`) : T(`未找到：$key=${k}$（桶 $${h}$ 无此键）`, `not found`), scene: { ...buildScene(cfg, h, null, 'traverse', origKeys), focusH: h } });
+    frames.push({ line: found ? 2 : 3, caption: found ? T(`命中：$key=${k}$ 在桶 $${h}$`, `found`) : T(`未找到：$key=${k}$（桶 $${h}$ 无此键）`, `not found`), scene: { ...buildScene(cfg, h, null, 'traverse', origKeys), focusH: h } });
     return frames;
   }
   if (cfg.op === 'insert') {
@@ -178,7 +178,7 @@ function gen(cfg: Cfg): Frame<Scene>[] {
     return [
       { line: 0, caption: T(`$h(${k})=${h}$（${HASH_METHOD_LABEL[cfg.method].zh}）$\\to$ 桶 $${h}$`, `h(${k})=${h}`), scene: buildScene(cfg, h, null, 'alloc', origKeys) },
       { line: 1, caption: exists ? T(`$key=${k}$ 已存在，策略允许追加`, `exists, append`) : T('$key$ 未存在', `new key`), scene: buildScene(cfg, h, null, 'alloc', origKeys) },
-      { line: 3, caption: T(`新节点 $malloc$ → $0x${newNode?.addr.toString(16)}$（$key=${k}$）`, `malloc→0x${newNode?.addr.toString(16)}`), scene: afterScene },
+      { line: 4, caption: T(`新节点 $malloc$ → $0x${newNode?.addr.toString(16)}$（$key=${k}$）`, `malloc→0x${newNode?.addr.toString(16)}`), scene: afterScene },
       { line: 4, caption: exists ? T(`允许重复：同 $key=${k}$ 再次入链，桶 $${h}$`, `append dup`) : T(`链入桶 $${h}$：插入链表$（冲突→链式）$`, `link into bucket${h}`), scene: { ...afterScene, focusH: h, focusKey: k } },
     ];
   }
@@ -196,16 +196,16 @@ function gen(cfg: Cfg): Frame<Scene>[] {
   return gen({ ...cfg, op: 'idle', execTick: 0 });
 }
 const CODE: Record<Op, any> = {
-  idle: [T('$h \\gets hash(key,m)$', '$h\\gets key\\bmod m$'), T('$table[0..m-1]$ 空', 'table'), T('等待执行…', 'pending')] as never,
-  search: [T('$h \\gets hash(key,m)$', '$h$'), T('遍历桶 $table[h]$ 链表', 'traverse bucket'), T('return 命中 / $null$', 'return')] as never,
+  idle: [T('$h \\gets hash(key,m)$', '$h\\gets hash(key,m)$'), T('$table[0..m-1]\\gets null$ // 空桶', '$table\\gets null$'), T('$pending$ // 等待执行', '$pending$')] as never,
+  search: [T('$h \\gets hash(key,m)$', '$h\\gets hash(key,m)$'), T('for $q$ in $table[h]$: // 遍历桶链表', 'for $q$ in $table[h]$:'), T('  if $q.key=key$: return $q$ // 命中', '  if $q.key=key$: return $q$'), T('return $null$ // 未找到', 'return $null$')] as never,
   insert: [
-    T('$h \\gets hash(key,m)$ // 哈希方法', '$h\\gets hash(key,m)$'),
-    T('if $key$ 已存在:', 'if key exists:'),
-    T('  reject/update$\Rightarrow$ 不新增节点（策略）', '  reject/update: no node'),
-    T('else $q \\gets malloc(nodeSize)$', 'else $q\\gets malloc$'),
-    T('链入桶 $table[h]$ // append 允许重复', 'link into $table[h]$'),
+    T('$h \\gets hash(key,m)$ // 定桶', '$h\\gets hash(key,m)$'),
+    T('if $exists(key)$: // 判重', 'if $exists(key)$:'),
+    T('  return // $reject$/$update$ 不新增节点', '  return // no new node'),
+    T('else: // $append$ 或新键', 'else:'),
+    T('  $q\\gets malloc(nodeSize)$; $link(q,table[h])$ // 链入桶', '  $q\\gets malloc$; $link(q,table[h])$'),
   ] as never,
-  delete: [T('$h \\gets hash(key,m)$', '$h$'), T('$q\\gets$ 桶内找 $key$', 'find in bucket'), T('$p.next\\gets q.next;\\; free(q)$', 'unlink & free')] as never,
+  delete: [T('$h \\gets hash(key,m)$ // 定桶', '$h\\gets hash(key,m)$'), T('$unlink(table[h],key)$; $free(q)$ // 摘链释放', '$unlink$; $free(q)$'), T('return $table[0..m-1]$ // 完成', 'return $table$')] as never,
 };
 function toHex(b: number) { return b.toString(16).padStart(2, '0').toUpperCase(); }
 

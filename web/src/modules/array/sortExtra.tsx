@@ -16,9 +16,10 @@ function snap(s: St, hl: number[], aux?: (number | null)[] | null, note?: string
 
 // ── 堆排 ──
 const HEAP_CODE = [
-  T('建堆：for $i\\gets\\lfloor n/2\\rfloor-1$ down to $0$: $\\text{siftDown}(i)$', 'Build heap bottom-up'),
-  T('  $\\text{siftDown}(i)$：与较大孩子比，大则交换下沉', '  sift down larger child'),
-  T('for $end\\gets n-1$ down to $1$: $swap(A[0],A[end])$ 就位；$\\text{siftDown}(0)$', 'Extract max to end; sift down'),
+  T('for $i\\gets\\lfloor n/2\\rfloor-1$ downto $0$: // 建堆', 'for $i$ downto $0$: build heap'),
+  T('  $\\text{siftDown}(i,n-1)$ // 下沉到堆尾', '  $\\text{siftDown}(i,n-1)$'),
+  T('for $end\\gets n-1$ downto $1$: // 取顶', 'for $end$ downto $1$: extract'),
+  T('  $\\text{swap}(A[0],A[end])$; $\\text{siftDown}(0,end-1)$ // 末位就位', '  $\\text{swap}(A[0],A[end])$; $\\text{siftDown}(0,end-1)$'),
   T('$\\text{done}$ // 堆结构见“树”章节', '$\\text{done}$ // heap: see Tree chapter'),
 ];
 
@@ -64,11 +65,11 @@ function heapGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
   for (let end = n - 1; end >= 1; end--) {
     swap(0, end);
     s.done[end] = true;
-    frames.push({ line: 2, caption: T(`$A[0]\\leftrightarrow A[${end}]$ 互换，$A[${end}]=${s.a[end]}$ 就位`, `max to ${end}$`), scene: snap(s, [0, end]) });
+    frames.push({ line: 3, caption: T(`$A[0]\\leftrightarrow A[${end}]$ 互换，$A[${end}]=${s.a[end]}$ 就位`, `max to ${end}$`), scene: snap(s, [0, end]) });
     sift(0, end - 1);
   }
   s.done[0] = true;
-  frames.push({ line: 3, caption: T(`完成：$A=[${s.a.join(',')}]$，比较 ${s.cmp} 次`, `Sorted, ${s.cmp} cmps`), scene: snap(s, []) });
+  frames.push({ line: 4, caption: T(`完成：$A=[${s.a.join(',')}]$，比较 ${s.cmp} 次`, `Sorted, ${s.cmp} cmps`), scene: snap(s, []) });
   return frames;
 }
 
@@ -136,9 +137,12 @@ function HeapRender({ scene: _scene }: any) {
 
 // ── 计数 ──
 const COUNT_CODE = [
-  T('统计：for $x$ in $A$: $cnt[x]{+}{+}$', 'Count occurrences'),
-  T('前缀和：$cnt[i]\\mathrel{+}=cnt[i-1]$（起始下标）', 'Prefix sums = positions'),
-  T('稳定输出：倒序取 $x$ → $out[{--}cnt[x]]=x$', 'Stable output backwards'),
+  T('for $x$ in $A$: // 统计', 'for $x$ in $A$: count'),
+  T('  $cnt[x]{+}{+}$', '  $cnt[x]{+}{+}$'),
+  T('for $i\\gets1$ to $k$: // 前缀和', 'for $i\\gets1$ to $k$: prefix'),
+  T('  $cnt[i]\\gets cnt[i]+cnt[i-1]$', '  $cnt[i]\\gets cnt[i]+cnt[i-1]$'),
+  T('for $i\\gets n-1$ downto $0$: // 稳定输出', 'for $i$ downto $0$: output'),
+  T('  $out[{--}cnt[A[i]]]\\gets A[i]$', '  $out[{--}cnt[A[i]]]\\gets A[i]$'),
 ];
 
 function countGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
@@ -155,22 +159,24 @@ function countGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
   frames.push({ line: 0, caption: T(`开始：$n=${n}$，值域 $0..${k}$`, `Range $0..${k}$`), scene: snap(s, [], cnt) });
   for (let i = 0; i < n; i++) {
     cnt[s.a[i]]++;
-    frames.push({ line: 0, caption: T(`读 $A[${i}]=${s.a[i]}$，$cnt[${s.a[i]}]\\to${cnt[s.a[i]]}$`, `count $A[${i}]$`), scene: snap(s, [i], cnt) });
+    frames.push({ line: 1, caption: T(`读 $A[${i}]=${s.a[i]}$，$cnt[${s.a[i]}]\\to${cnt[s.a[i]]}$`, `count $A[${i}]$`), scene: snap(s, [i], cnt) });
   }
+  frames.push({ line: 2, caption: T(`计数完成，求前缀和`, `prefix sums`), scene: snap(s, [], cnt) });
   for (let i = 1; i <= k; i++) {
     cnt[i] += cnt[i - 1];
-    frames.push({ line: 1, caption: T(`$cnt[${i}]\\mathrel{+}=cnt[${i - 1}]\\to${cnt[i]}$`, `prefix ${i}$`), scene: snap(s, [], cnt) });
+    frames.push({ line: 3, caption: T(`$cnt[${i}]\\gets cnt[${i}]+cnt[${i - 1}]=${cnt[i]}$`, `prefix ${i}$`), scene: snap(s, [], cnt) });
   }
   const out = new Array(n).fill(0);
+  frames.push({ line: 4, caption: T(`倒序输出保稳定`, `stable output`), scene: snap(s, [], cnt) });
   for (let i = n - 1; i >= 0; i--) {
     const x = s.a[i];
     cnt[x]--;
     out[cnt[x]] = x; s.mov++;
-    frames.push({ line: 2, caption: T(`倒序 $A[${i}]=${x}$ → $out[${cnt[x]}]$`, `place ${x}$ at ${cnt[x]}$`), scene: snap(s, [i], cnt) });
+    frames.push({ line: 5, caption: T(`$A[${i}]=${x}$ → $out[${cnt[x]}]$`, `place ${x}$ at ${cnt[x]}$`), scene: snap(s, [i], cnt) });
   }
   s.a = out;
   s.done = s.a.map(() => true);
-  frames.push({ line: 2, caption: T(`完成：$A=[${s.a.join(',')}]$，写回 ${s.mov} 次`, `Sorted, ${s.mov} writes`), scene: snap(s, [], cnt) });
+  frames.push({ line: 5, caption: T(`完成：$A=[${s.a.join(',')}]$，写回 ${s.mov} 次`, `Sorted, ${s.mov} writes`), scene: snap(s, [], cnt) });
   return frames;
 }
 

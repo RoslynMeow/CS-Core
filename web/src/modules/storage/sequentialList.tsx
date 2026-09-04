@@ -176,8 +176,8 @@ function gen(cfg: Cfg): Frame<Scene>[] {
     const s2 = buildHeapScene(cfg, pos, 'write', after.cells);
     return [
       { line: 0, caption: T(`判界：$pos=${pos}<capacity=${capacity}$ 且未满，可插入`, `can insert`), scene: s0 },
-      { line: 1, caption: shifting ? T(`搬移：$[${pos}..${orig.used - 1}]$ 后移 ${elemSize}B 腾位 $O(n)$`, `shift`) : T(`空槽直接写入（$pos>length$），无需搬移`, `write into empty slot`), scene: { ...s1, phase: 'shift' } },
-      { line: 2, caption: T(`写入：$L[${pos}]\\gets ${Math.trunc(cfg.insVal)}$ @0x${(s2.base + pos * elemSize).toString(16)}$`, `write L[${pos}]=${Math.trunc(cfg.insVal)}`), scene: { ...s2, focus: pos, phase: 'write' } },
+      { line: shifting ? 2 : 1, caption: shifting ? T(`搬移：$[${pos}..${orig.used - 1}]$ 后移 ${elemSize}B 腾位 $O(n)$`, `shift`) : T(`空槽直接写入（$pos>length$），无需搬移`, `write into empty slot`), scene: { ...s1, phase: 'shift' } },
+      { line: 3, caption: T(`写入：$L[${pos}]\\gets ${Math.trunc(cfg.insVal)}$ @0x${(s2.base + pos * elemSize).toString(16)}$`, `write L[${pos}]=${Math.trunc(cfg.insVal)}`), scene: { ...s2, focus: pos, phase: 'write' } },
       { line: 3, caption: T(`完成：$L=[${fmtList(after.cells)}]$，位置可用 $0..${capacity - 1}$`, `done [${fmtList(after.cells)}]`), scene: { ...s2, focus: pos } },
     ];
   }
@@ -193,17 +193,17 @@ function gen(cfg: Cfg): Frame<Scene>[] {
     const s2 = buildHeapScene(cfg, null, 'delete', after.cells);
     return [
       { line: 0, caption: T(`判界：$L[${pos}]=${orig.cells[pos]}$ 存在，可删除`, `can delete`), scene: s0 },
-      { line: 1, caption: T(`前移：$[${pos + 1}..]$ 前移 ${elemSize}B 覆盖 $L[${pos}]$ $O(n)$`, `shift forward`), scene: { ...s1, phase: 'delete' } },
-      { line: 2, caption: T(`完成：$L=[${fmtList(after.cells)}]$`, `done [${fmtList(after.cells)}]`), scene: { ...s2 } },
+      { line: 2, caption: T(`前移：$[${pos + 1}..]$ 前移 ${elemSize}B 覆盖 $L[${pos}]$ $O(n)$`, `shift forward`), scene: { ...s1, phase: 'delete' } },
+      { line: 3, caption: T(`完成：$L=[${fmtList(after.cells)}]$`, `done [${fmtList(after.cells)}]`), scene: { ...s2 } },
     ];
   }
   return gen({ ...cfg, op: 'idle', execTick: 0 });
 }
 const CODE: Record<Op, any> = {
-  idle: [T('$heapBase \\gets ASLR$', '$heapBase$'), T('$base \\gets malloc(total)$ // 真实地址', '$base\\gets malloc$'), T('等待执行…', 'pending')] as never,
-  get: [T('$addr \\gets base + i\\times elemSize$', '$addr$'), T('if $L[i]$ 未初始化 空槽', 'if empty'), T('return $mem[addr]$ // $O(1)$', 'return')] as never,
-  insert: [T('if $i<0 \\lor i\\ge capacity$ 越界', 'if oob'), T('if $length\\ge capacity$ 失败 // 满', 'if full fail'), T('for $k=length;k>i;k--$ $L[k]\\gets L[k-1]$', 'shift'), T('$L[i]\\gets x;\\; length++$', '$L[i]\\gets x$')] as never,
-  delete: [T('if $i<0 \\lor i\\ge capacity \\lor L[i]=\\varnothing$ 失败', 'oob/empty fail'), T('for $k=i;k<length-1;k++$ $L[k]\\gets L[k+1]$', 'shift'), T('$length--$', '$length--$')] as never,
+  idle: [T('$heapBase \\gets ASLR$', '$heapBase$'), T('$base \\gets malloc(total)$ // 真实地址', '$base\\gets malloc$'), T('$pending$ // 等待执行', '$pending$')] as never,
+  get: [T('$addr \\gets base + i\\times elemSize$', '$addr$'), T('if $L[i]=\\varnothing$:', 'if $L[i]=\\varnothing$:'), T('return $mem[addr]$ // $O(1)$', 'return')] as never,
+  insert: [T('if $i<0 \\lor i\\ge capacity \\lor length\\ge capacity$: // 越界或满则失败', 'if oob or full: fail'), T('for $k=length;k>i;k--$: // 后移腾位', 'for $k$: shift right'), T('  $L[k]\\gets L[k-1]$', '  $L[k]\\gets L[k-1]$'), T('$L[i]\\gets x;\\; length++$', '$L[i]\\gets x$')] as never,
+  delete: [T('if $i<0 \\lor i\\ge capacity \\lor L[i]=\\varnothing$: // 越界或空槽则失败', 'if oob or empty: fail'), T('for $k=i;k<length-1;k++$: // 前移覆盖', 'for $k$: shift left'), T('  $L[k]\\gets L[k+1]$', '  $L[k]\\gets L[k+1]$'), T('$length--$', '$length--$')] as never,
 };
 
 export const sequentialListModule: ModuleDef<Scene, Cfg> = {

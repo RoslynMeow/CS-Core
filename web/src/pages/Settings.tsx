@@ -2,6 +2,12 @@ import { useMemo, useState } from 'react';
 import { useLang } from '../i18n/LangContext';
 import { AlphabetStudio } from './AlphabetStudio';
 import { allModules } from '../modules/registry';
+import {
+  UNDIRECTED_BADGE_DEFAULT,
+  UNDIRECTED_BADGE_STORAGE_KEY,
+  getUndirectedBadgeColor,
+  setUndirectedBadgeColor,
+} from '../lib/graphTheme';
 
 type Entry = {
   id: string;
@@ -29,6 +35,12 @@ const FEATURE_ENTRIES: Entry[] = [
     label: '记忆沙盘 · Memory Sandbox',
     desc: 'memory:allocs / memory:buffer',
     match: (k) => k === 'memory:allocs' || k === 'memory:buffer',
+  },
+  {
+    id: 'graphDisplay',
+    label: '图形显示 · Graph Display',
+    desc: UNDIRECTED_BADGE_STORAGE_KEY,
+    match: (k) => k === UNDIRECTED_BADGE_STORAGE_KEY,
   },
   {
     id: 'graph',
@@ -82,6 +94,7 @@ function hasAny(match: (k: string) => boolean): boolean {
 export function Settings() {
   const { lang, setLang } = useLang();
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [undirectedColor, setUndirectedColor] = useState(getUndirectedBadgeColor());
 
   // 数据只在「清除 + 刷新」时变化，挂载时快照一次即可
   const entries = useMemo(
@@ -131,6 +144,35 @@ export function Settings() {
             <option value="en">English</option>
           </select>
           <span style={{ fontSize: 11, color: '#94a3b8' }}>i18n · 下拉选择（后续扩展）</span>
+        </div>
+        <div style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, color: '#475569' }}>无向边权重颜色</span>
+          <input
+            type="color"
+            value={undirectedColor}
+            onChange={(e) => {
+              setUndirectedBadgeColor(e.target.value);
+              setUndirectedColor(getUndirectedBadgeColor());
+            }}
+            style={{ width: 40, height: 28, padding: 2, border: '1px solid var(--border)', borderRadius: 8, cursor: 'pointer' }}
+          />
+          <span
+            className="tag"
+            style={{ background: undirectedColor, color: '#fff', borderColor: undirectedColor }}
+          >
+            3
+          </span>
+          <span style={{ fontSize: 11, color: '#94a3b8' }}>有权无向边的权重牌颜色</span>
+          <button
+            className="ghost"
+            style={{ padding: '4px 10px', fontSize: 12 }}
+            onClick={() => {
+              setUndirectedBadgeColor(UNDIRECTED_BADGE_DEFAULT);
+              setUndirectedColor(getUndirectedBadgeColor());
+            }}
+          >
+            恢复默认
+          </button>
         </div>
       </div>
       <ExperimentalZone />

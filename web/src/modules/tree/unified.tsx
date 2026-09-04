@@ -15,9 +15,10 @@ import {
   BST_SEARCH_CODE, BST_INSERT_CODE, BST_DELETE_CODE,
   binBf, binToGraph, treeTraverseSteps, LEVEL_CODE, BFS_CODE, DFS_CODE,
   avlInsertSteps, AVL_CODE,
-  heapBuildSteps, heapInsertSteps as heapInsertSteps2, heapDeleteTopSteps, HEAP_BUILD_CODE, HEAP_INSERT_CODE,
+  heapBuildSteps, heapInsertSteps as heapInsertSteps2, heapDeleteTopSteps, HEAP_BUILD_CODE, HEAP_INSERT_CODE, HEAP_DELETE_CODE,
 } from "../../lib/graph";
 import { resolveTree, type TreeCfg } from "./source";
+import { TRAVERSE_CODES } from "./binary";
 import { fromImport as graphFromImport, graphScene, algoStateTables } from "../graph/source";
 
 type SubMode = "general" | "traverse" | "bst" | "avl" | "heap" | "rb" | "btree" | "bplus";
@@ -173,7 +174,25 @@ export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
       </div>
     ) as unknown as never;
   },
-  codeFor(cfg) { return (CODE_MAP as any)[(cfg as Cfg).subMode] ?? []; },
+  codeFor(cfg) {
+    const c = cfg as Cfg;
+    // bst/heap 按操作态切分码表；traverse 按遍历序切分（行号语义见 treeTraverseSteps 注释）
+    // 暂位动画：红黑/B 树沿用 BST/堆步骤，码表与帧一致
+    if (c.subMode === "traverse") {
+      return ((TRAVERSE_CODES as any)[c.traverseMode] ?? LEVEL_CODE) as never;
+    }
+    if (c.subMode === "bst") {
+      if (c.bstMode === "search") return BST_SEARCH_CODE as never;
+      if (c.bstMode === "delete") return BST_DELETE_CODE as never;
+      return BST_INSERT_CODE as never;
+    }
+    if (c.subMode === "heap") {
+      if (c.heapMode === "insert") return HEAP_INSERT_CODE as never;
+      if (c.heapMode === "pop") return HEAP_DELETE_CODE as never;
+      return HEAP_BUILD_CODE as never;
+    }
+    return ((CODE_MAP as any)[c.subMode] ?? []) as never;
+  },
   generate(config) { return buildFrames(config as Cfg); },
   Render({ scene, t, config, onChange }) {
     const isZh = t(T("中文", "en")) !== "en";

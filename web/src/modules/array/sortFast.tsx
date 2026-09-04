@@ -18,9 +18,10 @@ function snap(s: St, hl: number[], aux?: (number | null)[] | null, extra?: Parti
 const SHELL_CODE = [
   T('for $gap \\gets \\lfloor n/2\\rfloor,\\lfloor gap/2\\rfloor,\\dots,1$:', 'for $gap=n/2..1$:'),
   T('  for $i \\gets gap$ to $n-1$:', '  for $i \\gets gap$ to $n-1$:'),
-  T('    $x\\gets A[i];\\; j\\gets i-gap$', '    $x\\gets A[i];\\; j\\gets i-gap$'),
-  T('    while $j\\ge0$ and $A[j]>x$: $A[j+gap]\\gets A[j];\\; j{-}{=}gap$', '    while $A[j]>x$: shift by $gap$'),
-  T('    $A[j+gap]\\gets x$', '    $A[j+gap]\\gets x$'),
+  T('    $x\\gets A[i]$; $j\\gets i-gap$', '    $x\\gets A[i]$; $j\\gets i-gap$'),
+  T('    while $j\\ge0 \\land A[j]>x$:', '    while $j\\ge0 \\land A[j]>x$:'),
+  T('      $A[j+gap]\\gets A[j]$; $j{-}{=}gap$', '      $A[j+gap]\\gets A[j]$; $j{-}{=}gap$'),
+  T('    $A[j+gap]\\gets x$ // 落位', '    $A[j+gap]\\gets x$'),
 ];
 
 function shellGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
@@ -47,11 +48,11 @@ function shellGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
         }
         const w = s.a[j];
         s.a[j + gap] = w; s.mov++;
-        frames.push({ line: 3, caption: T(`$${w}>x$，右移 $gap$ 格`, `shift ${w} by $gap$`), scene: snap(s, [j + gap], undefined, { note: `x=${x}` }) });
+        frames.push({ line: 4, caption: T(`$${w}>x$，右移 $gap$ 格`, `shift ${w} by $gap$`), scene: snap(s, [j + gap], undefined, { note: `x=${x}` }) });
         j -= gap;
       }
       s.a[j + gap] = x; s.mov++;
-      frames.push({ line: 4, caption: T(`$A[${j + gap}]\\gets${x}$`, `place ${x}$`), scene: snap(s, [j + gap]) });
+      frames.push({ line: 5, caption: T(`$A[${j + gap}]\\gets${x}$`, `place ${x}$`), scene: snap(s, [j + gap]) });
     }
   }
   s.done = s.a.map(() => true);
@@ -75,8 +76,8 @@ export const shellModule: ModuleDef<ArrayScene, ArrayCfg> = {
 const MERGE_CODE = [
   T('$\\text{MergeSort}(A,l,r)$:', '$\\text{MergeSort}(A,l,r)$:'),
   T('  if $l\\ge r$: return // 单个元素有序', '  if $l\\ge r$: return'),
-  T('  $m\\gets\\lfloor(l+r)/2\\rfloor$；递归排两半', '  $m$; sort halves'),
-  T('  $i\\gets l,\\;j\\gets m+1$；取小者 $\\to tmp$；拷回', '  merge halves via $tmp$'),
+  T('  $m\\gets\\lfloor(l+r)/2\\rfloor$; $\\text{MergeSort}(l,m)$; $\\text{MergeSort}(m+1,r)$ // 分半递归', '  $m\\gets\\lfloor(l+r)/2\\rfloor$; recurse halves'),
+  T('  $tmp[k{+}{+}]\\gets\\min(A[i],A[j])$; $A[l..r]\\gets tmp$ // 逐个取小合并后拷回', '  merge into $tmp$; copy back'),
 ];
 
 function mergeGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
@@ -143,10 +144,15 @@ export const mergeModule: ModuleDef<ArrayScene, ArrayCfg> = {
 
 // ── 快排（Lomuto）──
 const QUICK_CODE = [
-  T('$\\text{QuickSort}(A,l,r);\\; pivot\\gets A[r]$:', '$\\text{QuickSort}(A,l,r);\\; pivot\\gets A[r]$:'),
-  T('  if $l\\ge r$: return', '  if $l\\ge r$: return'),
-  T('  $i\\gets l-1$；for $j=l..r-1$：$A[j]<pivot\\implies i{+}{+},swap(A[i],A[j])$', '  partition: $A[j]<pivot \\implies$ swap'),
-  T('  $swap(A[i+1],A[r])$；递归两边', '  place pivot; recurse'),
+  T('$\\text{QuickSort}(A,l,r)$; $pivot\\gets A[r]$ // 取主元', '$\\text{QuickSort}(A,l,r)$; $pivot\\gets A[r]$'),
+  T('if $l\\ge r$:', 'if $l\\ge r$:'),
+  T('  return // 0~1 个元素有序', '  return'),
+  T('$i\\gets l-1$ // 左区尾下标', '$i\\gets l-1$'),
+  T('for $j\\gets l$ to $r-1$: // 分区扫描', 'for $j\\gets l$ to $r-1$:'),
+  T('  if $A[j]<pivot$:', '  if $A[j]<pivot$:'),
+  T('    $i{+}{+}$; $\\text{swap}(A[i],A[j])$', '    $i{+}{+}$; $\\text{swap}(A[i],A[j])$'),
+  T('  $p\\gets i+1$; $\\text{swap}(A[p],A[r])$ // 主元就位', '  $p\\gets i+1$; $\\text{swap}(A[p],A[r])$'),
+  T('  $\\text{QuickSort}(l,p-1)$; $\\text{QuickSort}(p+1,r)$ // 递归两边', '  recurse both halves'),
 ];
 
 function quickGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
@@ -159,7 +165,7 @@ function quickGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
     if (l >= r) {
       if (l === r) {
         s.done[l] = true;
-        frames.push({ line: 1, caption: T(`$[${l},${r}]$ 单个元素就位`, `single done`), scene: snap(s, [l]) });
+        frames.push({ line: 2, caption: T(`$[${l},${r}]$ 单个元素就位`, `single done`), scene: snap(s, [l]) });
       }
       return;
     }
@@ -168,24 +174,24 @@ function quickGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
     let i = l - 1;
     for (let j = l; j <= r - 1; j++) {
       s.cmp++;
-      frames.push({ line: 2, caption: T(`$A[${j}]=${s.a[j]}$ vs $pivot=${pivot}$`, `$A[${j}]$ vs $pivot$`), scene: snap(s, [j, r]) });
+      frames.push({ line: 5, caption: T(`$A[${j}]=${s.a[j]}$ vs $pivot=${pivot}$`, `$A[${j}]$ vs $pivot$`), scene: snap(s, [j, r]) });
       if (s.a[j] < pivot) {
         i++;
         if (i !== j) {
           const t = s.a[i]; s.a[i] = s.a[j]; s.a[j] = t; s.mov += 3;
-          frames.push({ line: 2, caption: T(`小！$i\\gets${i}$，$A[${i}]\\leftrightarrow A[${j}]$ 互换`, `swap into left part`), scene: snap(s, [i, j]) });
+          frames.push({ line: 6, caption: T(`小！$i\\gets${i}$，$A[${i}]\\leftrightarrow A[${j}]$ 互换`, `swap into left part`), scene: snap(s, [i, j]) });
         } else {
-          frames.push({ line: 2, caption: T(`小！$i\\gets${i}$（自交换，跳过）`, `$i=${i}$ skip`), scene: snap(s, [i]) });
+          frames.push({ line: 6, caption: T(`小！$i\\gets${i}$（自交换，跳过）`, `$i=${i}$ skip`), scene: snap(s, [i]) });
         }
       }
     }
     const p = i + 1;
     if (p !== r) {
       const t = s.a[p]; s.a[p] = s.a[r]; s.a[r] = t; s.mov += 3;
-      frames.push({ line: 3, caption: T(`主元 $A[${p}]\\leftrightarrow A[${r}]$ 互换`, `swap pivot into place`), scene: snap(s, [p, r]) });
+      frames.push({ line: 7, caption: T(`主元 $A[${p}]\\leftrightarrow A[${r}]$ 互换`, `swap pivot into place`), scene: snap(s, [p, r]) });
     }
     s.done[p] = true;
-    frames.push({ line: 3, caption: T(`主元就位 $A[${p}]=${pivot}$，左小右大`, `pivot placed at ${p}$`), scene: snap(s, [p]) });
+    frames.push({ line: 7, caption: T(`主元就位 $A[${p}]=${pivot}$，左小右大`, `pivot placed at ${p}$`), scene: snap(s, [p]) });
     sort(l, p - 1);
     sort(p + 1, r);
   };

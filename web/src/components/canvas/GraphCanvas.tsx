@@ -4,6 +4,11 @@ import { faMaximize } from "@fortawesome/free-solid-svg-icons";
 import type { GraphAlgoScene } from "../../lib/graph";
 import type { Text } from "../../i18n/lang";
 import type { AlgoTable } from "./StateBar";
+import {
+    getUndirectedBadgeColor,
+    graphHasWeight,
+    weightArrow,
+} from "../../lib/graphTheme";
 
 /** 图/树共用的渲染场景：库的算法步进 + 位置/边信息，喂给 GraphCanvas */
 export type GraphCanvasScene = GraphAlgoScene & {
@@ -96,6 +101,8 @@ export function GraphCanvas({
 }) {
     const { nodes, edges, directed = false } = scene;
     const pos = new Map(nodes.map((n) => [n.id, n]));
+    // 无向权重牌颜色（设置页可改，每帧渲染时读取）
+    const undirectedColor = getUndirectedBadgeColor();
     // 边端点直接落在节点圆心（连接两个节点圆的中心）；节点圆/矩形后绘会盖住穿心线段，视觉上自然衔接
     const edgePos = (u: number, v: number) => {
         const a = pos.get(u),
@@ -277,6 +284,16 @@ export function GraphCanvas({
                     {edges.map((e, i) => {
                         const p = edgePos(e.u, e.v);
                         if (!p) return null;
+                        // 双向边（有向图同时存在 u→v 与 v→u）画成对称弧线，避免线/箭头/权重完全重合
+                        const curved =
+                            directed &&
+                            e.u !== e.v &&
+                            edges.some((o) => o.u === e.v && o.v === e.u);
+                        const CURVE = 16; // 弧高（垂直偏移像素）
+                        // 只要有一条显式权重，全图视为有权图：权重（含显式 1）全部显示数值
+                        const showW =
+                            e.weight !== undefined || graphHasWeight(edges);
+                        const wVal = e.weight ?? 1;
                         if (e.beam) {
                             // 光束：被拆节点（左）→ 新节点（右），流动虚线“送”节点过去
                             return (
@@ -306,68 +323,127 @@ export function GraphCanvas({
                             ? "#059669"
                             : active
                               ? "#f59e0b"
-                              : "#94a3b8";
+                              : "#64748b";
                         const sw = mstPicked ? 3.2 : active ? 3 : 1.6;
                         const elb = scene.edgeLabels?.[`${e.u}-${e.v}`];
                         // 有向边：箭头画在目标节点外沿，线止于外沿，避免被后绘的实心节点圆盖住
+                        // 直线用起终点方向；弧线用终点切线方向（P1 - C）
                         const dxx = p.bx - p.ax,
                             dyy = p.by - p.ay;
                         const dl = Math.hypot(dxx, dyy) || 1;
                         const ux = dxx / dl,
                             uy = dyy / dl; // 源→目标单位向量
-                        const ARR = 12,
-                            AHW = 5.5; // 箭头长 / 半宽
-                        const tx2 = p.bx - ux * R; // 目标外沿（箭头尖）
-                        const ty2 = p.by - uy * R;
-                        const bx2 = tx2 - ux * ARR,
-                            by2 = ty2 - uy * ARR; // 底边中心（回退）
-                        const px2 = -uy,
-                            py2 = ux; // 垂直单位
-                        const x2 = directed ? tx2 : p.bx;
-                        const y2 = directed ? ty2 : p.by;
+                        // 弧线控制点：中点沿右法线偏移（反向边自动偏向另一侧，对称分开）
+                        const cx = curved ? (p.ax + p.bx) / 2 - uy * CURVE : (p.ax + p.bx) / 2;
+                        const cy = curved ? (p.ay + p.by) / 2 + ux * CURVE : (p.ay + p.by) / 2;
+                        // 二次贝塞尔 t=0.5 处（弧顶）：无向权重牌放这里，两条弧自然错开
+                        const lx = curved ? (p.ax + 2 * cx + p.bx) / 4 : p.mx;
+                        const ly = curved ? (p.ay + 2 * cy + p.by) / 4 : p.my;
+                        // 终点切线（弧线）或直线方向
+                        let tx = ux,
+                            ty = uy;
+                        if (curved) {
+                            const gx = p.bx - cx,
+                                gy = p.by - cy;
+                            const gl = Math.hypot(gx, gy) || 1;
+                            tx = gx / gl;
+                            ty = gy / gl;
+                        }
+                        // 权重数字直接写进箭头三角形里；无权边用稍大的箭头保证可见
+                        const wa = weightArrow(wVal);
+                        const AL = showW && directed ? wa.len : 15;
+                        const AH = showW && directed ? wa.half : 7;
+                        const tx2 = p.bx - tx * (R - 1); // 目标外沿内嵌 1px，保证与节点圆视觉相接
+                        const ty2 = p.by - ty * (R - 1);
+                        const bx2 = tx2 - tx * AL,
+                            by2 = ty2 - ty * AL; // 底边中心（回退）
+                        const px2 = -ty,
+                            py2 = tx; // 垂直单位
+                        // 线止于三角底边中心：三角里不穿线，数字独占干净底色
+                        const ex2 = directed ? bx2 : p.bx;
+                        const ey2 = directed ? by2 : p.by;
+                        const edgePath = curved
+                            ? `M ${p.ax} ${p.ay} Q ${cx} ${cy} ${bx2} ${by2}`
+                            : undefined;
+                        // 数字放在三角形视觉中心（约 0.55 倍箭长处），白字加深色描边保证可读
+                        const nx = tx2 - tx * AL * 0.55;
+                        const ny = ty2 - ty * AL * 0.55;
+                        // 无向有权边：中点牌子（主题色区分无向），数字写牌子里
+                        const badgeFill = directed ? stroke : undirectedColor;
                         return (
                             <g key={i}>
-                                <line
-                                    x1={p.ax}
-                                    y1={p.ay}
-                                    x2={x2}
-                                    y2={y2}
-                                    stroke={stroke}
-                                    strokeWidth={sw}
-                                    strokeDasharray={
-                                        e.dashed && !active ? "4 4" : undefined
-                                    }
-                                />
-                                {directed && (
-                                    <polygon
-                                        points={`${tx2},${ty2} ${bx2 + px2 * AHW},${by2 + py2 * AHW} ${bx2 - px2 * AHW},${by2 - py2 * AHW}`}
-                                        fill={stroke}
+                                {curved ? (
+                                    <path
+                                        d={edgePath}
+                                        fill="none"
+                                        stroke={stroke}
+                                        strokeWidth={sw}
+                                        strokeDasharray={
+                                            e.dashed && !active ? "4 4" : undefined
+                                        }
+                                    />
+                                ) : (
+                                    <line
+                                        x1={p.ax}
+                                        y1={p.ay}
+                                        x2={ex2}
+                                        y2={ey2}
+                                        stroke={stroke}
+                                        strokeWidth={sw}
+                                        strokeDasharray={
+                                            e.dashed && !active ? "4 4" : undefined
+                                        }
                                     />
                                 )}
-                                {e.weight !== undefined && e.weight !== 1 && (
+                                {directed ? (
                                     <g>
-                                        <circle
-                                            cx={p.mx}
-                                            cy={p.my}
-                                            r={9}
-                                            fill="#0f172a"
+                                        <polygon
+                                            points={`${tx2},${ty2} ${bx2 + px2 * AH},${by2 + py2 * AH} ${bx2 - px2 * AH},${by2 - py2 * AH}`}
+                                            fill={stroke}
                                         />
-                                        <text
-                                            x={p.mx}
-                                            y={p.my + 3}
-                                            textAnchor="middle"
-                                            fontSize={10}
-                                            fontWeight={800}
-                                            fill="#fff"
-                                        >
-                                            {e.weight}
-                                        </text>
+                                        {showW && (
+                                            <text
+                                                x={nx}
+                                                y={ny}
+                                                textAnchor="middle"
+                                                dominantBaseline="central"
+                                                fontSize={wa.font}
+                                                fontWeight={800}
+                                                fill="#fff"
+                                                stroke="rgba(15,23,42,.8)"
+                                                strokeWidth={2.5}
+                                                paintOrder="stroke"
+                                            >
+                                                {wVal}
+                                            </text>
+                                        )}
                                     </g>
+                                ) : (
+                                    showW && (
+                                        <g>
+                                            <circle
+                                                cx={lx}
+                                                cy={ly}
+                                                r={9}
+                                                fill={badgeFill}
+                                            />
+                                            <text
+                                                x={lx}
+                                                y={ly + 3}
+                                                textAnchor="middle"
+                                                fontSize={10}
+                                                fontWeight={800}
+                                                fill="#fff"
+                                            >
+                                                {wVal}
+                                            </text>
+                                        </g>
+                                    )
                                 )}
                                 {elb && (
                                     <text
-                                        x={p.mx}
-                                        y={p.my - 6}
+                                        x={lx}
+                                        y={ly - 6}
                                         textAnchor="middle"
                                         fontSize={10}
                                         fontWeight={800}

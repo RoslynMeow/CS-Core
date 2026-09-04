@@ -150,10 +150,10 @@ function gen(cfg: Cfg): Frame<Scene>[] {
 }
 
 const CODE: Record<Op, any> = {
-  idle: [T('$f\\gets 0,\\; r\\gets 0$ // 游标', '$f=0,\\;r=0$'), T('$r=f$（空）', 'empty: r=f'), T('等待执行…', 'pending')] as never,
-  enqueue: [T('if $(r+1)\\bmod cap = f$ 队满（牺牲一槽）', 'if full: (r+1)%cap=f'), T('$Q[r]\\gets x$; 写入', 'Q[r] = x'), T('$r\\gets (r+1)\\bmod cap$', 'r = (r+1)%cap')] as never,
-  dequeue: [T('if $r=f$ 空队', 'if empty: r=f'), T('$x\\gets Q[f]$; 释放', 'x = Q[f]'), T('$f\\gets (f+1)\\bmod cap$', 'f = (f+1)%cap')] as never,
-  peek: [T('if $r=f$ 空队', 'if empty'), T('return $Q[f]$', 'return Q[f]'), T('// 不删除', '// keep')] as never,
+  idle: [T('$f\\gets0$; $r\\gets0$ // 游标', '$f\\gets0$; $r\\gets0$'), T('$r=f$ // 空队', '$r=f$ // empty'), T('$pending$ // 等待执行', '$pending$')] as never,
+  enqueue: [T('if $(r+1)\\bmod cap=f$: // 队满则拒绝', 'if full: fail'), T('  $Q[r]\\gets x$ // 写队尾', '  $Q[r]\\gets x$'), T('  $r\\gets(r+1)\\bmod cap$ // 后移', '  $r\\gets(r+1)\\bmod cap$')] as never,
+  dequeue: [T('if $r=f$: // 空队则失败', 'if empty: fail'), T('  $x\\gets Q[f]$ // 取队首', '  $x\\gets Q[f]$'), T('  $f\\gets(f+1)\\bmod cap$ // 前移', '  $f\\gets(f+1)\\bmod cap$')] as never,
+  peek: [T('if $r=f$: // 空队则失败', 'if empty: fail'), T('  return $Q[f]$ // 读队首', '  return $Q[f]$'), T('$done$ // 不删除', '$done$')] as never,
 };
 
 export const queueModule: ModuleDef<Scene, Cfg> = {

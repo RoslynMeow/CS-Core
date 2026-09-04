@@ -91,17 +91,17 @@ function gen(cfg: Cfg): Frame<Scene>[] {
   if (cfg.mode === 'strlen') {
     const frames: Frame<Scene>[] = [];
     frames.push({ line: 0, caption: T(`$p \\gets s_1$，计数 $n \\gets 0$`, `n=0`), scene: buildScene(cfg, 'count', 0, null) });
-    for (let i = 0; i < s1.length - 1; i++) frames.push({ line: 1, caption: T(`$s_1[${i}]="${cfg.s1[i]}"$、ASCII $\\texttt{${toHexByte(s1[i].byte)}}$ $\\neq \\# $, $n\\gets ${i + 1}$，$p\\gets p{+}1$`, `count ${i + 1}`), scene: buildScene(cfg, 'count', i, null) });
-    frames.push({ line: 2, caption: T(`遇 $\\#=0x00$，返回 $n=${Math.max(0, s1.length - 1)}$（不含终结符）`, `strlen=${Math.max(0, s1.length - 1)}`), scene: buildScene({ ...cfg, mode: cfg.mode }, 'result', s1.length - 1, null) });
+    for (let i = 0; i < s1.length - 1; i++) frames.push({ line: 2, caption: T(`$s_1[${i}]="${cfg.s1[i]}"$、ASCII $\\texttt{${toHexByte(s1[i].byte)}}$ $\\neq \\# $, $n\\gets ${i + 1}$，$p\\gets p{+}1$`, `count ${i + 1}`), scene: buildScene(cfg, 'count', i, null) });
+    frames.push({ line: 3, caption: T(`遇 $\\#=0x00$，返回 $n=${Math.max(0, s1.length - 1)}$（不含终结符）`, `strlen=${Math.max(0, s1.length - 1)}`), scene: buildScene({ ...cfg, mode: cfg.mode }, 'result', s1.length - 1, null) });
     return frames;
   }
   if (cfg.mode === 'strcat') {
     const N = Math.max(0, s1.length - 1); // dst 原始长度
     const src = s2.slice(0, -1);
     const frames: Frame<Scene>[] = [];
-    frames.push({ line: 0, caption: T(`$\\texttt{strcat}(s_1,s_2)$：定位 $s_1$ 末尾的 $\\#$`, `find NUL`), scene: buildScene(cfg, 'copy', s1.length - 1, null) });
-    for (let i = 0; i < src.length; i++) frames.push({ line: 1, caption: T(`把 $s_2[${i}]="${src[i].ch}"$ 覆盖到 $s_1$ 末尾（含其 $\\#$ 传输）`, `copy ${src[i].ch}`), scene: buildScene(cfg, 'copy', N + i, i) });
-    frames.push({ line: 2, caption: T(`拼接结果 "${cfg.s1 + cfg.s2}"，$|s|=${src.length + N}$`, 'done'), scene: buildScene(cfg, 'result', null, null) });
+    frames.push({ line: 2, caption: T(`$\\texttt{strcat}(s_1,s_2)$：定位 $s_1$ 末尾的 $\\#$`, `find NUL`), scene: buildScene(cfg, 'copy', s1.length - 1, null) });
+    for (let i = 0; i < src.length; i++) frames.push({ line: 4, caption: T(`把 $s_2[${i}]="${src[i].ch}"$ 覆盖到 $s_1$ 末尾（含其 $\\#$ 传输）`, `copy ${src[i].ch}`), scene: buildScene(cfg, 'copy', N + i, i) });
+    frames.push({ line: 5, caption: T(`拼接结果 "${cfg.s1 + cfg.s2}"，$|s|=${src.length + N}$`, 'done'), scene: buildScene(cfg, 'result', null, null) });
     return frames;
   }
   // strcmp
@@ -111,33 +111,38 @@ function gen(cfg: Cfg): Frame<Scene>[] {
   for (let i = 0; i < M; i++) {
     const a = s1[i], b = s2[i];
     const aByte = a ? a.byte : 0, bByte = b ? b.byte : 0;
-    if (aByte === bByte && i < Math.min(s1.length, s2.length) - 1) frames.push({ line: 1, caption: T(`$s_1[${i}]=s_2[${i}]$（皆 ${aByte}），$p$、$q$ 同进`, `equal ${aByte}`), scene: buildScene(cfg, 'compare', i, i) });
-    else { frames.push({ line: 2, caption: T(`$s_1[${i}].ASCII=${aByte}$ vs $s_2[${i}].ASCII=${bByte}$ $\\Rightarrow$ $\\mathtt{strcmp}=${aByte - bByte}$（$<0$ 则 $s_1<s_2$）`, `diff ${aByte - bByte}`), scene: buildScene(cfg, 'result', i, i) }); break; }
+    if (aByte === bByte && i < Math.min(s1.length, s2.length) - 1) frames.push({ line: 2, caption: T(`$s_1[${i}]=s_2[${i}]$（皆 ${aByte}），$p$、$q$ 同进`, `equal ${aByte}`), scene: buildScene(cfg, 'compare', i, i) });
+    else { frames.push({ line: 3, caption: T(`$s_1[${i}].ASCII=${aByte}$ vs $s_2[${i}].ASCII=${bByte}$ $\\Rightarrow$ $\\mathtt{strcmp}=${aByte - bByte}$（$<0$ 则 $s_1<s_2$）`, `diff ${aByte - bByte}`), scene: buildScene(cfg, 'result', i, i) }); break; }
   }
-  if (frames.length === 1) frames.push({ line: 2, caption: T('相等（含终结符）：strcmp = 0', 'equal: 0'), scene: buildScene(cfg, 'result', null, null) });
+  if (frames.length === 1) frames.push({ line: 3, caption: T('相等（含终结符）：strcmp = 0', 'equal: 0'), scene: buildScene(cfg, 'result', null, null) });
   return frames;
 }
 
 const CODE: Record<Mode, any> = {
   layout: [
-    T('$s \\in \\Sigma^*$ 映为字符数组', '$s$ as char array'),
-    T('尾加 $\\#\\notin\\Sigma$（0x00）界定边界', 'append $\\#$'),
-    T('strlen=$|s|$ 不含 $\\#$', 'len=$|s|$'),
+    T('$s\\in\\Sigma^*$ // 映为字符数组', '$s$ as char array'),
+    T('$\\#\\notin\\Sigma$ // 尾加 0x00 界定边界', 'append $\\#$'),
+    T('$strlen\\gets|s|$ // 不含终结符 $\\#$', 'len=$|s|$'),
   ] as never,
   strlen: [
     T('$n \\gets 0;\\; p \\gets s$', '$n=0,p=s$'),
-    T('while $*p \\neq \\#$: $n{+}{+};\\; p{+}{+}$', 'while $*p\\neq\\#$'),
+    T('while $*p \\neq \\#$:', 'while $*p\\neq\\#$:'),
+    T('  $n{+}{+}$; $p{+}{+}$', '  $n{+}{+}$; $p{+}{+}$'),
     T('return $n$', 'return $n$'),
   ] as never,
   strcat: [
-    T('$p \\gets$ 定位 $s_1$ 的 $\\#$', 'find NUL in s1'),
-    T('while $*q \\neq \\#$: $*p{+}{+}\\gets *q{+}{+}$', 'copy src'),
+    T('$p\\gets s_1$ // 从首开始', '$p\\gets s_1$'),
+    T('while $*p\\neq\\#$:', 'while $*p\\neq\\#$:'),
+    T('  $p{+}{+}$ // 移到末尾 $\\#$', '  $p{+}{+}$'),
+    T('while $*q\\neq\\#$:', 'while $*q\\neq\\#$:'),
+    T('  $*p{+}{+}\\gets *q{+}{+}$ // 逐字覆盖', '  copy one char'),
     T('$*p \\gets \\#$ // 补终结符', 'append $\\#$'),
   ] as never,
   strcmp: [
-    T('比较 $s_1[i]$ 与 $s_2[i]$ 的 ASCII', 'compare byte'),
-    T('相等则 $i{+}{+}$ 继续', 'equal → next'),
-    T('return $s_1[i]-s_2[i]$', 'return diff'),
+    T('$a\\gets s_1[i]$; $b\\gets s_2[i]$ // 取双方字节', '$a,b\\gets s_1[i],s_2[i]$'),
+    T('if $a=b$:', 'if $a=b$:'),
+    T('  $i{+}{+}$ // 相等继续', '  $i{+}{+}$'),
+    T('return $a-b$ // 首个差异', 'return $a-b$'),
   ] as never,
 };
 

@@ -49,7 +49,7 @@ const DEFAULT: Cfg = {
   x: 5,
 };
 
-const VIEW_CODE: Text[] = [T("查看当前树", "view current tree")];
+const VIEW_CODE: Text[] = [T("$view$ // 查看当前树", "$view$ // view current tree")];
 const CODE: Record<Mode, Text[]> = {
   view: VIEW_CODE,
   search: BST_SEARCH_CODE as unknown as Text[],

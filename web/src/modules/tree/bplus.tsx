@@ -36,9 +36,9 @@ const CODE: Record<Mode, Text[]> = {
   build: BTREE_INSERT_CODE,
   search: BTREE_SEARCH_CODE,
   range: [
-    T("$range(l, r)$：先找 $l$ 的下界叶", "range(l, r): locate the leaf for l"),
-    T("沿叶子右链扫描 $\to$ 收集 $[l, r]$（虚线=叶子链）", "scan the leaf chain → collect $[l, r]$ (dashed = leaf chain)"),
-    T("// 范围查询只扫叶子，$O(k+\\log n)$", "// range scan touches leaves only, $O(k+\\log n)$"),
+    T("$range(l,r)$ // 先找 $l$ 的下界叶", "range(l, r): locate the leaf for l"),
+    T("$[l,r]\\gets scan(chain)$ // 沿叶子右链收集", "scan the leaf chain → collect $[l, r]$ (dashed = leaf chain)"),
+    T("$done$ // 范围查询只扫叶子，$O(k+\\log n)$", "$done$ // range scan touches leaves only, $O(k+\\log n)$"),
   ],
 };
 

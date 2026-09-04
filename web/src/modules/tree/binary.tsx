@@ -27,25 +27,26 @@ const DEFAULT: Cfg = {
   mode: "pre",
 };
 
-// 每模式各自完整、从 line0 开始的递归遍历伪代码
-const CODE: Record<Mode, Text[]> = {
+// 每模式各自完整、从 line0 开始的递归遍历伪代码（$preorder$ 等即本函数自身递归）
+export const TRAVERSE_CODES: Record<Mode, Text[]> = {
   pre: [
-    T("$visit(u)$  // 前序", "$visit(u)$  // preorder"),
-    T("$F(u_L)$  // 左", "$F(u_L)$  // left"),
-    T("$F(u_R)$  // 右", "$F(u_R)$  // right"),
+    T("$visit(u)$  // 前序：先访问根", "$visit(u)$  // preorder: root first"),
+    T("$preorder(u_L)$  // 左", "$preorder(u_L)$  // left"),
+    T("$preorder(u_R)$  // 右", "$preorder(u_R)$  // right"),
   ],
   in: [
-    T("$F(u_L)$  // 左", "$F(u_L)$  // left"),
+    T("$inorder(u_L)$  // 左", "$inorder(u_L)$  // left"),
     T("$visit(u)$  // 中序", "$visit(u)$  // inorder"),
-    T("$F(u_R)$  // 右", "$F(u_R)$  // right"),
+    T("$inorder(u_R)$  // 右", "$inorder(u_R)$  // right"),
   ],
   post: [
-    T("$F(u_L)$  // 左", "$F(u_L)$  // left"),
-    T("$F(u_R)$  // 右", "$F(u_R)$  // right"),
+    T("$postorder(u_L)$  // 左", "$postorder(u_L)$  // left"),
+    T("$postorder(u_R)$  // 右", "$postorder(u_R)$  // right"),
     T("$visit(u)$  // 后序", "$visit(u)$  // postorder"),
   ],
   level: LEVEL_CODE as unknown as Text[],
 };
+const CODE: Record<Mode, Text[]> = TRAVERSE_CODES;
 
 function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
   // 旧合并页存档防御：mode 可能残留 heap-* 等非法值 → 归一化到当前模式集

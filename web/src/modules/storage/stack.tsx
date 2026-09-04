@@ -142,10 +142,10 @@ function gen(cfg: Cfg): Frame<Scene>[] {
 }
 
 const CODE: Record<Op, any> = {
-  idle: [T('$top$ 初始化', '$top$'), T('$top=null$（空栈）', 'empty'), T('等待执行…', 'pending')] as never,
-  push: [T('if $length=cap$ 栈满', 'if full'), T('$x\\to top$; 分配/写入', 'x to top'), T('$top\\gets$ 新节点', 'top update')] as never,
-  pop: [T('if $top=null$ 空栈', 'if empty'), T('$x\\gets top.data$; 释放', 'x = top'), T('$top\\gets top.next$', 'top = top.next')] as never,
-  peek: [T('if $top=null$ 空栈', 'if empty'), T('return $top.data$', 'return top'), T('// 不删除', '// keep')] as never,
+  idle: [T('$top\\gets null$ // 空栈', '$top\\gets null$'), T('$cap\\gets capacity$ // 定容（顺序栈）', '$cap\\gets capacity$'), T('$pending$ // 等待执行', '$pending$')] as never,
+  push: [T('if $length=cap$: // 栈满则拒绝', 'if $length=cap$: fail'), T('  $x\\to top$; $top\\gets new$ // 分配写入', '  $x\\to top$; $top\\gets new$'), T('return $top$ // 完成', 'return $top$')] as never,
+  pop: [T('if $top=null$: // 空栈则失败', 'if $top=null$: fail'), T('  $x\\gets top.data$; $free(top)$ // 取值释放', '  $x\\gets top.data$; $free(top)$'), T('  $top\\gets top.next$ // 栈顶下移', '  $top\\gets top.next$')] as never,
+  peek: [T('if $top=null$: // 空栈则失败', 'if $top=null$: fail'), T('  return $top.data$ // 读栈顶', '  return $top.data$'), T('$done$ // 不删除', '$done$')] as never,
 };
 
 export const stackModule: ModuleDef<Scene, Cfg> = {

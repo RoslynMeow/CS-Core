@@ -12,33 +12,42 @@ import { bstSearchOnTree } from "./graph";
 /** 红黑树节点：BinNode + red（true=红，false/缺省=黑） */
 export type RBNode = BinNode;
 
-/** RB 插入伪代码（build/insert 共用；行 0 为新值宣布、行 7 为完成，与 buildDualFrames 约定一致）
+/** RB 插入伪代码（build/insert 共用；0 宣布、1 定位、3 挂入、6/8/10 分 case、11 收尾）
  *  正文仅含伪代码结构词与 $数学$，中文说明均在 // 注释后 */
 export const RB_INSERT_CODE: Text[] = [
   { zh: "new $z$; $z.c \\gets RED$  // 新节点染红", en: "new $z$; $z.c \\gets RED$  // new node, red" },
   { zh: "$y \\gets NIL$; $x \\gets root$  // 定位空位", en: "$y \\gets NIL$; $x \\gets root$  // locate" },
-  { zh: "while $x \\neq NIL$: $y \\gets x$, $x \\gets$ child  // 左/右下探", en: "while $x \\neq NIL$: $y \\gets x$, descend  // left/right" },
-  { zh: "$z.p \\gets y$; attach $z$  // 空位挂入", en: "$z.p \\gets y$; attach $z$" },
+  { zh: "while $x \\neq NIL$: // 左/右下探", en: "while $x \\neq NIL$: // descend" },
+  { zh: "$z.p \\gets y$; $attach(z)$  // 空位挂入", en: "$z.p \\gets y$; $attach(z)$" },
   { zh: "while $z.p.c = RED$:  // 红红冲突", en: "while $z.p.c = RED$:  // red-red conflict" },
-  { zh: "if $u = uncle(z)$ RED: $p,u \\gets BLACK$; $g \\gets RED$; $z \\gets g$  // case1 叔红", en: "if uncle $u$ RED: $p,u \\gets BLACK$; $g \\gets RED$; $z \\gets g$  // case1" },
-  { zh: "elif $z$ inner: $rotate(p)$  // case2 内侧旋父", en: "elif $z$ is inner: $rotate(p)$  // case2" },
-  { zh: "else: $p \\gets BLACK$; $g \\gets RED$; $rotate(g)$  // case3 外侧旋爷", en: "else: $p \\gets BLACK$; $g \\gets RED$; $rotate(g)$  // case3" },
-  { zh: "$root.c \\gets BLACK$  // 根恒黑 · 完成", en: "$root.c \\gets BLACK$  // done" },
+  { zh: "if $uncle(z).c = RED$: // case1 叔红", en: "if $uncle(z).c = RED$: // case1" },
+  { zh: "  $p.c,u.c \\gets BLACK$; $g.c \\gets RED$; $z \\gets g$  // 上提继续", en: "  recolor; $z \\gets g$  // move up" },
+  { zh: "elif $inner(z)$: // case2 内侧", en: "elif $inner(z)$: // case2" },
+  { zh: "  $\\text{rotate}(p)$ // 旋父转外侧", en: "  $\\text{rotate}(p)$" },
+  { zh: "else: // case3 外侧", en: "else: // case3" },
+  { zh: "  $p.c \\gets BLACK$; $g.c \\gets RED$; $\\text{rotate}(g)$  // 旋爷", en: "  recolor; $\\text{rotate}(g)$" },
+  { zh: "$root.c \\gets BLACK$ // 根恒黑完成", en: "$root.c \\gets BLACK$ // done" },
 ];
 
 /** RB 删除伪代码（全量的删黑修复 case1-4）；正文仅数学 + 伪代码结构词，中文在 // 后 */
 export const RB_DELETE_CODE: Text[] = [
-  { zh: "locate $z$; $y \\gets z$; $y.orig \\gets y.color$  // 定位 $z$ 并记录", en: "locate $z$; $y \\gets z$; record $y.color$" },
-  { zh: "if $z$ child $\\leq 1$: $x \\gets$ child $\\vee$ NIL; $transplant(z, x)$  // 至多一子", en: "if $\\leq 1$ child: $x \\gets$ child or NIL, $transplant(z,x)$" },
-  { zh: "else: $y \\gets min(z.R)$; $y.orig \\gets y.color$; $x \\gets y.R$  // 双子找后继", en: "else: $y \\gets$ min of right subtree, $x \\gets y.R$" },
-  { zh: "$transplant(y,x)$; $transplant(z,y)$; $y.color \\gets z.color$  // 后继顶替", en: "$transplant(y,x)$; $transplant(z,y)$; $y.color \\gets z.color$" },
-  { zh: "if $y.orig = BLACK$: $fixup(x)$  // 删黑 → 双黑补救", en: "if $y.c$ was BLACK: $fixup(x)$  // double-black" },
-  { zh: "while $x \\neq root \\wedge x = BLACK$:  // 双黑上升", en: "while $x \\neq root \\wedge x$ is BLACK $\\uparrow$  // double-black" },
-  { zh: "case1 $w = sib(x)$ RED: $w \\gets BLACK$; $p \\gets RED$; $rotate(p)$; $w \\gets$ new  // 兄红旋父", en: "case1 $w$ RED: recolor + rotate parent" },
-  { zh: "case2 $w$ BLACK $\\wedge$ children BLACK: $w \\gets RED$; $x \\gets x.p$  // 双子黑上移", en: "case2 sibling's children BLACK: $w$ RED, double-black moves up" },
-  { zh: "case3 near child RED: $near \\gets BLACK$; $w \\gets RED$; $rotate(w)$; $w \\gets$ new  // 旋兄", en: "case3 near child RED / far BLACK: recolor + rotate sibling" },
-  { zh: "case4 far child RED: $w.color \\gets p.color$; $p \\gets BLACK$; $far \\gets BLACK$; $rotate(p)$; $x \\gets root$  // 旋父消双黑", en: "case4 far child RED: recolor + rotate parent, $x \\gets root$" },
-  { zh: "$x.c \\gets BLACK$; $root.c \\gets BLACK$  // 完成", en: "$x.c \\gets BLACK$; done" },
+  { zh: "locate $z$; $y \\gets z$; $y.orig \\gets y.color$  // 定位并记录", en: "locate $z$; $y \\gets z$; record color" },
+  { zh: "if $z$ child $\\le1$: // 至多一子", en: "if $z$ has $\\le1$ child:" },
+  { zh: "  $x\\gets child\\lor NIL$; $transplant(z,x)$  // 直接摘除", en: "  $x\\gets child\\lor NIL$; $transplant(z,x)$" },
+  { zh: "else: // 双子", en: "else: // two children" },
+  { zh: "  $y\\gets\\min R(z)$ // 右子树最小后继", en: "  $y\\gets\\min R(z)$" },
+  { zh: "  $transplant(y,x)$; $transplant(z,y)$; $y.color\\gets z.color$  // 后继顶替", en: "  $transplant(y,x)$; $transplant(z,y)$; copy color" },
+  { zh: "if $y.orig=BLACK$: // 删黑判断", en: "if deleted was BLACK:" },
+  { zh: "while $x\\neq root \\land x.c=BLACK$:  // 双黑上升", en: "while double-black $x$ rises:" },
+  { zh: "  case1: $w=sib(x)$, $w.c=RED$ // 兄红", en: "  case1: sibling RED" },
+  { zh: "    $w.c\\gets BLACK$; $p.c\\gets RED$; $\\text{rotate}(p)$; $w\\gets sib(x)$  // 换色旋父", en: "    recolor; $\\text{rotate}(p)$" },
+  { zh: "  case2: $w.c=BLACK$ // 双子黑", en: "  case2: sibling children BLACK" },
+  { zh: "    $w.c\\gets RED$; $x\\gets p$  // 双黑上移", en: "    $w.c\\gets RED$; $x\\gets p$" },
+  { zh: "  case3: $far.c=BLACK$ // 近子红", en: "  case3: near RED far BLACK" },
+  { zh: "    $near.c\\gets BLACK$; $w.c\\gets RED$; $\\text{rotate}(w)$  // 换色旋兄", en: "    recolor; $\\text{rotate}(w)$" },
+  { zh: "  case4: $far.c=RED$ // 远子红", en: "  case4: far RED" },
+  { zh: "    $w.c\\gets p.c$; $p.c\\gets BLACK$; $far.c\\gets BLACK$; $\\text{rotate}(p)$; $x\\gets root$  // 消双黑", en: "    recolor; $\\text{rotate}(p)$; $x\\gets root$" },
+  { zh: "$x.c\\gets BLACK$; $root.c\\gets BLACK$  // 完成", en: "$x.c\\gets BLACK$; done" },
 ];
 
 function binParents(nodes: BinNode[]): number[] {
@@ -127,13 +136,13 @@ export function rbInsertSteps(values: number[]): BstStep[] {
     steps.push(snap(0, null, `插入 $x=${x}$（红）`, `insert ${x} (red)`));
     if (nodes.length === 0) {
       nodes.push({ id: 0, val: x, left: null, right: null, red: false });
-      steps.push(snap(7, 0, `根 = ${x}（黑）`, `root ${x} (black)`));
+      steps.push(snap(11, 0, `根 = ${x}（黑）`, `root ${x} (black)`));
       continue;
     }
     // BST 定位空位（从当前 root 出发）
     let p = root;
     while (true) {
-      steps.push(snap(1, p, `下探：$x=${x}$ vs $p=${nodes[p].val}$`, `x=${x} vs p=${nodes[p].val}`));
+      steps.push(snap(2, p, `下探：$x=${x}$ vs $p=${nodes[p].val}$`, `x=${x} vs p=${nodes[p].val}`));
       const cur = nodes[p];
       if (x < cur.val) {
         if (cur.left === null) {
@@ -169,7 +178,7 @@ export function rbInsertSteps(values: number[]): BstStep[] {
         nodes[pz].red = false;
         if (u !== null) nodes[u].red = false;
         nodes[gp].red = true;
-        steps.push(snap(5, gp, `case1：叔 ${S(u)} 红 → 父/叔黑、爷红，$z\\gets$ 爷=${S(gp)}`, `case1: uncle red`));
+        steps.push(snap(6, gp, `case1：叔 ${S(u)} 红 → 父/叔黑、爷红，$z\\gets$ 爷=${S(gp)}`, `case1: uncle red`));
         z = gp;
         continue;
       }
@@ -177,7 +186,7 @@ export function rbInsertSteps(values: number[]): BstStep[] {
       if (pIsLeft ? nodes[pz].right === z : nodes[pz].left === z) {
         // case2：z 是内侧 → 绕父旋转，使 z 变外侧
         root = pIsLeft ? rotL(nodes, root, pz) : rotR(nodes, root, pz);
-        steps.push(snap(6, pz, `case2：$z$ 内侧 → 旋父 ${S(pz)} 使 $z$ 变外侧`, `case2: inner → rotate parent`));
+        steps.push(snap(8, pz, `case2：$z$ 内侧 → 旋父 ${S(pz)} 使 $z$ 变外侧`, `case2: inner → rotate parent`));
         // 旋转后 z 不再沿原变量追踪：重新定位 z（现为旋转轴的旧父）→ 父链已变，重跑一次循环头
         z = pz;
         const par2 = binParents(nodes);
@@ -187,14 +196,14 @@ export function rbInsertSteps(values: number[]): BstStep[] {
         nodes[p2].red = false;
         nodes[gp2].red = true;
         root = pIsLeft ? rotR(nodes, root, gp2) : rotL(nodes, root, gp2);
-        steps.push(snap(7, gp2, `case3：$z$ 外侧 → 父黑、爷红、旋爷 ${S(gp2)}`, `case3: outer → rotate gp`));
+        steps.push(snap(10, gp2, `case3：$z$ 外侧 → 父黑、爷红、旋爷 ${S(gp2)}`, `case3: outer → rotate gp`));
         break;
       }
       // z 已是外侧 → 直接 case3
       nodes[pz].red = false;
       nodes[gp].red = true;
       root = pIsLeft ? rotR(nodes, root, gp) : rotL(nodes, root, gp);
-      steps.push(snap(7, gp, `case3：$z$ 外侧 → 父黑、爷红、旋爷 ${S(gp)}`, `case3: outer → rotate gp`));
+      steps.push(snap(10, gp, `case3：$z$ 外侧 → 父黑、爷红、旋爷 ${S(gp)}`, `case3: outer → rotate gp`));
       break;
     }
     // 根恒黑
@@ -207,10 +216,10 @@ export function rbInsertSteps(values: number[]): BstStep[] {
       }
     if (rr >= 0) nodes[rr].red = false;
     root = rr >= 0 ? rr : root;
-    steps.push(snap(7, root, `$root.c \\gets BLACK$（当前根 ${S(root)}）`, `root → black`));
+    steps.push(snap(11, root, `$root.c \\gets BLACK$（当前根 ${S(root)}）`, `root → black`));
   }
   steps.push(
-    snap(7, null, `完成：红黑中序 $[${nodes.map((n) => n.val).sort((a, b) => a - b).join(", ")}]$`, `done: RB inorder ${inorderOf(nodes).join(", ")}`),
+    snap(11, null, `完成：红黑中序 $[${nodes.map((n) => n.val).sort((a, b) => a - b).join(", ")}]$`, `done: RB inorder ${inorderOf(nodes).join(", ")}`),
   );
   return steps;
 }
@@ -244,13 +253,13 @@ export function rbInsertOne(
   if (nodes.length === 0) {
     nodes.push({ id: 0, val: x, left: null, right: null, red: false });
     steps.push(snap(0, null, `插入 $x=${x}$ → 根（黑）`, `root ${x} (black)`));
-    steps.push(snap(7, null, `完成：红黑中序 $[${x}]$`, `done`));
+    steps.push(snap(11, null, `完成：红黑中序 $[${x}]$`, `done`));
     return { steps, result: { nodes, root: 0 } };
   }
   steps.push(snap(0, null, `插入 $x=${x}$（红）`, `insert ${x} (red)`));
   let p = root;
   while (true) {
-    steps.push(snap(1, p, `下探：$x=${x}$ vs $p=${nodes[p].val}$`, `x=${x} vs p=${nodes[p].val}`));
+    steps.push(snap(2, p, `下探：$x=${x}$ vs $p=${nodes[p].val}$`, `x=${x} vs p=${nodes[p].val}`));
     const cur = nodes[p];
     if (x < cur.val) {
       if (cur.left === null) {
@@ -284,13 +293,13 @@ export function rbInsertOne(
       nodes[pz].red = false;
       if (u !== null) nodes[u].red = false;
       nodes[gp].red = true;
-      steps.push(snap(5, gp, `case1：叔 ${S(u)} 红 → 父/叔黑、爷红，$z\\gets$ 爷=${S(gp)}`, `case1`));
+      steps.push(snap(6, gp, `case1：叔 ${S(u)} 红 → 父/叔黑、爷红，$z\\gets$ 爷=${S(gp)}`, `case1`));
       z = gp;
       continue;
     }
     if (pIsLeft ? nodes[pz].right === z : nodes[pz].left === z) {
       root = pIsLeft ? rotL(nodes, root, pz) : rotR(nodes, root, pz);
-      steps.push(snap(6, pz, `case2：$z$ 内侧 → 旋父 ${S(pz)}`, `case2`));
+      steps.push(snap(8, pz, `case2：$z$ 内侧 → 旋父 ${S(pz)}`, `case2`));
       z = pz;
       const par2 = binParents(nodes);
       const p2 = par2[z];
@@ -299,13 +308,13 @@ export function rbInsertOne(
       nodes[p2].red = false;
       nodes[gp2].red = true;
       root = pIsLeft ? rotR(nodes, root, gp2) : rotL(nodes, root, gp2);
-      steps.push(snap(7, gp2, `case3：$z$ 外侧 → 父黑、爷红、旋爷 ${S(gp2)}`, `case3`));
+      steps.push(snap(10, gp2, `case3：$z$ 外侧 → 父黑、爷红、旋爷 ${S(gp2)}`, `case3`));
       break;
     }
     nodes[pz].red = false;
     nodes[gp].red = true;
     root = pIsLeft ? rotR(nodes, root, gp) : rotL(nodes, root, gp);
-    steps.push(snap(7, gp, `case3：$z$ 外侧 → 父黑、爷红、旋爷 ${S(gp)}`, `case3`));
+    steps.push(snap(10, gp, `case3：$z$ 外侧 → 父黑、爷红、旋爷 ${S(gp)}`, `case3`));
     break;
   }
   const parB = binParents(nodes);
@@ -318,7 +327,7 @@ export function rbInsertOne(
   if (rr >= 0) nodes[rr].red = false;
   root = rr >= 0 ? rr : root;
   steps.push(
-    snap(7, null, `完成：红黑中序 $[${nodes.map((n) => n.val).sort((a, b) => a - b).join(", ")}]$`, `done`),
+    snap(11, null, `完成：红黑中序 $[${nodes.map((n) => n.val).sort((a, b) => a - b).join(", ")}]$`, `done`),
   );
   return { steps, result: { nodes, root } };
 }
@@ -383,7 +392,7 @@ export function rbDeleteOnTree(
         nodes[w as number].red = false;
         nodes[p].red = true;
         root = xSide === "l" ? rotL(nodes, root, p) : rotR(nodes, root, p);
-        steps.push(snap(7, p, `case1：兄 ${S(w)} 红 → 换色 + 旋父`, `case1: sibling red`));
+        steps.push(snap(9, p, `case1：兄 ${S(w)} 红 → 换色 + 旋父`, `case1: sibling red`));
         continue; // x 的父仍是 p（旋转以 p 为轴，x 位置不变）
       }
       const wl = w === null || w === undefined ? null : nodes[w].left;
@@ -393,7 +402,7 @@ export function rbDeleteOnTree(
       if (wlBlack && wrBlack) {
         // case2：双子黑 → w 红、把双黑上移给父
         if (w !== null) nodes[w].red = true;
-        steps.push(snap(8, w ?? p, `case2：兄 ${S(w)} 双子黑 → 兄红、双黑上移`, `case2`));
+        steps.push(snap(11, w ?? p, `case2：兄 ${S(w)} 双子黑 → 兄红、双黑上移`, `case2`));
         if (p === root) {
           // 父是根 → 双黑落到根，黑高全局 -1，完成
           break;
@@ -411,7 +420,7 @@ export function rbDeleteOnTree(
         if (near !== null) nodes[near].red = false;
         if (w !== null) nodes[w].red = true;
         root = xSide === "l" ? rotR(nodes, root, w as number) : rotL(nodes, root, w as number);
-        steps.push(snap(9, w, `case3：兄 ${S(w)} 近子红 → 换色 + 旋兄`, `case3`));
+        steps.push(snap(13, w, `case3：兄 ${S(w)} 近子红 → 换色 + 旋兄`, `case3`));
         continue;
       }
       // case4：远子红 → w 取父色、父/远子黑、旋父、x→root
@@ -419,7 +428,7 @@ export function rbDeleteOnTree(
       nodes[p].red = false;
       if (far !== null) nodes[far].red = false;
       root = xSide === "l" ? rotL(nodes, root, p) : rotR(nodes, root, p);
-      steps.push(snap(10, p, `case4：兄 ${S(w)} 远子红 → 换色 + 旋父，双黑消除`, `case4`));
+      steps.push(snap(15, p, `case4：兄 ${S(w)} 远子红 → 换色 + 旋父，双黑消除`, `case4`));
       x = root;
       xPar = null;
       xSide = null;
@@ -478,7 +487,7 @@ export function rbDeleteOnTree(
       // 删除根且树只剩一个节点
       nodes = [];
       root = 0;
-      steps.push(snap(11, null, `完成：空树`, `done: empty`));
+      steps.push(snap(16, null, `完成：空树`, `done: empty`));
       return { steps, result: { nodes, root } };
     }
     if (zIsLeft) nodes[par as number].left = null;
@@ -507,11 +516,11 @@ export function rbDeleteOnTree(
     let yPar = z;
     steps.push(snap(3, z, `$p=${S(z)}$ 双子 → $y \\gets$ 右子树最小`, `two children`));
     while (nodes[y].left !== null) {
-      steps.push(snap(3, y, `找后继：$y=${S(y)}$（左走）`, `succ ${S(y)}`));
+      steps.push(snap(4, y, `找后继：$y=${S(y)}$（左走）`, `succ ${S(y)}`));
       yPar = y;
       y = nodes[y].left as number;
     }
-    steps.push(snap(3, y, `后继 $y=${S(y)}$`, `successor ${S(y)}`));
+    steps.push(snap(4, y, `后继 $y=${S(y)}$`, `successor ${S(y)}`));
     yOrig = nodes[y].red === true;
     x = nodes[y].right;
     if (yPar === z) {
@@ -545,7 +554,7 @@ export function rbDeleteOnTree(
 
   // 删的黑 → fixup
   if (yOrig === false && nodes.length > 0) {
-    steps.push(snap(5, x ?? xPar, "删的是黑 → 双黑补救", "double-black fixup"));
+    steps.push(snap(6, x ?? xPar, "删的是黑 → 双黑补救", "double-black fixup"));
     if (x === null) {
       // x=NIL：xPar/xSide 已有
       root = fixup(null, xPar, xSide);
@@ -567,7 +576,7 @@ export function rbDeleteOnTree(
     root = rr >= 0 ? rr : root;
   }
   steps.push(
-    snap(11, null, `完成：红黑中序 $[${nodes.map((n) => n.val).sort((a, b) => a - b).join(", ") || "∅"}]$`, `done`),
+    snap(16, null, `完成：红黑中序 $[${nodes.map((n) => n.val).sort((a, b) => a - b).join(", ") || "∅"}]$`, `done`),
   );
   return { steps, result: { nodes, root } };
 }

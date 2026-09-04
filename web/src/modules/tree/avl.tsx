@@ -43,7 +43,7 @@ const DEFAULT: Cfg = {
 };
 
 const CODE: Record<Mode, Text[]> = {
-  view: [T("查看当前树", "view current tree")],
+  view: [T("$view$ // 查看当前树", "$view$ // view current tree")],
   search: BST_SEARCH_CODE as unknown as Text[],
   build: AVL_CODE as unknown as Text[],
   insert: AVL_CODE as unknown as Text[],

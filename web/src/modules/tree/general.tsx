@@ -893,20 +893,22 @@ function postSteps(g: Graph, root: number, labels: string[]): AlgoStep[] {
 }
 
 const CODE: Record<Mode, Text[]> = {
-  terms: [], // 术语无算法 → 右侧显示图例 / 节点属性
+  terms: [T("$terms$ // 术语图例见右侧", "$terms$ // see legend")], // 术语无算法 → 右侧显示图例 / 节点属性
   pre: [
     T("$visit(u)$  // 先访问根", "$visit(u)$  // visit root first"),
     T(
-      "for each child $c$ of $u$: $preorder(c)$",
-      "for each child $c$ of $u$: $preorder(c)$",
+      "for each child $c$ of $u$:",
+      "for each child $c$ of $u$:",
     ),
+    T("  $preorder(c)$  // 递归子树", "  $preorder(c)$"),
     T("// 子树访问完，回到 $u$", "// back to u after subtrees"),
   ],
   post: [
     T(
-      "for each child $c$ of $u$: $postorder(c)$",
-      "for each child $c$ of $u$: $postorder(c)$",
+      "for each child $c$ of $u$:",
+      "for each child $c$ of $u$:",
     ),
+    T("  $postorder(c)$  // 递归子树", "  $postorder(c)$"),
     T("$visit(u)$  // 子树之后访问根", "$visit(u)$  // visit root last"),
   ],
   level: LEVEL_CODE, // 库自带 8 行层序伪代码（行号 0..7 与帧对齐）

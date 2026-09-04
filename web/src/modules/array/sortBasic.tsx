@@ -65,8 +65,10 @@ export const bubbleModule: ModuleDef<ArrayScene, ArrayCfg> = {
 const SELECT_CODE = [
   T('for $i \\gets 0$ to $n-2$:', 'for $i \\gets 0$ to $n-2$:'),
   T('  $m \\gets i$ // 假设最小', '  $m \\gets i$'),
-  T('  for $j \\gets i+1$ to $n-1$: $A[j]<A[m] \\implies m\\gets j$', '  for $j\\gets i+1$ to $n-1$: $A[j]<A[m]\\implies m\\gets j$'),
-  T('  $\\text{swap}(A[i],A[m])$', '$\\text{swap}(A[i],A[m])$'),
+  T('  for $j\\gets i+1$ to $n-1$:', '  for $j\\gets i+1$ to $n-1$:'),
+  T('    if $A[j]<A[m]$:', '    if $A[j]<A[m]$:'),
+  T('      $m\\gets j$ // 更小', '      $m\\gets j$'),
+  T('  $\\text{swap}(A[i],A[m])$ // 首位就位', '  $\\text{swap}(A[i],A[m])$'),
 ];
 
 function selectGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
@@ -82,17 +84,17 @@ function selectGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
     frames.push({ line: 1, caption: T(`$m\\gets${i}$`, `$m\\gets${i}$`), scene: snap(s, [m]) });
     for (let j = i + 1; j < n; j++) {
       s.cmp++;
-      frames.push({ line: 2, caption: T(`$A[${j}]=${s.a[j]}$ vs $A[${m}]=${s.a[m]}$`, `$A[${j}]=${s.a[j]}$ vs $A[${m}]=${s.a[m]}$`), scene: snap(s, [j, m]) });
+      frames.push({ line: 3, caption: T(`$A[${j}]=${s.a[j]}$ vs $A[${m}]=${s.a[m]}$`, `$A[${j}]=${s.a[j]}$ vs $A[${m}]=${s.a[m]}$`), scene: snap(s, [j, m]) });
       if (s.a[j] < s.a[m]) {
         m = j;
-        frames.push({ line: 2, caption: T(`更小！$m\\gets${j}$`, `new min $m\\gets${j}$`), scene: snap(s, [m]) });
+        frames.push({ line: 4, caption: T(`更小！$m\\gets${j}$`, `new min $m\\gets${j}$`), scene: snap(s, [m]) });
       }
     }
     if (m !== i) {
       const t = s.a[i]; s.a[i] = s.a[m]; s.a[m] = t; s.mov += 3;
-      frames.push({ line: 3, caption: T(`最小在 ${m}，$A[${i}]\\leftrightarrow A[${m}]$ 互换`, `swap min into place`), scene: snap(s, [i, m]) });
+      frames.push({ line: 5, caption: T(`最小在 ${m}，$A[${i}]\\leftrightarrow A[${m}]$ 互换`, `swap min into place`), scene: snap(s, [i, m]) });
     } else {
-      frames.push({ line: 3, caption: T(`$m=i$，无需交换`, `no swap`), scene: snap(s, [i]) });
+      frames.push({ line: 5, caption: T(`$m=i$，无需交换`, `no swap`), scene: snap(s, [i]) });
     }
     s.done[i] = true;
   }
@@ -116,9 +118,10 @@ export const selectionModule: ModuleDef<ArrayScene, ArrayCfg> = {
 // ── 插入 ──
 const INSERT_CODE = [
   T('for $i \\gets 1$ to $n-1$:', 'for $i \\gets 1$ to $n-1$:'),
-  T('  $x\\gets A[i];\\; j\\gets i-1$', '  $x\\gets A[i];\\; j\\gets i-1$'),
-  T('  while $j\\ge0$ and $A[j]>x$: $A[j+1]\\gets A[j];\\; j{-}{-}$', '  while $A[j]>x$: shift; $j{-}{-}$'),
-  T('  $A[j+1]\\gets x$', '  $A[j+1]\\gets x$'),
+  T('  $x\\gets A[i]$; $j\\gets i-1$', '  $x\\gets A[i]$; $j\\gets i-1$'),
+  T('  while $j\\ge0 \\land A[j]>x$:', '  while $j\\ge0 \\land A[j]>x$:'),
+  T('    $A[j+1]\\gets A[j]$; $j{-}{-}$', '    $A[j+1]\\gets A[j]$; $j{-}{-}$'),
+  T('  $A[j+1]\\gets x$ // 落位', '  $A[j+1]\\gets x$'),
 ];
 
 function insertGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
@@ -142,12 +145,12 @@ function insertGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
       }
       const w = s.a[j];
       s.a[j + 1] = w; s.mov++;
-      frames.push({ line: 2, caption: T(`$${w}>x$，右移一格`, `slide ${w} right`), scene: snap(s, [j + 1], { note: `x=${x}` }) });
+      frames.push({ line: 3, caption: T(`$${w}>x$，右移一格`, `slide ${w} right`), scene: snap(s, [j + 1], { note: `x=${x}` }) });
       j--;
     }
     s.a[j + 1] = x; s.mov++;
     for (let k = 0; k <= i; k++) s.done[k] = true;
-    frames.push({ line: 3, caption: T(`$A[${j + 1}]\\gets x=${x}$，前 ${i + 1} 个有序`, `place $x$ at ${j + 1}$`), scene: snap(s, [j + 1]) });
+    frames.push({ line: 4, caption: T(`$A[${j + 1}]\\gets x=${x}$，前 ${i + 1} 个有序`, `place $x$ at ${j + 1}$`), scene: snap(s, [j + 1]) });
   }
   frames.push({ line: 0, caption: T(`完成：$A=[${s.a.join(',')}]$，比较 ${s.cmp} 次，写回 ${s.mov} 次`, `Sorted, ${s.cmp} cmps`), scene: snap(s, []) });
   return frames;

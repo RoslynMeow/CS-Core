@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Graph, alphaLabels } from "../lib/graph";
 import type { ImportedGraph } from "../modules/tree/source";
+import {
+  getUndirectedBadgeColor,
+  graphHasWeight,
+  weightArrow,
+} from "../lib/graphTheme";
 
 type Layout = "circle" | "tree" | "force" | "free";
 type Tool = "move" | "addEdge" | "addVertex" | "delete";
@@ -140,7 +145,7 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
   useEffect(() => {
     if (!embedded) return;
     if (firstSync.current) { firstSync.current = false; return; }
-    const spec = g.edges.map((e) => `${e.u}-${e.v}${e.weight !== undefined && e.weight !== 1 ? ":" + e.weight : ""}`).join(",");
+    const spec = g.edges.map((e) => `${e.u}-${e.v}${e.weight !== undefined ? ":" + e.weight : ""}`).join(",");
     const out: ImportedGraph = { n: g.n, spec, labels: [...g.labels], directed: g.directed, root, layout, manual: { ...manual } };
     onConfirm(out);
   }, [g.n, g.edges, g.labels, g.directed, root, layout, manual, embedded]);
@@ -175,7 +180,7 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
     return null;
   };
   const specFromEdges = (es: { u: number; v: number; weight?: number }[]): string =>
-    es.map((e) => `${e.u}-${e.v}${e.weight !== undefined && e.weight !== 1 ? ":" + e.weight : ""}`).join(",");
+    es.map((e) => `${e.u}-${e.v}${e.weight !== undefined ? ":" + e.weight : ""}`).join(",");
   const distToSeg = (px: number, py: number, ax: number, ay: number, bx: number, by: number): number => {
     const dx = bx - ax, dy = by - ay; const L2 = dx*dx+dy*dy; if (L2===0) return Math.hypot(px-ax, py-ay);
     let t = ((px-ax)*dx + (py-ay)*dy)/L2; t = Math.max(0, Math.min(1,t)); return Math.hypot(px-(ax+t*dx), py-(ay+t*dy));
@@ -193,7 +198,7 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
 
   const removeVertex = (v: number) => {
     pushHistory();
-    const keep = g.edges.filter((e) => e.u !== v && e.v !== v).map((e) => `${e.u > v ? e.u - 1 : e.u}-${e.v > v ? e.v - 1 : e.v}${e.weight !== undefined && e.weight !== 1 ? ":" + e.weight : ""}`);
+    const keep = g.edges.filter((e) => e.u !== v && e.v !== v).map((e) => `${e.u > v ? e.u - 1 : e.u}-${e.v > v ? e.v - 1 : e.v}${e.weight !== undefined ? ":" + e.weight : ""}`);
     setN((nn) => Math.max(1, nn - 1));
     setEdgeSpec(keep.join(","));
     setLabels((ls) => ls.filter((_, i) => i !== v));
@@ -443,12 +448,65 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
             const p = edgePos(e.u, e.v);
             const isSel = selected !== null && (e.u === selected || e.v === selected);
             const isHlEdge = highlight?.edge && ((highlight.edge[0] === e.u && highlight.edge[1] === e.v) || (!g.directed && highlight.edge[0] === e.v && highlight.edge[1] === e.u));
-            const stroke = isHlEdge ? "#f59e0b" : isSel ? "#4f46e5" : "#94a3b8";
+            const stroke = isHlEdge ? "#f59e0b" : isSel ? "#4f46e5" : "#64748b";
+            const showW = e.weight !== undefined || graphHasWeight(g.edges);
+            const wVal = e.weight ?? 1;
+            // 边方向（edgePos 已内嵌 V_R，直接用）
+            const dx = p.bx - p.ax, dy = p.by - p.ay;
+            const dl = Math.hypot(dx, dy) || 1;
+            const ux = dx / dl, uy = dy / dl;
+            const wa = weightArrow(wVal);
+            // 有权箭头：数字写进放大的三角形里；无权箭头保持可见尺寸
+            const AL = showW && g.directed ? wa.len : 15;
+            const AH = showW && g.directed ? wa.half : 7;
+            // 箭尖贴到节点圆（从线端再往前 3px，正好内嵌 1px 相接）
+            const tx2 = p.bx + ux * 3, ty2 = p.by + uy * 3;
+            const bx2 = tx2 - ux * AL, by2 = ty2 - uy * AL;
+            const px = -uy, py = ux;
+            // 线止于三角底边中心：三角里不穿线，数字独占干净底色
+            const ex2 = g.directed ? bx2 : p.bx, ey2 = g.directed ? by2 : p.by;
+            // 数字放在三角形视觉中心（约 0.55 倍箭长处）
+            const nx = tx2 - ux * AL * 0.55, ny = ty2 - uy * AL * 0.55;
+            // 点箭头/牌子直接打开这条边的菜单（嵌入模式）：按命中复用下拉多选
+            const openHere = (ev: React.MouseEvent) => {
+              if (!embedded) return;
+              ev.stopPropagation();
+              const worldP = svgToWorld(svgPoint(ev));
+              const eds = hitEdges(worldP);
+              if (eds.length === 0) return;
+              const idx = eds.findIndex((o) => o.u === e.u && o.v === e.v);
+              setEdgeChoice(idx >= 0 ? idx : 0);
+              const cur = eds[idx >= 0 ? idx : 0];
+              setMenu({ x: ev.clientX, y: ev.clientY, sx: worldP.x, sy: worldP.y, target: null, edge: cur, edgeList: eds });
+            };
+            const badgeColor = getUndirectedBadgeColor();
             return (
               <g key={i}>
-                <line x1={p.ax} y1={p.ay} x2={p.bx} y2={p.by} stroke={stroke} strokeWidth={isHlEdge ? 3 : isSel ? 2.4 : 1.6} />
-                {g.directed && <polygon points={`${p.bx},${p.by} ${p.bx - 9},${p.by - 3.5} ${p.bx - 9},${p.by + 3.5}`} fill={stroke} transform={`rotate(${(Math.atan2(p.by - p.ay, p.bx - p.ax) * 180) / Math.PI} ${p.bx} ${p.by})`} />}
-                {e.weight !== undefined && e.weight !== 1 && <g><circle cx={p.mx} cy={p.my} r={9} fill={isHlEdge ? "#f59e0b" : "#0f172a"} /><text x={p.mx} y={p.my + 3} textAnchor="middle" fontSize={10} fontWeight={800} fill="#fff">{e.weight}</text></g>}
+                <line x1={p.ax} y1={p.ay} x2={ex2} y2={ey2} stroke={stroke} strokeWidth={isHlEdge ? 3 : isSel ? 2.4 : 1.6} />
+                {g.directed ? (
+                  <g
+                    onClick={embedded ? openHere : undefined}
+                    onPointerDown={embedded ? (ev) => ev.stopPropagation() : undefined}
+                    style={embedded ? { cursor: "pointer" } : undefined}
+                  >
+                    <polygon points={`${tx2},${ty2} ${bx2 + px * AH},${by2 + py * AH} ${bx2 - px * AH},${by2 - py * AH}`} fill={stroke} />
+                    {showW && (
+                      <text x={nx} y={ny} textAnchor="middle" dominantBaseline="central" fontSize={wa.font} fontWeight={800} fill="#fff" stroke="rgba(15,23,42,.8)" strokeWidth={2.5} paintOrder="stroke">{wVal}</text>
+                    )}
+                  </g>
+                ) : (
+                  showW && (
+                    <g
+                      onClick={embedded ? openHere : undefined}
+                      onPointerDown={embedded ? (ev) => ev.stopPropagation() : undefined}
+                      style={embedded ? { cursor: "pointer" } : undefined}
+                    >
+                      <circle cx={p.mx} cy={p.my} r={14} fill="transparent" />
+                      <circle cx={p.mx} cy={p.my} r={9} fill={badgeColor} />
+                      <text x={p.mx} y={p.my + 3} textAnchor="middle" fontSize={10} fontWeight={800} fill="#fff">{wVal}</text>
+                    </g>
+                  )
+                )}
               </g>
             );
           })}

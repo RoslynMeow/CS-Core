@@ -71,8 +71,8 @@ function gen(cfg: Cfg): Frame<Scene>[] {
     const target = buildScene(cfg, pos, 'traverse');
     const frames: Frame<Scene>[] = [];
     frames.push({ line: 0, caption: T(`$p\\gets head$ = 0x${target.head ? target.head.toString(16) : 'null'}`, `p=head`), scene: buildScene(cfg, null, 'traverse') });
-    for (let i = 0; i <= Math.min(pos, target.nodes.length - 1); i++) frames.push({ line: 1, caption: T(`while：遍历到 $L[${i}]$ @0x${target.nodes[i].addr.toString(16)}$`, `traverse to L[${i}]`), scene: buildScene(cfg, i, 'traverse') });
-    if (pos < target.nodes.length) frames.push({ line: 2, caption: T(`return $L[${pos}].data=${target.nodes[pos].data}$`, `return ${target.nodes[pos].data}`), scene: buildScene(cfg, pos, 'traverse') });
+    for (let i = 0; i <= Math.min(pos, target.nodes.length - 1); i++) frames.push({ line: 2, caption: T(`while：遍历到 $L[${i}]$ @0x${target.nodes[i].addr.toString(16)}$`, `traverse to L[${i}]`), scene: buildScene(cfg, i, 'traverse') });
+    if (pos < target.nodes.length) frames.push({ line: 3, caption: T(`return $L[${pos}].data=${target.nodes[pos].data}$`, `return ${target.nodes[pos].data}`), scene: buildScene(cfg, pos, 'traverse') });
     else frames.push({ line: 1, caption: T(`越界：$pos=${pos}\\ge length=${target.nodes.length}$`, `oob`), scene: buildScene(cfg, null, 'traverse') });
     return frames;
   }
@@ -101,10 +101,10 @@ function gen(cfg: Cfg): Frame<Scene>[] {
   return gen({ ...cfg, op: 'idle', execTick: 0 });
 }
 const CODE: Record<Op, any> = {
-  idle: [T('$heapBase \\gets ASLR$', '$heapBase$'), T('$p\\gets malloc(nodeSize)$ // 真实地址', '$p\\gets malloc$'), T('等待执行…', 'pending')] as never,
-  get: [T('$p\\gets head$', '$p\\gets head$'), T('while $p\\neq null$: $p\\gets p.next$', 'while'), T('return $p.data$', 'return')] as never,
-  insert: [T('$q\\gets malloc(nodeSize)$', '$q\\gets malloc$'), T('$q.data\\gets x;\\; q.next\\gets p.next$', '$q'), T('$p.next\\gets q$', '$p.next\\gets q$')] as never,
-  delete: [T('$q\\gets p.next$', '$q'), T('$p.next\\gets q.next$', '$p.next'), T('$free(q)$', 'free')] as never,
+  idle: [T('$heapBase \\gets ASLR$', '$heapBase$'), T('$p\\gets malloc(nodeSize)$ // 真实地址', '$p\\gets malloc$'), T('$pending$ // 等待执行', '$pending$')] as never,
+  get: [T('$p\\gets head$', '$p\\gets head$'), T('while $p\\neq null$:', 'while $p\\neq null$:'), T('  $p\\gets p.next$', '  $p\\gets p.next$'), T('return $p.data$', 'return $p.data$')] as never,
+  insert: [T('$q\\gets malloc(nodeSize)$', '$q\\gets malloc$'), T('$q.data\\gets x;\\; q.next\\gets p.next$', '$q.data\\gets x$; $q.next\\gets p.next$'), T('$p.next\\gets q$', '$p.next\\gets q$')] as never,
+  delete: [T('$q\\gets p.next$', '$q\\gets p.next$'), T('$p.next\\gets q.next$', '$p.next\\gets q.next$'), T('$free(q)$', '$free(q)$')] as never,
 };
 function toHex(b: number) { return b.toString(16).padStart(2, '0').toUpperCase(); }
 

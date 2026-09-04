@@ -64,7 +64,7 @@ const CODE: Record<Mode, ReturnType<NonNullable<ModuleDef['codeFor']>>> = {
     T('while $y_k > 0$:', 'while $y_k > 0$:'),
     T('  $Q_k \\gets y_k \\bmod m$', '  $Q_k \\gets y_k \\bmod m$'),
     T('  $y_{k+1} \\gets \\lfloor y_k/m\\rfloor$', '  $y_{k+1} \\gets \\lfloor y_k/m\\rfloor$'),
-    T('return $Q$ (逆序)', 'return $Q$ (reversed)'),
+    T('return $Q$ // 逆序输出', 'return $Q$'),
   ] as never,
   fraction: [
     T('$y \\gets \\text{value}_n(P)$ // 按权求值', '$y \\gets \\text{value}_n(P)$'),
@@ -72,7 +72,7 @@ const CODE: Record<Mode, ReturnType<NonNullable<ModuleDef['codeFor']>>> = {
     T('while $y_j \\neq 0$:', 'while $y_j \\neq 0$:'),
     T('  $Q_j \\gets \\lfloor y_j\\cdot m\\rfloor$', '  $Q_j \\gets \\lfloor y_j\\cdot m\\rfloor$'),
     T('  $y_{j-1} \\gets y_j\\cdot m - Q_j$', '  $y_{j-1} \\gets y_j\\cdot m - Q_j$'),
-    T('return $Q$ (正序)', 'return $Q$ (in order)'),
+    T('return $Q$ // 正序输出', 'return $Q$'),
   ] as never,
   full: [
     T('$y \\gets \\text{value}_n(P)$ // 按权求值', '$y \\gets \\text{value}_n(P)$'),
@@ -84,7 +84,7 @@ const CODE: Record<Mode, ReturnType<NonNullable<ModuleDef['codeFor']>>> = {
     T('while $y_j \\neq 0$:', 'while $y_j \\neq 0$:'),
     T('  $Q_j \\gets \\lfloor y_j\\cdot m\\rfloor$', '  $Q_j \\gets \\lfloor y_j\\cdot m\\rfloor$'),
     T('  $y_{j-1} \\gets y_j\\cdot m - Q_j$', '  $y_{j-1} \\gets y_j\\cdot m - Q_j$'),
-    T('return $Q$ (拼合) // 逆序+正序', 'return $Q$ (concat)'),
+    T('return $Q$ // 整数逆序＋小数正序拼合', 'return $Q$'),
   ] as never,
 };
 

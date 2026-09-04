@@ -32,66 +32,66 @@ export type BStep = {
 
 export const BTREE_SEARCH_CODE: Text[] = [
   {
-    zh: "$p \\gets root$; $i \\gets$ slot  // 定位键位 $i$",
-    en: "$p \\gets root$; $i \\gets$ slot  // locate key slot $i$",
+    zh: "$p \\gets root$; $i \\gets slot(p,x)$  // 定位键位",
+    en: "$p \\gets root$; $i \\gets slot(p,x)$  // locate key slot",
   },
   {
-    zh: "while $p$ internal: descend via $child_i$  // 非叶则下探",
-    en: "while $p$ internal: descend via $child_i$  // internal → descend",
+    zh: "while $internal(p)$: // 经 $child_i$ 下探",
+    en: "while $internal(p)$: // descend via $child_i$",
   },
   {
-    zh: "$x$ found in leaf → hit  // 叶内命中; B+ 数据在叶",
-    en: "$x$ found in leaf → hit  // in-leaf hit; (B+) data in leaf",
+    zh: "$hit\\gets(x\\in leaf)$  // 叶内命中，B+ 数据在叶",
+    en: "$hit\\gets(x\\in leaf)$  // in-leaf hit",
   },
 ];
 
 export const BTREE_INSERT_CODE: Text[] = [
   {
-    zh: "$p \\gets$ target leaf  // 沿键下探到目标叶子",
-    en: "$p \\gets$ target leaf  // descend by keys to target leaf",
+    zh: "$p \\gets targetLeaf(x)$  // 下探到目标叶子",
+    en: "$p \\gets targetLeaf(x)$  // descend to target leaf",
   },
   {
-    zh: "insert $x$ in order  // 叶内有序插入",
-    en: "insert $x$ in order  // into leaf, in order",
+    zh: "$leafInsert(x)$  // 叶内有序插入",
+    en: "$leafInsert(x)$  // into leaf, in order",
   },
   {
-    zh: "if $|keys| = m$ → split  // 中间键上提",
-    en: "if $|keys| = m$ → split  // full; middle key moves up",
+    zh: "if $|keys| = m$: // 满则分裂",
+    en: "if $|keys| = m$: // full, split",
   },
   {
-    zh: "while $|keys| \\geq m$: split up  // 父满则逐层分裂上提",
-    en: "while $|keys| \\geq m$: split up  // parent full → split & move up (may reach root)",
+    zh: "while $|keys| \\geq m$: // 父满逐层分裂上提",
+    en: "while $|keys| \\geq m$: // split up",
   },
   {
-    zh: "if $root$ full → new root, $h \\gets h+1$  // 根满建新根, 完成",
-    en: "if $root$ full → new root, $h \\gets h+1$  // root full → new root, done",
+    zh: "$newRoot(root)$ // 根满建新根，$h \\gets h+1$",
+    en: "$newRoot(root)$ // new root, $h \\gets h+1$",
   },
 ];
 
 export const BTREE_DELETE_CODE: Text[] = [
   {
-    zh: "locate $p$  // 叶/非叶; 删 $x$",
-    en: "locate $p$  // leaf or internal; delete $x$",
+    zh: "$p \\gets locate(x)$  // 定位删 $x$",
+    en: "$p \\gets locate(x)$  // locate $x$",
   },
   {
-    zh: "if internal: successor key  // 非叶走后继, 叶内真删",
-    en: "if internal: successor key  // replace; real delete in leaf",
+    zh: "if $internal(p)$: // 非叶走后继，叶内真删",
+    en: "if $internal(p)$: // successor or real delete",
   },
   {
     zh: "if $|keys| < \\lceil m/2 \\rceil - 1$:",
     en: "if $|keys| < \\lceil m/2 \\rceil - 1$:",
   },
   {
-    zh: "borrow from sibling  // 兄弟可借 + 父键旋转",
-    en: "borrow from sibling  // sibling has a spare → rotate via parent key",
+    zh: "$borrow(p,sib)$  // 兄弟可借，父键旋转",
+    en: "$borrow(p,sib)$  // rotate via parent key",
   },
   {
-    zh: "else merge siblings  // 合并兄弟 + 父键下移",
-    en: "else merge siblings  // merge sibling + pull parent key down (may cascade)",
+    zh: "else: // 兄弟不可借",
+    en: "else: // merge",
   },
   {
-    zh: "if $root$ empty → shrink  // 降根, 完成",
-    en: "if $root$ empty → shrink  // shrink root, done",
+    zh: "$merge(p,sib)$ // 合并兄弟，父键下移；空根降根完成",
+    en: "$merge(p,sib)$ // merge down",
   },
 ];
 

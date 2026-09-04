@@ -42,8 +42,8 @@ export const TRIE_INSERT_CODE: Text[] = [
     en: "$p \\gets root$; $i \\gets 0$  // walk chars",
   },
   {
-    zh: "while $i < |w|$: $p \\gets p.child(w_i)$  // 无该字符则新建",
-    en: "while $i < |w|$: $p \\gets p.child(w_i)$  // create if missing",
+    zh: "while $i < |w|$: // 经 $children[w_i]$ 下探，无则新建",
+    en: "while $i < |w|$: // descend, create if missing",
   },
   {
     zh: "$p.end \\gets true$  // 标记完整词",
@@ -57,8 +57,8 @@ export const TRIE_SEARCH_CODE: Text[] = [
     en: "$p \\gets root$; $i \\gets 0$  // walk chars",
   },
   {
-    zh: "while $i < |w|$: $p \\gets p.child(w_i)$, else $fail$  // 无该字符 → 失败",
-    en: "while $i < |w|$: $p \\gets p.child(w_i)$, else $fail$  // missing → fail",
+    zh: "while $i < |w|$: // 经 $children[w_i]$ 下探，无则失败",
+    en: "while $i < |w|$: // descend, fail if missing",
   },
   {
     zh: "return $p.end$  // 词尾才算命中（前缀不算）",
@@ -68,12 +68,16 @@ export const TRIE_SEARCH_CODE: Text[] = [
 
 export const TRIE_DELETE_CODE: Text[] = [
   {
-    zh: "locate word end $p$  // 定位词尾，逐字符下探，无则失败",
-    en: "locate word end $p$  // walk chars, fail if missing",
+    zh: "$locate(w)$  // 定位词尾，无则失败",
+    en: "$locate(w)$  // walk chars, fail if missing",
   },
   {
-    zh: "while $p \\neq root$: delete $p$  // 无子且非他词尾才删",
-    en: "while $p \\neq root$: delete $p$  // only if no children and not another word end",
+    zh: "while $p \\neq root$: // 无子且非他词尾才删",
+    en: "while $p \\neq root$: // only if no children and not another word end",
+  },
+  {
+    zh: "  $delete(p)$ // 回溯删除",
+    en: "  $delete(p)$",
   },
   {
     zh: "$end \\gets false$  // 只清标记",
@@ -87,12 +91,12 @@ export const RADIX_INSERT_CODE: Text[] = [
     en: "$p \\gets root$  // longest prefix match",
   },
   {
-    zh: "$split;; attach$  // 分裂边，新节点承接剩余子串",
-    en: "$split;; attach$  // split edge, new node takes the leftover",
+    zh: "$split(e)$; $attach(rest)$  // 分裂边，新节点承接剩余子串",
+    en: "$split(e)$; $attach(rest)$  // split edge, new node takes the leftover",
   },
   {
-    zh: "$compress$  // 合并无分支路径",
-    en: "$compress$  // compress single-child paths",
+    zh: "$compress(p)$  // 合并无分支路径",
+    en: "$compress(p)$  // compress single-child paths",
   },
 ];
 

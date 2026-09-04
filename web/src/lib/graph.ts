@@ -809,7 +809,7 @@ export function bfsSteps(
     });
     for (const [v] of adj[u]) {
       steps.push({
-        line: 4,
+        line: 5,
         current: u,
         exploring: u,
         visited: visitedList(),
@@ -825,7 +825,7 @@ export function bfsSteps(
         visited[v] = true;
         q.push(v);
         steps.push({
-          line: 5,
+          line: 6,
           current: u,
           exploring: u,
           visited: visitedList(),
@@ -841,7 +841,7 @@ export function bfsSteps(
     }
   }
   steps.push({
-    line: 6,
+    line: 7,
     current: null,
     exploring: null,
     visited: visitedList(),
@@ -948,7 +948,7 @@ export function dfsSteps(
     if (neighbors.length === 0) continue;
     for (const v of neighbors) {
       steps.push({
-        line: 5,
+        line: 7,
         current: u,
         exploring: u,
         visited: visitedList(),
@@ -964,7 +964,7 @@ export function dfsSteps(
     }
   }
   steps.push({
-    line: 6,
+    line: 8,
     current: null,
     exploring: null,
     visited: visitedList(),
@@ -1055,7 +1055,7 @@ export function topoSteps(g: Graph, labels: string[] = g.labels): AlgoStep[] {
     for (const [v] of adj[u]) {
       indeg[v]--;
       steps.push({
-        line: 5,
+        line: 6,
         current: u,
         exploring: u,
         visited: [...order],
@@ -1071,7 +1071,7 @@ export function topoSteps(g: Graph, labels: string[] = g.labels): AlgoStep[] {
     }
   }
   steps.push({
-    line: 6,
+    line: 8,
     current: null,
     exploring: null,
     visited: [...order],
@@ -1545,14 +1545,18 @@ export const BFS_CODE: Text[] = [
     en: "  $u \\gets Q.pop()$  // dequeue",
   },
   {
-    zh: "  for $v \\in adj(u)$: if $!visited[v]$:",
-    en: "  for $v \\in adj(u)$: if $!visited[v]$:",
+    zh: "  for $v \\in adj(u)$: // 遍历邻点",
+    en: "  for $v \\in adj(u)$:",
   },
   {
-    zh: "    $visited[v] \\gets true$; $Q.push(v)$  // 入队",
-    en: "    $visited[v] \\gets true$; $Q.push(v)$  // enqueue",
+    zh: "    if $!visited[v]$: // 未访问",
+    en: "    if $!visited[v]$:",
   },
-  { zh: "  // BFS 完成", en: "  // BFS done" },
+  {
+    zh: "      $visited[v] \\gets true$; $Q.push(v)$  // 入队",
+    en: "      $visited[v] \\gets true$; $Q.push(v)$  // enqueue",
+  },
+  { zh: "$done$ // BFS 完成", en: "$done$ // BFS done" },
 ];
 
 export const DFS_CODE: Text[] = [
@@ -1564,18 +1568,26 @@ export const DFS_CODE: Text[] = [
   { zh: "while $S \\neq \\emptyset$:", en: "while $S \\neq \\emptyset$:" },
   { zh: "  $u \\gets S.pop()$  // 出栈", en: "  $u \\gets S.pop()$  // pop" },
   {
-    zh: "  if $!visited[u]$: $visited[u] \\gets true$  // 访问 $u$",
-    en: "  if $!visited[u]$: $visited[u] \\gets true$  // visit $u$",
+    zh: "  $visited[u] \\gets true$  // $!visited[u]$ 未访问",
+    en: "  $visited[u] \\gets true$  // first visit",
   },
   {
-    zh: "  for $v \\in adj(u)$: if $!visited[v]$: $S.push(v)$",
-    en: "  for $v \\in adj(u)$: if $!visited[v]$: $S.push(v)$",
+    zh: "  for $v \\in adj(u)$: // 遍历邻点",
+    en: "  for $v \\in adj(u)$:",
   },
-  { zh: "  // DFS 完成", en: "  // DFS done" },
+  {
+    zh: "    if $!visited[v]$: // 未访问",
+    en: "    if $!visited[v]$:",
+  },
+  {
+    zh: "      $visited[v] \\gets true$; $S.push(v)$  // 入栈",
+    en: "      $visited[v] \\gets true$; $S.push(v)$  // push",
+  },
+  { zh: "$done$ // DFS 完成", en: "$done$ // DFS done" },
 ];
 
 export const TOPO_CODE: Text[] = [
-  { zh: "# Kahn: 计算入度", en: "# Kahn: indegree" },
+  { zh: "$in\\gets indegree$ // Kahn 算入度", en: "$in\\gets indegree$ // Kahn" },
   {
     zh: "$Q \\gets \\{v \\mid in[v]=0\\}$",
     en: "$Q \\gets \\{v \\mid in[v]=0\\}$",
@@ -1586,11 +1598,22 @@ export const TOPO_CODE: Text[] = [
     en: "  $u \\gets Q.pop()$; $order \\gets order \\cup \\{u\\}$",
   },
   {
-    zh: "  for $v \\in adj(u)$: $in[v] \\gets in[v]-1$",
-    en: "  for $v \\in adj(u)$: $in[v] \\gets in[v]-1$",
+    zh: "  for $v \\in adj(u)$: // 遍历邻点",
+    en: "  for $v \\in adj(u)$:",
   },
-  { zh: "    if $in[v]=0$: $Q.push(v)$", en: "    if $in[v]=0$: $Q.push(v)$" },
-  { zh: "# $|order| < n$ → 存在环", en: "# $|order| < n$ → cycle" },
+  {
+    zh: "    $in[v] \\gets in[v]-1$",
+    en: "    $in[v] \\gets in[v]-1$",
+  },
+  {
+    zh: "    if $in[v]=0$: // 入度清零",
+    en: "    if $in[v]=0$:",
+  },
+  {
+    zh: "      $Q.push(v)$  // 入队",
+    en: "      $Q.push(v)$  // enqueue",
+  },
+  { zh: "$done$ // $|order|=n$ 无环，否则有环", en: "$done$ // acyclic iff $|order|=n$" },
 ];
 
 export const LEVEL_CODE: Text[] = [
@@ -1615,30 +1638,34 @@ export const LEVEL_CODE: Text[] = [
     en: "    $u \\gets Q.pop()$  // dequeue",
   },
   {
-    zh: "    for $v \\in adj(u)$: if $!visited[v]$:",
-    en: "    for $v \\in adj(u)$: if $!visited[v]$:",
+    zh: "    for $v \\in adj(u)$: // 遍历邻点",
+    en: "    for $v \\in adj(u)$:",
   },
   {
-    zh: "      $visited[v] \\gets true$; $Q \\gets Q \\cup \\{v\\}$  // 入队",
-    en: "      $visited[v] \\gets true$; $Q \\gets Q \\cup \\{v\\}$  // enqueue",
+    zh: "      if $!visited[v]$: // 未访问",
+    en: "      if $!visited[v]$:",
   },
   {
-    zh: "  // 层序遍历完成",
-    en: "  // level-order done",
+    zh: "        $visited[v] \\gets true$; $Q \\gets Q \\cup \\{v\\}$  // 入队",
+    en: "        $visited[v] \\gets true$; $Q \\gets Q \\cup \\{v\\}$  // enqueue",
+  },
+  {
+    zh: "$done$ // 层序遍历完成",
+    en: "$done$ // level-order done",
   },
 ];
 
 export const ALL_BFS_CODE: Text[] = [
   {
-    zh: "for $v$: $visited[v] \\gets false$",
-    en: "for $v$: $visited[v] \\gets false$",
+    zh: "$visited[v]\\gets false$ // 全置未访问",
+    en: "$visited[v]\\gets false$",
   },
   {
-    zh: "for $s$: if $!visited[s]$:",
-    en: "for $s$: if $!visited[s]$:",
+    zh: "for $!visited[s]$: // 未访问开新分量",
+    en: "for $!visited[s]$: // new component",
   },
   {
-    zh: "  $Q \\gets \\{s\\}$; $visited[s] \\gets true$  // BFS($s$)",
+    zh: "  $Q \\gets \\{s\\}$; $visited[s] \\gets true$  // 开 $BFS(s)$",
     en: "  $Q \\gets \\{s\\}$; $visited[s] \\gets true$  // BFS($s$)",
   },
   {
@@ -1650,30 +1677,34 @@ export const ALL_BFS_CODE: Text[] = [
     en: "    $u \\gets Q.pop()$  // dequeue",
   },
   {
-    zh: "    for $v \\in adj(u)$: if $!visited[v]$:",
-    en: "    for $v \\in adj(u)$: if $!visited[v]$:",
+    zh: "    for $v \\in adj(u)$: // 遍历邻点",
+    en: "    for $v \\in adj(u)$:",
   },
   {
-    zh: "      $visited[v] \\gets true$; $Q \\gets Q \\cup \\{v\\}$  // 入队",
-    en: "      $visited[v] \\gets true$; $Q \\gets Q \\cup \\{v\\}$  // enqueue",
+    zh: "      if $!visited[v]$: // 未访问",
+    en: "      if $!visited[v]$:",
   },
   {
-    zh: "  // 全部连通分量完成",
-    en: "  // all components done",
+    zh: "        $visited[v] \\gets true$; $Q \\gets Q \\cup \\{v\\}$  // 入队",
+    en: "        $visited[v] \\gets true$; $Q \\gets Q \\cup \\{v\\}$  // enqueue",
+  },
+  {
+    zh: "$done$ // 全部连通分量完成",
+    en: "$done$ // all components done",
   },
 ];
 
 export const ALL_DFS_CODE: Text[] = [
   {
-    zh: "for $v$: $visited[v] \\gets false$",
-    en: "for $v$: $visited[v] \\gets false$",
+    zh: "$visited[v]\\gets false$ // 全置未访问",
+    en: "$visited[v]\\gets false$",
   },
   {
-    zh: "for $s$: if $!visited[s]$:",
-    en: "for $s$: if $!visited[s]$:",
+    zh: "for $!visited[s]$: // 未访问开新分量",
+    en: "for $!visited[s]$: // new component",
   },
   {
-    zh: "  $S \\gets \\{s\\}$  // DFS($s$)",
+    zh: "  $S \\gets \\{s\\}$  // 开 $DFS(s)$",
     en: "  $S \\gets \\{s\\}$  // DFS($s$)",
   },
   {
@@ -1685,51 +1716,59 @@ export const ALL_DFS_CODE: Text[] = [
     en: "    $u \\gets S.pop()$  // pop",
   },
   {
-    zh: "    if $!visited[u]$: $visited[u] \\gets true$  // 访问 $u$",
-    en: "    if $!visited[u]$: $visited[u] \\gets true$  // visit $u$",
+    zh: "    $visited[u] \\gets true$  // $!visited[u]$ 未访问",
+    en: "    $visited[u] \\gets true$  // first visit",
   },
   {
-    zh: "    for $v \\in adj(u)$: if $!visited[v]$: $S \\gets S \\cup \\{v\\}$",
-    en: "    for $v \\in adj(u)$: if $!visited[v]$: $S \\gets S \\cup \\{v\\}$",
+    zh: "    for $v \\in adj(u)$: // 遍历邻点",
+    en: "    for $v \\in adj(u)$:",
   },
   {
-    zh: "  // 全部连通分量完成",
-    en: "  // all components done",
+    zh: "      if $!visited[v]$: // 未访问",
+    en: "      if $!visited[v]$:",
+  },
+  {
+    zh: "        $visited[v] \\gets true$; $S \\gets S \\cup \\{v\\}$  // 入栈",
+    en: "        $visited[v] \\gets true$; $S \\gets S \\cup \\{v\\}$  // push",
+  },
+  {
+    zh: "$done$ // 全部连通分量完成",
+    en: "$done$ // all components done",
   },
 ];
 
 export const CYCLE_CODE: Text[] = [
   {
-    zh: "for $v$: $c[v] \\gets 0$  // 白",
-    en: "for $v$: $c[v] \\gets 0$  // white",
+    zh: "$c[v] \\gets 0$  // 全染白（未访问）",
+    en: "$c[v] \\gets 0$  // all white",
   },
   {
-    zh: "for $v$: if $c[v]=0$: DFS($v$)",
-    en: "for $v$: if $c[v]=0$: DFS($v$)",
+    zh: "for $c[v]=0$: // 白点开新分量",
+    en: "for $c[v]=0$: // new component",
   },
   {
     zh: "  $c[v] \\gets 1$  // 灰：入栈",
     en: "  $c[v] \\gets 1$  // gray: on stack",
   },
   {
-    zh: "  for $w \\in adj(v)$:",
+    zh: "  for $w \\in adj(v)$: // 看邻边",
     en: "  for $w \\in adj(v)$:",
   },
   {
-    zh: "    if $c[w]=1$: return true  // 回边 $v \\to w$",
-    en: "    if $c[w]=1$: return true  // back edge $v \\to w$",
+    zh: "    return $true$  // $c[w]=1$ 回边",
+    en: "    return $true$  // back edge",
   },
   {
-    zh: "    if $c[w]=0$: DFS($w$)",
-    en: "    if $c[w]=0$: DFS($w$)",
+    zh: "    if $c[w]=0$: // 白点递归",
+    en: "    if $c[w]=0$:",
   },
   {
     zh: "  $c[v] \\gets 2$  // 黑：出栈完成",
     en: "  $c[v] \\gets 2$  // black: done",
   },
   {
-    zh: "  // 结果：有/无环",
-    en: "  // result",
+    zh: "$done$  // 有环或无环",
+    en: "$done$  // cyclic or acyclic",
   },
 ];
 
@@ -1751,24 +1790,28 @@ export const DIJKSTRA_CODE: Text[] = [
     en: "  $u \\gets \\arg\\min\\{dist[v] \\mid v \\notin S\\}$",
   },
   {
-    zh: "  if $dist[u] = \\infty$: return  // 剩余不可达",
-    en: "  if $dist[u] = \\infty$: return  // unreachable",
+    zh: "  if $dist[u]=\\infty$: // 剩余不可达则返回",
+    en: "  if $dist[u]=\\infty$: // unreachable",
   },
   {
     zh: "  $S \\gets S \\cup \\{u\\}$  // 确定 $u$",
     en: "  $S \\gets S \\cup \\{u\\}$  // settle $u$",
   },
   {
-    zh: "  for $(u,v,w) \\in E$: if $dist[u]+w < dist[v]$:",
-    en: "  for $(u,v,w) \\in E$: if $dist[u]+w < dist[v]$:",
+    zh: "  for $(u,v,w) \\in E$: // 松弛试探",
+    en: "  for $(u,v,w) \\in E$:",
   },
   {
-    zh: "    $dist[v] \\gets dist[u]+w$; $prev[v] \\gets u$",
-    en: "    $dist[v] \\gets dist[u]+w$; $prev[v] \\gets u$",
+    zh: "    if $dist[u]+w<dist[v]$:",
+    en: "    if $dist[u]+w<dist[v]$:",
   },
   {
-    zh: "  // 完成",
-    en: "  // done",
+    zh: "      $dist[v] \\gets dist[u]+w$; $prev[v] \\gets u$",
+    en: "      $dist[v] \\gets dist[u]+w$; $prev[v] \\gets u$",
+  },
+  {
+    zh: "$done$ // 完成",
+    en: "$done$ // done",
   },
 ];
 
@@ -1790,24 +1833,28 @@ export const PRIM_CODE: Text[] = [
     en: "  $u \\gets \\arg\\min\\{key[v] \\mid v \\notin T\\}$",
   },
   {
-    zh: "  if $key[u] = \\infty$: return  // 图不连通",
-    en: "  if $key[u] = \\infty$: return  // disconnected",
+    zh: "  if $key[u]=\\infty$: // 图不连通则返回",
+    en: "  if $key[u]=\\infty$: // disconnected",
   },
   {
     zh: "  $T \\gets T \\cup \\{u\\}$",
     en: "  $T \\gets T \\cup \\{u\\}$",
   },
   {
-    zh: "  for $(u,v,w) \\in E$: if $v \\notin T$ , $w < key[v]$:",
-    en: "  for $(u,v,w) \\in E$: if $v \\notin T$ , $w < key[v]$:",
+    zh: "  for $(u,v,w) \\in E$: // 试探更新",
+    en: "  for $(u,v,w) \\in E$:",
   },
   {
-    zh: "    $key[v] \\gets w$; $parent[v] \\gets u$",
-    en: "    $key[v] \\gets w$; $parent[v] \\gets u$",
+    zh: "    if $v\\notin T \\land w<key[v]$:",
+    en: "    if $v\\notin T \\land w<key[v]$:",
   },
   {
-    zh: "  // 完成",
-    en: "  // done",
+    zh: "      $key[v] \\gets w$; $parent[v] \\gets u$",
+    en: "      $key[v] \\gets w$; $parent[v] \\gets u$",
+  },
+  {
+    zh: "$done$ // MST 完成",
+    en: "$done$ // MST done",
   },
 ];
 
@@ -1829,12 +1876,12 @@ export const KRUSKAL_CODE: Text[] = [
     en: "    $MST \\gets MST \\cup \\{(u,v)\\}$; $union(u,v)$",
   },
   {
-    zh: "  else continue  // 会成环",
-    en: "  else continue  // would cycle",
+    zh: "  else: // 会成环则跳过",
+    en: "  else: // would cycle",
   },
   {
-    zh: "  // 完成",
-    en: "  // done",
+    zh: "$done$ // 完成",
+    en: "$done$ // done",
   },
 ];
 
@@ -1852,20 +1899,28 @@ export const BELLMAN_CODE: Text[] = [
     en: "  for $(u,v,w) \\in E$:",
   },
   {
-    zh: "    if $dist[u]+w < dist[v]$: $dist[v] \\gets dist[u]+w$; $prev[v] \\gets u$",
-    en: "    if $dist[u]+w < dist[v]$: $dist[v] \\gets dist[u]+w$; $prev[v] \\gets u$",
+    zh: "    if $dist[u]+w<dist[v]$:",
+    en: "    if $dist[u]+w<dist[v]$:",
+  },
+  {
+    zh: "      $dist[v] \\gets dist[u]+w$; $prev[v] \\gets u$ // 松弛",
+    en: "      $dist[v] \\gets dist[u]+w$; $prev[v] \\gets u$",
   },
   {
     zh: "for $(u,v,w) \\in E$:  // 负环检测",
     en: "for $(u,v,w) \\in E$:  // neg-cycle check",
   },
   {
-    zh: "  if $dist[u]+w < dist[v]$: return false  // 存在负环",
-    en: "  if $dist[u]+w < dist[v]$: return false  // negative cycle",
+    zh: "  if $dist[u]+w<dist[v]$: // 仍可松弛",
+    en: "  if $dist[u]+w<dist[v]$:",
   },
   {
-    zh: "  // 完成",
-    en: "  // done",
+    zh: "    return $false$ // 存在负环",
+    en: "    return $false$ // negative cycle",
+  },
+  {
+    zh: "$done$ // 无负环完成",
+    en: "$done$ // done",
   },
 ];
 
@@ -1873,69 +1928,80 @@ export const ASTAR_CODE: Text[] = [
   { zh: "$openSet \\gets \\{s\\}$; $g[s] \\gets 0$; $f[s] \\gets h(s)$", en: "$openSet \\gets \\{s\\}$; $g[s] \\gets 0$; $f[s] \\gets h(s)$" },
   { zh: "while $openSet \\neq \\emptyset$:", en: "while $openSet \\neq \\emptyset$:" },
   { zh: "  $u \\gets \\arg\\min_{v \\in openSet} f[v]$", en: "  $u \\gets \\arg\\min_{v \\in openSet} f[v]$" },
-  { zh: "  if $u = t$: return reconstruct_path(u)  // 到达目标", en: "  if $u = t$: return path" },
+  { zh: "  if $u=t$:", en: "  if $u=t$:" },
+  { zh: "    return $path(u)$ // 到达目标", en: "    return $path(u)$" },
   { zh: "  $openSet \\gets openSet \\setminus \\{u\\}$; $closedSet \\gets closedSet \\cup \\{u\\}$", en: "  move u to closedSet" },
-  { zh: "  for $(u,v,w) \\in E$: if $v \\notin closedSet$:", en: "  for $(u,v,w) \\in E$: if $v \\notin closedSet$:" },
-  { zh: "    if $g[u]+w < g[v]$: $g[v] \\gets g[u]+w$; $f[v] \\gets g[v]+h(v)$; $parent[v] \\gets u$", en: "    if $g[u]+w < g[v]$: update $g,f,parent$" },
-  { zh: "    if $v \\notin openSet$: $openSet \\gets openSet \\cup \\{v\\}$", en: "    if $v \\notin openSet$: add to openSet" },
-  { zh: "  // 失败：openSet 空且未达目标", en: "  // fail: openSet empty" },
+  { zh: "  for $(u,v,w) \\in E$: // $v\\notin closedSet$ 才看", en: "  for $(u,v,w) \\in E$ outside closedSet:" },
+  { zh: "    if $g[u]+w<g[v]$:", en: "    if $g[u]+w<g[v]$:" },
+  { zh: "      $g[v]\\gets g[u]+w$; $f[v]\\gets g[v]+h(v)$; $parent[v]\\gets u$ // 更优则更新", en: "      update $g,f,parent$" },
+  { zh: "    if $v\\notin openSet$: // 新点", en: "    if $v\\notin openSet$:" },
+  { zh: "      $openSet\\gets openSet\\cup\\{v\\}$ // 入队", en: "      add to openSet" },
+  { zh: "$done$ // openSet 空且未达目标则失败", en: "$done$ // fail if unreachable" },
 ];
 
 export const FLOYD_CODE: Text[] = [
-  { zh: "for $i$: $dist[i][i] \\gets 0$", en: "for $i$: $dist[i][i] \\gets 0$" },
-  { zh: "for $(u,v,w) \\in E$: $dist[u][v] \\gets w$; $next[u][v] \\gets v$", en: "for edges: $dist[u][v]=w$, $next[u][v]=v$" },
-  { zh: "for $k \\gets 0$ to $n-1$:", en: "for $k \\gets 0$ to $n-1$:" },
+  { zh: "for $i$: $dist[i][i] \\gets 0$ // 对角清零", en: "for $i$: $dist[i][i] \\gets 0$" },
+  { zh: "$dist[u][v]\\gets w$; $next[u][v]\\gets v$ // 邻边直达初始化", en: "$dist[u][v]=w$, $next[u][v]=v$" },
+  { zh: "for $k \\gets 0$ to $n-1$: // 中转轮", en: "for $k \\gets 0$ to $n-1$:" },
   { zh: "  for $i \\gets 0$ to $n-1$:", en: "  for $i \\gets 0$ to $n-1$:" },
   { zh: "    for $j \\gets 0$ to $n-1$:", en: "    for $j \\gets 0$ to $n-1$:" },
-  { zh: "      if $dist[i][k]+dist[k][j] < dist[i][j]$:", en: "      if $dist[i][k]+dist[k][j] < dist[i][j]$:" },
-  { zh: "        $dist[i][j] \\gets dist[i][k]+dist[k][j]$; $next[i][j] \\gets next[i][k]$", en: "        $dist[i][j] \\gets ...$; $next[i][j] \\gets next[i][k]$" },
-  { zh: "if $\\exists i: dist[i][i] < 0$: negative cycle", en: "if $\\exists i: dist[i][i] < 0$: negative cycle" },
+  { zh: "      if $dist[i][k]+dist[k][j]<dist[i][j]$:", en: "      if $dist[i][k]+dist[k][j]<dist[i][j]$:" },
+  { zh: "        $dist[i][j] \\gets dist[i][k]+dist[k][j]$; $next[i][j] \\gets next[i][k]$ // 更新", en: "        $dist[i][j] \\gets ...$; $next[i][j] \\gets next[i][k]$" },
+  { zh: "if $\\exists i:dist[i][i]<0$: // 负环判定", en: "if $\\exists i:dist[i][i]<0$:" },
 ];
 
 export const KOSARAJU_CODE: Text[] = [
-  { zh: "# Pass 1: 原图 DFS，记完成序", en: "# Pass 1: DFS on G, record finish order" },
-  { zh: "for $v$: if $!vis[v]$: $DFS1(v)$", en: "for $v$: if $!vis[v]$: $DFS1(v)$" },
-  { zh: "  $vis[v] \\gets true$; for $w \\in adj(v)$: if $!vis[w]$: $DFS1(w)$", en: "  $vis[v]=true$; for $w$: $DFS1(w)$" },
-  { zh: "  $order.push(v)$  // 完成时入序", en: "  $order.push(v)$  // on finish" },
-  { zh: "# Pass 2: 反图 $G^R$，按 $order$ 逆序 DFS", en: "# Pass 2: on $G^R$, reverse $order$" },
-  { zh: "for $v \\in reverse(order)$: if $comp[v]=-1$: $DFS2(v, cid++)$", en: "for $v \\in rev(order)$: if $comp[v]=-1$: $DFS2(v)$" },
-  { zh: "  $comp[v] \\gets cid$; for $w \\in radj(v)$: if $comp[w]=-1$: $DFS2(w)$", en: "  $comp[v]=cid$; for $w \\in radj(v)$: $DFS2(w)$" },
+  { zh: "$Pass1(G)$ // 原图 DFS，记完成序", en: "$Pass1(G)$ // DFS on G, record finish order" },
+  { zh: "$checkEdge(u,v)$ // 查边", en: "$checkEdge(u,v)$" },
+  { zh: "$order.push(u)$  // 完成时入序", en: "  $order.push(u)$  // on finish" },
+  { zh: "$Pass2(G^R)$ // 逆序 DFS，新分量", en: "$Pass2(G^R)$ // reverse DFS, new component" },
+  { zh: "$traverse(rev)$; $assign(comp)$  // 反图遍历归入", en: "$traverse(rev)$; $assign(comp)$" },
+  { zh: "$done$ // 共 $cid$ 个强连通分量", en: "$done$ // $cid$ components" },
+  { zh: "$output(comp)$ // 输出划分", en: "$output(comp)$" },
 ];
 
 export const TARJAN_CODE: Text[] = [
-  { zh: "$index[v] \\gets low[v] \\gets idx++$; $push(v)$; $onStack[v] \\gets true$", en: "$index[v] \\gets low[v] \\gets idx++$; push $v$" },
-  { zh: "for $w \\in adj(v)$:", en: "for $w \\in adj(v)$:" },
-  { zh: "  if $index[w] = -1$: $DFS(w)$; $low[v] \\gets \\min(low[v], low[w])$", en: "  if $index[w]=-1$: $DFS(w)$; $low[v] \\gets \\min(low[v], low[w])$" },
-  { zh: "  else if $onStack[w]$: $low[v] \\gets \\min(low[v], index[w])$", en: "  else if $onStack[w]$: $low[v] \\gets \\min(low[v], index[w])$" },
-  { zh: "if $low[v] = index[v]$: pop 直到 $v$ → 1 个 SCC", en: "if $low[v] = index[v]$: pop until $v$ = 1 SCC" },
+  { zh: "$index/lowlink\\gets-1$; $stack\\gets\\emptyset$ // 初始化", en: "$index/lowlink\\gets-1$; $stack\\gets\\emptyset$" },
+  { zh: "$index[v]\\gets lowlink[v]\\gets idx{+}{+}$; $push(v)$; $onStack[v]\\gets true$ // 入栈", en: "$index[v]\\gets lowlink[v]\\gets idx{+}{+}$; $push(v)$" },
+  { zh: "for $w\\in adj(v)$: // 看邻边", en: "for $w\\in adj(v)$:" },
+  { zh: "  if $unvisited(w)$: // 未访问则递归", en: "  if $unvisited(w)$:" },
+  { zh: "  elif $onStack(w)$: // 栈上回边", en: "  elif $onStack(w)$:" },
+  { zh: "    $lowlink[v]\\gets\\min(lowlink[v],lowlink[w])$ // 更新", en: "    $lowlink[v]\\gets\\min(\\dots)$" },
+  { zh: "if $lowlink[v]=index[v]$: // 栈顶是根", en: "if $lowlink[v]=index[v]$:" },
+  { zh: "  $popTo(v)$ // 弹出一个 SCC", en: "  $popTo(v)$" },
+  { zh: "$done$ // 完成", en: "$done$ // done" },
 ];
 
 export const DINIC_CODE: Text[] = [
   { zh: "$flow \\gets 0$", en: "$flow \\gets 0$" },
-  { zh: "while $BFS()$ builds level graph:", en: "while $BFS()$ builds level graph:" },
-  { zh: "  $level[s] \\gets 0$; $Q \\gets \\{s\\}$", en: "  $level[s] \\gets 0$; $Q \\gets \\{s\\}$" },
-  { zh: "  while $Q$: pop $u$; for $v$: if $cap[u][v]-flow[u][v]>0 \\land level[v]=-1$:", en: "  while $Q$: pop $u$; for $v$: if residual>0 & level=-1:" },
-  { zh: "    $level[v] \\gets level[u]+1$; $Q.push(v)$", en: "    $level[v] \\gets level[u]+1$" },
-  { zh: "  if $level[t] = -1$: break  // 不可达", en: "  if $level[t]=-1$: break" },
-  { zh: "  $iter[v] \\gets 0$", en: "  $iter[v] \\gets 0$" },
-  { zh: "  while $(pushed = DFS(s, \\infty)) > 0$: $flow \\gets flow + pushed$", en: "  while $(pushed = DFS(s, \\infty)) > 0$: $flow \\plus= pushed$" },
-  { zh: "    $DFS(u, f)$: if $u=t$: return $f$", en: "    $DFS(u, f)$: if $u=t$: return $f$" },
-  { zh: "      for $v$ from $iter[u]$: if $residual>0 \\land level[v]=level[u]+1$:", en: "      for $v$ from $iter[u]$: if residual & level:" },
-  { zh: "        $ret \\gets DFS(v, \\min(f, residual))$", en: "        $ret \\gets DFS(v, \\min(f, residual))$" },
-  { zh: "        if $ret>0$: $flow[u][v]\\plus=ret$; $flow[v][u]\\minus=ret$; return $ret$", en: "        if $ret>0$: augment; return $ret$" },
+  { zh: "$BFSLevel(s,t)$ // 建分层图", en: "$BFSLevel(s,t)$ // level graph" },
+  { zh: "$augment(v,i)$ // DFS 尝试增广", en: "$augment(v,i)$" },
+  { zh: "$flow \\gets totalFlow$ // 最大流", en: "$flow \\gets totalFlow$ // max flow" },
+  { zh: "while $buildLevel(s,t)$: // BFS 建分层图", en: "while $buildLevel(s,t)$:" },
+  { zh: "  if $level[t]=-1$: break // 不可达", en: "  if $level[t]=-1$: break" },
+  { zh: "  $iter\\gets0$ // 当前弧清零", en: "  $iter\\gets0$" },
+  { zh: "  while $pushed\\gets augment(s,\\infty)$: // 阻塞流", en: "  while $pushed\\gets augment(s,\\infty)$:" },
+  { zh: "    $flow\\gets flow+pushed$", en: "    $flow\\gets flow+pushed$" },
+  { zh: "$DFS(u,f)$: // 深度优先找增广路，$u=t$ 返回 $f$", en: "$DFS(u,f)$: // returns $f$ at $t$" },
+  { zh: "  for $v$ from $iter[u]$: // 当前弧起试探", en: "  for $v$ from $iter[u]$:" },
+  { zh: "    if $residual>0 \\land level[v]=level[u]+1$: // 可推进", en: "    if $residual>0 \\land level[v]=level[u]+1$:" },
+  { zh: "      $ret\\gets DFS(v,\\min(f,residual))$; $augment(ret)$ // 增广回传", en: "      $ret\\gets DFS(v,\\min(f,residual))$; $augment(ret)$" },
 ];
 
 export const LCA_CODE: Text[] = [
-  { zh: "# 预处理：DFS 计算 depth 与 $up[v][j]=2^j$ 祖先", en: "# Preprocess: DFS for depth & $up[v][j]$" },
-  { zh: "$up[v][0] \\gets parent$; $up[v][j] \\gets up[up[v][j-1]][j-1]$", en: "$up[v][0] \\gets parent$; $up[v][j] \\gets up[up[v][j-1]][j-1]$" },
-  { zh: "# 查询 LCA(u,v):", en: "# Query LCA(u,v):" },
-  { zh: "if $depth[u] < depth[v]$: swap", en: "if $depth[u] < depth[v]$: swap" },
-  { zh: "for $j \\gets LOG-1$ downto 0: if $up[u][j] \\neq -1 \\land depth[up[u][j]] \\ge depth[v]$:", en: "for $j$ down: if ancestor at $2^j$ deep enough:" },
-  { zh: "  $u \\gets up[u][j]$  // 提升 u", en: "  $u \\gets up[u][j]$" },
-  { zh: "if $u = v$: return $u$", en: "if $u=v$: return $u$" },
-  { zh: "for $j \\gets LOG-1$ downto 0: if $up[u][j] \\neq up[v][j]$:", en: "for $j$ down: if $2^j$ ancestors differ:" },
-  { zh: "  $u \\gets up[u][j]$; $v \\gets up[v][j]$", en: "  $u \\gets up[u][j]$; $v \\gets up[v][j]$" },
-  { zh: "return $up[u][0]$  // 父节点即 LCA", en: "return $up[u][0]$" },
+  { zh: "$DFS(root)$ // 预处理 depth 与 $up$ 祖先", en: "$DFS(root)$ // depth & $up$" },
+  { zh: "$up[v][0]\\gets parent$; $up[v][j]\\gets up[up[v][j-1]][j-1]$ // 倍增建表", en: "$up[v][0]\\gets parent$; $up[v][j]\\gets up[up[v][j-1]][j-1]$" },
+  { zh: "$LCA(u,v)$ // 开始查询", en: "$LCA(u,v)$" },
+  { zh: "if $depth[u]<depth[v]$: // 浅者换到 $u$", en: "if $depth[u]<depth[v]$:" },
+  { zh: "for $j\\gets LOG-1$ downto $0$: // 从高位试跳", en: "for $j\\gets LOG-1$ downto $0$:" },
+  { zh: "  if $up[u][j]\\neq-1 \\land depth[up[u][j]]\\ge depth[v]$: // 2^j 步仍够深", en: "  if $up[u][j]\\neq-1 \\land depth\\ge depth[v]$:" },
+  { zh: "    $u\\gets up[u][j]$ // 上跳", en: "    $u\\gets up[u][j]$" },
+  { zh: "if $u=v$: // 对齐后相等", en: "if $u=v$:" },
+  { zh: "  return $u$ // 即 LCA", en: "  return $u$" },
+  { zh: "for $j\\gets LOG-1$ downto $0$: // 同步上跳", en: "for $j\\gets LOG-1$ downto $0$:" },
+  { zh: "  if $up[u][j]\\neq up[v][j]$: // 2^j 祖先不同", en: "  if $up[u][j]\\neq up[v][j]$:" },
+  { zh: "    $u\\gets up[u][j]$; $v\\gets up[v][j]$", en: "    $u\\gets up[u][j]$; $v\\gets up[v][j]$" },
+  { zh: "return $up[u][0]$ // 父节点即 LCA", en: "return $up[u][0]$" },
 ];
 
 // ============================================================
@@ -2037,7 +2103,7 @@ export function levelOrderSteps(
       });
       for (const [v] of adj[u]) {
         steps.push({
-          line: 5,
+          line: 6,
           current: u,
           exploring: u,
           visited: visitedList(),
@@ -2053,7 +2119,7 @@ export function levelOrderSteps(
           visited[v] = true;
           q.push(v);
           steps.push({
-            line: 6,
+            line: 7,
             current: u,
             exploring: u,
             visited: visitedList(),
@@ -2070,7 +2136,7 @@ export function levelOrderSteps(
     }
   }
   steps.push({
-    line: 7,
+    line: 8,
     current: null,
     exploring: null,
     visited: visitedList(),
@@ -2164,7 +2230,7 @@ export function bfsAllSteps(g: Graph, labels: string[] = g.labels): AlgoStep[] {
       });
       for (const [v] of adj[u]) {
         steps.push({
-          line: 5,
+          line: 6,
           current: u,
           exploring: u,
           visited: visitedList(),
@@ -2180,7 +2246,7 @@ export function bfsAllSteps(g: Graph, labels: string[] = g.labels): AlgoStep[] {
           visited[v] = true;
           q.push(v);
           steps.push({
-            line: 6,
+            line: 7,
             current: u,
             exploring: u,
             visited: visitedList(),
@@ -2194,7 +2260,7 @@ export function bfsAllSteps(g: Graph, labels: string[] = g.labels): AlgoStep[] {
     }
   }
   steps.push({
-    line: 7,
+    line: 8,
     current: null,
     exploring: null,
     visited: visitedList(),
@@ -2302,7 +2368,7 @@ export function dfsAllSteps(g: Graph, labels: string[] = g.labels): AlgoStep[] {
         .reverse();
       for (const v of neighbors) {
         steps.push({
-          line: 6,
+          line: 8,
           current: u,
           exploring: u,
           visited: visitedList(),
@@ -2316,7 +2382,7 @@ export function dfsAllSteps(g: Graph, labels: string[] = g.labels): AlgoStep[] {
     }
   }
   steps.push({
-    line: 7,
+    line: 9,
     current: null,
     exploring: null,
     visited: visitedList(),
@@ -2574,7 +2640,7 @@ export function dijkstraSteps(
       const cmp = `${D(u)} + ${w} = ${Number.isFinite(dist[u]) ? dist[u] + w : "∞"}`;
       steps.push(
         snap(
-          6,
+          7,
           u,
           u,
           cand(),
@@ -2588,7 +2654,7 @@ export function dijkstraSteps(
         prev[v] = u;
         steps.push(
           snap(
-            7,
+            8,
             u,
             u,
             cand(),
@@ -2602,7 +2668,7 @@ export function dijkstraSteps(
   }
   steps.push(
     snap(
-      8,
+      9,
       null,
       null,
       [],
@@ -2736,7 +2802,7 @@ export function primSteps(
     for (const [v, w] of adj[u]) {
       steps.push(
         snap(
-          6,
+          7,
           u,
           u,
           cand(),
@@ -2750,7 +2816,7 @@ export function primSteps(
         parent[v] = u;
         steps.push(
           snap(
-            7,
+            8,
             u,
             u,
             cand(),
@@ -2764,7 +2830,7 @@ export function primSteps(
   }
   steps.push(
     snap(
-      8,
+      9,
       null,
       null,
       [],
@@ -2980,7 +3046,7 @@ export function bellmanFordSteps(
       const w = e.weight ?? 1;
       steps.push(
         snap(
-          2,
+          3,
           e.u,
           e.v,
           [],
@@ -2994,7 +3060,7 @@ export function bellmanFordSteps(
         prev[e.v] = e.u;
         steps.push(
           snap(
-            3,
+            4,
             e.u,
             e.v,
             [],
@@ -3008,7 +3074,7 @@ export function bellmanFordSteps(
   }
   steps.push(
     snap(
-      4,
+      5,
       null,
       null,
       [],
@@ -3022,7 +3088,7 @@ export function bellmanFordSteps(
     const w = e.weight ?? 1;
     steps.push(
       snap(
-        5,
+        6,
         e.u,
         e.v,
         [],
@@ -3038,7 +3104,7 @@ export function bellmanFordSteps(
   }
   steps.push(
     snap(
-      6,
+      8,
       null,
       null,
       [],
@@ -3191,16 +3257,28 @@ export const BST_SEARCH_CODE: Text[] = [
     en: "while $p \\neq null$:",
   },
   {
-    zh: "  if $x = p.val$: return $p$  // 命中",
-    en: "  if $x = p.val$: return $p$  // hit",
+    zh: "  if $x = p.val$:",
+    en: "  if $x = p.val$:",
   },
   {
-    zh: "  if $x < p.val$: $p \\gets p.left$  // 走左",
-    en: "  if $x < p.val$: $p \\gets p.left$  // left",
+    zh: "    return $p$  // 命中",
+    en: "    return $p$  // hit",
   },
   {
-    zh: "  else: $p \\gets p.right$  // 走右",
-    en: "  else: $p \\gets p.right$  // right",
+    zh: "  if $x < p.val$:",
+    en: "  if $x < p.val$:",
+  },
+  {
+    zh: "    $p \\gets left(p)$  // 走左",
+    en: "    $p \\gets left(p)$  // go left",
+  },
+  {
+    zh: "  else:",
+    en: "  else:",
+  },
+  {
+    zh: "    $p \\gets right(p)$  // 走右",
+    en: "    $p \\gets right(p)$  // go right",
   },
   {
     zh: "return $null$  // 未找到",
@@ -3251,27 +3329,27 @@ export function bstSearchSteps(values: number[], target: number): BstStep[] {
       return steps;
     }
     if (target < nodes[p].val) {
-      steps.push(snap(3, p, `$x=${target}<${nodes[p].val}$ → 走左`, `go left`));
+      steps.push(snap(5, p, `$x=${target}<${nodes[p].val}$ → 走左`, `go left`));
       p = nodes[p].left;
     } else {
       steps.push(
-        snap(4, p, `$x=${target}>${nodes[p].val}$ → 走右`, `go right`),
+        snap(7, p, `$x=${target}>${nodes[p].val}$ → 走右`, `go right`),
       );
       p = nodes[p].right;
     }
   }
-  steps.push(snap(5, null, `$x=${target}$ 未找到（走到空位）`, `not found`));
+    steps.push(snap(8, null, `$x=${target}$ 未找到（走到空位）`, `not found`));
   return steps;
 }
 
 export const BST_INSERT_CODE: Text[] = [
   {
-    zh: "$x$  // 输入",
-    en: "$x$  // input",
+    zh: "$x$  // 输入待插键",
+    en: "$x$  // input key",
   },
   {
-    zh: "if $T = \\emptyset$: $root \\gets x$",
-    en: "if $T = \\emptyset$: $root \\gets x$",
+    zh: "$root \\gets x$  // $T=\\emptyset$ 空树作根",
+    en: "$root \\gets x$  // empty tree as root",
   },
   {
     zh: "$p \\gets root$",
@@ -3282,20 +3360,20 @@ export const BST_INSERT_CODE: Text[] = [
     en: "while $p \\neq null$:",
   },
   {
-    zh: "  if $x < p.val$: $p \\gets p.left$",
-    en: "  if $x < p.val$: $p \\gets p.left$",
+    zh: "  if $x < p.val$: // 走左或左空位",
+    en: "  if $x < p.val$: // go left",
   },
   {
-    zh: "  else: $p \\gets p.right$",
-    en: "  else: $p \\gets p.right$",
+    zh: "  else: // 走右或右空位",
+    en: "  else: // go right",
   },
   {
     zh: "$p.child \\gets x$  // 挂入空位",
     en: "$p.child \\gets x$  // attach",
   },
   {
-    zh: "// 完成",
-    en: "// done",
+    zh: "$done$ // 完成",
+    en: "$done$ // done",
   },
 ];
 
@@ -3457,28 +3535,28 @@ export function bstInsertSteps(values: number[]): BstStep[] {
 
 export const BST_DELETE_CODE: Text[] = [
   {
-    zh: "$p \\gets find(x)$  // 定位",
-    en: "$p \\gets find(x)$  // locate",
+    zh: "$p \\gets BSTSearch(T,x)$  // 先定位",
+    en: "$p \\gets BSTSearch(T,x)$  // locate first",
   },
   {
-    zh: "if $\\deg(p)=0$: $remove(p)$  // 叶",
-    en: "if $\\deg(p)=0$: $remove(p)$  // leaf",
+    zh: "$remove(p)$  // $\\deg(p)=0$ 叶删",
+    en: "$remove(p)$  // leaf",
   },
   {
-    zh: "if $\\deg(p)=1$: $splice(p)$  // 单子顶替",
-    en: "if $\\deg(p)=1$: $splice(p)$  // one child",
+    zh: "$splice(p)$  // $\\deg(p)=1$ 单子顶替",
+    en: "$splice(p)$  // one child",
   },
   {
-    zh: "else: $s \\gets \\min R(p)$  // 右子树最小",
-    en: "else: $s \\gets \\min R(p)$  // successor",
+    zh: "$s \\gets \\min R(p)$  // 双子取后继",
+    en: "$s \\gets \\min R(p)$  // successor",
   },
   {
-    zh: "  $p.val \\gets s.val$; $remove(s)$",
-    en: "  $p.val \\gets s.val$; $remove(s)$",
+    zh: "$p.val \\gets s.val$; $remove(s)$  // 后继顶替",
+    en: "$p.val \\gets s.val$; $remove(s)$",
   },
   {
-    zh: "// 完成",
-    en: "// done",
+    zh: "$done$ // 完成",
+    en: "$done$ // done",
   },
 ];
 
@@ -3551,7 +3629,7 @@ export function bstDeleteSteps(values: number[], target: number): BstStep[] {
     return false;
   };
   if (!locate()) {
-    steps.push(snap(5, null, `$x=${target}$ 不存在（走到空位）`, `not found`));
+    steps.push(snap(0, null, `$x=${target}$ 不存在（走到空位）`, `not found`));
     return steps;
   }
   const d = cur as number;
@@ -3621,36 +3699,40 @@ export function bstDeleteSteps(values: number[], target: number): BstStep[] {
 
 export const AVL_CODE: Text[] = [
   {
-    zh: "$insert_{BST}(u, x)$  // 按 BST 插入",
-    en: "$insert_{BST}(u, x)$  // BST insert",
+    zh: "$BSTInsert(T,x)$  // 先按 BST 插入",
+    en: "$BSTInsert(T,x)$  // BST insert first",
   },
   {
-    zh: "update $bf(u)$  // 回溯平衡因子",
-    en: "update $bf(u)$  // balance factor",
+    zh: "$bf\\gets update(u)$  // 回溯平衡因子",
+    en: "$bf\\gets update(u)$  // balance factor",
   },
   {
-    zh: "if $|bf|\\leq 1$: continue  // 平衡",
-    en: "if $|bf|\\leq 1$: continue  // balanced",
+    zh: "if $|bf|\\leq 1$: // 平衡则继续",
+    en: "if $|bf|\\leq 1$: // balanced",
   },
   {
-    zh: "else if $bf>1 \\land bf(L)\\geq 0$: $rotateR$  // LL",
-    en: "else if $bf>1 \\land bf(L)\\geq 0$: $rotateR$  // LL",
+    zh: "else: // 失衡，按类型旋转",
+    en: "else: // unbalanced",
   },
   {
-    zh: "else if $bf>1 \\land bf(L)<0$: $rotateL;\\; rotateR$  // LR",
-    en: "else if $bf>1 \\land bf(L)<0$: $rotateL;\\; rotateR$  // LR",
+    zh: "  $rotateR$ // LL",
+    en: "  $rotateR$ // LL",
   },
   {
-    zh: "else if $bf<-1 \\land bf(R)\\leq 0$: $rotateL$  // RR",
-    en: "else if $bf<-1 \\land bf(R)\\leq 0$: $rotateL$  // RR",
+    zh: "  $rotateL$; $rotateR$ // LR",
+    en: "  $rotateL$; $rotateR$ // LR",
   },
   {
-    zh: "else: $rotateR;\\; rotateL$  // RL",
-    en: "else: $rotateR;\\; rotateL$  // RL",
+    zh: "  $rotateL$ // RR",
+    en: "  $rotateL$ // RR",
   },
   {
-    zh: "// 完成",
-    en: "// done",
+    zh: "  $rotateR$; $rotateL$ // RL",
+    en: "  $rotateR$; $rotateL$ // RL",
+  },
+  {
+    zh: "$done$ // 完成",
+    en: "$done$ // done",
   },
 ];
 
@@ -3789,7 +3871,7 @@ export function avlInsertSteps(values: number[]): BstStep[] {
     const kind = pb > 1 ? (lb >= 0 ? "LL" : "LR") : rb <= 0 ? "RR" : "RL";
     steps.push(
       snap(
-        3 + (kind === "LL" ? 0 : kind === "LR" ? 1 : kind === "RR" ? 2 : 3),
+        4 + (kind === "LL" ? 0 : kind === "LR" ? 1 : kind === "RR" ? 2 : 3),
         pivot,
         `${kind}：$bf=${pb}$，子$bf=${childBf}$ → 旋转`,
         kind,
@@ -3825,7 +3907,7 @@ export function avlInsertSteps(values: number[]): BstStep[] {
     else nodes[pPar].right = t;
     steps.push(
       snap(
-        2,
+        4 + (kind === "LL" ? 0 : kind === "LR" ? 1 : kind === "RR" ? 2 : 3),
         t,
         `旋转完成：子树根 → ${nodes[t].val}，$|bf|\\leq 1$`,
         `rotated: root ${nodes[t].val}`,
@@ -3833,7 +3915,7 @@ export function avlInsertSteps(values: number[]): BstStep[] {
     );
   }
   steps.push(
-    snap(7, null, `完成：AVL 中序 $[${inorderOf(nodes).join(", ")}]$`, `done`),
+    snap(8, null, `完成：AVL 中序 $[${inorderOf(nodes).join(", ")}]$`, `done`),
   );
   return steps;
 }
@@ -3874,18 +3956,18 @@ export function bstSearchOnTree(
   while (p !== null) {
     steps.push(snap(1, p, `while：$p=${nodes[p].val}$`, `p=${nodes[p].val}`));
     if (nodes[p].val === target) {
-      steps.push(snap(2, p, `$x=${target}=p.val$ → 命中`, `hit`));
+      steps.push(snap(3, p, `$x=${target}=p.val$ → 命中`, `hit`));
       return steps;
     }
     if (target < nodes[p].val) {
-      steps.push(snap(3, p, `$x< p.val$ → 走左`, `left`));
+      steps.push(snap(5, p, `$x< p.val$ → 走左`, `left`));
       p = nodes[p].left;
     } else {
-      steps.push(snap(4, p, `$x> p.val$ → 走右`, `right`));
+      steps.push(snap(7, p, `$x> p.val$ → 走右`, `right`));
       p = nodes[p].right;
     }
   }
-  steps.push(snap(5, null, `$x=${target}$ 未找到（空位）`, `not found`));
+  steps.push(snap(8, null, `$x=${target}$ 未找到（空位）`, `not found`));
   return steps;
 }
 
@@ -4118,7 +4200,7 @@ export function bstDeleteOnTree(
     steps.push(snap(l, f, z, e)),
   );
   if (!out.found) {
-    steps.push(snap(5, null, `$x=${target}$ 不存在（空位）`, `not found`));
+    steps.push(snap(0, null, `$x=${target}$ 不存在（空位）`, `not found`));
     return { steps, result: out };
   }
   nodes.splice(0, nodes.length, ...out.nodes);
@@ -4233,7 +4315,7 @@ export function avlDeleteOnTree(
     steps.push(snap(l, f, z, e)),
   );
   if (!out.found) {
-    steps.push(snap(5, null, `$x=${target}$ 不存在（空位）`, `not found`));
+    steps.push(snap(0, null, `$x=${target}$ 不存在（空位）`, `not found`));
     return { steps, result: { nodes: out.nodes, root: out.root } };
   }
   nodes.splice(0, nodes.length, ...out.nodes);
@@ -4342,17 +4424,14 @@ function avlRebalance(
 export type TreeSnap = { nodes: BinNode[]; root: number };
 
 export const AVL_DELETE_CODE: Text[] = [
-  { zh: "$p \\gets locate(x)$", en: "$p \\gets locate(x)$" },
-  { zh: "if $p$ 无子女: remove // 叶", en: "if leaf: remove" },
-  { zh: "else if $p$ 仅一子: 子顶替", en: "one child: promote" },
-  { zh: "else 双子: $s \\gets$ 右子树最小", en: "two children: successor s" },
-  { zh: "$p.val \\gets s.val$; $remove(s)$", en: "copy s.val; remove(s)" },
-  {
-    zh: "while $|bf(u)| \\leq 1$: $u \\gets parent$",
-    en: "while balanced: up",
-  },
-  { zh: "rotate(LL/LR/RR/RL)  // 失衡修复", en: "rotate(LL/LR/RR/RL)" },
-  { zh: "// 完成", en: "// done" },
+  { zh: "$p \\gets locate(x)$ // 先定位", en: "$p \\gets locate(x)$" },
+  { zh: "$remove(p)$ // $leaf(p)$ 叶删", en: "$remove(p)$ // leaf" },
+  { zh: "$splice(p)$ // $onechild(p)$ 单子顶替", en: "$splice(p)$ // one child" },
+  { zh: "$s \\gets \\min R(p)$ // 双子取后继", en: "$s \\gets \\min R(p)$" },
+  { zh: "$p.val \\gets s.val$; $remove(s)$ // 后继顶替", en: "$p.val \\gets s.val$; $remove(s)$" },
+  { zh: "while $u\\neq null$: // 自底向上回溯检查 $bf$", en: "while $u\\neq null$: // backtrack" },
+  { zh: "$rotate(LL/LR/RR/RL)$ // 失衡修复", en: "$rotate(LL/LR/RR/RL)$" },
+  { zh: "$done$ // 完成", en: "$done$ // done" },
 ];
 
 // ============================================================
@@ -4380,16 +4459,16 @@ export const HEAP_INSERT_CODE: Text[] = [
     en: "while $i>0 \\land A[p_i] < A[i]$:  // $p_i=\\lfloor (i-1)/2 \\rfloor$",
   },
   {
-    zh: "  $swap(A_i, A_{p_i})$",
-    en: "  $swap(A_i, A_{p_i})$",
+    zh: "  $\\text{swap}(A_i, A_{p_i})$",
+    en: "  $\\text{swap}(A_i, A_{p_i})$",
   },
   {
     zh: "  $i \\gets p_i$  // $p_i=\\lfloor (i-1)/2 \\rfloor$",
     en: "  $i \\gets p_i$  // parent",
   },
   {
-    zh: "// 上滤完成",
-    en: "// sift-up done",
+    zh: "$done$ // 上滤完成",
+    en: "$done$ // sift-up done",
   },
 ];
 
@@ -4496,12 +4575,12 @@ export const HEAP_DELETE_CODE: Text[] = [
     en: "  $j \\gets \\arg\\max(A_{2i+1}, A_{2i+2})$",
   },
   {
-    zh: "  $swap(A_i, A_j)$; $i \\gets j$",
-    en: "  $swap(A_i, A_j)$; $i \\gets j$",
+    zh: "  $\\text{swap}(A_i, A_j)$; $i \\gets j$",
+    en: "  $\\text{swap}(A_i, A_j)$; $i \\gets j$",
   },
   {
-    zh: "// 下滤完成",
-    en: "// sift-down done",
+    zh: "$done$ // 下滤完成",
+    en: "$done$ // sift-down done",
   },
 ];
 
@@ -4630,8 +4709,8 @@ export const HEAP_BUILD_CODE: Text[] = [
     en: "  $siftDown(A, i)$  // sift-down",
   },
   {
-    zh: "// 建堆完成",
-    en: "// built",
+    zh: "$done$ // 建堆完成",
+    en: "$done$ // built",
   },
 ];
 
@@ -4863,7 +4942,7 @@ export function aStarSteps(
 
     steps.push(
       snap(
-        1,
+        2,
         current,
         null,
         null,
@@ -4875,7 +4954,7 @@ export function aStarSteps(
     if (current === target) {
       steps.push(
         snap(
-          2,
+          4,
           current,
           null,
           null,
@@ -4893,7 +4972,7 @@ export function aStarSteps(
 
     steps.push(
       snap(
-        3,
+        5,
         current,
         current,
         null,
@@ -4909,7 +4988,7 @@ export function aStarSteps(
 
       steps.push(
         snap(
-          4,
+          7,
           current,
           current,
           [current, neighbor],
@@ -4928,7 +5007,7 @@ export function aStarSteps(
           inOpen[neighbor] = true;
           steps.push(
             snap(
-              5,
+              8,
               current,
               current,
               [current, neighbor],
@@ -4939,7 +5018,7 @@ export function aStarSteps(
         } else {
           steps.push(
             snap(
-              5,
+              8,
               current,
               current,
               [current, neighbor],
@@ -4963,7 +5042,7 @@ export function aStarSteps(
 
   steps.push(
     snap(
-      6,
+      11,
       null,
       null,
       null,
@@ -5047,7 +5126,7 @@ export function floydWarshallSteps(
   for (let k = 0; k < n; k++) {
     steps.push(
       snap(
-        1,
+        2,
         k,
         null,
         k,
@@ -5065,7 +5144,7 @@ export function floydWarshallSteps(
         const via = dist[i][k] + dist[k][j];
         steps.push(
           snap(
-            2,
+            5,
             i,
             j,
             k,
@@ -5080,7 +5159,7 @@ export function floydWarshallSteps(
           next[i][j] = next[i][k];
           steps.push(
             snap(
-              3,
+              6,
               i,
               j,
               k,
@@ -5104,7 +5183,7 @@ export function floydWarshallSteps(
 
   steps.push(
     snap(
-      4,
+      7,
       null,
       null,
       n,
@@ -5310,10 +5389,10 @@ export function tarjanSteps(
       if (index[w] === -1) {
         strongconnect(w);
         lowlink[v] = Math.min(lowlink[v], lowlink[w]);
-        steps.push(snap(3, v, w, [v, w], `更新 lowlink[${S(v)}]=min(${lowlink[v]}, lowlink[${S(w)}]=${lowlink[w]})=${Math.min(lowlink[v], lowlink[w])}`, `update lowlink[${S(v)}]`));
+        steps.push(snap(5, v, w, [v, w], `更新 lowlink[${S(v)}]=min(${lowlink[v]}, lowlink[${S(w)}]=${lowlink[w]})=${Math.min(lowlink[v], lowlink[w])}`, `update lowlink[${S(v)}]`));
       } else if (onStack[w]) {
         lowlink[v] = Math.min(lowlink[v], index[w]);
-        steps.push(snap(3, v, w, [v, w], `回边到栈上 ${S(w)}：lowlink[${S(v)}]=min(${lowlink[v]}, index[${S(w)}]=${index[w]})=${Math.min(lowlink[v], index[w])}`, `back edge to stack ${S(w)}`));
+        steps.push(snap(5, v, w, [v, w], `回边到栈上 ${S(w)}：lowlink[${S(v)}]=min(${lowlink[v]}, index[${S(w)}]=${index[w]})=${Math.min(lowlink[v], index[w])}`, `back edge to stack ${S(w)}`));
       }
     }
 
@@ -5327,7 +5406,7 @@ export function tarjanSteps(
         scc.push(w);
       } while (w !== v);
       sccCount++;
-      steps.push(snap(4, v, null, null, `lowlink=index → 弹出 SCC #${sccCount-1}: [${scc.map(S).join(", ")}]`, `SCC #${sccCount-1}: [${scc.map(S).join(", ")}]`));
+      steps.push(snap(7, v, null, null, `lowlink=index → 弹出 SCC #${sccCount-1}: [${scc.map(S).join(", ")}]`, `SCC #${sccCount-1}: [${scc.map(S).join(", ")}]`));
     }
   };
 
@@ -5335,7 +5414,7 @@ export function tarjanSteps(
     if (index[v] === -1) strongconnect(v);
   }
 
-  steps.push(snap(5, null, null, null, `完成：共 ${sccCount} 个强连通分量`, `done: ${sccCount} SCCs`));
+  steps.push(snap(8, null, null, null, `完成：共 ${sccCount} 个强连通分量`, `done: ${sccCount} SCCs`));
 
   return steps;
 }
@@ -5579,28 +5658,28 @@ export function lcaBinaryLiftingSteps(
 
   for (let j = LOG - 1; j >= 0; j--) {
     if (up[uu][j] !== -1 && depth[up[uu][j]] >= depth[vv]) {
-      steps.push(snap(3, uu, vv, [uu, up[uu][j]], uu, vv, null, `${S(uu)} ← up[${S(uu)}][${j}]=${S(up[uu][j])} (2^${j}=${1<<j} 步)`, `lift ${S(uu)} by 2^${j}`));
+      steps.push(snap(6, uu, vv, [uu, up[uu][j]], uu, vv, null, `${S(uu)} ← up[${S(uu)}][${j}]=${S(up[uu][j])} (2^${j}=${1<<j} 步)`, `lift ${S(uu)} by 2^${j}`));
       uu = up[uu][j];
     }
   }
 
   if (uu === vv) {
-    steps.push(snap(4, uu, vv, null, uu, vv, uu, `对齐后相等 → LCA = ${S(uu)}`, `aligned → LCA = ${S(uu)}`));
+    steps.push(snap(7, uu, vv, null, uu, vv, uu, `对齐后相等 → LCA = ${S(uu)}`, `aligned → LCA = ${S(uu)}`));
     return steps;
   }
 
-  steps.push(snap(4, uu, vv, null, uu, vv, null, `对齐后不同：${S(uu)} ≠ ${S(vv)}，二者同步上跳`, `not equal, lift together`));
+  steps.push(snap(9, uu, vv, null, uu, vv, null, `对齐后不同：${S(uu)} ≠ ${S(vv)}，二者同步上跳`, `not equal, lift together`));
 
   for (let j = LOG - 1; j >= 0; j--) {
     if (up[uu][j] !== -1 && up[uu][j] !== up[vv][j]) {
-      steps.push(snap(5, uu, vv, [uu, up[uu][j]], uu, vv, null, `${S(uu)}←${S(up[uu][j])}, ${S(vv)}←${S(up[vv][j])} (2^${j})`, `lift both by 2^${j}`));
+      steps.push(snap(11, uu, vv, [uu, up[uu][j]], uu, vv, null, `${S(uu)}←${S(up[uu][j])}, ${S(vv)}←${S(up[vv][j])} (2^${j})`, `lift both by 2^${j}`));
       uu = up[uu][j];
       vv = up[vv][j];
     }
   }
 
   const lca = up[uu][0];
-  steps.push(snap(6, uu, vv, [uu, lca], uu, vv, lca, `父节点相同 → LCA = ${S(lca)}`, `parent same → LCA = ${S(lca)}`));
+  steps.push(snap(12, uu, vv, [uu, lca], uu, vv, lca, `父节点相同 → LCA = ${S(lca)}`, `parent same → LCA = ${S(lca)}`));
 
   return steps;
 }
