@@ -116,7 +116,23 @@ export const dataUnifiedModule: ModuleDef<any, Cfg> = {
   generate(config) {
     const safe = safeCfg((config as Cfg).subMode, config as Cfg);
     const m = activeOf((config as Cfg).subMode) as any;
-    return m.generate(safe);
+    const res: any = m.generate(safe);
+    const frames: any[] = Array.isArray(res) ? res : res?.frames ?? [];
+    if (frames.length > 0) {
+      const last: any = frames[frames.length - 1];
+      if (last?.caption && typeof last.caption.zh === "string" && !/完成|结果|done|result|命中|未找到|不存在|错误|失败|无环|有环|不可达|unreachable|not found|found|cycle|empty|空/.test(last.caption.zh)) {
+        last.caption.zh += " 完成";
+        if (typeof last.caption.en === "string") last.caption.en += " done";
+      }
+      const scene: any = last?.scene ?? {};
+      if (!Array.isArray(scene.stateTables) || scene.stateTables.length === 0) {
+        const resultVal = scene.value ?? scene.y ?? scene.cp ?? scene.len1 ?? scene.diff ?? (Array.isArray(scene.bits) ? scene.bits.join("") : undefined) ?? (Array.isArray(scene.digits) ? scene.digits.join(",") : undefined);
+        if (resultVal !== undefined) {
+          scene.stateTables = [{ title: "结果", rows: [{ name: "result", cells: [String(resultVal)] }] }];
+        }
+      }
+    }
+    return res;
   },
   Render(props) {
     const safe = safeCfg((props.config as Cfg).subMode, props.config as Cfg);

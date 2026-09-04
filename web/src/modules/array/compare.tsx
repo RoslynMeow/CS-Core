@@ -155,7 +155,7 @@ export const raceModule: ModuleDef<RaceScene, RaceCfg> = {
   tags: ['algorithms'],
   defaultConfig: { n: 8, valuesStr: '38,27,43,3,9,82,10,15' },
   Controls(p) { return ArrayControls(p as any) as never; },
-  code: [],
+  code: [T("$race$ // 十路同跑，锁步对比", "$race$")],
   bare: true,
   generate: raceGen,
   Render(p: any) { return RaceRender(p) as never; },
