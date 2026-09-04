@@ -1,6 +1,172 @@
-\chapter{Linear Structures and Abstract Data Types}
+\chapter{线性结构与抽象数据类型}
 
-本章按数学四段体组织：对象--公理/不变式--定理--实例化。代数规约与物理实现分层，\texttt{Error}/\texttt{Exception}、数组下标、指针结构体均为实例化。
+\section{物理存储结构：线性表（Linear List）}
+
+线性表是有限序列 $L = \langle d_1, d_2, \dots, d_n \rangle$，$d_i \in \mathcal{D}$。
+
+\subsection{顺序存储结构（顺序表 / 数组）}
+
+\begin{itemize}
+    \item \textbf{对象}：基址 $\beta$，元大小 $\sigma$，连续区间 $[\beta, \beta+n\sigma)$。
+    \item \textbf{不变式（随机访问）}：$\text{Addr}(i)=\beta+i\sigma$，$0\le i<n$，时间 $O(1)$。
+    \item \textbf{多维压平（行优先）}：$M\times N$ 矩阵逻辑 $(i,j)$ 映为 $\text{Addr}(i,j)=\beta+(iN+j)\sigma$；列优先为对偶实例。
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    cell/.style={draw, minimum width=1.4cm, minimum height=0.8cm, font=\ttfamily},
+    addr/.style={font=\small},
+    arrow/.style={->, >=latex}
+]
+    \node[cell] (c0) at (0,0) {$d_0$};
+    \node[cell] (c1) at (2.6,0) {$d_1$};
+    \node[cell] (c2) at (5.2,0) {$d_2$};
+    \node[cell] (c3) at (7.8,0) {$d_3$};
+    \node[cell] (c4) at (10.4,0) {$\dots$};
+    \draw[arrow] (c0.south) -- ++(0,-0.5) node[addr, below] {$\beta$};
+    \draw[arrow] (c1.south) -- ++(0,-0.5) node[addr, below] {$\beta+\sigma$};
+    \draw[arrow] (c2.south) -- ++(0,-0.5) node[addr, below] {$\beta+2\sigma$};
+    \node[addr, anchor=west] at ($(c4.east)+(0.3,0)$) {$\leftarrow$ 物理地址连续，支持 $O(1)$ 随机访问};
+\end{tikzpicture}
+\caption{一维顺序表物理内存布局}
+\label{fig:array_1d}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    cell/.style={draw, minimum size=0.75cm, font=\ttfamily},
+    bigcell/.style={draw, minimum width=1.1cm, minimum height=0.75cm, font=\ttfamily},
+    arrow/.style={->, >=latex, thick},
+    brace/.style={decorate, decoration={brace, amplitude=5pt, mirror}}
+]
+    \matrix (mlog) [matrix of nodes, nodes={cell}, column sep=-\pgflinewidth, row sep=-\pgflinewidth] {
+        (0,0) & (0,1) & (0,2) \\
+        (1,0) & (1,1) & (1,2) \\
+    };
+    \node[left=0.3cm of mlog, font=\bfseries] {逻辑结构};
+
+    \draw[arrow] (mlog.south) -- ++(0,-0.7) node[midway, right, font=\small] {行优先压平};
+
+    \matrix (mphy) [matrix of nodes, nodes={bigcell}, column sep=-\pgflinewidth, below=1.1cm of mlog.south] {
+        (0,0) & (0,1) & (0,2) & (1,0) & (1,1) & (1,2) \\
+    };
+    \node[right=0.3cm of mphy, font=\bfseries] {物理内存排列};
+
+    \draw[brace] (mphy-1-1.south west) -- (mphy-1-3.south east) node[midway, below=5pt, font=\small] {第 0 行};
+    \draw[brace] (mphy-1-4.south west) -- (mphy-1-6.south east) node[midway, below=5pt, font=\small] {第 1 行};
+
+    \node[font=\small] (base) at ($(mphy-1-1.south)+(0,-1.3)$) {$\beta$};
+    \draw[arrow] (base.north) -- ($(mphy-1-1.south)+(0,-0.05)$);
+\end{tikzpicture}
+\caption{二维数组行优先 (Row-Major) 压平排列}
+\label{fig:array_2d}
+\end{figure}
+
+\begin{itemize}
+    \item \textbf{稀疏压缩}：$A\in\mathbb{R}^{M\times N}$，三元组 $\mathcal{T}=\{(i,j,A_{ij})\mid A_{ij}\neq0\}$，空间 $O(|\mathcal{T}|)$，检索需索引结构。
+\end{itemize}
+
+\subsection{链式存储结构（链表 / Link List）}
+
+\begin{itemize}
+    \item \textbf{对象}：节点 $n_k=(d_k,p_k)$，$p_k\in\text{Memory}\cup\{\emptyset\}$。
+    \item \textbf{不变式}：$p_k=\text{Addr}(n_{k+1})$，$p_{\text{last}}=\emptyset$；双向加前驱，循环令 $p_{\text{last}}=\text{Addr}(n_1)$。
+    \item \textbf{定理}：随机访问 $O(n)$，头插删 $O(1)$。
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    head/.style={draw, minimum width=1.1cm, minimum height=0.8cm, font=\ttfamily},
+    lnode/.style={rectangle split, rectangle split horizontal, rectangle split parts=2,
+                  rectangle split part align={center, center},
+                  draw, minimum height=0.8cm, font=\ttfamily, inner sep=6pt},
+    arrow/.style={->, >=latex, thick},
+    node distance=1.2cm
+]
+    \node[head] (h) {$h$};
+    \node[lnode, right=of h] (a) {$d_1$ \nodepart{two} $\bullet$};
+    \node[lnode, right=of a] (b) {$d_2$ \nodepart{two} $\bullet$};
+    \node[lnode, right=of b] (c) {$d_3$ \nodepart{two} $\emptyset$};
+
+    \draw[arrow] (h.east) -- (a.west);
+    \draw[arrow] (a.east) -- (b.west);
+    \draw[arrow] (b.east) -- (c.west);
+\end{tikzpicture}
+\caption{单向链表 (Singly Linked List)}
+\label{fig:linked_singly}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    head/.style={draw, minimum width=1.1cm, minimum height=0.8cm, font=\ttfamily},
+    dnode/.style={rectangle split, rectangle split horizontal, rectangle split parts=3,
+                  rectangle split part align={center, center, center},
+                  draw, minimum height=0.8cm, font=\ttfamily, inner sep=5pt},
+    arrow/.style={->, >=latex, thick},
+    node distance=1.2cm
+]
+    \node[head] (h) {$h$};
+    \node[dnode, right=of h] (a) {$\emptyset$ \nodepart{two} $d_1$ \nodepart{three} $\bullet$};
+    \node[dnode, right=of a] (b) {$\bullet$ \nodepart{two} $d_2$ \nodepart{three} $\bullet$};
+    \node[dnode, right=of b] (c) {$\bullet$ \nodepart{two} $d_3$ \nodepart{three} $\emptyset$};
+
+    \draw[arrow] (h.east) -- (a.west);
+    \draw[arrow] ($(a.east)+(0,0.18)$) -- ($(b.west)+(0,0.18)$);
+    \draw[arrow] ($(b.west)-(0,0.18)$) -- ($(a.east)-(0,0.18)$);
+    \draw[arrow] ($(b.east)+(0,0.18)$) -- ($(c.west)+(0,0.18)$);
+    \draw[arrow] ($(c.west)-(0,0.18)$) -- ($(b.east)-(0,0.18)$);
+\end{tikzpicture}
+\caption{双向链表 (Doubly Linked List)}
+\label{fig:linked_doubly}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    head/.style={draw, minimum width=1.1cm, minimum height=0.8cm, font=\ttfamily},
+    lnode/.style={rectangle split, rectangle split horizontal, rectangle split parts=2,
+                  rectangle split part align={center, center},
+                  draw, minimum height=0.8cm, font=\ttfamily, inner sep=6pt},
+    arrow/.style={->, >=latex, thick},
+    node distance=1.2cm
+]
+    \node[head] (h) {$h$};
+    \node[lnode, right=of h] (a) {$d_1$ \nodepart{two} $\bullet$};
+    \node[lnode, right=of a] (b) {$d_2$ \nodepart{two} $\bullet$};
+    \node[lnode, right=of b] (c) {$d_3$ \nodepart{two} $\bullet$};
+
+    \draw[arrow] (h.east) -- (a.west);
+    \draw[arrow] (a.east) -- (b.west);
+    \draw[arrow] (b.east) -- (c.west);
+    \coordinate (ret) at ($(h.south)+(0,-0.9)$);
+    \draw[arrow, rounded corners=4pt] (c.east) -- ++(0.6,0) |- (ret) -- (h.south);
+\end{tikzpicture}
+\caption{循环链表 (Circular Linked List)}
+\label{fig:linked_circular}
+\end{figure}
+
+\section{核心矛盾对比：顺序表 vs 链表}
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\textwidth}{@{}CCC@{}}
+\toprule
+\textbf{特性维度} & \textbf{顺序存储（数组）} & \textbf{链式存储（链表）} \\
+\midrule
+\textbf{物理内存要求} & 连续区间 $[\beta,\beta+n\sigma)$ & 离散节点集合 $\{n_1,\dots,n_k\}$ \\
+\textbf{元素访问} & $O(1)$：$\text{Addr}(i)=\beta+i\sigma$ & $O(n)$：指针链遍历 \\
+\textbf{插入/删除} & $O(n)$：平移 $d_{i+1}\dots d_n$ & $O(1)$：重写常数个指针（已知前驱） \\
+\textbf{空间代价} & 连续分配，扩容需 $O(n)$ 复制（摊还） & 额外指针 $O(n\sigma_p)$，但无扩容复制 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+
 
 \section{栈 (Stack)}
 
@@ -29,9 +195,7 @@
     \item $\text{pop}(\text{empty}) = \bot, \quad \text{top}(\text{empty}) = \bot$
 \end{enumerate}
 
-\begin{itemize}
-    \item \textbf{实例化}：网页 \texttt{stack} 演示 \texttt{push}/\texttt{pop}/\texttt{top} 的帧序列；语言实例中 $\bot$ 实现为异常或错误码，数学层仅以偏函数表达。
-\end{itemize}
+
 
 \subsection{物理实现方案}
 \begin{enumerate}
@@ -52,9 +216,7 @@
 \end{algorithmic}
 \end{algorithm}
 
-\begin{itemize}
-    \item \textbf{实例化注}：溢出/下溢 $t=m-1$/$t=-1$ 时数学上无定义（$\bot$）；语言实例以 \texttt{Error}、异常或返回值标记，网页 \texttt{stack} 即按此演示。
-\end{itemize}
+
 
 \begin{figure}[H]
 \centering
@@ -102,7 +264,6 @@
     \item \textbf{对象}：$Q[0..m-1]$, $f,r\in\mathbb{Z}_m$。
     \item \textbf{不变式}：$f\leftarrow(f+1)\bmod m$, $r\leftarrow(r+1)\bmod m$；队空 $r=f$，队满 $(r+1)\bmod m=f$（牺牲一槽位的不变式实例，其他实例以计数器区分）。
     \item \textbf{定理}：环上 \texttt{enqueue}/\texttt{dequeue} 均为 $O(1)$。
-    \item \textbf{实例化}：网页 \texttt{queue} 演示普通与循环队列的指针帧；计数器方案为另一实例。
 \end{itemize}
 
 \begin{algorithm}[H]
@@ -118,9 +279,7 @@
 \end{algorithmic}
 \end{algorithm}
 
-\begin{itemize}
-    \item \textbf{实例化注}：满/空判据的 \texttt{Error} 为语言实例的 $\bot$ 实现；数学层以定义域表达。
-\end{itemize}
+
 
 \begin{figure}[H]
 \centering
@@ -259,7 +418,6 @@
         \item \textbf{二次探测} $\delta(i)=i^2$：$h(k),h(k)+1,h(k)+4,\dots$ 缓解主聚集；$m$ 为质数且 $\alpha<0.5$ 时可遍历。
         \item \textbf{双重散列} $h_i(k)=(h_1(k)+i\cdot h_2(k))\bmod m$，$h_2(k)\not\equiv0$，各键独立序列，最接近随机。
         \item \textbf{公共缺陷}：删除需墓碑标记，再散列为扩容实例。
-        \item \textbf{实例化}：网页 \texttt{hash-table} 演示开放寻址的探测链；三者均为 $h_i$ 的实例化。
     \end{itemize}
 
     \item \textbf{链地址法 (Chaining)}
@@ -324,6 +482,3 @@
 \label{fig:hash_chaining}
 \end{figure}
 
-\begin{itemize}
-    \item \textbf{实例化}：网页 \texttt{hash-table} 演示链地址与重构；三探测、墓碑、再散列均为本规约的实例化。
-\end{itemize}

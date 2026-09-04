@@ -1,6 +1,6 @@
-\chapter{Dynamic Classic Algorithms and Core Operators}
+\chapter{动态经典算法与核心算子}
 
-本章从静态结构向动态算子演进，涵盖设计范式、排序、查找与图论算法。数学层只谈规约与定理，\texttt{Visit}、优先队列、并查集实现均为实例化。
+本章探讨从静态结构向动态算子的演进，涵盖算法设计范式、排序、查找以及高级图论算法。
 
 \section{顶层设计范式}
 
@@ -8,7 +8,6 @@
 \begin{itemize}
     \item \textbf{对象}：规模 $n$ 的问题 $P$ 划分为 $a$ 个规模 $n/b$ 的子问题。
     \item \textbf{递推}：$T(n)=aT(n/b)+f(n)$，由主定理决定渐进阶。
-    \item \textbf{实例化}：归并、快排为分治实例。
 \end{itemize}
 
 \subsection{贪心算法 (Greedy)}
@@ -59,9 +58,7 @@
     \item \textbf{基数排序}：按位 $d=0\dots D-1$ 稳定排序（以计数为子程序）。
 \end{enumerate}
 
-\begin{itemize}
-    \item \textbf{实例化}：网页 \texttt{array-algorithms} 与 \texttt{race} 分别演示各排序的帧与实测对比；\texttt{Swap} 为语言实例。
-\end{itemize}
+
 
 \newpage
 
@@ -72,15 +69,44 @@
     \item \textbf{对象}：有序数组 $A$ 上区间 $[l,r]$，$m=\lfloor(l+r)/2\rfloor$。
     \item \textbf{不变式}：$A[m]=x\implies$找到；$A[m]<x\implies l=m+1$；否则 $r=m-1$。
     \item \textbf{定理}：时间 $O(\log n)$，需随机访问 $O(1)$（顺序存储实例）。
-    \item \textbf{实例化}：网页 \texttt{array-algorithms:search} 演示区间收缩。
 \end{itemize}
+
+\begin{algorithm}[H]
+\caption{二分查找规约}
+\begin{algorithmic}[1]
+\Procedure{BinarySearch}{$A,x$}
+    \State $l\gets0; r\gets|A|-1$
+    \While{$l\le r$}
+        \State $m\gets\lfloor(l+r)/2\rfloor$
+        \If{$A[m]=x$} \Return $m$ \ElsIf{$A[m]<x$} $l\gets m+1$ \Else $r\gets m-1$ \EndIf
+    \EndWhile
+    \State \Return $-1$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
 
 \subsection{并查集 (Union-Find)}
 \begin{itemize}
     \item \textbf{对象}：不相交集合族 $\mathcal{S}=\{S_1,\dots,S_k\}$。
     \item \textbf{操作}：$\text{Find}(x)$ 取代表元，$\text{Union}(x,y)$ 合并；按秩合并+路径压缩后摊还 $O(\alpha(n))$。
-    \item \textbf{实例化}：图论 Kruskal、Tarjan 中复用本结构；网页 \texttt{graph-mst} 演示并查集判环。
 \end{itemize}
+
+\begin{algorithm}[H]
+\caption{并查集规约（路径压缩+按秩合并）}
+\begin{algorithmic}[1]
+\Procedure{Find}{$x$}
+    \If{$parent[x]\neq x$} $parent[x]\gets\text{Find}(parent[x])$ \EndIf
+    \State \Return $parent[x]$
+\EndProcedure
+\Procedure{Union}{$x,y$}
+    \State $rx\gets\text{Find}(x); ry\gets\text{Find}(y)$
+    \If{$rx=ry$} \Return \EndIf
+    \If{$rank[rx]<rank[ry]$} $parent[rx]\gets ry$
+    \ElsIf{$rank[rx]>rank[ry]$} $parent[ry]\gets rx$
+    \Else $parent[ry]\gets rx; rank[rx]\gets rank[rx]+1$ \EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
 
 \newpage
 
@@ -106,9 +132,7 @@
 \end{algorithmic}
 \end{algorithm}
 
-\begin{itemize}
-    \item \textbf{实例化}：网页 \texttt{graph-dijkstra}、\texttt{graph-bellman}、\texttt{graph-floyd} 分别演示三算法的 $D$ 表；堆为 Dijkstra 的 PQ 实例。
-\end{itemize}
+
 
 \subsection{最小生成树 (MST)}
 \begin{enumerate}
@@ -116,28 +140,92 @@
     \item \textbf{Kruskal}：$E$ 升序，依序取 $(u,v)$ 若 $\text{Find}(u)\neq\text{Find}(v)$ 则入 MST（并查集实例），$O(|E|\log|E|)$。
 \end{enumerate}
 
+\begin{algorithm}[H]
+\caption{Prim 规约（$Q$ 为优先队列）}
+\begin{algorithmic}[1]
+\State $key[v]\gets\infty, parent[v]\gets\text{nil}, inT[r]\gets\text{true}, key[r]\gets0, Q\gets V$
+\While{$Q\neq\emptyset$}
+    \State $u\gets\text{ExtractMin}(Q)$; $inT[u]\gets\text{true}$
+    \ForAll{$v\in N(u)$} \If{$\neg inT[v]\land w(u,v)<key[v]$} $key[v]\gets w(u,v); parent[v]\gets u; \text{DecreaseKey}(Q,v,key[v])$ \EndIf \EndFor
+\EndWhile
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{Kruskal 规约（并查集判环）}
+\begin{algorithmic}[1]
+\State $A\gets\emptyset$; 将 $E$ 按 $w$ 升序; 初始化并查集
+\ForAll{$(u,v)\in E$ 有序}
+    \If{$\text{Find}(u)\neq\text{Find}(v)$} $A\gets A\cup\{(u,v)\}$; $\text{Union}(u,v)$ \EndIf
+\EndFor
+\State \Return $A$
+\end{algorithmic}
+\end{algorithm}
+
 \subsection{拓扑排序：Kahn 算法}
 \begin{itemize}
     \item \textbf{对象}：DAG 的入度 $\text{indeg}(v)=|\{u\mid(u,v)\in E\}|$。
     \item \textbf{规约}：$Q=\{v\mid\text{indeg}(v)=0\}$；弹出 $u$ 入 $\sigma$，$\forall v\in N(u),\text{indeg}(v)--$ 为 $0$ 则入 $Q$；$|\sigma|<|V|\implies$有环。
-    \item \textbf{实例化}：$Q$ 的公平性为实例（队列/任意集均正确）；网页 \texttt{graph-toposort} 演示入度表。
 \end{itemize}
+
+\begin{algorithm}[H]
+\caption{Kahn 拓扑排序规约}
+\begin{algorithmic}[1]
+\Procedure{Kahn}{$G$}
+    \State 计算 $\text{indeg}[v]$; $Q\gets\{v\mid\text{indeg}[v]=0\}$; $\sigma\gets\langle\rangle$
+    \While{$Q\neq\emptyset$}
+        \State $u\gets\text{pop}(Q)$; $\sigma\gets\sigma\circ\langle u\rangle$
+        \ForAll{$v\in N(u)$} $\text{indeg}[v]\gets\text{indeg}[v]-1$; \If{$\text{indeg}[v]=0$} $Q\gets Q\cup\{v\}$ \EndIf \EndFor
+    \EndWhile
+    \If{$|\sigma|<|V|$} \Return “有环” \Else \Return $\sigma$ \EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
 
 \subsection{启发式搜索：A* (A-Star)}
 \begin{itemize}
     \item \textbf{对象}：加权图 $G$，起点 $s$，终点 $t$，启发式 $h:V\to\mathbb{R}_{\ge0}$ 估计 $v\to t$ 代价。
     \item \textbf{不变式}：$g(v)$ 为 $s\to v$ 已知最短，$f(v)=g(v)+h(v)$ 为优先键；\textbf{可采纳} $h(v)\le h^*(v)$（真实最优），\textbf{一致} $h(u)\le w(u,v)+h(v)$。
     \item \textbf{定理}：可采纳时 A* 首次出队 $t$ 即最优；$h\equiv0$ 退化为 Dijkstra；一致时无需重开集。
-    \item \textbf{实例化}：网页 \texttt{graph-astar} 以 $f$ 标注演示 $h=0$/曼哈顿/欧几里得模拟；真实坐标 $h$ 为实例化。
 \end{itemize}
+
+\begin{algorithm}[H]
+\caption{A* 规约}
+\begin{algorithmic}[1]
+\State $g[s]\gets0, f[s]\gets h(s), Q\gets\{s\}$ \Comment{$Q$ 按 $f$ 优先}
+\While{$Q\neq\emptyset$}
+    \State $u\gets\text{ExtractMin}(Q)$ \Comment{按 $f$}
+    \If{$u=t$} \Return 重构路径 \EndIf
+    \ForAll{$v\in N(u)$}
+        \State $ng\gets g[u]+w(u,v)$
+        \If{$ng<g[v]$} $g[v]\gets ng; f[v]\gets ng+h(v); parent[v]\gets u; Q\gets Q\cup\{v\}$ \EndIf
+    \EndFor
+\EndWhile
+\end{algorithmic}
+\end{algorithm}
 
 \subsection{树上查询：LCA 倍增}
 \begin{itemize}
     \item \textbf{对象}：有根树 $T$，$depth[v]$，$up[v][j]=v$ 的 $2^j$ 祖先，$LOG=\lceil\log_2|V|\rceil$。
     \item \textbf{不变式}：$up[v][0]=parent(v)$，$up[v][j]=up[up[v][j-1]][j-1]$。
     \item \textbf{规约}：查询 $(u,v)$：(1) 提深者至同深；(2) 同步上跳至分叉点之子，父即 LCA。预处理 $O(|V|\log|V|)$，查询 $O(\log|V|)$。
-    \item \textbf{实例化}：网页 \texttt{graph-lca} 演示深度表与二进制提升路径。
 \end{itemize}
+
+\begin{algorithm}[H]
+\caption{LCA 倍增规约}
+\begin{algorithmic}[1]
+\State 预处理: $depth[root]\gets0$, DFS 求 $up[v][0]$, $up[v][j]\gets up[up[v][j-1]][j-1]$
+\Procedure{LCA}{$u,v$}
+    \If{$depth[u]<depth[v]$} $\text{swap}(u,v)$ \EndIf
+    \State 将 $u$ 上提至 $depth[u]=depth[v]$ \Comment{二进制分解差值}
+    \If{$u=v$} \Return $u$ \EndIf
+    \For{$j\gets LOG-1$ \textbf{downto} $0$}
+        \If{$up[u][j]\neq up[v][j]$} $u\gets up[u][j]; v\gets up[v][j]$ \EndIf
+    \EndFor
+    \State \Return $parent[u]$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
 
 \section{高级工程专项算子}
 
@@ -146,20 +234,81 @@
     \item \textbf{对象}：$G=(V,E)$，容量 $c:E\to\mathbb{R}^+$，流 $f:E\to\mathbb{R}$ 满足 $0\le f\le c$ 且 $\forall u\neq s,t,\sum_v f(u,v)=0$。
     \item \textbf{残量}：$c_f(u,v)=c(u,v)-f(u,v)$，增广路 $P$ 在 $G_f$ 中 $s\to t$。
     \item \textbf{定理（最大流最小割）}：$|f|_{\max}=\min_{S\ni s,T\ni t} c(S,T)$；增广至无 $s\to t$ 路即最优。
-    \item \textbf{实例化}：\textbf{Edmonds-Karp} 以 BFS 找增广 $O(|V||E|^2)$；\textbf{Dinic} 以 BFS 分层 + DFS 阻塞流 $O(|V|^2|E|)$（二分图 $O(\sqrt{|V|}|E|)$），为同一残量定理的不同实例；网页 \texttt{graph-maxflow} 演示 Dinic 分层与阻塞流。
 \end{itemize}
+
+\begin{algorithm}[H]
+\caption{Dinic 规约（分层+阻塞流）}
+\begin{algorithmic}[1]
+\Procedure{Dinic}{$G,s,t$}
+    \State $f\gets0$
+    \While{以 $c_f$ BFS 构分层 $level[\ ]$ 且可达 $t$}
+        \State $it[v]\gets0$ 对所有 $v$
+        \While{$push\gets\text{DFS}(s,t,\infty)$ 推得 $>0$} $f\gets f+push$ \EndWhile
+    \EndWhile
+    \State \Return $f$
+\EndProcedure
+\Procedure{DFS}{$u,t,upTo$}
+    \If{$u=t$} \Return $upTo$ \EndIf
+    \For{$i\gets it[u]$ \textbf{to} $|Adj[u]|-1$}
+        \State $it[u]\gets i$; 令 $(u,v)\gets Adj[u][i]$
+        \If{$c_f(u,v)>0 \land level[v]=level[u]+1$}
+            \State $d\gets\text{DFS}(v,t,\min(upTo,c_f(u,v)))$
+            \If{$d>0$} $c_f(u,v)\gets c_f(u,v)-d; c_f(v,u)\gets c_f(v,u)+d;$ \Return $d$ \EndIf
+        \EndIf
+    \EndFor
+    \State \Return $0$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
 
 \subsection{二分图最大匹配}
 \begin{itemize}
     \item \textbf{对象}：$G=(X\cup Y,E)$，匹配 $M\subseteq E$ 无公共点。
     \item \textbf{定理（Berge）}：$M$ 最大 $\iff$ 无增广路 $P$（端点未匹配、交替）。$M'\gets M\oplus P$ 增大。
-    \item \textbf{实例化}：匈牙利算法反复找增广路；网页虽未单列模块，但为流的特例（建源汇容量 $1$）。
 \end{itemize}
+
+\begin{algorithm}[H]
+\caption{匈牙利增广规约}
+\begin{algorithmic}[1]
+\Procedure{MaxMatching}{$G$}
+    \State $M\gets\emptyset$
+    \ForAll{$u\in X$}
+        \State $vis[\ ]\gets\text{false}$
+        \If{$\text{DFS}(u)$}  \Comment{找到增广则 $M$ 已在 DFS 内翻转} \EndIf
+    \EndFor
+    \State \Return $M$
+\EndProcedure
+\Procedure{DFS}{$u$}
+    \ForAll{$v\in N(u)$}
+        \If{$\neg vis[v]$} $vis[v]\gets\text{true}$
+            \If{$match[v]=\text{nil} \lor \text{DFS}(match[v])$} $match[v]\gets u; M\gets M\oplus (u,v);$ \Return true \EndIf
+        \EndIf
+    \EndFor
+    \State \Return false
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
 
 \subsection{强连通分量 (SCC)：Tarjan 算法}
 \begin{itemize}
     \item \textbf{对象}：DFS 时间戳 $DFN[u]$，追溯 $LOW[u]$。
     \item \textbf{不变式}：$u$ 入栈；$v$ 未访则 $LOW[u]=\min(LOW[u],LOW[v])$；$v$ 在栈则 $LOW[u]=\min(LOW[u],DFN[v])$。
     \item \textbf{定理}：$LOW[u]=DFN[u]\iff u$ 为 SCC 根，栈中 $u$ 及以上一次弹出构成一 SCC，$O(|V|+|E|)$。
-    \item \textbf{实例化}：网页 \texttt{graph-scc} 演示 $DFN/LOW$ 与弹栈帧。
 \end{itemize}
+
+\begin{algorithm}[H]
+\caption{Tarjan SCC 规约}
+\begin{algorithmic}[1]
+\State $timer\gets0$; 栈 $S\gets\emptyset$
+\Procedure{Tarjan}{$u$}
+    \State $DFN[u]\gets LOW[u]\gets timer\gets timer+1$; $S.\text{push}(u)$; $onStack[u]\gets\text{true}$
+    \ForAll{$v\in N(u)$}
+        \If{$DFN[v]=\text{nil}$} $\text{Tarjan}(v)$; $LOW[u]\gets\min(LOW[u],LOW[v])$
+        \ElsIf{$onStack[v]$} $LOW[u]\gets\min(LOW[u],DFN[v])$ \EndIf
+    \EndFor
+    \If{$LOW[u]=DFN[u]$}
+        \Repeat $v\gets S.\text{pop}()$; $onStack[v]\gets\text{false}$; 输出 $v$ 归入同一 SCC \Until{$v=u$}
+    \EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}

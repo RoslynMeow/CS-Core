@@ -1,6 +1,6 @@
-\chapter{Non-linear Structures II: Graph Theory}
+\chapter{非线性结构 II：图论}
 
-图是多对多的网状结构。本章按数学四段体组织：对象--不变式--定理--实例化；队列、Visit 回调、矩阵下标均为实例化。
+图是一种多对多的网状逻辑结构，用于建模现实世界中复杂的关联网络。
 
 \section{图的形式化定义}
 
@@ -10,7 +10,6 @@
         \item 无向图：$E$ 为无序对 $\{\{u,v\}\}$；有向图：$E$ 为有序对 $\{(u,v)\}$。
     \end{itemize}
     \item \textbf{扩展属性}：权重 $w:E\to\mathbb{R}$；邻接 $N: V\to\mathcal{P}(V)$，$N(u)=\{v\mid(u,v)\in E\}$。
-    \item \textbf{实例化}：网页 \texttt{graph} 以可编辑点边演示 $G$ 的对象层；权重、有向/无向为同一对象的属性切换。
 \end{itemize}
 
 \section{边的拓扑分类}
@@ -78,7 +77,6 @@
     \item \textbf{对象}：Visited $\subseteq V$，输出序列 $\sigma\in V^*$（数学层以序列代替回调 \texttt{Visit}）。
     \item \textbf{不变式（BFS）}：队列 $F$ 为公平选择器，$\sigma$ 按层扩展；\textbf{（DFS）}：以递归（结构归纳）扩展，$\sigma$ 深度优先。
     \item \textbf{定理}：连通图上 BFS/DFS 均恰访每个可达顶点一次，时间 $O(|V|+|E|)$。
-    \item \textbf{实例化}：队列 $Q$、栈 $S$、递归调用栈均为同一规约的实例；网页 \texttt{graph-bfs-dfs} 按帧演示 $F$ 与 $\sigma$ 的演进。
 \end{itemize}
 
 \begin{algorithm}[H]
@@ -105,7 +103,6 @@
     \item \textbf{对象}：DAG $G$。
     \item \textbf{不变式}：构造 $\sigma=\langle v_1,\dots,v_n\rangle$ 使 $\forall(u,v)\in E, u=v_i, v=v_j \implies i<j$。
     \item \textbf{定理}：$G$ 有拓扑序 $\iff$ $G$ 为 DAG；Kahn 算法（反复取零入度集）与 DFS 逆后序均为构造性证明，时间 $O(|V|+|E|)$。
-    \item \textbf{实例化}：零入度集的选取公平性由实例决定（队列、栈、任意集均正确）；网页 \texttt{graph-toposort} 演示 Kahn 的入度表帧。
 \end{itemize}
 
 \section{图的物理存储实现}
@@ -117,5 +114,4 @@
 
 \begin{itemize}
     \item \textbf{定理}：两存储在图同构意义下等价，仅时空权衡不同。
-    \item \textbf{实例化}：网页 \texttt{matrix} 演示矩阵的 $\beta+(iN+j)\sigma$ 寻址；\texttt{graph} 的邻接表为链式实例。
 \end{itemize}

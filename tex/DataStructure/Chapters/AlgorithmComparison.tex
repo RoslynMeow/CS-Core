@@ -1,6 +1,6 @@
-\chapter{Algorithm Comparison}
+\chapter{算法对比}
 
-本章以表汇集核心算子，与网页交互模块同步。时空界为数学层，稳定性、是否原地为不变式，网页演示为实例化。
+本章以表汇集核心算子的时空复杂度与关键特性，便于对比与选型。
 
 \section{核心排序算法算子对比}
 
@@ -28,9 +28,7 @@
 \label{tab:sort_compare}
 \end{table}
 
-\begin{itemize}
-    \item \textbf{实例化}：网页 \texttt{array-unified} 含冒泡/选择/插入/希尔/快排/归并/堆/计数/桶/基数；\texttt{array-compare} 实测时空。
-\end{itemize}
+
 
 \section{高级图论与检索算子对比}
 
@@ -60,6 +58,3 @@
 \label{tab:graph_compare}
 \end{table}
 
-\begin{itemize}
-    \item \textbf{实例化}：网页 \texttt{graph-dijkstra}、\texttt{graph-astar}、\texttt{graph-bellman}、\texttt{graph-floyd}、\texttt{graph-lca}、\texttt{graph-mst}、\texttt{graph-toposort}、\texttt{graph-scc}、\texttt{graph-maxflow} 一一对应；\texttt{graph-astar} 中 $h=0$ 退化 Dijkstra 即本表关系。
-\end{itemize}

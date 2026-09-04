@@ -1,6 +1,6 @@
-\chapter{Positional Numeral System}
+\chapter{位置记数系统}
 
-在数学中，\textbf{$n$ 进制}（进位计数制，Positional Numeral System）是指用一组固定的符号来表示任意实数的计数方法。本章按数学四段体组织：对象--不变式--定理--实例化。语言相关实现（C/Java/Python、硬件位宽）均归入实例化，不参与定义。
+在数学中，\textbf{$n$ 进制}（进位计数制，Positional Numeral System）是指用一组固定的符号来表示任意实数的计数方法。其严谨的数学形式化定义由以下三个核心要素构成：
 
 \section{任意进制定义}
 
@@ -11,7 +11,6 @@
     \item \textbf{不变式}：有限数码集合
 $$S_n = \{ x \mid x \in \mathbb{N}, 0 \leq x < n \} = \{0, 1, 2, \dots, n-1\}$$
 满足 $|S_n| = n$ 且 $\forall d \in S_n, 0 \le d < n$。
-    \item \textbf{实例化}：$n=2$（二进制，$S_2=\{0,1\}$）、$n=10$（十进制）、$n=16$（十六进制）为同一数学对象的实例；字符字形（\texttt{0}--\texttt{9,A--F}）是 $S_n$ 到字形的渲染映射，详见网页 \texttt{positional-system} 的字符表实例。
 \end{itemize}
 
 \subsection{离散数码序列 (Numeral Sequence)}
@@ -29,10 +28,7 @@ $$S_n = \{ x \mid x \in \mathbb{N}, 0 \leq x < n \} = \{0, 1, 2, \dots, n-1\}$$
 $$y = \mathcal{I}_n(\{P_i\}) = \sum_{i=-\infty}^{\infty} P_i \cdot n^i$$
 展开为 $y = \dots + P_2 n^2 + P_1 n^1 + P_0 n^0 + P_{-1} n^{-1} + P_{-2} n^{-2} + \dots$。
     \item \textbf{不变式}：整数部分 $i \ge 0$ 与小数部分 $i < 0$ 同一公式分区，仅指数符号不同。
-    \item \textbf{实例化}：网页 \texttt{positional-system} 模式 \texttt{expansion} 与 \texttt{positional-expansion} 按 $y \gets y + P_i n^i$ 逐项累加演示本映射。
 \end{itemize}
-
-\newpage
 
 \section{\texorpdfstring{任意进制转换定义 ($n \to m$)}{任意进制转换定义 (n 转 m)}}
 
@@ -55,10 +51,7 @@ $$y = \sum_{i} P_i n^i = \sum_{j} Q_j m^j, \quad P_i \in S_n, Q_j \in S_m$$
         \item 小数位 $j < 0$：$Q_j = \left\lfloor y_{\text{fraction}} \cdot m^{-j} \right\rfloor \bmod m$，其中 $y_{\text{fraction}} = y - \lfloor y \rfloor \in [0,1)$。
     \end{itemize}
     \item \textbf{不变式}：$\forall j, Q_j \in S_m$。
-    \item \textbf{实例化}：该闭式直接计算 $m^j$，需 $O(\log m^j)$ 位与高精度除法；细化为递推见本章末节。
 \end{itemize}
-
-\newpage
 
 \section{\texorpdfstring{数学算子应用示例 ($10 \to 2$ 进制)}{数学算子应用示例 (10 转 2 进制)}}
 
@@ -96,7 +89,6 @@ $$\sum_{j=-3}^{3} Q_j 2^j = 1\cdot2^3 + 0\cdot2^2 + 1\cdot2^1 + 1\cdot2^0 + 1\cd
 $$s_i = P_i + c_i, \quad Q_i = s_i \bmod n, \quad c_{i+1} = \left\lfloor s_i / n \right\rfloor, \quad c_0 = 1$$
 特例：若 $P_i = n-1$ 则 $Q_i = 0, c_{i+1}=1$ 继续；否则 $Q_i = P_i+1, c_{i+1}=0$ 终止。
     \item \textbf{定理}：$\mathcal{I}_n(\text{succ}(\{P_i\})) = \mathcal{I}_n(\{P_i\}) + 1$，且进位链长度即首个非 $n-1$ 的位置，最坏 $O(k)$。
-    \item \textbf{实例化}：网页 \texttt{positional-successor} 与 \texttt{positional-system} 模式 \texttt{successor} 按 $i=0,1,\dots$ 逐位清零进位演示；$n=10, P=19 \to 20$ 为实例。
 \end{itemize}
 
 \begin{algorithm}[H]
@@ -117,7 +109,6 @@ $$s_i = P_i + c_i, \quad Q_i = s_i \bmod n, \quad c_{i+1} = \left\lfloor s_i / n
 $$s_i = P_i + Q_i + c_i, \quad R_i = s_i \bmod n, \quad c_{i+1} = \lfloor s_i / n \rfloor, \quad c_0 = 0$$
 且 $\forall i, s_i \le 2(n-1)+1 = 2n-1 \implies c_{i+1} \in \{0,1\}$。
     \item \textbf{定理（正确性）}：$\sum_i R_i n^i = \sum_i P_i n^i + \sum_i Q_i n^i$；若末进位 $c_k=1$ 则 $R_k=1$，否则无溢出。
-    \item \textbf{实例化}：网页 \texttt{positional-addition} 与 \texttt{positional-system} 模式 \texttt{addition} 按 $s=P_i+Q_i+c$ 逐列演示 $27+48$ 等实例。
 \end{itemize}
 
 \begin{algorithm}[H]
@@ -171,8 +162,4 @@ y_{j-1} = y_j \cdot m - Q_j
 \begin{itemize}
     \item $Q_j = \lfloor y_j m \rfloor$ 将小数首位放大到个位摘取；$y_{j-1}=y_j m - Q_j$ 余下纯小数继续。
     \item 产出顺序为 $Q_{-1} \to Q_{-2} \dots$（高位到低位），正序拼接。
-\end{itemize}
-
-\begin{itemize}
-    \item \textbf{实例化}：网页 \texttt{base-conversion} 按上述两递推分步演示整数除基取余与小数乘基取整；直接幂运算为数学闭式，递推为其等价细化，语言层 \texttt{BigInt}/\texttt{Number} 仅为实例。
 \end{itemize}

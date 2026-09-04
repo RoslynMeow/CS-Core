@@ -1,6 +1,6 @@
-\chapter{Algorithm Definition and Asymptotic Analysis}
+\chapter{算法定义与渐近分析}
 
-本章建立评价算法的统一度量，按数学四段体：对象--不变式--定理--实例化。算法本体为基本操作上的有限序列，伪代码为数学记号，高级语言为语义实现。
+本章探讨评价算法优劣的统一数学度量衡，建立时间与空间复杂度的渐进趋势评估模型。
 
 \section{算法的定义与四大核心特征}
 
@@ -14,7 +14,6 @@
         \item \textbf{可行性}：每 $op_i\in\mathcal{P}$ 可实现。
         \item \textbf{输入/输出}：$I\in\mathcal{D}_{in}^*$, $O\in\mathcal{D}_{out}^+$，满足 $Post(I,O)$。
     \end{enumerate}
-    \item \textbf{实例化}：同一算法可细化为伪代码（数学记号）或 C/Python 程序（语言实现），正确性由规约保持。
 \end{itemize}
 
 \section{算法的描述层级}
@@ -36,7 +35,6 @@
     \item \textbf{大 O（上界）}：$\exists c>0,n_0>0$ 使 $\forall n\ge n_0, T(n)\le c\cdot f(n)$，记 $T(n)=O(f(n))$。
     \item \textbf{$\Omega$（下界）}：$\exists c>0,n_0$ 使 $T(n)\ge c\cdot f(n)$。
     \item \textbf{$\Theta$（紧界）}：$T(n)=O(f(n))\land T(n)=\Omega(f(n))$。
-    \item \textbf{实例化}：忽略低阶与常数，聚焦 $n\to\infty$ 趋势。
 \end{itemize}
 
 \subsection{复杂度阶数}
@@ -93,7 +91,6 @@
 \begin{itemize}
     \item \textbf{串联}：$O(a)+O(b)=O(\max(a,b))$。
     \item \textbf{嵌套}：$O(a)\cdot O(b)=O(a\cdot b)$。
-    \item \textbf{实例化}：循环嵌套为乘法，顺序为取极大。
 \end{itemize}
 
 \section{算法的空间复杂度 (Space Complexity)}
@@ -159,6 +156,3 @@
 
 并查集的 $O(\alpha(n))$ 为摊还界，需在本章度量下理解（见经典算法章）。
 
-\begin{itemize}
-    \item \textbf{实例化}：网页 \texttt{array-compare} 实测时间 vs 理论 $O$ 的趋势；理论界与实测常数因子为实例化差异。
-\end{itemize}
