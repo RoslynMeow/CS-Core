@@ -22,14 +22,14 @@ import {
   type TreeCfg,
 } from "./source";
 
-type Mode = "terms" | "pre" | "post" | "level" | "forest";
+type Mode = "pre" | "post" | "level" | "forest";
 type Cfg = TreeCfg & { mode: Mode };
 const DEFAULT: Cfg = {
   source: "graph",
   values: [1, 2, 3, 4, 5, 6, 7, 8],
   imp: null,
   confirmed: true,
-  mode: "terms",
+  mode: "pre",
 };
 
 /** FNV-1a 哈希：同一 values → 同一棵树（换模式不重新生成） */
@@ -359,12 +359,6 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
     for (const e of scene.edges) g.addEdge(e.u, e.v);
     const root =
       typeof scene.root === "number" && scene.root >= 0 ? scene.root : 0;
-    if (cfg.mode === "terms")
-      return termsSteps(g, root, g.labels).map((s) => ({
-        line: s.line,
-        caption: s.msg,
-        scene: polyScene(g, root, s, undefined, treeTone(g, root)),
-      }));
     if (cfg.mode === "forest") return forestFrames(g, root, g.labels);
     const steps: AlgoStep[] =
       cfg.mode === "level"
@@ -383,12 +377,6 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
   const n = Math.max(2, cfg.values.length);
   const { g, root } = randPoly(n, mulberry32(hashSeed(cfg.values)));
   const labels = g.labels;
-  if (cfg.mode === "terms")
-    return termsSteps(g, root, labels).map((s) => ({
-      line: s.line,
-      caption: s.msg,
-      scene: polyScene(g, root, s, undefined, treeTone(g, root)),
-    }));
   if (cfg.mode === "forest") return forestFrames(g, root, labels);
   const steps: AlgoStep[] =
     cfg.mode === "level"
@@ -893,7 +881,6 @@ function postSteps(g: Graph, root: number, labels: string[]): AlgoStep[] {
 }
 
 const CODE: Record<Mode, Text[]> = {
-  terms: [T("$terms$ // 术语图例见右侧", "$terms$ // see legend")], // 术语无算法 → 右侧显示图例 / 节点属性
   pre: [
     T("$visit(u)$  // 先访问根", "$visit(u)$  // visit root first"),
     T(
@@ -982,7 +969,6 @@ export const generalTreeModule: ModuleDef<GraphCanvasScene, Cfg> = {
           >
             {(
               [
-                ["terms", "术语", "Terms"],
                 ["pre", "先根", "Pre-order"],
                 ["post", "后根", "Post-order"],
                 ["level", "层序", "Level"],
@@ -1011,8 +997,7 @@ export const generalTreeModule: ModuleDef<GraphCanvasScene, Cfg> = {
     return buildFrames(config);
   },
   Render({ scene, t, config, onChange, inspected, onInspect }) {
-    // 只有「术语」模式允许点击节点查看属性；其它模式画布无交互
-    const clickable = config?.mode === "terms";
+    const clickable = false;
     return (
       <TreeCanvas
         scene={scene}
@@ -1024,5 +1009,5 @@ export const generalTreeModule: ModuleDef<GraphCanvasScene, Cfg> = {
       />
     );
   },
-  Side: TermsSide,
+  Side: undefined as unknown as typeof TermsSide,
 };

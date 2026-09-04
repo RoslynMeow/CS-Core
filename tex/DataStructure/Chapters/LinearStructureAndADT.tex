@@ -1,5 +1,7 @@
 \chapter{Linear Structures and Abstract Data Types}
 
+本章按数学四段体组织：对象--公理/不变式--定理--实例化。代数规约与物理实现分层，\texttt{Error}/\texttt{Exception}、数组下标、指针结构体均为实例化。
+
 \section{栈 (Stack)}
 
 \subsection{代数定义}
@@ -12,8 +14,8 @@
     \end{itemize}
     \item \textbf{观测算子}：
     \begin{itemize}
-        \item $\text{pop}: S \to S \cup \{\bot\}$ （弹出）
-        \item $\text{top}: S \to E \cup \{\bot\}$ （栈顶元素）
+        \item $\text{pop}: S \to S \cup \{\bot\}$ （弹出，偏函数）
+        \item $\text{top}: S \to E \cup \{\bot\}$ （栈顶，偏函数）
         \item $\text{isEmpty}: S \to \mathbb{B}$ （判空）
     \end{itemize}
 \end{itemize}
@@ -27,33 +29,32 @@
     \item $\text{pop}(\text{empty}) = \bot, \quad \text{top}(\text{empty}) = \bot$
 \end{enumerate}
 
+\begin{itemize}
+    \item \textbf{实例化}：网页 \texttt{stack} 演示 \texttt{push}/\texttt{pop}/\texttt{top} 的帧序列；语言实例中 $\bot$ 实现为异常或错误码，数学层仅以偏函数表达。
+\end{itemize}
+
 \subsection{物理实现方案}
 \begin{enumerate}
-    \item \textbf{顺序栈}：映射到连续数组 $A[0..m-1]$，栈顶指针 $t \in \{-1, \dots, m-1\}$。$\text{push}$ 操作需满足 $t < m-1$，否则栈溢出。
-    \item \textbf{链栈}：映射到单向链表，表头即为栈顶，无容量上限。
+    \item \textbf{顺序栈（有界实例）}：$S_m$ 映射到 $A[0..m-1]$，$t\in\{-1,\dots,m-1\}$，不变式 $t<m-1$ 为 \texttt{push} 的定义域，$t\ge0$ 为 \texttt{pop} 的定义域。
+    \item \textbf{链栈（无界实例）}：映射到单向链表，表头即栈顶，无容量上限，为 $S$ 的无界实例。
 \end{enumerate}
 
 \begin{algorithm}[H]
-\caption{栈操作伪代码 (Stack Operations)}
+\caption{栈操作规约（有界顺序实例，数学层为偏函数）}
 \begin{algorithmic}[1]
-\State \textbf{数据结构}: 数组 $A[0..m-1]$, 整数 $t \gets -1$
-\Procedure{Push}{$e$}
-    \If{$t = m - 1$}
-        \State \Return \textbf{Error} (Stack Overflow)
-    \EndIf
-    \State $t \gets t + 1$
-    \State $A[t] \gets e$
+\State \textbf{状态}: $A[0..m-1]$, $t\gets-1$
+\Procedure{Push}{$e$} \Comment{requires $t<m-1$}
+    \State $t\gets t+1$; $A[t]\gets e$
 \EndProcedure
-\Procedure{Pop}{}
-    \If{$t = -1$}
-        \State \Return \textbf{Error} (Stack Underflow)
-    \EndIf
-    \State $e \gets A[t]$
-    \State $t \gets t - 1$
-    \State \Return $e$
+\Procedure{Pop}{} \Comment{requires $t\ge0$}
+    \State $e\gets A[t]$; $t\gets t-1$; \Return $e$
 \EndProcedure
 \end{algorithmic}
 \end{algorithm}
+
+\begin{itemize}
+    \item \textbf{实例化注}：溢出/下溢 $t=m-1$/$t=-1$ 时数学上无定义（$\bot$）；语言实例以 \texttt{Error}、异常或返回值标记，网页 \texttt{stack} 即按此演示。
+\end{itemize}
 
 \begin{figure}[H]
 \centering
@@ -80,10 +81,10 @@
 \section{队列 (Queue)}
 
 \subsection{代数定义}
-队列 $Q$ 是定义在元素集 $E$ 上的代数结构：
+队列 $Q$ 是定义在 $E$ 上的代数结构：
 \begin{itemize}
     \item \textbf{构造算子}：$\text{emptyQ}: \to Q$，$\text{enqueue}: Q \times E \to Q$
-    \item \textbf{观测算子}：$\text{dequeue}: Q \to Q \cup \{\bot\}$，$\text{front}: Q \to E \cup \{\bot\}$，$\text{isEmptyQ}: Q \to \mathbb{B}$
+    \item \textbf{观测算子}：$\text{dequeue}: Q \to Q \cup \{\bot\}$，$\text{front}: Q \to E \cup \{\bot\}$，$\text{isEmptyQ}: Q \to \mathbb{B}$（均为偏函数，空队列上为 $\bot$）
 \end{itemize}
 
 \textbf{公理系统}（$\forall q \in Q, e \in E$）：
@@ -96,34 +97,30 @@
 \end{enumerate}
 
 \subsection{循环队列 (Circular Queue)}
-为消除假溢出，将数组索引映射到模 $m$ 剩余类环 $\mathbb{Z}_m$。
+为消除假溢出，将数组索引映射到剩余类环 $\mathbb{Z}_m$。
 \begin{itemize}
-    \item \textbf{指针移动}：$f \leftarrow (f + 1) \bmod m$，$r \leftarrow (r + 1) \bmod m$。
-    \item \textbf{队满判据}：$(r + 1) \bmod m = f$（牺牲一槽位）。
-    \item \textbf{队空判据}：$r = f$。
+    \item \textbf{对象}：$Q[0..m-1]$, $f,r\in\mathbb{Z}_m$。
+    \item \textbf{不变式}：$f\leftarrow(f+1)\bmod m$, $r\leftarrow(r+1)\bmod m$；队空 $r=f$，队满 $(r+1)\bmod m=f$（牺牲一槽位的不变式实例，其他实例以计数器区分）。
+    \item \textbf{定理}：环上 \texttt{enqueue}/\texttt{dequeue} 均为 $O(1)$。
+    \item \textbf{实例化}：网页 \texttt{queue} 演示普通与循环队列的指针帧；计数器方案为另一实例。
 \end{itemize}
 
 \begin{algorithm}[H]
-\caption{循环队列操作伪代码 (Circular Queue Operations)}
+\caption{循环队列规约（有界实例，数学层为偏函数）}
 \begin{algorithmic}[1]
-\State \textbf{数据结构}: 数组 $Q[0..m-1]$, 整数 $f \gets 0, r \gets 0$
-\Procedure{Enqueue}{$e$}
-    \If{$(r + 1) \bmod m = f$}
-        \State \Return \textbf{Error} (Queue Full)
-    \EndIf
-    \State $Q[r] \gets e$
-    \State $r \gets (r + 1) \bmod m$
+\State \textbf{状态}: $Q[0..m-1]$, $f\gets0, r\gets0$
+\Procedure{Enqueue}{$e$} \Comment{requires $(r+1)\bmod m\neq f$}
+    \State $Q[r]\gets e$; $r\gets(r+1)\bmod m$
 \EndProcedure
-\Procedure{Dequeue}{}
-    \If{$r = f$}
-        \State \Return \textbf{Error} (Queue Empty)
-    \EndIf
-    \State $e \gets Q[f]$
-    \State $f \gets (f + 1) \bmod m$
-    \State \Return $e$
+\Procedure{Dequeue}{} \Comment{requires $r\neq f$}
+    \State $e\gets Q[f]$; $f\gets(f+1)\bmod m$; \Return $e$
 \EndProcedure
 \end{algorithmic}
 \end{algorithm}
+
+\begin{itemize}
+    \item \textbf{实例化注}：满/空判据的 \texttt{Error} 为语言实例的 $\bot$ 实现；数学层以定义域表达。
+\end{itemize}
 
 \begin{figure}[H]
 \centering
@@ -181,11 +178,13 @@
 
 \subsection{形式化定义}
 \begin{itemize}
-    \item \textbf{字母表}：$\Sigma$ 为有限非空字符集合。
-    \item \textbf{字符串集合}：$\Sigma^* = \bigcup_{k=0}^{\infty} \Sigma^k$，其中 $\Sigma^k$ 为长度为 $k$ 的字符串集合。
-    \item \textbf{空串}：$\varepsilon \in \Sigma^0$。
-    \item \textbf{连接运算}：$\circ: \Sigma^* \times \Sigma^* \to \Sigma^*$，满足结合律，且 $\varepsilon$ 为单位元。
-    \item \textbf{物理存储}：在底层语言中，字符串 $s \in \Sigma^*$ 映射为字符数组，以终结符 $\# \notin \Sigma$（如 C 语言的 \texttt{\textbackslash 0}）界定边界。
+    \item \textbf{对象}：字母表 $\Sigma$ 有限非空。
+    \item \textbf{字符串幺半群}：$\Sigma^* = \bigcup_{k=0}^{\infty} \Sigma^k$，空串 $\varepsilon\in\Sigma^0$，连接 $\circ: \Sigma^*\times\Sigma^*\to\Sigma^*$ 结合，$\varepsilon$ 为单位元。
+    \item \textbf{不变式}：$|s\circ t| = |s|+|t|$，$|\varepsilon|=0$。
+\end{itemize}
+
+\begin{itemize}
+    \item \textbf{物理实例}：底层以字符数组存储，边界以哨兵 $\#\notin\Sigma$ 界定。语言实例取 $\#=\backslash0$（C 字符串），数学层仅以 $\#\notin\Sigma$ 表达；网页 \texttt{string-ops} 演示连接、子串等幺半群操作。
 \end{itemize}
 
 \begin{figure}[H]
@@ -201,7 +200,7 @@
     \node[lbl] at ($(str-1-2.south)+(0,-0.35)$) {1};
     \node[lbl] at ($(str-1-3.south)+(0,-0.35)$) {2};
     \node[lbl] at ($(str-1-4.south)+(0,-0.35)$) {3};
-    \node[lbl, anchor=west] at ($(str.east)+(0.3,0)$) {$\leftarrow s \in \Sigma^*$ 的物理映射};
+    \node[lbl, anchor=west] at ($(str.east)+(0.3,0)$) {$\leftarrow s \in \Sigma^*$ 的物理映射（$\#\notin\Sigma$）};
 \end{tikzpicture}
 \caption{字符串物理存储布局}
 \label{fig:string_layout}
@@ -211,22 +210,22 @@
 
 \subsection{字典 (Dictionary) / 映射 (Map)}
 \begin{itemize}
-    \item \textbf{逻辑定义}：映射关系 $\mathcal{M}: K \rightharpoonup V$，其中 $K$ 为键集，$V$ 为值集，$\rightharpoonup$ 表示偏函数。
-    \item \textbf{约束}：$\forall k_1, k_2 \in \text{dom}(\mathcal{M}), \mathcal{M}(k_1) = \mathcal{M}(k_2) \implies k_1 = k_2$（单射性）。
+    \item \textbf{对象}：偏函数 $\mathcal{M}: K \rightharpoonup V$，$\text{dom}(\mathcal{M})\subseteq K$。
+    \item \textbf{不变式}：单射于键（$\mathcal{M}(k_1)=\mathcal{M}(k_2)\implies k_1=k_2$ 在值可逆时，或键唯一性由表保证）。
 \end{itemize}
 
 \subsection{哈希表 (Hash Table)}
-通过哈希函数 $h: K \to \mathbb{Z}_m$ 将键空间压缩至有限数组槽位 $\{0, \dots, m-1\}$。
+通过 $h: K \to \mathbb{Z}_m$ 将键空间压缩至槽位 $\{0,\dots,m-1\}$。
 
 \subsubsection{(1) 哈希函数}
 \begin{itemize}
-    \item \textbf{除留余数法}：$h(k) = k \bmod m$，通常取 $m$ 为质数以最小化冲突。
-    \item \textbf{理想哈希}：$\forall k_i \neq k_j \implies h(k_i) \neq h(k_j)$。
+    \item \textbf{除留余数法}：$h(k)=k\bmod m$，$m$ 取质数以最小化冲突为实例化启发式。
+    \item \textbf{理想哈希}：$\forall k_i\neq k_j\implies h(k_i)\neq h(k_j)$（鸽巢原理下仅当 $|K|\le m$ 可实现）。
 \end{itemize}
 
 \subsection{哈希碰撞 (Hash Collision)}
 \subsubsection{(1) 碰撞必然性}
-由鸽巢原理，若 $|K| > m$，则 $\exists k_i \neq k_j$ 使得 $h(k_i) = h(k_j)$。
+由鸽巢原理，若 $|K|>m$，则 $\exists k_i\neq k_j$ 使 $h(k_i)=h(k_j)$。
 
 \begin{figure}[H]
 \centering
@@ -255,66 +254,40 @@
 \begin{enumerate}
     \item \textbf{开放寻址法 (Open Addressing)}
     \begin{itemize}
-        \item 探测序列：$h_i(k) = (h(k) + \delta(i)) \bmod m$，其中 $\delta(i)$ 为步长函数；所有槽位都存放在主表数组中，冲突时按序列继续探测。
-
-        \item \textbf{线性探测 (Linear Probing)}：$\delta(i) = i$，探测 $h(k), h(k)+1, h(k)+2, \dots$
-        \begin{itemize}
-            \item 实现最简单、缓存友好，期望探测次数 $O(1 + \alpha)$。
-            \item 缺点：易产生\textbf{主聚集 (Primary Clustering)}——冲突键连续堆叠成块，探测链越拖越长，性能急剧恶化。
-        \end{itemize}
-
-        \item \textbf{二次探测 (Quadratic Probing)}：$\delta(i) = i^2$，探测 $h(k), h(k)+1, h(k)+4, h(k)+9, \dots$
-        \begin{itemize}
-            \item 探测间距随 $i$ 增大而拉大，同簇键迅速分散，缓解主聚集（\textbf{次级聚集}仍可能存在）。
-            \item 注意：$i^2 \bmod m$ 可能提前循环，仅当 $m$ 为质数且负载因子 $\alpha < 0.5$ 时才能保证遍历全部槽位。
-        \end{itemize}
-
-        \item \textbf{双重散列 (Double Hashing)}：$h_i(k) = (h_1(k) + i \cdot h_2(k)) \bmod m$，其中 $h_2(k) \not\equiv 0 \pmod m$
-        \begin{itemize}
-            \item 典型取法：$h_1(k) = k \bmod m$，$h_2(k) = 1 + (k \bmod (m-1))$，步长随键变化且与 $m$ 互质（$m$ 与 $m-1$ 恒互质）。
-            \item 每个键拥有\emph{独立}的探测序列，分布最均匀，最接近理想随机探测，冲突性能最优。
-        \end{itemize}
-
-        \item \textbf{开放寻址公共缺陷}：删除不能直接置空（会截断后续键的探测链），须以「墓碑」标记被删槽位；负载因子过高时须\textbf{再散列 (Rehashing)}扩容重建。
+        \item 探测序列：$h_i(k) = (h(k) + \delta(i)) \bmod m$，所有槽位在主表中，冲突时按序列探测。
+        \item \textbf{线性探测} $\delta(i)=i$：$h(k),h(k)+1,\dots$ 期望 $O(1+\alpha)$，但易主聚集。
+        \item \textbf{二次探测} $\delta(i)=i^2$：$h(k),h(k)+1,h(k)+4,\dots$ 缓解主聚集；$m$ 为质数且 $\alpha<0.5$ 时可遍历。
+        \item \textbf{双重散列} $h_i(k)=(h_1(k)+i\cdot h_2(k))\bmod m$，$h_2(k)\not\equiv0$，各键独立序列，最接近随机。
+        \item \textbf{公共缺陷}：删除需墓碑标记，再散列为扩容实例。
+        \item \textbf{实例化}：网页 \texttt{hash-table} 演示开放寻址的探测链；三者均为 $h_i$ 的实例化。
     \end{itemize}
 
     \item \textbf{链地址法 (Chaining)}
     \begin{itemize}
-        \item 每个槽位 $i \in \mathbb{Z}_m$ 维护一个链表 $L_i = \{ (k, v) \mid h(k) = i \}$。
-        \item 检索时间复杂度：期望 $O(1 + \alpha)$，其中 $\alpha = n/m$ 为负载因子。
-        \item \textbf{动态重构}：当 $|L_i| > \tau$（阈值）时，将链表重构为自平衡二叉搜索树（如红黑树），最坏检索复杂度降为 $O(\log n)$。
+        \item 槽位 $i\in\mathbb{Z}_m$ 维护 $L_i=\{(k,v)\mid h(k)=i\}$。
+        \item 期望 $O(1+\alpha)$，$\alpha=n/m$。
+        \item \textbf{动态重构}：$|L_i|>\tau$ 时重构为平衡树（实例取红黑树），最坏 $O(\log n)$。
     \end{itemize}
 \end{enumerate}
 
 \begin{algorithm}[H]
-\caption{哈希表查找与插入伪代码 (Hash Table Operations)}
+\caption{哈希表查找与插入规约（以 $h_i$ 泛化，线性为实例）}
 \begin{algorithmic}[1]
-\State \textbf{数据结构}: 数组 $T[0..m-1]$ (初始为 $\emptyset$), 哈希函数 $h(k)$
+\State \textbf{状态}: $T[0..m-1]$, $h_i(k)$
 \Procedure{Search}{$k$}
-    \State $i \gets 0$
+    \State $i\gets0$
     \Repeat
-        \State $j \gets (h(k) + i) \bmod m$ \Comment{线性探测}
-        \If{$T[j] = \emptyset$ \textbf{or} $T[j].key = k$}
-            \State \Return $T[j]$
-        \EndIf
-        \State $i \gets i + 1$
-    \Until{$i = m$}
-    \State \Return \textbf{Error} (Not Found)
+        \State $j\gets h_i(k)$ \Comment{实例：$(h(k)+i)\bmod m$ 为线性}
+        \If{$T[j]=\emptyset$ \textbf{or} $T[j].key=k$} \Return $T[j]$ \EndIf
+        \State $i\gets i+1$
+    \Until{$i=m$}
+    \State \Return $\bot$
 \EndProcedure
-\Procedure{Insert}{$k, v$}
-    \State $item \gets \text{Search}(k)$
-    \If{$item \neq \textbf{Error}$}
-        \State $item.value \gets v$ \Comment{更新}
+\Procedure{Insert}{$k,v$}
+    \State $item\gets\text{Search}(k)$
+    \If{$item\neq\bot$} $item.value\gets v$
     \Else
-        \State $i \gets 0$
-        \While{True}
-            \State $j \gets (h(k) + i) \bmod m$
-            \If{$T[j] = \emptyset$}
-                \State $T[j] \gets \langle k, v \rangle$
-                \State \Return
-            \EndIf
-            \State $i \gets i + 1$
-        \EndWhile
+        \State $i\gets0$; \While{True} $j\gets h_i(k)$; \If{$T[j]=\emptyset$} $T[j]\gets\langle k,v\rangle$; \Return \EndIf; $i\gets i+1$ \EndWhile
     \EndIf
 \EndProcedure
 \end{algorithmic}
@@ -350,3 +323,7 @@
 \caption{链地址法与动态重构模型}
 \label{fig:hash_chaining}
 \end{figure}
+
+\begin{itemize}
+    \item \textbf{实例化}：网页 \texttt{hash-table} 演示链地址与重构；三探测、墓碑、再散列均为本规约的实例化。
+\end{itemize}

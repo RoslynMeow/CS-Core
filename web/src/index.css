@@ -571,4 +571,12 @@ html, body {
    卡片按内容定高（最小＝内容高度）、max-height 封顶满高，不足满高时靠 main 的 safe center 居中 */
 .stage { flex: none; max-height: 100%; min-height: 0; display: flex; flex-direction: column; width: 100%; margin: 0; }
 .stage-body { flex: 1; min-height: 0; overflow: hidden; }
+@media (max-width: 640px) {
+  html, body { height: auto; overflow: auto; }
+  .app { height: auto; min-height: 100dvh; overflow: visible; }
+  .main { justify-content: flex-start; overflow: visible; max-height: none; }
+  .stage { max-height: none; }
+  .stage-body { overflow: visible; }
+  .canvas { overflow: visible; }
+}
 

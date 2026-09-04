@@ -1,13 +1,13 @@
 \chapter{Data System and Physical Storage}
 
-本章自底向上探讨数据在计算机底层的物理本质，从最基本的比特流开始，逐步演进到数字系统、字符系统以及物理内存的组织形式。
+本章自底向上探讨数据的数学本质：从比特域出发，经数、字符的解释协议，到线性表的物理组织。数学层只谈集合与映射，位宽、字节、语言类型均为实例化。
 
 \section{最根本元起点}
 
 \begin{itemize}
     \item \textbf{基本域}：$\mathbb{B} = \{0, 1\}$。
-    \item \textbf{比特序列空间}：$\mathbb{B}^* = \bigcup_{n=0}^{\infty} \mathbb{B}^n$。计算机中所有存储对象均可视为 $\mathbb{B}^*$ 中的元素。
-    \item \textbf{解释协议（Interpretation Protocols）}：通过映射函数 $\mathcal{I}: \mathbb{B}^n \to \mathcal{D}$，将底层比特流解释为特定的数学对象集合 $\mathcal{D}$（如整数、字符、地址等）。
+    \item \textbf{比特序列空间}：$\mathbb{B}^* = \bigcup_{n=0}^{\infty} \mathbb{B}^n$。所有存储对象均为 $\mathbb{B}^*$ 中的元素。
+    \item \textbf{解释协议}：映射 $\mathcal{I}: \mathbb{B}^n \to \mathcal{D}$ 将比特流解释为数学对象 $\mathcal{D}$（整数、字符、地址等）。同一比特串在不同 $\mathcal{I}$ 下可解释为不同对象。
 \end{itemize}
 
 \section{数字体系 (Number)}
@@ -15,71 +15,93 @@
 \subsection{\texorpdfstring{自然数 ($\mathbb{N}$)}{自然数 (N)}}
 
 \begin{itemize}
-    \item \textbf{集合定义}：$\mathbb{N} = \{0, 1, 2, \dots\}$。
-    \item \textbf{有限位表示}：若分配 $n$ 位存储空间（即 $b \in \mathbb{B}^n$），其可表示的绝对数值范围为：
-    $$[0, \ 2^n - 1]$$
-    \item \textbf{解码映射}：$\mathcal{I}_{\mathbb{N}}(b) = \sum_{i=0}^{n-1} b_i \cdot 2^i$。
+    \item \textbf{对象}：$\mathbb{N} = \{0, 1, 2, \dots\}$。
+    \item \textbf{不变式（定长无符号）}：$n$ 位 $b = b_{n-1}\dots b_0 \in \mathbb{B}^n$，解码
+$$\mathcal{I}_{\mathbb{N}}(b) = \sum_{i=0}^{n-1} b_i 2^i, \quad \mathcal{I}_{\mathbb{N}}: \mathbb{B}^n \to [0, 2^n-1]$$
+为双射，值域 $[0,2^n-1]$。
+    \item \textbf{定理}：加法在环 $\mathbb{Z}_{2^n}$ 中封闭，溢出即模 $2^n$ 回绕。
+    \item \textbf{实例化}：网页 \texttt{unsigned-int} 按 $y \gets \sum b_i2^i$ 逐位累加演示；$n=8$ 时 $y \in [0,255]$ 为实例。
 \end{itemize}
 
 \subsection{\texorpdfstring{整数 ($\mathbb{Z}$)}{整数 (Z)}}
 
 \begin{itemize}
-    \item \textbf{集合定义}：$\mathbb{Z} = \{\dots, -2, -1, 0, 1, 2, \dots\}$。
-    \item \textbf{补码系统（Two's Complement）}：
-    为统一加减法运算，引入补码映射。对于 $n$ 位二进制序列 $b = b_{n-1}b_{n-2}\dots b_0 \in \mathbb{B}^n$，其解码方程为：
-    $$\mathcal{I}_{\mathbb{Z}}(b) = -b_{n-1} \cdot 2^{n-1} + \sum_{i=0}^{n-2} b_i \cdot 2^i$$
-    \item \textbf{值域}：该映射将 $\mathbb{B}^n$ 双射到 $[-2^{n-1}, 2^{n-1}-1] \subset \mathbb{Z}$，消除了 $+0$ 与 $-0$ 的二义性。
+    \item \textbf{对象}：$\mathbb{Z} = \{\dots, -2, -1, 0, 1, 2, \dots\}$。
+    \item \textbf{不变式（补码）}：$b = b_{n-1}\dots b_0 \in \mathbb{B}^n$，
+$$\mathcal{I}_{\mathbb{Z}}(b) = -b_{n-1}2^{n-1} + \sum_{i=0}^{n-2} b_i2^i$$
+符号位负权消除 $+0/-0$ 二义性。
+    \item \textbf{定理}：$\mathcal{I}_{\mathbb{Z}}: \mathbb{B}^n \to [-2^{n-1}, 2^{n-1}-1]$ 为双射；同一比特加法器对 $\mathcal{I}_{\mathbb{N}}$ 与 $\mathcal{I}_{\mathbb{Z}}$ 均正确（模 $2^n$ 同构）。
+    \item \textbf{实例化}：网页 \texttt{twos-complement} 演示符号位 $-2^{n-1}$ 与低位累加；$n=8$ 时 $[-128,127]$ 为实例。
 \end{itemize}
 
 \subsection{\texorpdfstring{实数/有理数 ($\mathbb{R} \to \mathbb{Q}_{\text{discrete}}$)}{实数/有理数 (R 到 Q discrete)}}
 
-\textbf{物理事实}：计算机为离散状态机，无法精确表达连续无理数。实数被离散化为有理数子集 $\mathbb{Q}_{\text{discrete}} \subset \mathbb{Q}$。
+\textbf{物理事实}：离散状态机无法精确表示连续无理数，实数离散化为 $\mathbb{Q}_{\text{discrete}} \subset \mathbb{Q}$。
 
 \begin{enumerate}
-    \item \textbf{定点数 (Fixed-Point)}：小数点位置固定。数学表达为 $x = m \cdot B^{-f}$，其中 $m \in \mathbb{Z}$，$f$ 为固定小数位数。
+    \item \textbf{定点数 (Fixed-Point)}：$x = m \cdot B^{-f}$，$m \in \mathbb{Z}$，$f$ 固定。值域与精度由 $f$ 权衡。
     \item \textbf{浮点数 (Floating-Point)}：
     \begin{itemize}
-        \item \textbf{通用形式}：$x = (-1)^s \cdot m \cdot 2^e$，其中 $s \in \mathbb{B}$，$m$ 为尾数，$e$ 为指数。
-        \item \textbf{IEEE 754 结构}：将 $n$ 位划分为 $[s \mid e \mid f]$。指数部分采用偏置表示：$E = e + \text{Bias}$，其中 $\text{Bias} = 2^{k-1}-1$（$k$ 为指数位宽）。
-        \item \textbf{特殊值}：
+        \item \textbf{通用形式}：$x = (-1)^s \cdot m \cdot 2^e$，$s \in \mathbb{B}$，$m$ 为尾数，$e$ 为指数。
+        \item \textbf{IEEE 754 结构}：$n$ 位划分为 $[s \mid E \mid F]$，$k$ 为指数位宽，$p$ 为尾数位宽，偏置 $\text{Bias}=2^{k-1}-1$，$E_{\text{raw}} \in [0,2^k-1]$。
         \begin{itemize}
-            \item $\text{NaN}$：$e = 2^k-1 \land f \neq 0$。
-            \item $\pm\infty$：$e = 2^k-1 \land f = 0$。
-            \item $\pm 0$：$e = 0 \land f = 0$。
+            \item $E_{\text{raw}}=0, F=0$：$\pm 0$。
+            \item $E_{\text{raw}}=0, F\neq0$：非规格化 $x=(-1)^s\cdot (F/2^p)\cdot 2^{1-\text{Bias}}$。
+            \item $1\le E_{\text{raw}}\le 2^k-2$：规格化 $x=(-1)^s\cdot (1+F/2^p)\cdot 2^{E_{\text{raw}}-\text{Bias}}$（隐含前导 $1$）。
+            \item $E_{\text{raw}}=2^k-1, F=0$：$\pm\infty$；$F\neq0$：$\text{NaN}$。
         \end{itemize}
-        \item \textbf{浮点相等判定}：引入容差 $\epsilon > 0$，定义等价关系 $a \equiv_\epsilon b \iff |a - b| < \epsilon$。
+        \item \textbf{实例参数}：binary32 $k=8,p=23,\text{Bias}=127$；binary64 $k=11,p=52,\text{Bias}=1023$。
+        \item \textbf{等价判定}：引入容差 $\epsilon>0$，$a\equiv_\epsilon b \iff |a-b|<\epsilon$，避免直接判等。
     \end{itemize}
 \end{enumerate}
+
+\begin{itemize}
+    \item \textbf{实例化}：网页 \texttt{ieee754} 支持 binary32/64 编解码与分类演示；上述公式为数学层，位串布局为实例。
+\end{itemize}
 
 \section{字符体系 (Character)}
 
-字符系统建立了从底层数字到人类符号的双射映射。
+\begin{itemize}
+    \item \textbf{对象}：有限字母表 $\Sigma$，字符串幺半群 $(\Sigma^*,\circ,\varepsilon)$。
+\end{itemize}
 
 \subsection{ANSI / ASCII}
-标准 ASCII 为映射 $\phi: \{0, \dots, 127\} \to \Sigma_{\text{ASCII}}$，物理存储占用 8 位（1 字节），最高位恒为 0。
+
+\begin{itemize}
+    \item \textbf{对象}：映射 $\phi: \{0,\dots,127\} \to \Sigma_{\text{ASCII}}$ 为双射，$|\Sigma_{\text{ASCII}}|=128$。
+    \item \textbf{不变式}：$7$ 位码 $\in [0,127]$。
+    \item \textbf{实例化}：存储实例将 $7$ 位以 $0xxxxxxx$ 置于 $1$ 字节（$8$ 位），最高位恒 $0$；网页 \texttt{character-encoding} 模式 \texttt{ascii} 演示该实例。
+\end{itemize}
 
 \subsection{Unicode 架构}
 \begin{enumerate}
-    \item \textbf{抽象字符集 (UCS)}：定义全局字符空间 $\mathcal{U}$，每个字符 $c \in \mathcal{U}$ 对应唯一码点 $u \in \mathbb{N}$，记作 $\text{U}+XXXX$。
-    \item \textbf{编码方案 (UTF)}：实现映射 $\psi: \mathcal{U} \to \mathbb{B}^*$。
+    \item \textbf{抽象字符集 (UCS)}：全局空间 $\mathcal{U}$，$c\in\mathcal{U}$ 对应唯一码点 $u\in\mathbb{N}$，记 $\text{U}+XXXX$。
+    \item \textbf{编码方案 (UTF)}：$\psi: \mathcal{U}\to\mathbb{B}^*$ 具前缀可解码性。
     \begin{itemize}
-        \item \textbf{UTF-8}：变长编码，$\psi(c) \in \mathbb{B}^8 \cup \mathbb{B}^{16} \cup \mathbb{B}^{24} \cup \mathbb{B}^{32}$，向下兼容 ASCII。
-        \item \textbf{UTF-16/32}：定长/变长编码，常用于系统内核。
+        \item \textbf{UTF-8}：变长 $1$--$4$ 字节，
+        \begin{center}
+        \small
+        $U+0000$--$007F$: $0xxxxxxx$; $U+0080$--$07FF$: $110xxxxx\;10xxxxxx$; $U+0800$--$FFFF$: $1110xxxx\;10xxxxxx\;10xxxxxx$; $U+10000$--$10FFFF$: $11110xxx\;10xxxxxx\;10xxxxxx\;10xxxxxx$
+        \end{center}
+        向下兼容 ASCII（首字节 $0$ 判单字节）。
+        \item \textbf{UTF-16/32}：$\psi$ 的另两种实例化，码点到码元的定/变长映射。
     \end{itemize}
 \end{enumerate}
 
+\begin{itemize}
+    \item \textbf{实例化}：网页 \texttt{character-encoding} 模式 \texttt{utf8} 按码点区间分步生成字节；字符字形与字节存储均为实例。
+\end{itemize}
+
 \section{物理存储结构：线性表（Linear List）}
 
-线性表是具有相同特性数据元素的有限序列 $L = \langle d_1, d_2, \dots, d_n \rangle$，其中 $d_i \in \mathcal{D}$。
+线性表是有限序列 $L = \langle d_1, d_2, \dots, d_n \rangle$，$d_i \in \mathcal{D}$。
 
 \subsection{顺序存储结构（顺序表 / 数组）}
 
 \begin{itemize}
-    \item \textbf{内存特征}：分配连续物理地址空间 $[\beta, \beta + n \cdot \sigma)$，其中 $\beta$ 为首地址，$\sigma$ 为元素大小。
-    \item \textbf{随机访问映射}：定义索引函数 $\text{Addr}: \{0, \dots, n-1\} \to \text{Memory}$：
-    $$\text{Addr}(i) = \beta + i \cdot \sigma$$
-    \item \textbf{多维压平（行优先）}：对于 $M \times N$ 矩阵，逻辑坐标 $(i, j)$ 映射为：
-    $$\text{Addr}(i, j) = \beta + (i \cdot N + j) \cdot \sigma$$
+    \item \textbf{对象}：基址 $\beta$，元大小 $\sigma$，连续区间 $[\beta, \beta+n\sigma)$。
+    \item \textbf{不变式（随机访问）}：$\text{Addr}(i)=\beta+i\sigma$，$0\le i<n$，时间 $O(1)$。
+    \item \textbf{多维压平（行优先）}：$M\times N$ 矩阵逻辑 $(i,j)$ 映为 $\text{Addr}(i,j)=\beta+(iN+j)\sigma$；列优先为对偶实例。
 \end{itemize}
 
 \begin{figure}[H]
@@ -135,16 +157,17 @@
 \end{figure}
 
 \begin{itemize}
-    \item \textbf{稀疏矩阵压缩}：对于稀疏矩阵 $A \in \mathbb{R}^{M \times N}$，采用三元组集合表示：
-    $$\mathcal{T} = \{ (i, j, A_{ij}) \mid A_{ij} \neq 0 \}$$
+    \item \textbf{稀疏压缩}：$A\in\mathbb{R}^{M\times N}$，三元组 $\mathcal{T}=\{(i,j,A_{ij})\mid A_{ij}\neq0\}$，空间 $O(|\mathcal{T}|)$，检索需索引结构。
+    \item \textbf{实例化}：网页 \texttt{sequential-list}、\texttt{matrix} 演示连续寻址与越界；行/列优先、稀疏三元组均为本映射的实例。
 \end{itemize}
 
 \subsection{链式存储结构（链表 / Link List）}
 
 \begin{itemize}
-    \item \textbf{内存特征}：节点 $n_k = (d_k, p_k)$ 物理地址离散，其中 $d_k \in \mathcal{D}$ 为数据域，$p_k \in \text{Memory} \cup \{\emptyset\}$ 为指针域。
-    \item \textbf{拓扑维系}：链表 $L$ 由节点序列构成，满足 $p_k = \text{Addr}(n_{k+1})$，且 $p_{\text{last}} = \emptyset$。
-    \item \textbf{访问复杂度}：丧失直接寻址能力，检索第 $i$ 个元素需顺序遍历，时间复杂度 $O(n)$。
+    \item \textbf{对象}：节点 $n_k=(d_k,p_k)$，$p_k\in\text{Memory}\cup\{\emptyset\}$。
+    \item \textbf{不变式}：$p_k=\text{Addr}(n_{k+1})$，$p_{\text{last}}=\emptyset$；双向加前驱，循环令 $p_{\text{last}}=\text{Addr}(n_1)$。
+    \item \textbf{定理}：随机访问 $O(n)$，头插删 $O(1)$。
+    \item \textbf{实例化}：网页 \texttt{linked-list}、\texttt{doubly-linked-list}、\texttt{circular-linked-list} 分别演示三类不变式的指针重写。
 \end{itemize}
 
 \begin{figure}[H]
@@ -229,10 +252,14 @@
 \toprule
 \textbf{特性维度} & \textbf{顺序存储（数组）} & \textbf{链式存储（链表）} \\
 \midrule
-\textbf{物理内存要求} & 连续区间 $[\beta, \beta + n\sigma)$ & 离散节点集合 $\{n_1, \dots, n_k\}$ \\
-\textbf{元素访问效率} & $O(1)$：$\text{Addr}(i) = \beta + i\sigma$ & $O(n)$：需顺序遍历指针链 \\
-\textbf{插入与删除} & $O(n)$：需平移后续元素 $d_{i+1}, \dots, d_n$ & $O(1)$：仅需修改相邻节点指针域 \\
-\textbf{空间利用率} & 预分配，易产生空闲碎片; 扩容代价高 & 动态分配，但指针域引入额外开销 \\
+\textbf{物理内存要求} & 连续区间 $[\beta,\beta+n\sigma)$ & 离散节点集合 $\{n_1,\dots,n_k\}$ \\
+\textbf{元素访问} & $O(1)$：$\text{Addr}(i)=\beta+i\sigma$ & $O(n)$：指针链遍历 \\
+\textbf{插入/删除} & $O(n)$：平移 $d_{i+1}\dots d_n$ & $O(1)$：重写常数个指针（已知前驱） \\
+\textbf{空间代价} & 连续分配，扩容需 $O(n)$ 复制（摊还） & 额外指针 $O(n\sigma_p)$，但无扩容复制 \\
 \bottomrule
 \end{tabulary}
 \end{table}
+
+\begin{itemize}
+    \item \textbf{实例化}：顺序表的连续分配与扩容、链表的指针开销均为分配策略的实例；数学代价不变。
+\end{itemize}

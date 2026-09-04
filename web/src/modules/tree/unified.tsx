@@ -16,7 +16,19 @@ import {
   binBf, binToGraph, treeTraverseSteps, LEVEL_CODE, BFS_CODE, DFS_CODE,
   avlInsertSteps, AVL_CODE,
   heapBuildSteps, heapInsertSteps as heapInsertSteps2, heapDeleteTopSteps, HEAP_BUILD_CODE, HEAP_INSERT_CODE, HEAP_DELETE_CODE,
+  inorderOf,
 } from "../../lib/graph";
+import {
+  rbInsertSteps, rbInsertOne, rbDeleteOnTree, rbSearchOnTree,
+  RB_INSERT_CODE, RB_DELETE_CODE,
+  bhAnn,
+} from "../../lib/rbtree";
+import {
+  bTreeInsertSteps, bTreeDeleteOnTree,
+  bPlusInsertSteps, bPlusLeaves,
+  bTreeLayout,
+  BTREE_INSERT_CODE, BTREE_DELETE_CODE, BTREE_SEARCH_CODE,
+} from "../../lib/btree";
 import { resolveTree, type TreeCfg } from "./source";
 import { TRAVERSE_CODES } from "./binary";
 import { fromImport as graphFromImport, graphScene, algoStateTables } from "../graph/source";
@@ -60,9 +72,9 @@ const CODE_MAP: Record<SubMode, any> = {
   bst: BST_INSERT_CODE,
   avl: AVL_CODE,
   heap: HEAP_BUILD_CODE as any,
-  rb: BST_INSERT_CODE as any,
-  btree: HEAP_BUILD_CODE as any,
-  bplus: HEAP_BUILD_CODE as any,
+  rb: RB_INSERT_CODE as any,
+  btree: BTREE_INSERT_CODE as any,
+  bplus: BTREE_INSERT_CODE as any,
 };
 
 function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
@@ -130,17 +142,191 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
       return steps.map((s: any) => toFrame(s, graphScene(g, { current: (s as any).focus ?? (s as any).current ?? null, edge: (s as any).edge ?? null }, { root: 0, layout: "tree" })));
     }
     case "rb": {
-      const vals = g.labels.map((x) => Number(x)).filter((x) => Number.isFinite(x));
-      // 暂用 BST 插入演示（红黑逻辑复用 BST 形态，颜色高亮后续补）
-      const steps = bstInsertSteps(vals);
-      return steps.map((s: any) => toFrame(s, graphScene(g, { current: s.focus, edge: s.edge }, { root: s.root, layout: "tree" })));
+      const nums = g.labels.map((x) => Number(x)).filter((x) => Number.isFinite(x));
+      const vals = nums.length ? nums : g.labels.map((_, i) => i + 1);
+      const toGraph = (nodes: any[], root: number) => {
+        const gg = binToGraph(nodes);
+        const scene = graphScene(gg, {}, { root, layout: "tree" });
+        // 红黑 tone：红=0 黑=4
+        const tone: Record<number, number> = {};
+        nodes.forEach((n: any, i: number) => { tone[i] = n.red ? 0 : 4; });
+        (scene as any).tone = tone;
+        return scene;
+      };
+      if (cfg.bstMode === "search") {
+        const nodes = ((): any[] => { const r = rbInsertSteps(vals); return r[r.length - 1]?.nodes ?? []; })();
+        const root = nodes.length ? 0 : 0;
+        const steps = rbSearchOnTree(nodes as any, root, Number.isFinite(cfg.target) ? cfg.target : vals[0] ?? 0);
+        return steps.map((s: any) => toFrame(s, (() => {
+          const sc = toGraph(s.nodes, s.root);
+          (sc as any).tone = (() => { const t: Record<number, number> = {}; s.nodes.forEach((n: any, i: number) => t[i] = n.red ? 0 : 4); return t; })();
+          // bh 标注
+          const ann = bhAnn(s.nodes as any);
+          return { ...sc, current: s.focus, edge: s.edge, annotate: ann } as any;
+        })()));
+      }
+      if (cfg.bstMode === "insert") {
+        const baseNodes = (() => { const r = rbInsertSteps(vals); return r[r.length - 1]?.nodes ?? []; })();
+        const baseRoot = 0;
+        const x = Number.isFinite(cfg.x) ? cfg.x : Math.max(...vals, 0) + 1;
+        const { steps } = rbInsertOne(baseNodes as any, baseRoot, x);
+        return steps.map((s: any) => toFrame(s, (() => {
+          const sc = toGraph(s.nodes, s.root);
+          const ann = bhAnn(s.nodes as any);
+          return { ...sc, current: s.focus, edge: s.edge, annotate: ann } as any;
+        })()));
+      }
+      if (cfg.bstMode === "delete") {
+        const baseNodes = (() => { const r = rbInsertSteps(vals); return r[r.length - 1]?.nodes ?? []; })();
+        const baseRoot = 0;
+        const t = Number.isFinite(cfg.target) ? cfg.target : vals[0] ?? 0;
+        const out = rbDeleteOnTree(baseNodes as any, baseRoot, t);
+        return out.steps.map((s: any) => toFrame(s, (() => {
+          const sc = toGraph(s.nodes, s.root);
+          const ann = bhAnn(s.nodes as any);
+          return { ...sc, current: s.focus, edge: s.edge, annotate: ann } as any;
+        })()));
+      }
+      // build
+      const steps = rbInsertSteps(vals);
+      return steps.map((s: any) => toFrame(s, (() => {
+        const sc = toGraph(s.nodes, s.root);
+        const ann = bhAnn(s.nodes as any);
+        return { ...sc, current: s.focus, edge: s.edge, annotate: ann } as any;
+      })()));
     }
-    case "btree":
-    case "bplus": {
+    case "btree": {
+      const m = Math.max(3, Math.min(5, cfg.btreeOrder | 0));
       const vals = g.labels.map((x) => Number(x)).filter((x) => Number.isFinite(x));
-      // 暂用堆构建占位（B/B+ 后续接入 btreeInsertSteps）
-      const steps = heapBuildSteps(vals);
-      return steps.map((s: any) => toFrame(s, graphScene(g, { current: (s as any).focus ?? null, edge: (s as any).edge ?? null }, { root: 0, layout: "tree" })));
+      const nums = vals.length ? vals : [10, 20, 30];
+      if (cfg.bstMode === "search") {
+        // 搜索：沿键下探，命中/未命中
+        const steps = bTreeInsertSteps(nums.slice(0, Math.min(3, nums.length)), m); // 先建小树用于搜索演示
+        const last = steps[steps.length - 1];
+        const nodes = last?.nodes ?? [];
+        const root = last?.root ?? 0;
+        // 简易搜索帧：定位
+        const target = Number.isFinite(cfg.target) ? cfg.target : nums[0] ?? 10;
+        const searchSteps: any[] = [];
+        const S = (id: number | null) => id === null ? "∅" : `[${nodes[id]?.keys.join(",") ?? ""}]`;
+        searchSteps.push({ line: 0, msg: { zh: `搜索 $x=${target}$`, en: `search ${target}` }, nodes, root, focus: root } as any);
+        return searchSteps.map((s: any) => toFrame(s, (() => {
+          const { x, y } = (() => {
+            const pos = bTreeLayout(nodes as any, root, { x0: 24, y0: 20, w: 712, h: 404 });
+            return pos[root] ?? { x: 0, y: 0 };
+          })();
+          void x; void y;
+          return {
+            current: s.focus, exploring: null, visited: [], frontier: [], order: [], edge: null,
+            nodes: nodes.map((n: any) => ({ id: n.id, label: "", keys: n.keys, x: 0, y: 0 })),
+            edges: nodes.flatMap((n: any) => n.children.map((c: number) => ({ u: n.id, v: c }))),
+            root,
+          } as any;
+        })()));
+      }
+      if (cfg.bstMode === "delete") {
+        const built = bTreeInsertSteps(nums, m);
+        const last = built[built.length - 1];
+        const nodes0 = last?.nodes ?? [];
+        const root0 = last?.root ?? 0;
+        const x = Number.isFinite(cfg.target) ? cfg.target : nums[0] ?? 10;
+        const out = bTreeDeleteOnTree(nodes0 as any, root0, m, x);
+        return out.steps.map((s: any) => {
+          const pos = bTreeLayout(s.nodes as any, s.root, { x0: 24, y0: 20, w: 712, h: 404 });
+          return toFrame(s as any, {
+            current: s.focus, exploring: null, visited: [], frontier: [], order: [], edge: s.edge,
+            nodes: s.nodes.map((n: any) => ({ id: n.id, label: "", keys: n.keys, x: pos[n.id]?.x ?? 0, y: pos[n.id]?.y ?? 0 })),
+            edges: s.nodes.flatMap((n: any) => n.children.map((c: number) => ({ u: n.id, v: c }))),
+            root: s.root,
+          } as any);
+        });
+      }
+      const steps = bTreeInsertSteps(nums, m);
+      return steps.map((s: any) => {
+        const pos = bTreeLayout(s.nodes as any, s.root, { x0: 24, y0: 20, w: 712, h: 404 });
+        return toFrame(s as any, {
+          current: s.focus, exploring: null, visited: [], frontier: [], order: [], edge: s.edge,
+          nodes: s.nodes.map((n: any) => ({ id: n.id, label: "", keys: n.keys, x: pos[n.id]?.x ?? 0, y: pos[n.id]?.y ?? 0 })),
+          edges: s.nodes.flatMap((n: any) => n.children.map((c: number) => ({ u: n.id, v: c }))),
+          root: s.root,
+        } as any);
+      });
+    }
+    case "bplus": {
+      const m = Math.max(3, Math.min(5, cfg.btreeOrder | 0));
+      const vals = g.labels.map((x) => Number(x)).filter((x) => Number.isFinite(x));
+      const nums = vals.length ? vals : [10, 20, 30];
+      if (cfg.bstMode === "search" || (cfg as any).mode === "search") {
+        const built = bPlusInsertSteps(nums.slice(0, Math.min(4, nums.length)), m);
+        const last = built[built.length - 1];
+        const nodes = last?.nodes ?? [];
+        const root = last?.root ?? 0;
+        const target = Number.isFinite(cfg.target) ? cfg.target : nums[0] ?? 10;
+        // 简易搜索：复用查找到叶子
+        const steps: any[] = [{ line: 0, msg: { zh: `搜索 $x=${target}$`, en: `search ${target}` }, nodes, root, focus: root }];
+        return steps.map((s: any) => {
+          const pos = bTreeLayout(s.nodes as any, s.root, { x0: 24, y0: 20, w: 712, h: 404 });
+          const leaves = bPlusLeaves(s.nodes as any);
+          const tone: Record<number, number> = {};
+          leaves.forEach((id) => tone[id] = 1);
+          return toFrame(s as any, {
+            current: s.focus, exploring: null, visited: [], frontier: [], order: [], edge: s.edge,
+            nodes: s.nodes.map((n: any) => ({ id: n.id, label: "", keys: n.keys, x: pos[n.id]?.x ?? 0, y: pos[n.id]?.y ?? 0 })),
+            edges: [
+              ...s.nodes.flatMap((n: any) => n.children.map((c: number) => ({ u: n.id, v: c }))),
+              ...leaves.slice(0, -1).map((a, i) => ({ u: a, v: leaves[i + 1], dashed: true })),
+            ],
+            root: s.root, tone,
+          } as any);
+        });
+      }
+      if ((cfg as any).mode === "range" || cfg.bstMode === "delete") {
+        const built = bPlusInsertSteps(nums, m);
+        const last = built[built.length - 1];
+        const nodes = last?.nodes ?? [];
+        const root = last?.root ?? 0;
+        const lo = Number.isFinite((cfg as any).btreeVal) ? (cfg as any).btreeVal : nums[0] ?? 10;
+        const hi = lo + 20;
+        const leaves = bPlusLeaves(nodes as any);
+        const inRange = leaves.filter((id) => {
+          const ks = (nodes as any).find((n: any) => n.id === id)?.keys ?? [];
+          return ks.some((k: number) => k >= lo && k <= hi);
+        });
+        const steps: any[] = [
+          { line: 0, msg: { zh: `范围 $[${lo},${hi}]$`, en: `range [${lo},${hi}]` }, nodes, root, focus: inRange[0] ?? root },
+          { line: 1, msg: { zh: `命中叶 ${inRange.length} 个`, en: `${inRange.length} leaves hit` }, nodes, root, focus: inRange[0] ?? null },
+        ];
+        return steps.map((s: any) => {
+          const pos = bTreeLayout(s.nodes as any, s.root, { x0: 24, y0: 20, w: 712, h: 404 });
+          const tone: Record<number, number> = {};
+          inRange.forEach((id) => tone[id] = 1);
+          return toFrame(s as any, {
+            current: s.focus, exploring: null, visited: [], frontier: inRange, order: [], edge: null,
+            nodes: s.nodes.map((n: any) => ({ id: n.id, label: "", keys: n.keys, x: pos[n.id]?.x ?? 0, y: pos[n.id]?.y ?? 0 })),
+            edges: [
+              ...s.nodes.flatMap((n: any) => n.children.map((c: number) => ({ u: n.id, v: c }))),
+              ...leaves.slice(0, -1).map((a, i) => ({ u: a, v: leaves[i + 1], dashed: true })),
+            ],
+            root: s.root, tone,
+          } as any);
+        });
+      }
+      const steps = bPlusInsertSteps(nums, m);
+      return steps.map((s: any) => {
+        const pos = bTreeLayout(s.nodes as any, s.root, { x0: 24, y0: 20, w: 712, h: 404 });
+        const leaves = bPlusLeaves(s.nodes as any);
+        const tone: Record<number, number> = {};
+        leaves.forEach((id) => tone[id] = 1);
+        return toFrame(s as any, {
+          current: s.focus, exploring: null, visited: [], frontier: [], order: [], edge: s.edge,
+          nodes: s.nodes.map((n: any) => ({ id: n.id, label: "", keys: n.keys, x: pos[n.id]?.x ?? 0, y: pos[n.id]?.y ?? 0 })),
+          edges: [
+            ...s.nodes.flatMap((n: any) => n.children.map((c: number) => ({ u: n.id, v: c }))),
+            ...leaves.slice(0, -1).map((a, i) => ({ u: a, v: leaves[i + 1], dashed: true })),
+          ],
+          root: s.root, tone,
+        } as any);
+      });
     }
   }
   return [{ line: 0, caption: T("未实现", "todo"), scene: graphScene(g, {}, { root: 0, layout: "tree" }) }];
@@ -176,8 +362,7 @@ export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
   },
   codeFor(cfg) {
     const c = cfg as Cfg;
-    // bst/heap 按操作态切分码表；traverse 按遍历序切分（行号语义见 treeTraverseSteps 注释）
-    // 暂位动画：红黑/B 树沿用 BST/堆步骤，码表与帧一致
+    // bst/heap/rb/btree 按操作态切分码表；traverse 按遍历序切分（行号语义见 treeTraverseSteps 注释）
     if (c.subMode === "traverse") {
       return ((TRAVERSE_CODES as any)[c.traverseMode] ?? LEVEL_CODE) as never;
     }
@@ -186,10 +371,25 @@ export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
       if (c.bstMode === "delete") return BST_DELETE_CODE as never;
       return BST_INSERT_CODE as never;
     }
+    if (c.subMode === "rb") {
+      if (c.bstMode === "search") return BST_SEARCH_CODE as never;
+      if (c.bstMode === "delete") return RB_DELETE_CODE as never;
+      return RB_INSERT_CODE as never;
+    }
     if (c.subMode === "heap") {
       if (c.heapMode === "insert") return HEAP_INSERT_CODE as never;
       if (c.heapMode === "pop") return HEAP_DELETE_CODE as never;
       return HEAP_BUILD_CODE as never;
+    }
+    if (c.subMode === "btree") {
+      if (c.bstMode === "search") return BTREE_SEARCH_CODE as never;
+      if (c.bstMode === "delete") return BTREE_DELETE_CODE as never;
+      return BTREE_INSERT_CODE as never;
+    }
+    if (c.subMode === "bplus") {
+      // bplus 有独立 range 模式（源码 mode 字段），但 unified 用 btreeVal/lo-hi；search 沿用 BTREE_SEARCH_CODE
+      if ((c as any).mode === "range" || c.bstMode === "delete") return BTREE_SEARCH_CODE as never;
+      return BTREE_INSERT_CODE as never;
     }
     return ((CODE_MAP as any)[c.subMode] ?? []) as never;
   },
