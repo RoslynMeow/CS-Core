@@ -164,6 +164,26 @@ export function GraphEditor({ initialGraph, onConfirm, onCancel, constraints, ti
 
   const worldToSvg = (p: { x: number; y: number }) => ({ x: p.x * view.s + view.tx, y: p.y * view.s + view.ty });
   const svgToWorld = (p: { x: number; y: number }) => ({ x: (p.x - view.tx) / view.s, y: (p.y - view.ty) / view.s });
+  // 滚轮缩放（展示画布同款：非 passive 监听 + 指针中心缩放），编辑器之前缺这个，滚轮直接滚页面
+  const wheelRef = useRef<(e: WheelEvent) => void>(() => {});
+  wheelRef.current = (e: WheelEvent) => {
+    e.preventDefault();
+    const p = svgPoint(e as unknown as React.MouseEvent);
+    const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+    setView((v) => {
+      const s = Math.min(4, Math.max(0.3, v.s * factor));
+      const tx = p.x - (p.x - v.tx) * (s / v.s);
+      const ty = p.y - (p.y - v.ty) * (s / v.s);
+      return { tx, ty, s };
+    });
+  };
+  useEffect(() => {
+    const el = svgRef.current;
+    if (!el) return;
+    const h = (e: WheelEvent) => wheelRef.current(e);
+    el.addEventListener("wheel", h, { passive: false });
+    return () => el.removeEventListener("wheel", h);
+  }, []);
   const svgPoint = (e: React.PointerEvent | React.MouseEvent): { x: number; y: number } => {
     const svg = svgRef.current!;
     const rect = svg.getBoundingClientRect();
