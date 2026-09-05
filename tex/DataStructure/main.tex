@@ -24,6 +24,16 @@
 \usepackage{fancyhdr}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
+\usepackage{needspace}
+\usepackage{etoolbox}
+\widowpenalty=10000
+\clubpenalty=10000
+\raggedbottom
+\setlength{\intextsep}{8pt}
+\setlength{\textfloatsep}{10pt}
+\pretocmd{\section}{\needspace{8\baselineskip}}{}{}
+\pretocmd{\subsection}{\needspace{6\baselineskip}}{}{}
+\pretocmd{\subsubsection}{\needspace{4\baselineskip}}{}{}
 
 \onehalfspacing
 \pagestyle{fancy}

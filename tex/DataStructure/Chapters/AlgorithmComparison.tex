@@ -1,4 +1,6 @@
-\chapter{Algorithm Comparison}
+\chapter{算法对比}
+
+本章以表汇集核心算子的时空复杂度与关键特性，便于对比与选型。
 
 \section{核心排序算法算子对比}
 
@@ -13,15 +15,20 @@
 \textbf{冒泡} & $O(n)$ & $O(n^2)$ & $O(n^2)$ & $O(1)$ & 稳定 & 消除逆序对，对有序敏感 \\
 \textbf{选择} & $O(n^2)$ & $O(n^2)$ & $O(n^2)$ & $O(1)$ & 不稳定 & 比较次数固定 $\frac{n(n-1)}{2}$ \\
 \textbf{插入} & $O(n)$ & $O(n^2)$ & $O(n^2)$ & $O(1)$ & 稳定 & 顺移偏置，适合近似有序 \\
-\textbf{快速} & $O(n \log n)$ & $O(n^2)$ & $O(n \log n)$ & $O(\log n)$ & 不稳定 & 分治划分，基准随机化防退化 \\
-\textbf{归并} & $O(n \log n)$ & $O(n \log n)$ & $O(n \log n)$ & $O(n)$ & 稳定 & 严格分治合并，需辅助数组 \\
-\textbf{堆排} & $O(n \log n)$ & $O(n \log n)$ & $O(n \log n)$ & $O(1)$ & 不稳定 & 完全二叉树隐式维护偏序 \\
+\textbf{希尔} & $O(n\log n)$ & $O(n^2)$ & $O(n^{1.3})$ & $O(1)$ & 不稳定 & 分组插入，步长递减 \\
+\textbf{快速} & $O(n\log n)$ & $O(n^2)$ & $O(n\log n)$ & $O(\log n)$ & 不稳定 & 分治划分，随机基准 \\
+\textbf{归并} & $O(n\log n)$ & $O(n\log n)$ & $O(n\log n)$ & $O(n)$ & 稳定 & 严格分治合并 \\
+\textbf{堆排} & $O(n\log n)$ & $O(n\log n)$ & $O(n\log n)$ & $O(1)$ & 不稳定 & 堆序偏序维护 \\
 \textbf{计数} & $O(n+k)$ & $O(n+k)$ & $O(n+k)$ & $O(k)$ & 稳定 & 前缀和寻址，突破比较下界 \\
+\textbf{桶} & $O(n+k)$ & $O(n^2)$ & $O(n+k)$ & $O(k)$ & 稳定 & 区间分桶，桶内排序 \\
+\textbf{基数} & $O(d(n+k))$ & $O(d(n+k))$ & $O(d(n+k))$ & $O(n+k)$ & 稳定 & 按位稳定排序 \\
 \bottomrule
 \end{tabulary}
 \caption{核心排序算法算子对比}
 \label{tab:sort_compare}
 \end{table}
+
+
 
 \section{高级图论与检索算子对比}
 
@@ -34,16 +41,43 @@
 \textbf{算法} & \textbf{目标} & \textbf{时间} & \textbf{空间} & \textbf{核心依赖} & \textbf{限制/判据} \\
 \midrule
 \textbf{二分查找} & 有序检索 & $O(\log n)$ & $O(1)$ & 顺序存储对切 & 需连续且绝对有序 \\
-\textbf{并查集} & 集合维护 & $O(\alpha(n))$ & $O(n)$ & 树森林、路径压缩 & 摊还接近 $O(1)$ \\
-\textbf{Dijkstra} & 单源最短路 & $O(|E| \log |V|)$ & $O(|V|)$ & 优先队列、贪心 & \textbf{不支持负权边} \\
-\textbf{Bellman-Ford} & 单源带权 & $O(|V| \cdot |E|)$ & $O(|V|)$ & $|V|-1$ 轮松弛 & 第 $|V|$ 轮松弛成功 $\implies$ 负环 \\
-\textbf{Floyd-Warshall} & 多源最短路 & $O(|V|^3)$ & $O(|V|^2)$ & 状态转移矩阵 & 支持负权，负环 $\implies D[i][i]<0$ \\
-\textbf{Prim} & MST & $O(|E| \log |V|)$ & $O(|V|)$ & 割定理、横切边 & 适合稠密图 \\
-\textbf{Kruskal} & MST & $O(|E| \log |E|)$ & $O(|E|)$ & 边升序、并查集 & 适合稀疏图 \\
-\textbf{Kahn} & 拓扑序 & $O(|V| + |E|)$ & $O(|V|)$ & 入度统计、队列 & $|\sigma| < |V| \implies$ 有环 \\
-\textbf{Tarjan} & SCC & $O(|V| + |E|)$ & $O(|V|)$ & DFS 双时间戳、栈 & $LOW[u] = DFN[u] \implies$ 弹栈 \\
+\textbf{并查集} & 集合维护 & $O(\alpha(n))$ 摊还 & $O(n)$ & 路径压缩 & 接近 $O(1)$ \\
+\textbf{Dijkstra} & 单源最短路 & $O(|E|\log|V|)$ & $O(|V|)$ & 优先队列 & 不支持负权 \\
+\textbf{A*} & 单源启发 & $O(|E|)$ 期望 & $O(|V|)$ & $f=g+h$ & $h$ 可采纳则最优 \\
+\textbf{Bellman-Ford} & 单源带权 & $O(|V||E|)$ & $O(|V|)$ & $|V|-1$ 轮松弛 & 负环判据 \\
+\textbf{Floyd-Warshall} & 多源最短路 & $O(|V|^3)$ & $O(|V|^2)$ & 动态规划 & $D[i][i]<0\implies$负环 \\
+\textbf{Prim} & MST & $O(|E|\log|V|)$ & $O(|V|)$ & 割定理 & 稠密优 \\
+\textbf{Kruskal} & MST & $O(|E|\log|E|)$ & $O(|E|)$ & 并查集 & 稀疏优 \\
+\textbf{Kahn} & 拓扑序 & $O(|V|+|E|)$ & $O(|V|)$ & 入度集 & $|\sigma|<|V|\implies$有环 \\
+\textbf{Tarjan} & SCC & $O(|V|+|E|)$ & $O(|V|)$ & $DFN/LOW$ & $LOW=DFN\implies$根 \\
+\textbf{Dinic} & 最大流 & $O(|V|^2|E|)$ & $O(|V|+|E|)$ & 分层+阻塞流 & 残量无 $s\to t$ 即最优 \\
 \bottomrule
 \end{tabulary}
 \caption{高级图论与检索算子对比}
 \label{tab:graph_compare}
 \end{table}
+
+\section{树算子对比}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\renewcommand{\arraystretch}{1.5}
+\begin{tabulary}{\textwidth}{@{}CCCCCC@{}}
+\toprule
+\textbf{算子} & \textbf{目标} & \textbf{时间} & \textbf{空间} & \textbf{核心依赖} & \textbf{限制/判据} \\
+\midrule
+\textbf{二叉遍历} & 全树访问 & $O(n)$ & $O(H)$ & 递归/显式栈 & 线索化可降至 $O(1)$ \\
+\textbf{BST} & 有序检索维护 & $O(H)$ & $O(n)$ & BST 序性质 & 偏斜退化 $O(n)$ \\
+\textbf{AVL} & 平衡检索维护 & $O(\log n)$ & $O(n)$ & 平衡因子+旋转 & 旋转恢复不变式 \\
+\textbf{红黑树} & 近似平衡维护 & $O(\log n)$ & $O(n)$ & 黑高+变色 & 插入至多两次旋转 \\
+\textbf{B/B+ 树} & 外存索引 & $O(\log_m n)$ & $O(n)$ & 分裂/合并 & 叶层等深 \\
+\textbf{Huffman} & 最优前缀码 & $O(n\log n)$ & $O(n)$ & 最小堆贪心 & 需已知频次 \\
+\textbf{堆} & 最值维护 & 建堆 $O(n)$，操作 $O(\log n)$ & $O(n)$ & 上滤/下滤 & 完全二叉树 \\
+\textbf{LCA 倍增} & 树上祖先查询 & $O(\log|V|)$ 查询 & $O(|V|\log|V|)$ & $up[v][j]$ & 仅树 \\
+\bottomrule
+\end{tabulary}
+\caption{树算子对比}
+\label{tab:tree_compare}
+\end{table}
+

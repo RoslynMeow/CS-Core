@@ -1,4 +1,4 @@
-\chapter{Positional Numeral System}
+\chapter{位置记数系统}
 
 在数学中，\textbf{$n$ 进制}（进位计数制，Positional Numeral System）是指用一组固定的符号来表示任意实数的计数方法。其严谨的数学形式化定义由以下三个核心要素构成：
 
@@ -6,142 +6,160 @@
 
 \subsection{基数与合法数码集 (Alphabet of Digits)}
 
-设基数 $n$ 为一个大于 1 的正整数（$n \in \mathbb{Z}^+, n > 1$）。
-该进制的\textbf{有限数码集合 $S_n$} 严格定义为：
+\begin{itemize}
+    \item \textbf{对象}：基数 $n \in \mathbb{Z}^+, n > 1$。
+    \item \textbf{不变式}：有限数码集合
 $$S_n = \{ x \mid x \in \mathbb{N}, 0 \leq x < n \} = \{0, 1, 2, \dots, n-1\}$$
+满足 $|S_n| = n$ 且 $\forall d \in S_n, 0 \le d < n$。
+\end{itemize}
 
 \subsection{离散数码序列 (Numeral Sequence)}
 
-任意实数在 $n$ 进制下的形式化表达，是一个双向无穷的\textbf{离散数码序列}：
-$$\{P_i\}_{i=-\infty}^{\infty}$$
-其中，每一位上的数码必须满足严格约束：$\forall i \in \mathbb{Z}, P_i \in S_n$。
-
-\textit{注：为保证映射的唯一性，通常规定最高有效位向左不包含无穷个连续的 $0$，且小数末尾不包含无穷个连续的数码 $(n-1)$。}
+\begin{itemize}
+    \item \textbf{对象}：双向无穷序列 $\{P_i\}_{i=-\infty}^{\infty}$，约束 $\forall i \in \mathbb{Z}, P_i \in S_n$。
+    \item \textbf{不变式（唯一性）}：为使 $y \mapsto \{P_i\}$ 唯一，禁止两类尾：最高有效位左侧不含无穷个 $0$，小数末尾不含无穷个 $(n-1)$（排除 $0.999\ldots = 1.000\ldots$ 二义性）。
+    \item \textbf{定理}：在上述不变式下，$\{P_i\} \mapsto y$ 为双射（除零测集外）。
+\end{itemize}
 
 \subsection{按权展开映射 (Polynomial Expansion)}
 
-将"数码序列"映射到实数轴上的"绝对数值 $y$"（$y \in \mathbb{R}$），是通过\textbf{位权级数求和}实现的双向映射：
-$$y = \sum_{i=-\infty}^{\infty} P_i \cdot n^i$$
-
-将该无穷级数以小数点（$i=0$）为分界展开，其标准数学形式为：
-$$y = \dots + P_2 \cdot n^2 + P_1 \cdot n^1 + P_0 \cdot n^0 + P_{-1} \cdot n^{-1} + P_{-2} \cdot n^{-2} + \dots$$
-
 \begin{itemize}
-    \item \textbf{整数部分 ($i \geq 0$)}：位权为 $n^i$，对应的基数为正指数幂。
-    \item \textbf{小数部分 ($i < 0$)}：位权为 $n^i$，对应的基数为负指数幂。
+    \item \textbf{对象}：解释映射 $\mathcal{I}_n: S_n^{\mathbb{Z}} \to \mathbb{R}$，
+$$y = \mathcal{I}_n(\{P_i\}) = \sum_{i=-\infty}^{\infty} P_i \cdot n^i$$
+展开为 $y = \dots + P_2 n^2 + P_1 n^1 + P_0 n^0 + P_{-1} n^{-1} + P_{-2} n^{-2} + \dots$。
+    \item \textbf{不变式}：整数部分 $i \ge 0$ 与小数部分 $i < 0$ 同一公式分区，仅指数符号不同。
 \end{itemize}
-
-\newpage
 
 \section{\texorpdfstring{任意进制转换定义 ($n \to m$)}{任意进制转换定义 (n 转 m)}}
 
-将一个数从 \textbf{$n$ 进制} 转换到 \textbf{$m$ 进制}，在数学上是通过\textbf{值守恒公理}与\textbf{数码分离算子}来进行形式化表达的。
-
 \subsection{转换核心公理：值守恒 (Value Conservation)}
 
-进制转换的本质是\textbf{变换数码的形式，但保持数轴上的绝对值 $y$ 不变}。
-设源进制为 $n$（数码为 $P_i$），目标进制为 $m$（数码为 $Q_j$），则数学映射关系严格表达为：
-$$y = \sum_{i=-\infty}^{\infty} P_i \cdot n^i = \sum_{j=-\infty}^{\infty} Q_j \cdot m^j$$
-其中：$P_i \in S_n$，$Q_j \in S_m$。
+\begin{itemize}
+    \item \textbf{对象}：源序列 $\{P_i\} \in S_n^{\mathbb{Z}}$，目标序列 $\{Q_j\} \in S_m^{\mathbb{Z}}$。
+    \item \textbf{不变式（值守恒）}：
+$$y = \sum_{i} P_i n^i = \sum_{j} Q_j m^j, \quad P_i \in S_n, Q_j \in S_m$$
+转换是数码表示的变换，实轴值 $y$ 不变。
+    \item \textbf{定理}：在唯一性不变式下，满足值守恒的 $\{Q_j\}$ 存在唯一。
+\end{itemize}
 
 \subsection{数学求解算子：数码分离 (Digit Extraction Operator)}
 
-已知绝对值 $y$，想要显式直接求解目标 $m$ 进制中任意第 $j$ 位上的数码 $Q_j$，数学上使用\textbf{向下取整算子 $\lfloor \dots \rfloor$} 和 \textbf{取模算子 $\bmod$} 表达：
-
 \begin{itemize}
-    \item \textbf{整数部分（第 $j$ 位数码，其中 $j \geq 0$）：}
-    $$Q_j = \left\lfloor \frac{y}{m^j} \right\rfloor \bmod m$$
-    \textit{（注：将值右移 $j$ 位，截去低位干扰后取模）}
-    
-    \item \textbf{小数部分（第 $j$ 位数码，其中 $j < 0$）：}
-    $$Q_j = \left\lfloor y_{\text{fraction}} \cdot m^{-j} \right\rfloor \bmod m$$
-    \textit{（注：$y_{\text{fraction}} = y - \lfloor y \rfloor$ 为纯小数部分。通过左移 $-j$ 位将目标小数位提到整数个位，取整后取模剥离）}
+    \item \textbf{对象}：已知 $y$，求 $Q_j$ 的闭式算子（全局算子）：
+    \begin{itemize}
+        \item 整数位 $j \ge 0$：$Q_j = \left\lfloor y / m^j \right\rfloor \bmod m$。
+        \item 小数位 $j < 0$：$Q_j = \left\lfloor y_{\text{fraction}} \cdot m^{-j} \right\rfloor \bmod m$，其中 $y_{\text{fraction}} = y - \lfloor y \rfloor \in [0,1)$。
+    \end{itemize}
+    \item \textbf{不变式}：$\forall j, Q_j \in S_m$。
 \end{itemize}
-
-\newpage
 
 \section{\texorpdfstring{数学算子应用示例 ($10 \to 2$ 进制)}{数学算子应用示例 (10 转 2 进制)}}
 
-\textbf{【示例】} 将十进制数 $y = 11.625$ 转换为二进制（目标基数 $m = 2$）。
+\textbf{【示例】} 将 $y = 11.625$ 转换为 $m=2$，验证值守恒。
 
 \subsection{\texorpdfstring{整数部分求解 ($y = 11$, 求解 $j \geq 0$ 的数码)}{(1) 整数部分求解 (y = 11, 求解 j >= 0 的数码)}}
 
 \begin{itemize}
-    \item \textbf{$j = 0$（个位）:}  
-    $$Q_0 = \left\lfloor \frac{11}{2^0} \right\rfloor \bmod 2 = 11 \bmod 2 = 1$$
-    \item \textbf{$j = 1$（十位/$2^1$位）:}  
-    $$Q_1 = \left\lfloor \frac{11}{2^1} \right\rfloor \bmod 2 = \lfloor 5.5 \rfloor \bmod 2 = 5 \bmod 2 = 1$$
-    \item \textbf{$j = 2$（百位/$2^2$位）:}  
-    $$Q_2 = \left\lfloor \frac{11}{2^2} \right\rfloor \bmod 2 = \lfloor 2.75 \rfloor \bmod 2 = 2 \bmod 2 = 0$$
-    \item \textbf{$j = 3$（千位/$2^3$位）:}  
-    $$Q_3 = \left\lfloor \frac{11}{2^3} \right\rfloor \bmod 2 = \lfloor 1.375 \rfloor \bmod 2 = 1 \bmod 2 = 1$$
-    \item \textbf{$j = 4$:} $\left\lfloor \frac{11}{2^4} \right\rfloor = 0$，计算终止。  
-    \textbf{得出整数部分：} $(11)_{10} = (Q_3 Q_2 Q_1 Q_0)_2 = (1011)_2$
+    \item $j=0$: $Q_0 = \lfloor 11/2^0 \rfloor \bmod 2 = 1$
+    \item $j=1$: $Q_1 = \lfloor 11/2^1 \rfloor \bmod 2 = \lfloor 5.5 \rfloor \bmod 2 = 1$
+    \item $j=2$: $Q_2 = \lfloor 11/2^2 \rfloor \bmod 2 = 0$
+    \item $j=3$: $Q_3 = \lfloor 11/2^3 \rfloor \bmod 2 = 1$
+    \item $j=4$: $\lfloor 11/2^4 \rfloor = 0$ 终止。得 $(11)_{10} = (1011)_2$，即 $Q_3Q_2Q_1Q_0$。
 \end{itemize}
 
 \subsection{\texorpdfstring{小数部分求解 ($y_f = 0.625$, 求解 $j < 0$ 的数码)}{(2) 小数部分求解 (yf = 0.625, 求解 j < 0 的数码)}}
 
 \begin{itemize}
-    \item \textbf{$j = -1$（十分位/$2^{-1}$位）:}  
-    $$Q_{-1} = \left\lfloor 0.625 \cdot 2^{-(-1)} \right\rfloor \bmod 2 = \lfloor 1.25 \rfloor \bmod 2 = 1 \bmod 2 = 1$$
-    \item \textbf{$j = -2$（百分位/$2^{-2}$位）:}  
-    $$Q_{-2} = \left\lfloor 0.625 \cdot 2^{-(-2)} \right\rfloor \bmod 2 = \lfloor 2.5 \rfloor \bmod 2 = 2 \bmod 2 = 0$$
-    \item \textbf{$j = -3$（千分位/$2^{-3}$位）:}  
-    $$Q_{-3} = \left\lfloor 0.625 \cdot 2^{-(-3)} \right\rfloor \bmod 2 = \lfloor 5.0 \rfloor \bmod 2 = 5 \bmod 2 = 1$$
-    \item \textbf{$j = -4$:} 小数部分已被完全提取，后续结果均为 $0$，计算终止。
-
-    \textbf{得出小数部分：} $(0.625)_{10} = (0.Q_{-1} Q_{-2} Q_{-3})_2 = (0.101)_2$
+    \item $j=-1$: $Q_{-1} = \lfloor 0.625 \cdot 2^{1} \rfloor \bmod 2 = 1$
+    \item $j=-2$: $Q_{-2} = \lfloor 0.625 \cdot 2^{2} \rfloor \bmod 2 = 0$
+    \item $j=-3$: $Q_{-3} = \lfloor 0.625 \cdot 2^{3} \rfloor \bmod 2 = 1$
+    \item $j=-4$ 起全 $0$ 终止。得 $(0.625)_{10} = (0.101)_2$。
 \end{itemize}
 
 \subsection{最终值守恒合并}
 
-$$\sum_{j=-3}^{3} Q_j \cdot 2^j = 1\cdot2^3 + 0\cdot2^2 + 1\cdot2^1 + 1\cdot2^0 + 1\cdot2^{-1} + 0\cdot2^{-2} + 1\cdot2^{-3} = 11.625$$
-确定最终转换结果：$(11.625)_{10} = (1011.101)_2$
+$$\sum_{j=-3}^{3} Q_j 2^j = 1\cdot2^3 + 0\cdot2^2 + 1\cdot2^1 + 1\cdot2^0 + 1\cdot2^{-1} + 0\cdot2^{-2} + 1\cdot2^{-3} = 11.625$$
+故 $(11.625)_{10} = (1011.101)_2$。
 
-\section{算法级数轴递推（计算机实现逻辑的状态转移方程）}
+\section{后继与进位 (Successor and Carry)}
 
-在计算机实际运行中，如果直接对高维幂次 $m^j$ 进行直接计算（如前面的直接算子），会带来极高的\textbf{空间复杂度与浮点数精度误差}。为了让硬件高效执行，必须将静态的数学公式转化为\textbf{单步迭代的递推状态转移方程}。
+\begin{itemize}
+    \item \textbf{对象}：序列 $\{P_i\} \in S_n^{\mathbb{Z}}$，进位 $c_i \in \{0,1\}$。
+    \item \textbf{不变式}：后继 $\text{succ}: S_n^{\mathbb{Z}} \to S_n^{\mathbb{Z}}$ 定义为 $y \mapsto y+1$ 在数码层的实现。逐位方程：
+$$s_i = P_i + c_i, \quad Q_i = s_i \bmod n, \quad c_{i+1} = \left\lfloor s_i / n \right\rfloor, \quad c_0 = 1$$
+特例：若 $P_i = n-1$ 则 $Q_i = 0, c_{i+1}=1$ 继续；否则 $Q_i = P_i+1, c_{i+1}=0$ 终止。
+    \item \textbf{定理}：$\mathcal{I}_n(\text{succ}(\{P_i\})) = \mathcal{I}_n(\{P_i\}) + 1$，且进位链长度即首个非 $n-1$ 的位置，最坏 $O(k)$。
+\end{itemize}
 
-这便是计算机中经典的 \textbf{"商与余数递推（除基取余法）"} 与 \textbf{"积与整数递推（乘基取整法）"}。
+\begin{algorithm}[H]
+\caption{后继（进位链）}
+\begin{algorithmic}[1]
+\State $i \gets 0; c \gets 1$
+\While{$c = 1$}
+    \State $s \gets P_i + c$; $Q_i \gets s \bmod n$; $c \gets \lfloor s/n \rfloor$; $i \gets i+1$
+\EndWhile
+\end{algorithmic}
+\end{algorithm}
+
+\section{列式加法 (Column Addition)}
+
+\begin{itemize}
+    \item \textbf{对象}：$\{P_i\}, \{Q_i\} \in S_n^{\mathbb{Z}}$，和 $\{R_i\} \in S_n^{\mathbb{Z}}$，进位 $c_i \in \{0,1\}$。
+    \item \textbf{不变式}：逐列
+$$s_i = P_i + Q_i + c_i, \quad R_i = s_i \bmod n, \quad c_{i+1} = \lfloor s_i / n \rfloor, \quad c_0 = 0$$
+且 $\forall i, s_i \le 2(n-1)+1 = 2n-1 \implies c_{i+1} \in \{0,1\}$。
+    \item \textbf{定理（正确性）}：$\sum_i R_i n^i = \sum_i P_i n^i + \sum_i Q_i n^i$；若末进位 $c_k=1$ 则 $R_k=1$，否则无溢出。
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{列式加法}
+\begin{algorithmic}[1]
+\State $c \gets 0; i \gets 0$
+\While{$i < k$}
+    \State $s \gets P_i + Q_i + c$; $R_i \gets s \bmod n$; $c \gets \lfloor s/n \rfloor$; $i \gets i+1$
+\EndWhile
+\If{$c=1$} $R_k \gets 1$ \EndIf
+\end{algorithmic}
+\end{algorithm}
+
+\section{闭式到递推的细化（进制转换的迭代实现）}
+
+直接计算闭式中的 $m^j$ 需 $O(\log m^j)$ 位与高精度浮点，易引入舍入误差。数学上将其细化为单步递推，仅用 $O(1)$ 的取模/取整。
 
 \subsection{整数项递推：商与余数 (Division-Remainder Iteration)}
 
-此算法用于处理\textbf{整数部分}（$j \geq 0$）。它通过引入中间状态变量 $y_j$，在每一步循环中只做一次单步除法，从而把全局计算降维到局部计算。
-
-\subsubsection{(1) 状态转移方程组}
-$$\begin{cases}
-Q_j = y_j \bmod m & \text{（状态输出：当前步的数码）} \\
-y_{j+1} = \left\lfloor \frac{y_j}{m} \right\rfloor & \text{（状态转移：更新下一步的被除数）}
-\end{cases}$$
 \begin{itemize}
-    \item \textbf{初始状态}：$y_0 = \lfloor y \rfloor$ （即原始数值的纯整数部分）。
-    \item \textbf{终止条件}：当新状态 $y_{j+1} = 0$ 时，算法迭代停止。
+    \item \textbf{对象}：整数状态 $y_j \in \mathbb{N}$。
+    \item \textbf{状态转移}：
+$$\begin{cases}
+Q_j = y_j \bmod m \\
+y_{j+1} = \left\lfloor y_j / m \right\rfloor
+\end{cases}, \quad y_0 = \lfloor y \rfloor$$
+    \item \textbf{不变式}：$y = y_{j+1} \cdot m^{j+1} + \sum_{t=0}^{j} Q_t m^t$。
+    \item \textbf{终止}：$y_{j+1}=0$。
 \end{itemize}
 
-\subsubsection{(2) 核心原理解析}
+\subsubsection{核心原理解析}
 \begin{itemize}
-    \item \textbf{$Q_j = y_j \bmod m$}：因为任意整数都可以写成 $y_j = k \cdot m + Q_j$ 的形式，所以对 $m$ 取模可以直接隔离出当前最低位（末尾）的数码。
-    \item \textbf{$y_{j+1} = \left\lfloor \frac{y_j}{m} \right\rfloor$}：将当前数字整体向右移一位（抹去刚刚已经提取出的末尾数码），其商作为新的状态输入到下一轮循环中。
-    \item \textbf{数码产出顺序}：由于我们是从个位开始向左剥离，因此数码的产出顺序是\textbf{从低位到高位}（即 $Q_0 \to Q_1 \to Q_2 \dots$）。计算机输出时需要逆序排列。
+    \item $Q_j = y_j \bmod m$ 隔离最低位；$y_{j+1} = \lfloor y_j/m \rfloor$ 右移一位。
+    \item 产出顺序为 $Q_0 \to Q_1 \dots$（低位到高位），序列表示为 $\text{rev}(Q_0\dots Q_{k-1})$。
 \end{itemize}
 
 \subsection{小数项递推：积与整数 (Multiplication-Integer Iteration)}
 
-此算法用于处理\textbf{小数部分}（$j < 0$）。由于小数点的右侧代表负指数幂（$\frac{1}{m}, \frac{1}{m^2}$），我们需要通过"放大"而非"缩小"来提取数码。
-
-\subsubsection{(1) 状态转移方程组}
-$$\begin{cases}
-Q_j = \lfloor y_j \cdot m \rfloor & \text{（状态输出：当前步的数码）} \\
-y_{j-1} = (y_j \cdot m) - Q_j & \text{（状态转移：更新下一步的纯小数）}
-\end{cases}$$
 \begin{itemize}
-    \item \textbf{初始状态}：$y_{-1} = y - \lfloor y \rfloor$ （即原始数值的纯小数部分）。
-    \item \textbf{终止条件}：新状态 $y_{j-1} = 0$（即小数部分完全被榨干清零）或达到指定的计算机最高精度步数。
+    \item \textbf{对象}：小数状态 $y_j \in [0,1)$。
+    \item \textbf{状态转移}：
+$$\begin{cases}
+Q_j = \lfloor y_j \cdot m \rfloor \\
+y_{j-1} = y_j \cdot m - Q_j
+\end{cases}, \quad y_{-1} = y - \lfloor y \rfloor$$
+    \item \textbf{不变式}：$y_{-1} = \sum_{t=j}^{-1} Q_t m^t + y_{j-1} m^{j}$。
+    \item \textbf{终止}：$y_{j-1}=0$ 或达到精度界。
 \end{itemize}
 
-\subsubsection{(2) 核心原理解析}
+\subsubsection{核心原理解析}
 \begin{itemize}
-    \item \textbf{$Q_j = \lfloor y_j \cdot m \rfloor$}：由于 $y_j$ 是一个处于 $[0, 1)$ 区间内的纯小数，将其乘以基数 $m$ 后，其原本在小数点后第一位的数字会被放大到整数部分（个位），通过向下取整即可直接摘取。
-    \item \textbf{$y_{j-1} = (y_j \cdot m) - Q_j$}：乘基之后，减去刚刚脱离出来的整数部分 $Q_j$，剩下的依然是一个纯小数。这个余下的纯小数作为新的状态，继续投入下一次放大。
-    \item \textbf{数码产出顺序}：因为我们是从十分位开始向右逐位放大剥离，所以数码的产出顺序是\textbf{从高位到低位}（即 $Q_{-1} \to Q_{-2} \to Q_{-3} \dots$）。计算机输出时按常规正序拼接即可。
+    \item $Q_j = \lfloor y_j m \rfloor$ 将小数首位放大到个位摘取；$y_{j-1}=y_j m - Q_j$ 余下纯小数继续。
+    \item 产出顺序为 $Q_{-1} \to Q_{-2} \dots$（高位到低位），正序拼接。
 \end{itemize}

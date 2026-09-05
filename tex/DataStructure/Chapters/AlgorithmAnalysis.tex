@@ -1,49 +1,45 @@
-\chapter{Algorithm Definition and Asymptotic Analysis}
+\chapter{算法定义与渐近分析}
 
 本章探讨评价算法优劣的统一数学度量衡，建立时间与空间复杂度的渐进趋势评估模型。
 
 \section{算法的定义与四大核心特征}
 
-算法（Algorithm）是指解决特定问题的一组明确的、有穷的、可执行的指令序列。一个合格的算法必须具备以下四大核心特征：
+\begin{itemize}
+    \item \textbf{对象}：算法为基本操作集 $\mathcal{P}$ 上的有限序列 $A=\langle op_1,\dots,op_k\rangle$，配备控制构造子（顺序、分支、循环）。
+    \item \textbf{规约 (Specification)}：前置 $Pre$ 与后置 $Post$ 的谓词变换 $ \{Pre\} A \{Post\}$。
+    \item \textbf{四大特征}：
+    \begin{enumerate}
+        \item \textbf{有穷性}：$\exists B$ 使执行步数 $\le B$；每步有穷时间内完成。
+        \item \textbf{确定性}：$\forall$ 状态，下一步唯一。
+        \item \textbf{可行性}：每 $op_i\in\mathcal{P}$ 可实现。
+        \item \textbf{输入/输出}：$I\in\mathcal{D}_{in}^*$, $O\in\mathcal{D}_{out}^+$，满足 $Post(I,O)$。
+    \end{enumerate}
+\end{itemize}
 
-\begin{enumerate}
-    \item \textbf{有穷性（Finiteness）}：算法必须在执行有限个操作步骤后自动结束，不能陷入死循环，且每一步都应在有穷时间内完成。
-    \item \textbf{确定性（Definiteness）}：算法中的指令每一步都必须有确切的含义，在任何条件下都具有唯一一条执行路径，不产生任何歧义。
-    \item \textbf{可行性（Effectiveness）}：算法中涉及的所有操作均是最基础、可执行的，能够通过已经实现的底层基本运算在有限时间内准确运行。
-    \item \textbf{输入/输出（Input / Output）}：一个算法拥有零个或多个输入（作为算法处理的初始物理量），并必然产生一个或多个输出（作为算法执行的结果回馈）。
-\end{enumerate}
-
-\section{算法的描述媒介}
-
-根据“信息流动方向”与“面向对象（人或机器）”的不同，算法的描述主要分为两大阵营、四种流派：
+\section{算法的描述层级}
 
 \begin{itemize}
-    \item \textbf{面向人类思维（人写人看）}：
-    \begin{enumerate}
-        \item \textbf{自然语言}：用人类日常语言描述。优点是通俗易懂，缺点是过于冗长且容易产生语义歧义。
-        \item \textbf{流程图（Flowchart）}：利用图形化、具有严密逻辑关系的有向图来表达控制流。
-        \item \textbf{伪代码（Pseudo-code）}：介于自然语言与编程语言之间。直接利用公式与控制流算子进行映射，具备接近代码的严密性，是学术界描述算法的标准媒介。
-    \end{enumerate}
-    \item \textbf{面向底层执行（人写机看）}：
-    \begin{enumerate}
-        \setcounter{enumi}{3}
-        \item \textbf{高级编程语言}：如 C++、Java、Python 等。直接翻译为计算机硬件可以理解并编译运行的二进制指令。
-    \end{enumerate}
+    \item \textbf{规约层}：用谓词逻辑描述 $Pre/Post$。
+    \item \textbf{细化层}：用伪代码与控制算子表达，与语言无关的数学记号（本书采用）。
+    \item \textbf{实现层}：高级语言对细化的语义实现（如 C/Java/Python 的编译/解释），编译器保持语义等价。
+    \item \textbf{定理}：伪代码到语言实现的翻译保持 $Pre/Post$，仅时空常数因子变化。
 \end{itemize}
 
 \section{算法的时间复杂度 (Time Complexity)}
 
-评价一个算法的优劣不能依靠绝对的计时。科学的评估方法是分析\textbf{输入规模 $n$ 与资源消耗规模之间的渐进趋势关系}。
+评价标准为输入规模 $n$ 与资源消耗的渐进趋势，非绝对计时。
 
-\subsection{大 O 表示法的渐进上界定义}
+\subsection{渐进记号定义}
 
-大 O 符号用于寻求算法执行时间随着规模 $n$ 放大时的渐进上界。其严格数学定义为：若存在正连续常数 $c$ 和 $n_0$，使得当 $n \ge n_0$ 时，算法的实际运行时间 $T(n)$ 均满足：
-$$T(n) \le c \cdot f(n)$$
-则记作 $T(n) = O(f(n))$。它忽略了低阶项与常数系数，专注于长远增长趋势。
+\begin{itemize}
+    \item \textbf{大 O（上界）}：$\exists c>0,n_0>0$ 使 $\forall n\ge n_0, T(n)\le c\cdot f(n)$，记 $T(n)=O(f(n))$。
+    \item \textbf{$\Omega$（下界）}：$\exists c>0,n_0$ 使 $T(n)\ge c\cdot f(n)$。
+    \item \textbf{$\Theta$（紧界）}：$T(n)=O(f(n))\land T(n)=\Omega(f(n))$。
+\end{itemize}
 
 \subsection{复杂度阶数}
 
-随着输入规模 $n$ 的爆炸式增长，不同复杂度阶数的资源消耗会产生明显的趋势分流。
+随着 $n$ 增长，不同阶的消耗显著分流（见图 \ref{fig:big_o_curves}）。
 
 \begin{figure}[H]
 \centering
@@ -64,33 +60,24 @@ $$T(n) \le c \cdot f(n)$$
     every axis y label/.style={at={(ticklabel* cs:1)}, anchor=south},
     legend style={draw=none},
 ]
-    % 负半轴虚线延伸
     \draw[dashed, gray, thick] (axis cs:0,0) -- (axis cs:-2,0);
     \draw[dashed, gray, thick] (axis cs:0,0) -- (axis cs:0,-2.5);
-    
-    % O(1)
     \addplot[thick, gray] {1};
     \addplot[dashed, gray, domain=-2:0] {1};
     \node[anchor=west, font=\small, gray] at (axis cs:40,0.6) {$O(1)$ };
-    % O(log n)
     \addplot[thick, green!60!black, domain=1:40] {log2(x)};
     \node[anchor=west, font=\small, green!60!black] at (axis cs:40,4.5) {$O(\log n)$ };
-    % O(n)
     \addplot[thick, blue] {x};
     \addplot[dashed, blue, domain=-2:0] {x};
     \node[anchor=west, font=\small, blue] at (axis cs:40,38.5) {$O(n)$ };
-    % O(n log n)
     \addplot[thick, cyan!60!black, domain=1:10] {x*log2(x)};
     \node[anchor=west, font=\small, cyan!60!black] at (axis cs:10,33.2) {$O(n \log n)$ };
-    % O(n^2)
     \addplot[thick, magenta!80!black, domain=0:6.32] {x^2};
     \addplot[dashed, magenta!80!black, domain=-2:0] {x^2};
     \node[anchor=south west, font=\small, magenta!80!black] at (axis cs:6,38) {$O(n^2)$ };
-    % O(2^n)
     \addplot[thick, red, domain=0:5.32] {2^x};
     \addplot[dashed, red, domain=-2:0] {2^x};
     \node[anchor=south west, font=\small, red] at (axis cs:1,35) {$O(2^n)$ };
-    % O(n!) - 严格经过整数点并用平滑曲线连接
     \addplot[thick, red!60!black, samples at={0,1,2,3,4}, smooth] {factorial(x)};
     \node[anchor=south west, font=\small, red!60!black] at (axis cs:0,20) {$O(n!)$ };
 \end{axis}
@@ -99,18 +86,33 @@ $$T(n) \le c \cdot f(n)$$
 \label{fig:big_o_curves}
 \end{figure}
 
-\subsection{复杂度组合乘法原理}
+\subsection{复杂度组合原理}
 
-当算法的各个模块相互嵌套或串联时，其大 O 符号满足乘法运算法则：
-$$O(a) \cdot O(b) = O(a \cdot b)$$
+\begin{itemize}
+    \item \textbf{串联}：$O(a)+O(b)=O(\max(a,b))$。
+    \item \textbf{嵌套}：$O(a)\cdot O(b)=O(a\cdot b)$。
+\end{itemize}
+
+\subsection{主定理（递归树证明）}
+
+\begin{itemize}
+    \item \textbf{对象}：$T(n) = aT(n/b) + f(n)$，$a\ge1$，$b>1$，$f$ 渐进正。
+    \item \textbf{递归树}：深度 $L=\log_b n$，第 $j$ 层 $a^j$ 个节点，单节点代价 $f(n/b^j)$，层代价 $a^j f(n/b^j)$，叶 $a^L = n^{\log_b a}$ 个 $\Theta(1)$。
+    \item \textbf{定理（主定理）}：记 $n^{\log_b a}$ 与 $f(n)$ 比较：
+    \begin{enumerate}
+        \item 若 $f(n) = O(n^{\log_b a-\epsilon})$，则 $T(n) = \Theta(n^{\log_b a})$（叶主导）。
+        \item 若 $f(n) = \Theta(n^{\log_b a})$，则 $T(n) = \Theta(n^{\log_b a}\log n)$（每层等量）。
+        \item 若 $f(n) = \Omega(n^{\log_b a+\epsilon})$ 且 $af(n/b)\le cf(n)$（$c<1$，正则），则 $T(n) = \Theta(f(n))$（根主导）。
+    \end{enumerate}
+\end{itemize}
 
 \section{算法的空间复杂度 (Space Complexity)}
 
-空间复杂度用于衡量随着输入规模 $n$ 的扩大，算法运行期间\textbf{额外占用的辅助存储空间}的增幅趋势。
+衡量随 $n$ 增长的\textbf{辅助空间}增幅（含递归栈）。
 
-\subsection{\texorpdfstring{$O(1)$}{O(1)} 常数级辅助空间（In-place 原地置换）}
+\subsection{\texorpdfstring{$O(1)$}{O(1)} 常数级（In-place）}
 
-算法在原输入数据的存储空间上直接进行修改与操作。整个过程不需要开辟随 $n$ 增长的新空间，仅需要常数个辅助变量用于临时中转。
+原地修改，仅常数个辅助槽位 $\tau$ 中转。
 
 \begin{figure}[H]
 \centering
@@ -135,9 +137,13 @@ $$O(a) \cdot O(b) = O(a \cdot b)$$
 \label{fig:space_o1}
 \end{figure}
 
-\subsection{\texorpdfstring{$O(n)$}{O(n)} 线性级辅助空间（Clone 副本生成）}
+\subsection{\texorpdfstring{$O(\log n)$}{O(log n)} 递归栈}
 
-在算法执行期间（如为了保持原数据不被破坏，或者为了进行高效率的哈希映射），必须在物理内存中动态生成一份与原输入规模等大的副本（Clone）。其开辟的内存槽位随 $n$ 同步线性增长。
+递归深度 $H$ 的调用栈辅助空间为 $O(H)$，平衡分治时 $H=O(\log n)$（如快排期望）。
+
+\subsection{\texorpdfstring{$O(n)$}{O(n)} 线性辅助（Clone）}
+
+需与输入等大副本 $A'$ 时辅助 $O(n)$（如归并、哈希表）。
 
 \begin{figure}[H]
 \centering
@@ -158,3 +164,8 @@ $$O(a) \cdot O(b) = O(a \cdot b)$$
 \caption{副本克隆 (Clone) 内存空间扩张模型}
 \label{fig:space_on}
 \end{figure}
+
+\subsection{摊还分析}
+
+并查集的 $O(\alpha(n))$ 为摊还界，需在本章度量下理解（见经典算法章）。
+

@@ -1,168 +1,416 @@
-\chapter{Dynamic Classic Algorithms and Core Operators}
+\chapter{动态经典算法与核心算子}
 
 本章探讨从静态结构向动态算子的演进，涵盖算法设计范式、排序、查找以及高级图论算法。
 
 \section{顶层设计范式}
 
 \subsection{分治策略 (Divide and Conquer)}
-将规模 $n$ 的问题 $P$ 划分为 $a$ 个子问题 $\{P_1, \dots, P_a\}$，每个规模为 $n/b$。时间递推关系：
-$$T(n) = aT\left(\frac{n}{b}\right) + f(n)$$
-由主定理（Master Theorem）决定渐进复杂度。
+\begin{itemize}
+    \item \textbf{对象}：规模 $n$ 的问题 $P$ 划分为 $a$ 个规模 $n/b$ 的子问题。
+    \item \textbf{递推}：$T(n)=aT(n/b)+f(n)$，由主定理决定渐进阶。
+\end{itemize}
 
 \subsection{贪心算法 (Greedy)}
-每一步选择局部最优解 $s_i = \arg\max_{x \in C} \mathcal{F}(x)$。全局最优需满足：
+每步取局部最优 $s_i=\arg\max_{x\in C}\mathcal{F}(x)$。全局最优需：
 \begin{enumerate}
-    \item \textbf{最优子结构}：$P$ 的最优解包含子问题 $P'$ 的最优解。
-    \item \textbf{贪心选择性}：可通过局部最优序列构造全局最优解。
+    \item \textbf{最优子结构}：$P$ 的最优解含子问题 $P'$ 的最优解。
+    \item \textbf{贪心选择性}：局部最优序列可拼接为全局最优。
 \end{enumerate}
+
+\subsection{动态规划 (Dynamic Programming)}
+\begin{itemize}
+    \item \textbf{对象}：问题 $P$ 具最优子结构与重叠子问题，状态 $dp$ 递推。
+    \item \textbf{不变式}：$dp$ 按拓扑序填表，已算子问题 $dp[s']$ 不重复计算。
+    \item \textbf{定理}：填表顺序保证 $dp[P]$ 即最优，时间常为状态数 $\times$ 转移代价。
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{01 背包 DP 规约}
+\begin{algorithmic}[1]
+\State $dp[0..n][0..W]\gets0$
+\For{$i\gets1$ \textbf{to} $n$}
+    \For{$w\gets0$ \textbf{to} $W$}
+        \If{$wt[i]>w$} $dp[i][w]\gets dp[i-1][w]$
+        \Else $dp[i][w]\gets\max(dp[i-1][w], dp[i-1][w-wt[i]]+val[i])$ \EndIf
+    \EndFor
+\EndFor
+\State \Return $dp[n][W]$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{LCS DP 规约}
+\begin{algorithmic}[1]
+\State $c[0..m][0..n]\gets0$
+\For{$i\gets1$ \textbf{to} $m$}
+    \For{$j\gets1$ \textbf{to} $n$}
+        \If{$X[i]=Y[j]$} $c[i][j]\gets c[i-1][j-1]+1$
+        \ElsIf{$c[i-1][j]\ge c[i][j-1]$} $c[i][j]\gets c[i-1][j]$
+        \Else $c[i][j]\gets c[i][j-1]$ \EndIf
+    \EndFor
+\EndFor
+\State \Return $c[m][n]$
+\end{algorithmic}
+\end{algorithm}
 
 \newpage
 
 \section{排序算法算子 (Sort)}
 
-输入序列 $A = \langle a_1, \dots, a_n \rangle$，目标输出 $A' = \langle a'_1, \dots, a'_n \rangle$ 使得 $a'_1 \le a'_2 \le \dots \le a'_n$。
+输入 $A=\langle a_1,\dots,a_n\rangle$，目标 $A'=\langle a'_1,\dots,a'_n\rangle$ 使 $a'_1\le\cdots\le a'_n$。
 
 \subsection{比较类排序}
 \begin{enumerate}
-    \item \textbf{冒泡排序}：通过相邻交换减少逆序对数 $I(A) = |\{(i, j) \mid i < j \land a_i > a_j\}|$。每轮将最大值移至末尾。
-    \item \textbf{选择排序}：第 $k$ 轮选择 $a_k' = \min\{a_k, \dots, a_n\}$ 并与 $a_k$ 交换。比较次数固定为 $\frac{n(n-1)}{2}$。
-    \item \textbf{插入排序}：维护已排序前缀 $A[1..k]$，将 $a_{k+1}$ 插入正确位置。最好情况 $O(n)$（已有序）。
-    \item \textbf{快速排序}：选取基准 $p$，划分 $A$ 为 $A_L = \{x \in A \mid x \le p\}$ 与 $A_R = \{x \in A \mid x > p\}$。递归排序 $A_L, A_R$。
-    \item \textbf{归并排序}：$T(n) = 2T(n/2) + O(n)$。将 $A$ 对半分割后合并，稳定且 $O(n \log n)$，但需 $O(n)$ 辅助空间。
-    \item \textbf{堆排序}：建堆 $O(n)$，重复提取根节点并下滤。时间 $O(n \log n)$，空间 $O(1)$。
+    \item \textbf{冒泡排序}：相邻交换消逆序对 $I(A)=|\{(i,j)\mid i<j\land a_i>a_j\}|$。
+    \item \textbf{选择排序}：$a'_k=\min\{a_k,\dots,a_n\}$，比较次数固定 $n(n-1)/2$。
+    \item \textbf{插入排序}：维护已序前缀 $A[1..k]$，插入 $a_{k+1}$；已序时 $O(n)$。
+    \item \textbf{快速排序}：基准 $p$ 划分 $A_L=\{x\le p\},A_R=\{x>p\}$，递归。
+    \item \textbf{归并排序}：$T(n)=2T(n/2)+O(n)$，稳定 $O(n\log n)$，需 $O(n)$ 辅助。
+    \item \textbf{堆排序}：建堆 $O(n)$，反复取根下滤，$O(n\log n)$，$O(1)$ 辅助。
 \end{enumerate}
 
 \begin{algorithm}[H]
-\caption{快速排序伪代码 (Quick Sort)}
+\caption{快速排序规约}
 \begin{algorithmic}[1]
-\Procedure{QuickSort}{$A, l, r$}
-    \If{$l \ge r$} \State \Return \EndIf
-    \State $p \gets \text{Partition}(A, l, r)$ \Comment{划分操作}
-    \State \text{QuickSort}$(A, l, p - 1)$
-    \State \text{QuickSort}$(A, p + 1, r)$
+\Procedure{QuickSort}{$A,l,r$}
+    \If{$l\ge r$} \Return \EndIf
+    \State $p\gets\text{Partition}(A,l,r)$
+    \State \text{QuickSort}$(A,l,p-1)$; \text{QuickSort}$(A,p+1,r)$
 \EndProcedure
-\Procedure{Partition}{$A, l, r$}
-    \State $pivot \gets A[r]$ \Comment{选取末尾元素为基准}
-    \State $i \gets l - 1$
-    \For{$j \gets l$ \textbf{to} $r - 1$}
-        \If{$A[j] \le pivot$}
-            \State $i \gets i + 1$
-            \State \textbf{Swap}($A[i], A[j]$)
-        \EndIf
+\Procedure{Partition}{$A,l,r$}
+    \State $pivot\gets A[r]$; $i\gets l-1$
+    \For{$j\gets l$ \textbf{to} $r-1$}
+        \If{$A[j]\le pivot$} $i\gets i+1$; \textbf{Swap}($A[i],A[j]$) \EndIf
     \EndFor
-    \State \textbf{Swap}($A[i + 1], A[r]$)
-    \State \Return $i + 1$
+    \State \textbf{Swap}($A[i+1],A[r]$); \Return $i+1$
 \EndProcedure
 \end{algorithmic}
 \end{algorithm}
 
 \subsection{非比较类排序}
 \begin{enumerate}
-    \item \textbf{计数排序}：统计频次 $C[x] = |\{a_i \mid a_i = x\}|$，计算前缀和 $S[x] = \sum_{k \le x} C[k]$ 确定位置。
-    \item \textbf{桶排序}：将值域 $[Min, Max]$ 划分为 $k$ 个区间 $B_1, \dots, B_k$，桶内排序后串联。
-    \item \textbf{基数排序}：按位 $d=0 \dots D-1$ 进行稳定排序（通常用计数排序）。
+    \item \textbf{计数排序}：$C[x]=|\{a_i\mid a_i=x\}|$，前缀 $S[x]=\sum_{k\le x}C[k]$ 定位置，$O(n+k)$。
+    \item \textbf{桶排序}：值域 $[Min,Max]$ 分 $k$ 区间 $B_1\dots B_k$，桶内排序后串联。
+    \item \textbf{基数排序}：按位 $d=0\dots D-1$ 稳定排序（以计数为子程序）。
 \end{enumerate}
+
+\begin{algorithm}[H]
+\caption{归并排序规约}
+\begin{algorithmic}[1]
+\Procedure{MergeSort}{$A,l,r$}
+    \If{$l\ge r$} \Return \EndIf
+    \State $m\gets\lfloor(l+r)/2\rfloor$; $\text{MergeSort}(A,l,m)$; $\text{MergeSort}(A,m+1,r)$; $\text{Merge}(A,l,m,r)$
+\EndProcedure
+\Procedure{Merge}{$A,l,m,r$}
+    \State $B\gets A[l..r]$; $i\gets l; j\gets m+1; k\gets l$
+    \While{$i\le m\land j\le r$} \If{$B[i-l]\le B[j-l]$} $A[k]\gets B[i-l]; i\gets i+1$ \Else $A[k]\gets B[j-l]; j\gets j+1$ \EndIf; $k\gets k+1$ \EndWhile
+    \While{$i\le m$} $A[k]\gets B[i-l]; i\gets i+1; k\gets k+1$ \EndWhile
+    \While{$j\le r$} $A[k]\gets B[j-l]; j\gets j+1; k\gets k+1$ \EndWhile
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{堆排序规约}
+\begin{algorithmic}[1]
+\Procedure{HeapSort}{$A$}
+    \State $\text{BuildMaxHeap}(A)$ \Comment{自底向上 $O(n)$}
+    \For{$i\gets|A|-1$ \textbf{downto} $1$}
+        \State \textbf{Swap}($A[0],A[i]$); $\text{SiftDown}(A,0,i)$
+    \EndFor
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{计数排序规约}
+\begin{algorithmic}[1]
+\Procedure{CountingSort}{$A,k$}
+    \State $C[0..k]\gets0$; \ForAll{$x\in A$} $C[x]\gets C[x]+1$ \EndFor
+    \For{$i\gets1$ \textbf{to} $k$} $C[i]\gets C[i]+C[i-1]$ \EndFor
+    \State $B\gets A$; \For{$i\gets|A|-1$ \textbf{downto} $0$} $C[B[i]]\gets C[B[i]]-1$; $A[C[B[i]]]\gets B[i]$ \EndFor
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{桶排序规约}
+\begin{algorithmic}[1]
+\Procedure{BucketSort}{$A,k$}
+    \State 将 $[Min,Max]$ 划分为 $k$ 个区间 $B_0..B_{k-1}$
+    \ForAll{$x\in A$} 将 $x$ 插入 $B_{\lfloor k\cdot(x-Min)/(Max-Min+1)\rfloor}$ \EndFor
+    \For{$i\gets0$ \textbf{to} $k-1$} 排序 $B_i$ \Comment{桶内插排} \EndFor
+    \State 串联 $B_0,\dots,B_{k-1}$ 回 $A$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{基数排序规约}
+\begin{algorithmic}[1]
+\Procedure{RadixSort}{$A,D$}
+    \For{$d\gets0$ \textbf{to} $D-1$}
+        \State 按第 $d$ 位稳定计数排序 $A$ \Comment{低位到高位}
+    \EndFor
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+
 
 \newpage
 
 \section{查找与并查集}
 
 \subsection{二分查找 (Binary Search)}
-作用于有序数组 $A$。维护搜索区间 $[l, r]$，取中点 $m = \lfloor (l+r)/2 \rfloor$。
-$$\text{若 } A[m] = x \implies \text{找到}; \text{若 } A[m] < x \implies l = m+1; \text{否则 } r = m-1$$
-时间复杂度 $O(\log n)$。
+\begin{itemize}
+    \item \textbf{对象}：有序数组 $A$ 上区间 $[l,r]$，$m=\lfloor(l+r)/2\rfloor$。
+    \item \textbf{不变式}：$A[m]=x\implies$找到；$A[m]<x\implies l=m+1$；否则 $r=m-1$。
+    \item \textbf{定理}：时间 $O(\log n)$，需随机访问 $O(1)$（顺序存储实例）。
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{二分查找规约}
+\begin{algorithmic}[1]
+\Procedure{BinarySearch}{$A,x$}
+    \State $l\gets0; r\gets|A|-1$
+    \While{$l\le r$}
+        \State $m\gets\lfloor(l+r)/2\rfloor$
+        \If{$A[m]=x$} \Return $m$ \ElsIf{$A[m]<x$} $l\gets m+1$ \Else $r\gets m-1$ \EndIf
+    \EndWhile
+    \State \Return $-1$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
 
 \subsection{并查集 (Union-Find)}
-维护不相交集合族 $\mathcal{S} = \{S_1, \dots, S_k\}$，$S_i \subseteq V$。
 \begin{itemize}
-    \item $\text{Find}(x)$：返回 $x$ 所在集合的代表元。
-    \item $\text{Union}(x, y)$：合并 $S_x$ 与 $S_y$。
+    \item \textbf{对象}：不相交集合族 $\mathcal{S}=\{S_1,\dots,S_k\}$。
+    \item \textbf{操作}：$\text{Find}(x)$ 取代表元，$\text{Union}(x,y)$ 合并；按秩合并+路径压缩后摊还 $O(\alpha(n))$。
 \end{itemize}
-引入按秩合并与路径压缩后，摊还复杂度 $O(\alpha(n))$，其中 $\alpha$ 为反阿克曼函数。
+
+\begin{algorithm}[H]
+\caption{并查集规约（路径压缩+按秩合并）}
+\begin{algorithmic}[1]
+\Procedure{Find}{$x$}
+    \If{$parent[x]\neq x$} $parent[x]\gets\text{Find}(parent[x])$ \EndIf
+    \State \Return $parent[x]$
+\EndProcedure
+\Procedure{Union}{$x,y$}
+    \State $rx\gets\text{Find}(x); ry\gets\text{Find}(y)$
+    \If{$rx=ry$} \Return \EndIf
+    \If{$rank[rx]<rank[ry]$} $parent[rx]\gets ry$
+    \ElsIf{$rank[rx]>rank[ry]$} $parent[ry]\gets rx$
+    \Else $parent[ry]\gets rx; rank[rx]\gets rank[rx]+1$ \EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
 
 \newpage
 
 \section{图论核心算法}
 
-\subsection{基础遍历}
-维护已访问集合 $\text{Visited} \subseteq V$。
-\subsubsection{BFS}
-\begin{enumerate}
-    \item 初始化 $Q = \{s\}$，$\text{Visited} = \{s\}$。
-    \item 当 $Q \neq \emptyset$，弹出 $u$。
-    \item $\forall v \in N(u) \setminus \text{Visited}$：$\text{Visited} \leftarrow \text{Visited} \cup \{v\}$，$Q \leftarrow Q \cup \{v\}$。
-\end{enumerate}
-
-\subsubsection{DFS}
-递归定义：$\text{DFS}(u) \implies \text{Visited} \leftarrow \text{Visited} \cup \{u\} \land \forall v \in N(u) \setminus \text{Visited}, \text{DFS}(v)$。
-
 \subsection{最短路径算法}
-维护距离函数 $D: V \to \mathbb{R} \cup \{\infty\}$。松弛操作：
-$$\text{若 } D[u] + w(u, v) < D[v] \implies D[v] \leftarrow D[u] + w(u, v)$$
+维护 $D:V\to\mathbb{R}\cup\{\infty\}$，松弛：$D[u]+w(u,v)<D[v]\implies D[v]\gets D[u]+w(u,v)$。
 
 \begin{enumerate}
-    \item \textbf{Dijkstra}：贪心策略。维护集合 $S$（已确定最短路径），每次选 $u \in V \setminus S$ 使 $D[u]$ 最小，加入 $S$ 并松弛邻边。不支持负权边。
-    \item \textbf{Bellman-Ford}：对 $E$ 进行 $|V|-1$ 轮全量松弛。若第 $|V|$ 轮仍可松弛，则存在负环。
-    \item \textbf{Floyd-Warshall}：动态规划。$D^{(k)}[i][j] = \min(D^{(k-1)}[i][j], D^{(k-1)}[i][k] + D^{(k-1)}[k][j])$。支持负权，但负环导致 $D[i][i] < 0$。
+    \item \textbf{Dijkstra}：贪心取 $u\in V\setminus S$ 使 $D[u]$ 最小入 $S$ 并松弛。不支持负权；优先队列 $\text{ExtractMin}/\text{DecreaseKey}$ 为贪心选择的实例化（实例取堆，见树章堆序）。
+    \item \textbf{Bellman-Ford}：$|V|-1$ 轮全量松弛；第 $|V|$ 轮可松弛 $\implies$ 负环，$O(|V||E|)$。
+    \item \textbf{Floyd-Warshall}：$D^{(k)}[i][j]=\min(D^{(k-1)}[i][j],D^{(k-1)}[i][k]+D^{(k-1)}[k][j])$，$O(|V|^3)$，支持负权，$D[i][i]<0\implies$负环。
 \end{enumerate}
 
 \begin{algorithm}[H]
-\caption{Dijkstra 最短路径伪代码}
+\caption{Dijkstra 规约（$Q$ 为优先队列实例）}
 \begin{algorithmic}[1]
-\State \textbf{输入}: 图 $G=(V, E)$, 源点 $s$, 权重 $w$
-\State \textbf{初始化}: $\forall v \in V, D[v] \gets \infty, D[s] \gets 0$
-\State $S \gets \emptyset$ \Comment{已确定最短路径集合}
-\State $Q \gets V$ \Comment{优先队列}
-\While{$Q \neq \emptyset$}
-    \State $u \gets \text{ExtractMin}(Q)$ \Comment{取出 $D[u]$ 最小的节点}
-    \State $S \gets S \cup \{u\}$
-    \ForAll{$v \in N(u)$}
-        \If{$D[u] + w(u, v) < D[v]$} \Comment{松弛操作}
-            \State $D[v] \gets D[u] + w(u, v)$
-            \State $\text{DecreaseKey}(Q, v, D[v])$
-        \EndIf
+\State \textbf{输入}: $G=(V,E),s,w$; $\forall v,D[v]\gets\infty,D[s]\gets0$; $S\gets\emptyset$; $Q\gets V$
+\While{$Q\neq\emptyset$}
+    \State $u\gets\text{ExtractMin}(Q)$; $S\gets S\cup\{u\}$
+    \ForAll{$v\in N(u)$} \If{$D[u]+w(u,v)<D[v]$} $D[v]\gets D[u]+w(u,v)$; $\text{DecreaseKey}(Q,v,D[v])$ \EndIf \EndFor
+\EndWhile
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{Bellman-Ford 规约}
+\begin{algorithmic}[1]
+\State \textbf{输入}: $G=(V,E),s,w$; $\forall v,D[v]\gets\infty,D[s]\gets0$
+\For{$i\gets1$ \textbf{to} $|V|-1$}
+    \ForAll{$(u,v)\in E$} \If{$D[u]+w(u,v)<D[v]$} $D[v]\gets D[u]+w(u,v); parent[v]\gets u$ \EndIf \EndFor
+\EndFor
+\ForAll{$(u,v)\in E$} \If{$D[u]+w(u,v)<D[v]$} \Return “存在负环” \EndIf \EndFor
+\State \Return $D$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{Floyd-Warshall 规约}
+\begin{algorithmic}[1]
+\State $D^{(0)}[i][j]\gets w(i,j)$ 若 $(i,j)\in E$ 否则 $\infty$, $D^{(0)}[i][i]\gets0$
+\For{$k\gets1$ \textbf{to} $|V|$}
+    \For{$i\gets1$ \textbf{to} $|V|$}
+        \For{$j\gets1$ \textbf{to} $|V|$}
+            \State $D^{(k)}[i][j]\gets\min(D^{(k-1)}[i][j], D^{(k-1)}[i][k]+D^{(k-1)}[k][j])$
+        \EndFor
+    \EndFor
+\EndFor
+\State 若 $\exists i, D^{(|V|)}[i][i]<0$ 则存在负环
+\end{algorithmic}
+\end{algorithm}
+
+
+
+\subsection{最小生成树 (MST)}
+\begin{enumerate}
+    \item \textbf{Prim}：任意 $r\in V$，维护 $T$，取横切边最小者入 $T$（割定理），$O(|E|\log|V|)$。
+    \item \textbf{Kruskal}：$E$ 升序，依序取 $(u,v)$ 若 $\text{Find}(u)\neq\text{Find}(v)$ 则入 MST（并查集实例），$O(|E|\log|E|)$。
+\end{enumerate}
+
+\begin{algorithm}[H]
+\caption{Prim 规约（$Q$ 为优先队列）}
+\begin{algorithmic}[1]
+\State $key[v]\gets\infty, parent[v]\gets\text{nil}, inT[r]\gets\text{true}, key[r]\gets0, Q\gets V$
+\While{$Q\neq\emptyset$}
+    \State $u\gets\text{ExtractMin}(Q)$; $inT[u]\gets\text{true}$
+    \ForAll{$v\in N(u)$} \If{$\neg inT[v]\land w(u,v)<key[v]$} $key[v]\gets w(u,v); parent[v]\gets u; \text{DecreaseKey}(Q,v,key[v])$ \EndIf \EndFor
+\EndWhile
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{Kruskal 规约（并查集判环）}
+\begin{algorithmic}[1]
+\State $A\gets\emptyset$; 将 $E$ 按 $w$ 升序; 初始化并查集
+\ForAll{$(u,v)\in E$ 有序}
+    \If{$\text{Find}(u)\neq\text{Find}(v)$} $A\gets A\cup\{(u,v)\}$; $\text{Union}(u,v)$ \EndIf
+\EndFor
+\State \Return $A$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{拓扑排序：Kahn 算法}
+\begin{itemize}
+    \item \textbf{对象}：DAG 的入度 $\text{indeg}(v)=|\{u\mid(u,v)\in E\}|$。
+    \item \textbf{规约}：$Q=\{v\mid\text{indeg}(v)=0\}$；弹出 $u$ 入 $\sigma$，$\forall v\in N(u),\text{indeg}(v)--$ 为 $0$ 则入 $Q$；$|\sigma|<|V|\implies$有环。
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{Kahn 拓扑排序规约}
+\begin{algorithmic}[1]
+\Procedure{Kahn}{$G$}
+    \State 计算 $\text{indeg}[v]$; $Q\gets\{v\mid\text{indeg}[v]=0\}$; $\sigma\gets\langle\rangle$
+    \While{$Q\neq\emptyset$}
+        \State $u\gets\text{pop}(Q)$; $\sigma\gets\sigma\circ\langle u\rangle$
+        \ForAll{$v\in N(u)$} $\text{indeg}[v]\gets\text{indeg}[v]-1$; \If{$\text{indeg}[v]=0$} $Q\gets Q\cup\{v\}$ \EndIf \EndFor
+    \EndWhile
+    \If{$|\sigma|<|V|$} \Return “有环” \Else \Return $\sigma$ \EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{启发式搜索：A* (A-Star)}
+\begin{itemize}
+    \item \textbf{对象}：加权图 $G$，起点 $s$，终点 $t$，启发式 $h:V\to\mathbb{R}_{\ge0}$ 估计 $v\to t$ 代价。
+    \item \textbf{不变式}：$g(v)$ 为 $s\to v$ 已知最短，$f(v)=g(v)+h(v)$ 为优先键；\textbf{可采纳} $h(v)\le h^*(v)$（真实最优），\textbf{一致} $h(u)\le w(u,v)+h(v)$。
+    \item \textbf{定理}：可采纳时 A* 首次出队 $t$ 即最优；$h\equiv0$ 退化为 Dijkstra；一致时无需重开集。
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{A* 规约}
+\begin{algorithmic}[1]
+\State $g[s]\gets0, f[s]\gets h(s), Q\gets\{s\}$ \Comment{$Q$ 按 $f$ 优先}
+\While{$Q\neq\emptyset$}
+    \State $u\gets\text{ExtractMin}(Q)$ \Comment{按 $f$}
+    \If{$u=t$} \Return 重构路径 \EndIf
+    \ForAll{$v\in N(u)$}
+        \State $ng\gets g[u]+w(u,v)$
+        \If{$ng<g[v]$} $g[v]\gets ng; f[v]\gets ng+h(v); parent[v]\gets u; Q\gets Q\cup\{v\}$ \EndIf
     \EndFor
 \EndWhile
 \end{algorithmic}
 \end{algorithm}
 
-\subsection{最小生成树 (MST)}
-\begin{enumerate}
-    \item \textbf{Prim}：从任意 $r \in V$ 开始，维护树节点集 $T$。每次选横切边 $(u, v)$ 中 $w(u, v)$ 最小且 $u \in T, v \notin T$ 的边，将 $v$ 加入 $T$。
-    \item \textbf{Kruskal}：将 $E$ 按权重升序排列。依序选边 $(u, v)$，若 $u, v$ 不在同一连通分量（用并查集判定），则加入 MST。
-\end{enumerate}
-
-\subsection{拓扑排序：Kahn 算法}
-\begin{enumerate}
-    \item 计算所有顶点入度 $\text{indeg}(v) = |\{u \mid (u, v) \in E\}|$。
-    \item 初始化队列 $Q = \{v \mid \text{indeg}(v) = 0\}$。
-    \item 弹出 $u$，加入序列 $\sigma$。$\forall v \in N(u)$，$\text{indeg}(v) \leftarrow \text{indeg}(v) - 1$; 若为 0 则入队。
-    \item 若 $|\sigma| < |V|$，则图含环。
-\end{enumerate}
-
 \section{高级工程专项算子}
 
 \subsection{网络流 (Network Flow)}
-图 $G=(V, E)$ 带容量 $c: E \to \mathbb{R}^+$。流 $f: E \to \mathbb{R}$ 满足：
-\begin{enumerate}
-    \item 容量限制：$0 \le f(u, v) \le c(u, v)$
-    \item 流量守恒：$\forall u \in V \setminus \{s, t\}, \sum_{v} f(u, v) = 0$
-\end{enumerate}
-\textbf{Edmonds-Karp}：在残量网络 $c_f(u, v) = c(u, v) - f(u, v)$ 中用 BFS 找增广路，更新 $f$ 直至无增广路。复杂度 $O(|V| \cdot |E|^2)$。
+\begin{itemize}
+    \item \textbf{对象}：$G=(V,E)$，容量 $c:E\to\mathbb{R}^+$，流 $f:E\to\mathbb{R}$ 满足 $0\le f\le c$ 且 $\forall u\neq s,t,\sum_v f(u,v)=0$。
+    \item \textbf{残量}：$c_f(u,v)=c(u,v)-f(u,v)$，增广路 $P$ 在 $G_f$ 中 $s\to t$。
+    \item \textbf{定理（最大流最小割）}：$|f|_{\max}=\min_{S\ni s,T\ni t} c(S,T)$；增广至无 $s\to t$ 路即最优。
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{Dinic 规约（分层+阻塞流）}
+\begin{algorithmic}[1]
+\Procedure{Dinic}{$G,s,t$}
+    \State $f\gets0$
+    \While{以 $c_f$ BFS 构分层 $level[\ ]$ 且可达 $t$}
+        \State $it[v]\gets0$ 对所有 $v$
+        \While{$push\gets\text{DFS}(s,t,\infty)$ 推得 $>0$} $f\gets f+push$ \EndWhile
+    \EndWhile
+    \State \Return $f$
+\EndProcedure
+\Procedure{DFS}{$u,t,upTo$}
+    \If{$u=t$} \Return $upTo$ \EndIf
+    \For{$i\gets it[u]$ \textbf{to} $|Adj[u]|-1$}
+        \State $it[u]\gets i$; 令 $(u,v)\gets Adj[u][i]$
+        \If{$c_f(u,v)>0 \land level[v]=level[u]+1$}
+            \State $d\gets\text{DFS}(v,t,\min(upTo,c_f(u,v)))$
+            \If{$d>0$} $c_f(u,v)\gets c_f(u,v)-d; c_f(v,u)\gets c_f(v,u)+d;$ \Return $d$ \EndIf
+        \EndIf
+    \EndFor
+    \State \Return $0$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
 
 \subsection{二分图最大匹配}
-二分图 $G=(X \cup Y, E)$。匹配 $M \subseteq E$ 满足任意两条边无公共顶点。
-\textbf{匈牙利算法}：寻找增广路 $P$（交替未匹配/匹配边，端点均未匹配）。若存在，则 $M' = M \oplus P$（对称差）为更大匹配。重复至无增广路。
+\begin{itemize}
+    \item \textbf{对象}：$G=(X\cup Y,E)$，匹配 $M\subseteq E$ 无公共点。
+    \item \textbf{定理（Berge）}：$M$ 最大 $\iff$ 无增广路 $P$（端点未匹配、交替）。$M'\gets M\oplus P$ 增大。
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{匈牙利增广规约}
+\begin{algorithmic}[1]
+\Procedure{MaxMatching}{$G$}
+    \State $M\gets\emptyset$
+    \ForAll{$u\in X$}
+        \State $vis[\ ]\gets\text{false}$
+        \If{$\text{DFS}(u)$}  \Comment{找到增广则 $M$ 已在 DFS 内翻转} \EndIf
+    \EndFor
+    \State \Return $M$
+\EndProcedure
+\Procedure{DFS}{$u$}
+    \ForAll{$v\in N(u)$}
+        \If{$\neg vis[v]$} $vis[v]\gets\text{true}$
+            \If{$match[v]=\text{nil} \lor \text{DFS}(match[v])$} $match[v]\gets u; M\gets M\oplus (u,v);$ \Return true \EndIf
+        \EndIf
+    \EndFor
+    \State \Return false
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
 
 \subsection{强连通分量 (SCC)：Tarjan 算法}
-基于 DFS 维护时间戳 $DFN[u]$ 与追溯值 $LOW[u]$。
 \begin{itemize}
-    \item 初始化：$DFN[u] = LOW[u] = \text{timer}$，$u$ 入栈。
-    \item 遍历邻接点 $v$：
-    \begin{itemize}
-        \item 若 $v$ 未访问：$\text{DFS}(v)$，$LOW[u] = \min(LOW[u], LOW[v])$
-        \item 若 $v$ 在栈中：$LOW[u] = \min(LOW[u], DFN[v])$
-    \end{itemize}
-    \item 若 $LOW[u] = DFN[u]$，则栈中 $u$ 及上方节点构成一个 SCC，批量弹栈。
+    \item \textbf{对象}：DFS 时间戳 $DFN[u]$，追溯 $LOW[u]$。
+    \item \textbf{不变式}：$u$ 入栈；$v$ 未访则 $LOW[u]=\min(LOW[u],LOW[v])$；$v$ 在栈则 $LOW[u]=\min(LOW[u],DFN[v])$。
+    \item \textbf{定理}：$LOW[u]=DFN[u]\iff u$ 为 SCC 根，栈中 $u$ 及以上一次弹出构成一 SCC，$O(|V|+|E|)$。
 \end{itemize}
-时间复杂度 $O(|V| + |E|)$。
+
+\begin{algorithm}[H]
+\caption{Tarjan SCC 规约}
+\begin{algorithmic}[1]
+\State $timer\gets0$; 栈 $S\gets\emptyset$
+\Procedure{Tarjan}{$u$}
+    \State $DFN[u]\gets LOW[u]\gets timer\gets timer+1$; $S.\text{push}(u)$; $onStack[u]\gets\text{true}$
+    \ForAll{$v\in N(u)$}
+        \If{$DFN[v]=\text{nil}$} $\text{Tarjan}(v)$; $LOW[u]\gets\min(LOW[u],LOW[v])$
+        \ElsIf{$onStack[v]$} $LOW[u]\gets\min(LOW[u],DFN[v])$ \EndIf
+    \EndFor
+    \If{$LOW[u]=DFN[u]$}
+        \Repeat $v\gets S.\text{pop}()$; $onStack[v]\gets\text{false}$; 输出 $v$ 归入同一 SCC \Until{$v=u$}
+    \EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}

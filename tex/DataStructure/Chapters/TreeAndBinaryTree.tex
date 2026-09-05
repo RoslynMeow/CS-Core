@@ -1,4 +1,4 @@
-\chapter{Non-linear Structures I: Trees and Binary Trees}
+\chapter{非线性结构 I：树与二叉树}
 
 树是一种一对多的非线性层次逻辑结构。在图论中，树被严密定义为：任意两个顶点间有且仅有一条路径的无环连通图。
 
@@ -31,8 +31,7 @@
     \item \textbf{偏斜树 (Skewed Tree)}：$\forall v, \text{deg}(v) \le 1$。退化为线性结构，检索复杂度 $O(n)$。
     \item \textbf{完全二叉树 (Complete Tree)}：节点按层序编号 $1 \dots n$，与满二叉树前 $n$ 个节点一一对应。
     \item \textbf{满二叉树 (Full Tree)}：$\forall v, \text{deg}(v) \in \{0, 2\}$，且所有叶子节点深度相同。
-    \item \textbf{二叉搜索树 (BST)}：满足偏序关系 $\forall x \in L, x.val < d.val \land \forall y \in R, y.val > d.val$。
-    \item \textbf{平衡二叉树 (AVL)}：$\forall v \in V, |H(L_v) - H(R_v)| \le 1$。
+    \item \textbf{有序与平衡特化}：二叉搜索树、AVL、红黑树、B/B+ 树均为在上述结构上附加序关系或平衡不变式的特化，详见本章后文各节（对象--不变式--定理--实例化）。
 \end{enumerate}
 
 \begin{figure}[H]
@@ -83,10 +82,13 @@
 
 \section{树的物理存储}
 
+树的存储分为数学映射与语言实例化两层。数学层只谈索引函数与元组结构；数组下标基址、指针结构体均为实例约定。
+
 \begin{enumerate}
     \item \textbf{顺序存储法（完全二叉树）}
     \begin{itemize}
         \item 映射到数组 $A[0..n-1]$。
+        \item \textbf{下标约定}：本书取 $0$ 基实例约定（C/Java 实例）。数学本质为完全二叉树的层序同构，$1$ 基形式为 $l(i)=2i, r(i)=2i+1$，与下式等价。
         \item 隐式纽带：$\forall i \in \{0, \dots, n-1\}$，
         \begin{itemize}
             \item 左子节点索引：$l(i) = 2i + 1$（若 $< n$）
@@ -97,7 +99,7 @@
     \item \textbf{链式存储法（二叉链表）}
     \begin{itemize}
         \item 节点结构：$n = \langle lc, d, rc \rangle$，其中 $lc, rc \in \text{Node} \cup \{\emptyset\}$。
-        \item 通用树转换（孩子兄弟表示法）：$n = \langle \text{firstChild}, d, \text{nextSibling} \rangle$。
+        \item 通用树转换定理（孩子兄弟表示法）：任意通用树同构于一棵二叉树，$n = \langle \text{firstChild}, d, \text{nextSibling} \rangle$。指针结构体为该同构的语言实例化。
     \end{itemize}
 \end{enumerate}
 
@@ -133,7 +135,7 @@
 
 \subsection{非递归遍历 (Iterative Traversal)}
 
-利用显式栈 $S$ 模拟系统调用栈，消除递归开销。
+递归即结构归纳，迭代即以显式栈 $S$ 对调用栈的模拟（模拟引理），空间仍为 $O(H)$，而非消除复杂度。
 
 \begin{algorithm}[H]
 \caption{中序遍历迭代伪代码 (Iterative Inorder)}
@@ -198,6 +200,128 @@
 \end{algorithmic}
 \end{algorithm}
 
+\section{二叉搜索树 (BST)}
+
+\begin{itemize}
+    \item \textbf{对象}：二叉树 $B = \langle d, L, R \rangle$，键来自全序集 $(K, <)$。
+    \item \textbf{不变式（序）}：$\forall x \in L, x.val < d.val \land \forall y \in R, y.val > d.val$。等价地，中序遍历序列 $\sigma_{\text{in}}(B)$ 严格递增。
+    \item \textbf{定理}：若不变式成立，则检索、插入、删除沿一条根--叶路径进行，时间 $O(H)$，其中 $H$ 为树高。偏斜时 $H = n-1$，退化为 $O(n)$；期望随机插入下 $H = O(\log n)$。
+    \item \textbf{操作规约}：$\text{Search}(x)$ 为序比较导航；$\text{Insert}(x)$ 为叶位扩展；$\text{Delete}(x)$ 为三态：叶直接删、单支提升、双支以后继 $\min(R)$ 替代并递归删后继，保持中序不变。
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{BST 规约（Search/Insert/Delete）}
+\begin{algorithmic}[1]
+\Procedure{Search}{$root,x$}
+    \State $u\gets root$ \While{$u\neq\text{nil}\land u.val\neq x$} \If{$x<u.val$} $u\gets u.left$ \Else $u\gets u.right$ \EndIf \EndWhile \State \Return $u$
+\EndProcedure
+\Procedure{Insert}{$root,x$}
+    \If{$root=\text{nil}$} \Return $\text{node}(x)$ \EndIf
+    \If{$x<root.val$} $root.left\gets\text{Insert}(root.left,x)$ \ElsIf{$x>root.val$} $root.right\gets\text{Insert}(root.right,x)$ \EndIf \State \Return $root$
+\EndProcedure
+\Procedure{Delete}{$root,x$}
+    \If{$x<root.val$} $root.left\gets\text{Delete}(root.left,x)$
+    \ElsIf{$x>root.val$} $root.right\gets\text{Delete}(root.right,x)$
+    \ElsIf{$root.left=\text{nil}$} \Return $root.right$
+    \ElsIf{$root.right=\text{nil}$} \Return $root.left$
+    \Else $s\gets\min(root.right)$; $root.val\gets s.val$; $root.right\gets\text{Delete}(root.right,s.val)$ \EndIf
+    \State \Return $root$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\section{平衡二叉树 (AVL)}
+
+\begin{itemize}
+    \item \textbf{对象}：BST $B$，记 $H(v)$ 为以 $v$ 为根的子树高，平衡因子 $bf(v) = H(L_v) - H(R_v)$。
+    \item \textbf{不变式（平衡）}：$\forall v \in V, |bf(v)| \le 1$。
+    \item \textbf{定理}：AVL 树高 $H = O(\log n)$（Fibonacci 下界：$n(H) \ge F_{H+3} - 1$）。插入/删除后沿回溯路径首个 $|bf| = 2$ 节点经一次旋转恢复全局不变式。
+    \item \textbf{旋转同构}：左旋/右旋为保持中序序列不变的树同构。四型：LL（右旋）、RR（左旋）、LR（先左后右）、RL（先右后左）。旋转只重写常数条边，为 $O(1)$。
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{AVL 插入与重平衡规约}
+\begin{algorithmic}[1]
+\Procedure{AVLInsert}{$v,x$}
+    \State $v\gets\text{BST-Insert}(v,x)$; 更新 $H$ 与 $bf$ 回溯
+    \If{$|bf(v)|=2$} \Comment{首个失衡点}
+        \If{$bf(v)=2\land bf(v.left)\ge0$} $v\gets\text{RightRotate}(v)$ \Comment{LL}
+        \ElsIf{$bf(v)=-2\land bf(v.right)\le0$} $v\gets\text{LeftRotate}(v)$ \Comment{RR}
+        \ElsIf{$bf(v)=2\land bf(v.left)<0$} $v.left\gets\text{LeftRotate}(v.left)$; $v\gets\text{RightRotate}(v)$ \Comment{LR}
+        \Else $v.right\gets\text{RightRotate}(v.right)$; $v\gets\text{LeftRotate}(v)$ \Comment{RL}
+        \EndIf
+    \EndIf
+    \State \Return $v$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\begin{itemize}
+    \item \textbf{对象}：BST 附加颜色函数 $c: V \to \{\text{红}, \text{黑}\}$，引入外部黑哨兵叶。
+    \item \textbf{不变式}：(1) 根为黑；(2) 红节点的子节点皆黑；(3) 任一根--叶路径黑高 $bh$ 一致；(4) 新插入节点初染红。
+    \item \textbf{定理（黑高引理）}：$n \ge 2^{bh} - 1$，故 $H \le 2\log_2(n+1) = O(\log n)$。插入修复至多两次旋转 + $O(\log n)$ 次变色；删除修复为兄弟态讨论，均保持黑高不变。
+    \item \textbf{与 AVL 对比}：AVL 平衡更紧（检索更优），红黑放宽到近似平衡（插入/删除变色均摊更优），同为 $O(\log n)$ 序结构。
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{红黑树插入修复规约}
+\begin{algorithmic}[1]
+\State $z\gets\text{BST-Insert}(root,x)$; $z.color\gets\text{红}$
+\While{$z.parent.color=\text{红}$}
+    \If{$z.parent$ 为祖父左子}
+        \State $y\gets$ 祖父右子 \Comment{叔}
+        \If{$y.color=\text{红}$} $y.color\gets\text{黑}$; $z.parent.color\gets\text{黑}$; $z.parent.parent.color\gets\text{红}$; $z\gets z.parent.parent$
+        \Else
+            \If{$z$ 为右子} $z\gets z.parent$; $\text{LeftRotate}(z)$ \EndIf
+            \State $z.parent.color\gets\text{黑}$; $z.parent.parent.color\gets\text{红}$; $\text{RightRotate}(z.parent.parent)$
+        \EndIf
+    \Else \Comment{镜像} \EndIf
+\EndWhile
+\State $root.color\gets\text{黑}$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{itemize}
+    \item \textbf{对象}：多路搜索树，阶为 $m$（网页实例取 $m \in \{3,4,5\}$）。内节点存有序键与子树指针。
+    \item \textbf{不变式（B 树）}：除根外每节点键数 $k \in [\lceil m/2 \rceil - 1, m-1]$，子数 $k+1$；键有序分隔子树区间；所有叶等深。
+    \item \textbf{定理}：高 $H = O(\log_m n)$。插入经分裂（中键上提）、删除经合并/借键，至多 $O(H)$ 个节点重写，分裂合并保持等深。
+    \item \textbf{B+ 特化}：内节点仅存分隔键，数据全在叶层且叶链表相连；区间扫描为叶链表线性遍历，点查仍 $O(\log_m n)$。内节点分支因子更大，高度更低。
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{B 树插入分裂规约}
+\begin{algorithmic}[1]
+\Procedure{BInsert}{$node,x$}
+    \If{$node$ 为叶} 插入 $x$ 有序; \Else 选子 $c$ 使区间含 $x$; $\text{BInsert}(c,x)$ \EndIf
+    \If{$|node.keys|=m$} \Comment{满}
+        \State $mid\gets$ 中键; 分裂为 $L,R$ 各 $\lceil m/2\rceil-1$ 键
+        \If{$node$ 为根} 新根 $\langle L,mid,R\rangle$ \Else 将 $mid$ 上提至父，父接 $L,R$ \EndIf
+    \EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\section{Huffman 最优树}
+
+\begin{itemize}
+    \item \textbf{对象}：字母表 $\Sigma$，频次 $freq: \Sigma\to\mathbb{N}$，带权路径 $WPL(T)=\sum_{c} freq(c)\cdot depth(c)$。
+    \item \textbf{不变式（最优）}：无前缀码，合并两最小频次节点得新子树，频次为和。
+    \item \textbf{定理}：Huffman 贪心构造的树 $WPL$ 最小，时间 $O(n\log n)$。
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{Huffman 构造规约}
+\begin{algorithmic}[1]
+\State $Q\gets$ 按 $freq$ 建最小堆，叶节点为 $(c,freq(c))$
+\For{$i\gets1$ \textbf{to} $|\Sigma|-1$}
+    \State $x\gets\text{ExtractMin}(Q)$; $y\gets\text{ExtractMin}(Q)$
+    \State $z\gets\text{node}(freq\gets freq(x)+freq(y), left\gets x, right\gets y)$
+    \State $\text{Insert}(Q,z)$
+\EndFor
+\State \Return $\text{ExtractMin}(Q)$
+\end{algorithmic}
+\end{algorithm}
+
 \section{堆体系 (Heap)}
 
 \begin{itemize}
@@ -205,6 +329,7 @@
     \item \textbf{大顶堆 (Max Heap)}：$\forall v \in V, v.val \ge \text{leftChild}(v).val \land v.val \ge \text{rightChild}(v).val$。
     \item \textbf{小顶堆 (Min Heap)}：$\forall v \in V, v.val \le \text{leftChild}(v).val \land v.val \le \text{rightChild}(v).val$。
     \item \textbf{功能}：提供 $O(1)$ 的最值访问与 $O(\log n)$ 的动态插入/删除，是优先队列的物理实现。
+    \item \textbf{定理}：自底向上建堆为 $O(n)$（高度求和 $\sum H/2^H$ 收敛）；上滤/下滤保持堆序，优先队列 $\text{ExtractMin}/\text{DecreaseKey}$ 为其实例化接口（供图论 Dijkstra 章复用）。
 \end{itemize}
 
 \begin{algorithm}[H]
@@ -225,6 +350,45 @@
         \State \textbf{Swap}($A[i], A[largest]$)
         \State \text{SiftDown}($largest, n$) \Comment{递归下滤}
     \EndIf
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}[H]
+\caption{建堆规约 (BuildHeap)}
+\begin{algorithmic}[1]
+\Procedure{BuildMaxHeap}{$A$}
+    \State $n\gets|A|$
+    \For{$i\gets\lfloor n/2\rfloor-1$ \textbf{downto} $0$}
+        \State $\text{SiftDown}(A,i,n)$
+    \EndFor
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\begin{itemize}
+    \item \textbf{定理}：建堆时间为 $O(n)$。高度 $h$ 层至多 $\lceil n/2^{h+1}\rceil$ 个节点下滤 $O(h)$，总和 $\sum_{h\ge0} n h/2^{h+1} = O(n)$。
+\end{itemize}
+
+\section{树上查询：LCA 倍增}
+\begin{itemize}
+    \item \textbf{对象}：有根树 $T$，$depth[v]$，$up[v][j]=v$ 的 $2^j$ 祖先，$LOG=\lceil\log_2|V|\rceil$。
+    \item \textbf{不变式}：$up[v][0]=parent(v)$，$up[v][j]=up[up[v][j-1]][j-1]$。
+    \item \textbf{规约}：查询 $(u,v)$：(1) 提深者至同深；(2) 同步上跳至分叉点之子，父即 LCA。预处理 $O(|V|\log|V|)$，查询 $O(\log|V|)$。
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{LCA 倍增规约}
+\begin{algorithmic}[1]
+\State 预处理: $depth[root]\gets0$, DFS 求 $up[v][0]$, $up[v][j]\gets up[up[v][j-1]][j-1]$
+\Procedure{LCA}{$u,v$}
+    \If{$depth[u]<depth[v]$} $\text{swap}(u,v)$ \EndIf
+    \State 将 $u$ 上提至 $depth[u]=depth[v]$ \Comment{二进制分解差值}
+    \If{$u=v$} \Return $u$ \EndIf
+    \For{$j\gets LOG-1$ \textbf{downto} $0$}
+        \If{$up[u][j]\neq up[v][j]$} $u\gets up[u][j]; v\gets up[v][j]$ \EndIf
+    \EndFor
+    \State \Return $parent[u]$
 \EndProcedure
 \end{algorithmic}
 \end{algorithm}

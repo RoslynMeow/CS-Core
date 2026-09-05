@@ -1,0 +1,853 @@
+import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faMaximize } from "@fortawesome/free-solid-svg-icons";
+import type { GraphAlgoScene } from "../../lib/graph";
+import type { Text } from "../../i18n/lang";
+import type { AlgoTable } from "./StateBar";
+import {
+    fitArrowLen,
+    getUndirectedBadgeColor,
+    graphHasWeight,
+    weightArrow,
+} from "../../lib/graphTheme";
+
+/** 图/树共用的渲染场景：库的算法步进 + 位置/边信息，喂给 GraphCanvas */
+export type GraphCanvasScene = GraphAlgoScene & {
+    nodes: {
+        id: number;
+        label: string;
+        x: number;
+        y: number;
+        /** 已从“上一棵树（输入树）”拆走的节点：空心 + 虚线描边（AVL/BST 建树双面板） */
+        hollow?: boolean;
+        /** 飞入动画起点（输入树坐标）：新节点从输入树“飞”到正在建立的树 */
+        fly?: { x: number; y: number };
+        /** 货架节点（B树/B+树）：多键一行排列；设置了 keys 时 label 不渲染（由 keys 渲染） */
+        keys?: (string | number)[];
+    }[];
+    edges: {
+        u: number;
+        v: number;
+        weight?: number;
+        beam?: boolean;
+        /** 虚线边（B+树叶子兄弟链等结构示意） */
+        dashed?: boolean;
+    }[];
+    /** MST 已选边（Prim 的 T 边 / Kruskal 的并查集 accepted 边）：绿色加粗，用于最小生成树演示 */
+    picked?: Array<[number, number]>;
+    directed?: boolean;
+    root?: number | null;
+    annotate?: Record<number, string>; // 节点下方小字（如 dist / key / bf）
+    edgeLabels?: Record<string, string>; // `${u}-${v}` → 'L' | 'R' 等边标注
+    blurred?: boolean; // 虚化预览：已选“从图创建导入”且未确认（点击画布导入）
+    error?: string; // 图不符合当前要求的原因（Render 显示红色横幅 + 去图创建）
+    warn?: Text; // 黄条警告（如退化链/偏斜树提示）
+    tone?: Record<number, number>; // 彩色树：节点类别配色索引（0=红 1=蓝 2=黄 3=灰 4=黑），fill 固定用 TONE_FILL
+    /** 双面板建树（AVL/BST）：左右面板标题（左=随机生成的输入树，右=正在建立的树）；GraphCanvas 需传 t 才渲染 */
+    panel?: { left?: Text; right?: Text };
+    /** 算法状态数组面板：画布下方展示 邻接表 / dist / prev / key / uf 等，随帧刷新 */
+    stateTables?: AlgoTable[];
+};
+
+const W = 760,
+    H = 440,
+    R = 17;
+
+/** 节点类别配色（彩色树 tone 的角色着色）：索引 → 填充色 / 标签色
+ *  0=红（根/红黑树红节点） 1=蓝 2=黄 3=灰 4=黑（红黑树黑节点） */
+export const TONE_FILL = [
+    "#dc2626",
+    "#4f46e5",
+    "#eab308",
+    "#64748b",
+    "#1e293b",
+];
+export const TONE_LABEL = ["#fff", "#fff", "#1e293b", "#fff", "#fff"];
+/** 彩色树（tone）下算法高亮的“圆环”颜色：fill 保持角色色，不再被算法色覆盖 */
+export const HL_RING = {
+    current: "#f59e0b",
+    exploring: "#f97316",
+    visited: "#059669",
+    frontier: "#0284c7",
+} as const;
+
+/** 货架节点（B树/B+树）：一行多键；宽随键数增长（封顶防溢出画布），高固定 */
+export const KEYS_BOX_W = (k: number) =>
+    Math.min(170, Math.max(34, 16 + k * 30));
+export const KEYS_BOX_H = 34;
+
+export function GraphCanvas({
+    scene,
+    width = W,
+    height = H,
+    hint,
+    onClick,
+    notice,
+    selected,
+    onNodeClick,
+    t,
+}: {
+    scene: GraphCanvasScene;
+    width?: number;
+    height?: number;
+    hint?: string;
+    onClick?: () => void;
+    notice?: React.ReactNode;
+    /** 当前被选中的节点 id（画虚线环） */
+    selected?: number | null;
+    /** 点击节点回调（虚化预览时被忽略，由整张画布负责“点击导入”） */
+    onNodeClick?: (id: number) => void;
+    /** i18n：渲染 scene.panel 双面板标题（AVL/BST 建树动画），同时启用面板固定/内容可缩放视口 */
+    t?: (x: Text) => string;
+}) {
+    const { nodes, edges, directed = false } = scene;
+    const pos = new Map(nodes.map((n) => [n.id, n]));
+    // MST 定稿帧：未选入树的边压暗，只留结果高亮
+    const dimUnpicked = !!(scene as any).dimUnpicked;
+    // 无向权重牌颜色（设置页可改，每帧渲染时读取）
+    const undirectedColor = getUndirectedBadgeColor();
+    // 数字层：统一最后绘制，保证数字不被对向箭头盖住
+    const numLayer: ReactNode[] = [];
+    // 边端点直接落在节点圆心（连接两个节点圆的中心）；节点圆/矩形后绘会盖住穿心线段，视觉上自然衔接
+    const edgePos = (u: number, v: number) => {
+        const a = pos.get(u),
+            b = pos.get(v);
+        if (!a || !b) return null;
+        return {
+            ax: a.x,
+            ay: a.y,
+            bx: b.x,
+            by: b.y,
+            mx: (a.x + b.x) / 2,
+            my: (a.y + b.y) / 2,
+        };
+    };
+    const isAlgoEdge = (u: number, v: number) =>
+        !!scene.edge &&
+        ((scene.edge![0] === u && scene.edge![1] === v) ||
+            (!directed && scene.edge![0] === v && scene.edge![1] === u));
+
+    // ================= 视口：谷歌地图式 平移 + 缩放 =================
+    // 设计采纳点：图/树布局有过大的自动缩放溢出画布的风险，这里用「滚轮以指针为中心缩放 + 空白拖拽平移 + ⊩ 复位」，
+    // 和 GraphStudio 保持一致；双面板建树（AVL/BST）也随视口缩放，整面一起看。
+    const svgRef = useRef<SVGSVGElement | null>(null);
+    const [view, setView] = useState({ tx: 0, ty: 0, s: 1 });
+    const [pan, setPan] = useState<{
+        sx: number;
+        sy: number;
+        tx: number;
+        ty: number;
+    } | null>(null);
+    /** 容器像素 → viewBox 用户坐标：SVG 等比缩放（内容不变形），换算时补偿纵向留白 */
+    const svgPoint = (
+        e: React.PointerEvent | React.MouseEvent | WheelEvent,
+    ): { x: number; y: number } => {
+        const svg = svgRef.current;
+        if (!svg) return { x: 0, y: 0 };
+        const rect = svg.getBoundingClientRect();
+        const contentW = rect.width;
+        const contentH = contentW * (H / W);
+        const padY = Math.max(0, (rect.height - contentH) / 2);
+        return {
+            x: ((e.clientX - rect.left) / contentW) * W,
+            y: ((e.clientY - rect.top - padY) / contentH) * H,
+        };
+    };
+    const onPointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+        // 只对空白处拖拽平移；点到节点/边交给默认 onNodeClick
+        if (e.target !== e.currentTarget) return;
+        if (e.button !== 0) return;
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+        const p = svgPoint(e);
+        setPan({ sx: p.x, sy: p.y, tx: view.tx, ty: view.ty });
+    };
+    const onPointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+        if (!pan) return;
+        const p = svgPoint(e);
+        setView((v) => ({
+            ...v,
+            tx: pan.tx + (p.x - pan.sx),
+            ty: pan.ty + (p.y - pan.sy),
+        }));
+    };
+    const onPointerUp = () => setPan(null);
+    // 滚轮缩放：原生非 passive 监听（React passive wheel 无法 preventDefault）
+    const wheelRef = useRef<(e: WheelEvent) => void>(() => {});
+    wheelRef.current = (e: WheelEvent) => {
+        e.preventDefault();
+        const p = svgPoint(e);
+        const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+        setView((v) => {
+            const s = Math.min(4, Math.max(0.3, v.s * factor));
+            // 保持指针下世界点不动：world = (svgP - tx)/s 恒定
+            const tx = p.x - (p.x - v.tx) * (s / v.s);
+            const ty = p.y - (p.y - v.ty) * (s / v.s);
+            return { tx, ty, s };
+        });
+    };
+    useEffect(() => {
+        const el = svgRef.current;
+        if (!el) return;
+        const h = (e: WheelEvent) => wheelRef.current(e);
+        el.addEventListener("wheel", h, { passive: false });
+        return () => el.removeEventListener("wheel", h);
+    }, []);
+    const viewActive = view.s !== 1 || view.tx !== 0 || view.ty !== 0;
+    const resetView = () => setView({ tx: 0, ty: 0, s: 1 });
+    const resetBtn = !scene.blurred && viewActive ? (
+        <button
+            onClick={resetView}
+            title={t ? t({ zh: "复位视图", en: "Reset view" } as Text) : "复位"}
+            style={{
+                position: "absolute",
+                top: 8,
+                right: 8,
+                zIndex: 5,
+                minWidth: 28,
+                height: 28,
+                padding: "0 8px",
+                borderRadius: 8,
+                border: "1px solid #c7d2fe",
+                background: "rgba(255,255,255,0.92)",
+                color: "#4338ca",
+                fontSize: 13,
+                fontWeight: 800,
+                cursor: "pointer",
+                boxShadow: "0 2px 8px rgba(2,6,23,.18)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+            }}
+        >
+            <FontAwesomeIcon icon={faMaximize} />
+        </button>
+    ) : null;
+
+    const inner =
+        nodes.length === 0 ? (
+            <div className="empty">空 · Empty</div>
+        ) : (
+            <svg
+                ref={svgRef}
+                viewBox={`0 0 ${W} ${H}`}
+                width={width}
+                height={height}
+                style={{
+                    width: "100%",
+                    height: "auto",
+                    display: "block",
+                    cursor: pan ? "grabbing" : viewActive ? "grab" : undefined,
+                    touchAction: "none",
+                    // 防止拖拽/点击画布时选中节点名字文本
+                    userSelect: "none",
+                    WebkitUserSelect: "none",
+                }}
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerUp}
+                onPointerLeave={onPointerUp}
+            >
+                {/* 视口变换：谷歌地图式平移缩放 —— 整面内容（含双面板）随视口，保持结构完整 */}
+                <g transform={`translate(${view.tx} ${view.ty}) scale(${view.s})`}>
+                    {/* 双面板建树（AVL/BST）：左=输入树，右=正在建立的树；中缝 + 面板标题 */}
+                    {scene.panel && t && (
+                        <g>
+                            <line
+                                x1={380}
+                                y1={40}
+                                x2={380}
+                                y2={424}
+                                stroke="#e2e8f0"
+                                strokeWidth={1.5}
+                            />
+                            {scene.panel.left && (
+                                <text
+                                    x={192}
+                                    y={19}
+                                    textAnchor="middle"
+                                    fontSize={12}
+                                    fontWeight={800}
+                                    fill="#475569"
+                                >
+                                    {t(scene.panel.left)}
+                                </text>
+                            )}
+                            {scene.panel.right && (
+                                <text
+                                    x={568}
+                                    y={19}
+                                    textAnchor="middle"
+                                    fontSize={12}
+                                    fontWeight={800}
+                                    fill="#475569"
+                                >
+                                    {t(scene.panel.right)}
+                                </text>
+                            )}
+                        </g>
+                    )}
+                    {edges.map((e, i) => {
+                        const p = edgePos(e.u, e.v);
+                        if (!p) return null;
+                        // 双向边（有向图同时存在 u→v 与 v→u）画成对称弧线，避免线/箭头/权重完全重合
+                        const curved =
+                            directed &&
+                            e.u !== e.v &&
+                            edges.some((o) => o.u === e.v && o.v === e.u);
+                        const CURVE = 16; // 弧高（垂直偏移像素）
+                        // 只要有一条显式权重，全图视为有权图：权重（含显式 1）全部显示数值
+                        const showW =
+                            e.weight !== undefined || graphHasWeight(edges);
+                        const wVal = e.weight ?? 1;
+                        if (e.beam) {
+                            // 光束：被拆节点（左）→ 新节点（右），流动虚线“送”节点过去
+                            return (
+                                <g key={i}>
+                                    <line
+                                        x1={p.ax}
+                                        y1={p.ay}
+                                        x2={p.bx}
+                                        y2={p.by}
+                                        stroke="#f59e0b"
+                                        strokeWidth={2.5}
+                                        strokeDasharray="6 6"
+                                        className="tree-beam"
+                                    />
+                                </g>
+                            );
+                        }
+                        const active = isAlgoEdge(e.u, e.v);
+                        // MST 已选边（picked）：绿色加粗
+                        const mstPicked =
+                            scene.picked?.some(
+                                ([a, b]) =>
+                                    (a === e.u && b === e.v) ||
+                                    (a === e.v && b === e.u),
+                            ) ?? false;
+                        const stroke = mstPicked
+                            ? "#dc2626"
+                            : active
+                              ? "#f59e0b"
+                              : "#64748b";
+                        const sw = mstPicked ? 3.8 : active ? 3 : 1.6;
+                        const dimmed = dimUnpicked && !mstPicked;
+                        const elb = scene.edgeLabels?.[`${e.u}-${e.v}`];
+                        // 有向边：箭头画在目标节点外沿，线止于外沿，避免被后绘的实心节点圆盖住
+                        // 直线用起终点方向；弧线用终点切线方向（P1 - C）
+                        const dxx = p.bx - p.ax,
+                            dyy = p.by - p.ay;
+                        const dl = Math.hypot(dxx, dyy) || 1;
+                        const ux = dxx / dl,
+                            uy = dyy / dl; // 源→目标单位向量
+                        // 弧线控制点：中点沿右法线偏移（反向边自动偏向另一侧，对称分开）
+                        const cx = curved ? (p.ax + p.bx) / 2 - uy * CURVE : (p.ax + p.bx) / 2;
+                        const cy = curved ? (p.ay + p.by) / 2 + ux * CURVE : (p.ay + p.by) / 2;
+                        // 二次贝塞尔 t=0.5 处（弧顶）：无向权重牌放这里，两条弧自然错开
+                        const lx = curved ? (p.ax + 2 * cx + p.bx) / 4 : p.mx;
+                        const ly = curved ? (p.ay + 2 * cy + p.by) / 4 : p.my;
+                        // 终点切线（弧线）或直线方向
+                        let tx = ux,
+                            ty = uy;
+                        if (curved) {
+                            const gx = p.bx - cx,
+                                gy = p.by - cy;
+                            const gl = Math.hypot(gx, gy) || 1;
+                            tx = gx / gl;
+                            ty = gy / gl;
+                        }
+                        // 权重数字直接写进箭头三角形里；无权边用稍大的箭头保证可见
+                        const wa = weightArrow(wVal);
+                        const needLen = showW && directed ? wa.len : 15;
+                        // A：按边长封顶（对子边各分一半跨度），两三角永不互盖
+                        const AL = fitArrowLen(needLen, dl, curved);
+                        const asc = needLen > 0 ? AL / needLen : 1;
+                        const AH = (showW && directed ? wa.half : 7) * asc;
+                        const afont =
+                            showW && directed
+                                ? Math.max(7, Math.round(wa.font * asc))
+                                : wa.font;
+                        const tx2 = p.bx - tx * (R - 1); // 目标外沿内嵌 1px，保证与节点圆视觉相接
+                        const ty2 = p.by - ty * (R - 1);
+                        const bx2 = tx2 - tx * AL,
+                            by2 = ty2 - ty * AL; // 底边中心（回退）
+                        const px2 = -ty,
+                            py2 = tx; // 垂直单位
+                        // 线止于三角底边中心：三角里不穿线，数字独占干净底色
+                        const ex2 = directed ? bx2 : p.bx;
+                        const ey2 = directed ? by2 : p.by;
+                        const edgePath = curved
+                            ? `M ${p.ax} ${p.ay} Q ${cx} ${cy} ${bx2} ${by2}`
+                            : undefined;
+                        // 数字放在三角形视觉中心（约 0.55 倍箭长处），白字加深色描边保证可读
+                        const nx = tx2 - tx * AL * 0.55;
+                        const ny = ty2 - ty * AL * 0.55;
+                        // 无向有权边：中点牌子（主题色区分无向），数字写牌子里；定稿 MST 边同样变红
+                        const badgeFill = mstPicked ? (dimUnpicked ? "#dc2626" : "#059669") : directed ? stroke : undirectedColor;
+                        // 数字层统一最后绘制（C）：push 无返回值渲染问题，提前 imperative 收集
+                        if (showW && directed) {
+                            numLayer.push(
+                                <text
+                                    key={`num-${i}`}
+                                    x={nx}
+                                    y={ny}
+                                    textAnchor="middle"
+                                    dominantBaseline="central"
+                                    fontSize={afont}
+                                    fontWeight={800}
+                                    fill="#fff"
+                                    stroke="rgba(15,23,42,.8)"
+                                    strokeWidth={2.5}
+                                    paintOrder="stroke"
+                                    opacity={dimmed ? 0.25 : undefined}
+                                >
+                                    {wVal}
+                                </text>,
+                            );
+                        }
+                        return (
+                            <g key={i} opacity={dimmed ? 0.22 : undefined}>
+                                {curved ? (
+                                    <path
+                                        d={edgePath}
+                                        fill="none"
+                                        stroke={stroke}
+                                        strokeWidth={sw}
+                                        strokeDasharray={
+                                            e.dashed && !active ? "4 4" : undefined
+                                        }
+                                    />
+                                ) : (
+                                    <line
+                                        x1={p.ax}
+                                        y1={p.ay}
+                                        x2={ex2}
+                                        y2={ey2}
+                                        stroke={stroke}
+                                        strokeWidth={sw}
+                                        strokeDasharray={
+                                            e.dashed && !active ? "4 4" : undefined
+                                        }
+                                    />
+                                )}
+                                {directed ? (
+                                    <polygon
+                                        points={`${tx2},${ty2} ${bx2 + px2 * AH},${by2 + py2 * AH} ${bx2 - px2 * AH},${by2 - py2 * AH}`}
+                                        fill={stroke}
+                                    />
+                                ) : (
+                                    showW && (
+                                        <g opacity={dimmed ? 0.25 : undefined}>
+                                            <circle
+                                                cx={lx}
+                                                cy={ly}
+                                                r={9}
+                                                fill={badgeFill}
+                                            />
+                                            <text
+                                                x={lx}
+                                                y={ly + 3}
+                                                textAnchor="middle"
+                                                fontSize={10}
+                                                fontWeight={800}
+                                                fill="#fff"
+                                            >
+                                                {wVal}
+                                            </text>
+                                        </g>
+                                    )
+                                )}
+                                {elb && (
+                                    <text
+                                        x={lx}
+                                        y={ly - 6}
+                                        textAnchor="middle"
+                                        fontSize={10}
+                                        fontWeight={800}
+                                        fill="#64748b"
+                                    >
+                                        {elb}
+                                    </text>
+                                )}
+                            </g>
+                        );
+                    })}
+                    {nodes.map((n) => {
+                        const hollow = !!n.hollow;
+                        const isCurrent = scene.current === n.id;
+                        const isExp = scene.exploring === n.id;
+                        const isVis = scene.visited.includes(n.id);
+                        const isFr = scene.frontier.includes(n.id);
+                        const isRoot = scene.root === n.id;
+                        const isAlgo = isCurrent || isExp || isVis || isFr;
+                        const boxKeys =
+                            n.keys !== undefined && n.keys.length > 0
+                                ? n.keys
+                                : null;
+                        const boxW = boxKeys ? KEYS_BOX_W(boxKeys.length) : 0;
+                        const cellW = boxKeys ? boxW / boxKeys.length : 0;
+                        const tone = scene.tone?.[n.id];
+                        const toneMode =
+                            scene.tone !== undefined && tone !== undefined;
+                        const fill = toneMode
+                            ? (TONE_FILL[tone] ?? "#fff")
+                            : hollow
+                              ? "#f8fafc"
+                              : isCurrent
+                                ? "#4f46e5"
+                                : isExp
+                                  ? "#f59e0b"
+                                  : isVis
+                                    ? "#10b981"
+                                    : isFr
+                                      ? "#38bdf8"
+                                      : "#fff";
+                        const stroke = hollow
+                            ? "#94a3b8"
+                            : isCurrent
+                              ? "#312e81"
+                              : isExp
+                                ? "#b45309"
+                                : isVis
+                                  ? "#059669"
+                                  : isFr
+                                    ? "#0284c7"
+                                    : isRoot
+                                      ? "#dc2626"
+                                      : "#6366f1";
+                        const sw =
+                            isCurrent || isExp
+                                ? 3
+                                : isRoot
+                                  ? 2.4
+                                  : hollow
+                                    ? 1.2
+                                    : 1.4;
+                        const labelColor = toneMode
+                            ? (TONE_LABEL[tone] ?? "#fff")
+                            : hollow
+                              ? "#94a3b8"
+                              : isAlgo
+                                ? "#fff"
+                                : "#1e293b";
+                        const ringColor = isCurrent
+                            ? HL_RING.current
+                            : isExp
+                              ? HL_RING.exploring
+                              : isVis
+                                ? HL_RING.visited
+                                : isFr
+                                  ? HL_RING.frontier
+                                  : null;
+                        const orderIdx = scene.order.indexOf(n.id);
+                        const ann = scene.annotate?.[n.id];
+                        // 飞入动画：起点 = 输入树中的位置（--fx/--fy 是平移偏移量，CSS 动画平移到原位）
+                        const flyStyle = n.fly
+                            ? ({
+                                  "--fx": `${n.fly.x - n.x}px`,
+                                  "--fy": `${n.fly.y - n.y}px`,
+                              } as React.CSSProperties)
+                            : undefined;
+                        const topGap = boxKeys ? KEYS_BOX_H / 2 : R;
+                        // 预计算三种状态的外圈（货架用矩形、圆用圆环），避免在 JSX 里内联嵌套三元
+                        let shapeBody: React.ReactNode;
+                        let boxWv = 0;
+                        let cellWv = 0;
+                        if (boxKeys) {
+                            boxWv = boxW;
+                            cellWv = cellW;
+                            shapeBody = (
+                                <g>
+                                    <rect
+                                        x={n.x - boxWv / 2}
+                                        y={n.y - KEYS_BOX_H / 2}
+                                        width={boxWv}
+                                        height={KEYS_BOX_H}
+                                        rx={8}
+                                        fill={fill}
+                                        stroke={stroke}
+                                        strokeWidth={sw}
+                                        strokeDasharray={
+                                            hollow ? "4 3" : undefined
+                                        }
+                                    />
+                                    {boxKeys.map((k, i) => (
+                                        <g key={i}>
+                                            {i > 0 && (
+                                                <line
+                                                    x1={n.x - boxWv / 2 + i * cellWv}
+                                                    y1={n.y - KEYS_BOX_H / 2 + 6}
+                                                    x2={n.x - boxWv / 2 + i * cellWv}
+                                                    y2={n.y + KEYS_BOX_H / 2 - 6}
+                                                    stroke={
+                                                        hollow ? "#cbd5e1" : "#94a3b8"
+                                                    }
+                                                    strokeWidth={1}
+                                                />
+                                            )}
+                                            <text
+                                                x={
+                                                    n.x - boxWv / 2 + i * cellWv + cellWv / 2
+                                                }
+                                                y={n.y + 4}
+                                                textAnchor="middle"
+                                                fontSize={11}
+                                                fontWeight={700}
+                                                fill={labelColor}
+                                            >
+                                                {String(k)}
+                                            </text>
+                                        </g>
+                                    ))}
+                                </g>
+                            );
+                        } else {
+                            shapeBody = (
+                                <circle
+                                    cx={n.x}
+                                    cy={n.y}
+                                    r={R}
+                                    fill={fill}
+                                    stroke={stroke}
+                                    strokeWidth={sw}
+                                    strokeDasharray={hollow ? "4 3" : undefined}
+                                />
+                            );
+                        }
+                        const ringBody =
+                            toneMode && ringColor ? (
+                                boxKeys ? (
+                                    <rect
+                                        x={n.x - boxWv / 2 - 3}
+                                        y={n.y - KEYS_BOX_H / 2 - 3}
+                                        width={boxWv + 6}
+                                        height={KEYS_BOX_H + 6}
+                                        rx={11}
+                                        fill="none"
+                                        stroke={ringColor}
+                                        strokeWidth={
+                                            isCurrent || isExp ? 3.5 : 2.5
+                                        }
+                                    />
+                                ) : (
+                                    <circle
+                                        cx={n.x}
+                                        cy={n.y}
+                                        r={R + (isCurrent || isExp ? 5 : 4)}
+                                        fill="none"
+                                        stroke={ringColor}
+                                        strokeWidth={
+                                            isCurrent || isExp ? 3.5 : 2.5
+                                        }
+                                    />
+                                )
+                            ) : null;
+                        const selBody =
+                            selected === n.id ? (
+                                boxKeys ? (
+                                    <rect
+                                        x={n.x - boxWv / 2 - 4}
+                                        y={n.y - KEYS_BOX_H / 2 - 4}
+                                        width={boxWv + 8}
+                                        height={KEYS_BOX_H + 8}
+                                        rx={13}
+                                        fill="none"
+                                        stroke="#7c3aed"
+                                        strokeWidth={2.5}
+                                        strokeDasharray="5 4"
+                                    />
+                                ) : (
+                                    <circle
+                                        cx={n.x}
+                                        cy={n.y}
+                                        r={R + 7}
+                                        fill="none"
+                                        stroke="#7c3aed"
+                                        strokeWidth={2.5}
+                                        strokeDasharray="5 4"
+                                    />
+                                )
+                            ) : null;
+                        return (
+                            <g
+                                key={n.id}
+                                onClick={(e) => {
+                                    if (scene.blurred) return; // 虚化预览：交给外层“点击画布导入”
+                                    e.stopPropagation();
+                                    onNodeClick?.(n.id);
+                                }}
+                                style={{
+                                    cursor:
+                                        onNodeClick && !scene.blurred
+                                            ? "pointer"
+                                            : undefined,
+                                    opacity: hollow ? 0.72 : undefined,
+                                }}
+                            >
+                                <g
+                                    className={n.fly ? "tree-fly" : undefined}
+                                    style={flyStyle}
+                                >
+                                    {shapeBody}
+                                    {/* 彩色树（tone）下算法高亮用圆环表示，保持角色色与图例一致 */}
+                                    {ringBody}
+                                    {!boxKeys && (
+                                        <text
+                                            x={n.x}
+                                            y={n.y + 4}
+                                            textAnchor="middle"
+                                            fontSize={11}
+                                            fontWeight={700}
+                                            fill={labelColor}
+                                        >
+                                            {n.label}
+                                        </text>
+                                    )}
+                                    {isRoot && (
+                                        <text
+                                            x={n.x}
+                                            y={n.y - topGap - 3}
+                                            textAnchor="middle"
+                                            fontSize={9}
+                                            fontWeight={800}
+                                            fill="#dc2626"
+                                        >
+                                            根
+                                        </text>
+                                    )}
+                                    {orderIdx >= 0 && (
+                                        <text
+                                            x={
+                                                n.x + (boxKeys ? boxWv / 2 : R) - 2
+                                            }
+                                            y={n.y - topGap + 2}
+                                            fontSize={9}
+                                            fontWeight={800}
+                                            fill={
+                                                isCurrent ? "#e0e7ff" : "#475569"
+                                            }
+                                        >
+                                            {orderIdx + 1}
+                                        </text>
+                                    )}
+                                    {ann !== undefined && (
+                                        <text
+                                            x={n.x}
+                                            y={n.y + topGap + 12}
+                                            textAnchor="middle"
+                                            fontSize={9}
+                                            fontWeight={700}
+                                            fill="#64748b"
+                                        >
+                                            {ann}
+                                        </text>
+                                    )}
+                                    {/* 被点击选中：紫色虚线环 */}
+                                    {selBody}
+                                </g>
+                            </g>
+                        );
+                    })}
+                    {/* 数字层最后绘制：权重数字永远在最上，不被对向箭头盖住 */}
+                    {numLayer}
+                </g>
+            </svg>
+        );
+
+    if (!scene.blurred && !hint && !notice)
+        return (
+            <div style={{ position: "relative" }}>
+                {inner}
+                {resetBtn}
+            </div>
+        );
+    return (
+        <div
+            style={{
+                position: "relative",
+                cursor: onClick ? "pointer" : undefined,
+            }}
+            onClick={onClick}
+        >
+            <div
+                style={
+                    scene.blurred
+                        ? {
+                              filter: "blur(6px) saturate(0.7)",
+                              opacity: 0.55,
+                              pointerEvents: "none",
+                              userSelect: "none",
+                          }
+                        : undefined
+                }
+            >
+                {inner}
+            </div>
+            {hint && (
+                <div
+                    style={{
+                        position: "absolute",
+                        inset: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        pointerEvents: "none",
+                    }}
+                >
+                    <span
+                        style={{
+                            background: "rgba(15, 23, 42, 0.82)",
+                            color: "#fff",
+                            border: "1px solid rgba(165, 180, 252, 0.55)",
+                            padding: "10px 18px",
+                            borderRadius: 999,
+                            fontSize: 13,
+                            fontWeight: 800,
+                            letterSpacing: ".02em",
+                            boxShadow: "0 6px 24px rgba(2, 6, 23, 0.4)",
+                        }}
+                    >
+                        {hint}
+                    </span>
+                </div>
+            )}
+            {notice && (
+                <div
+                    style={{
+                        position: "absolute",
+                        left: 0,
+                        right: 0,
+                        bottom: 12,
+                        display: "flex",
+                        justifyContent: "center",
+                        pointerEvents: "none",
+                    }}
+                >
+                    <div
+                        style={{
+                            pointerEvents: "auto",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            gap: 10,
+                            flexWrap: "wrap",
+                            background: "#fef2f2",
+                            border: "1px solid #fecaca",
+                            color: "#b91c1c",
+                            padding: "8px 14px",
+                            borderRadius: 12,
+                            fontSize: 13,
+                            fontWeight: 700,
+                            boxShadow: "0 6px 24px rgba(127, 29, 29, 0.18)",
+                            maxWidth: "92%",
+                        }}
+                    >
+                        {notice}
+                    </div>
+                </div>
+            )}
+            {!scene.blurred && resetBtn}
+        </div>
+    );
+}
+export default GraphCanvas;
