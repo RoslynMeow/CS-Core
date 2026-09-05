@@ -864,22 +864,22 @@ export function MemoryVisualizer() {
                     })}
                   </div>
                   <span style={{ color: '#64748b', letterSpacing: 0.5, overflow: 'hidden', whiteSpace: 'nowrap', fontSize: 11 }}>
-                      {Array.from({ length: 16 }, (_, i) => {
-                        const idx = off + i;
-                        if (idx >= total) return <span key={i}> </span>;
-                        const v = bytes[idx];
-                        const ch = v >= 32 && v <= 126 ? String.fromCharCode(v) : '.';
-                        const addr = base + idx;
-                        const a = addrToAlloc.get(addr);
-                        const f = addrToField.get(addr);
-                        const isSel = selectedAddr === addr;
-                        const a2 = a != null ? a : undefined;
-                        const inSelAlloc = selScope !== null && selScope.key !== null && a2 !== undefined && addr >= selScope.start && addr < selScope.end && a2.key === selScope.key;
-                        return (
-                          <span key={i} onClick={() => selectAddr(addr)} title={`0x${addr.toString(16)} = 0x${toHexByte(v)} '${ch}'`} style={{ color: isSel ? '#0f172a' : a ? (f?.field.color ?? a.color ?? '#0f172a') : '#94a3b8', fontWeight: a ? 700 : 400, background: isSel ? '#e2e8f0' : inSelAlloc ? 'rgba(56,189,248,.35)' : 'transparent', borderRadius: 2, cursor: 'pointer', padding: '0 1px', animation: inSelAlloc ? 'memBlink 1.1s infinite' : undefined }}>{ch}</span>
-                        );
-                      })}
-                    </span>
+                    {Array.from({ length: 16 }, (_, i) => {
+                      const idx = off + i;
+                      if (idx >= total) return <span key={i}> </span>;
+                      const v = bytes[idx];
+                      const ch = v >= 32 && v <= 126 ? String.fromCharCode(v) : '.';
+                      const addr = base + idx;
+                      const a = addrToAlloc.get(addr);
+                      const f = addrToField.get(addr);
+                      const isSel = selectedAddr === addr;
+                      const a2 = a != null ? a : undefined;
+                      const inSelAlloc = selScope !== null && selScope.key !== null && a2 !== undefined && addr >= selScope.start && addr < selScope.end && a2.key === selScope.key;
+                      return (
+                        <span key={i} onClick={() => selectAddr(addr)} title={`0x${addr.toString(16)} = 0x${toHexByte(v)} '${ch}'`} style={{ color: isSel ? '#0f172a' : a ? (f?.field.color ?? a.color ?? '#0f172a') : '#94a3b8', fontWeight: a ? 700 : 400, background: isSel ? '#e2e8f0' : inSelAlloc ? 'rgba(56,189,248,.35)' : 'transparent', borderRadius: 2, cursor: 'pointer', padding: '0 1px', animation: inSelAlloc ? 'memBlink 1.1s infinite' : undefined }}>{ch}</span>
+                      );
+                    })}
+                  </span>
                 </div>
               );
             })}
@@ -888,218 +888,218 @@ export function MemoryVisualizer() {
 
         {/* 结构侧栏 */}
         <div style={{ border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden', background: '#fff', display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, minWidth: 0 }}>
-            <div style={{ padding: '10px 12px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0, flexWrap: 'wrap' }}>
-              <span style={{ fontWeight: 800, fontSize: 12 }}>结构视图</span>
-              <span style={{ fontSize: 11, color: '#64748b' }}>{allocs.length} 块 · 按地址升序</span>
-              <span style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 11, color: '#64748b' }}>
-                <span>字段解码</span>
-                {(['little', 'big'] as const).map(e => (
-                  <button
-                    key={e}
-                    onClick={toggleEndian}
-                    style={{ padding: '2px 8px', borderRadius: 999, border: '1px solid #c7d2fe', background: viewEndian === e ? '#4f46e5' : '#fff', color: viewEndian === e ? '#fff' : '#4338ca', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}
-                  >
-                    {e}
-                  </button>
-                ))}
+          <div style={{ padding: '10px 12px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0, flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: 800, fontSize: 12 }}>结构视图</span>
+            <span style={{ fontSize: 11, color: '#64748b' }}>{allocs.length} 块 · 按地址升序</span>
+            <span style={{ display: 'flex', gap: 4, alignItems: 'center', fontSize: 11, color: '#64748b' }}>
+              <span>字段解码</span>
+              {(['little', 'big'] as const).map(e => (
                 <button
-                  onClick={cycleDecodeMode}
-                  title={`全局解码模式（点击强制全部字段一起切换，清除单独设置）：${DECODE_MODES.map(l => MODE_LABEL[l]).join(' → ')}`}
-                  style={{ padding: '2px 8px', borderRadius: 999, border: '1px solid #c7d2fe', background: decodeMode !== 'auto' ? '#4f46e5' : '#fff', color: decodeMode !== 'auto' ? '#fff' : '#4338ca', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}
+                  key={e}
+                  onClick={toggleEndian}
+                  style={{ padding: '2px 8px', borderRadius: 999, border: '1px solid #c7d2fe', background: viewEndian === e ? '#4f46e5' : '#fff', color: viewEndian === e ? '#fff' : '#4338ca', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}
                 >
-                  模式:{MODE_LABEL[decodeMode]}
+                  {e}
                 </button>
-              </span>
-              <span style={{ flex: 1 }} />
-              <button className="ghost" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => setSettingsOpen(true)}>
-                ⚙ 总体设置
-              </button>
+              ))}
               <button
-                className="ghost"
-                style={{ padding: '4px 8px', fontSize: 11 }}
-                onClick={() => {
-                  try {
-                    const raw = mode === 'b64' ? tryAtob((activeHex || b64).trim()) : jsonText;
-                    copy(raw);
-                  } catch {
-                    copy(jsonText);
-                  }
-                }}
+                onClick={cycleDecodeMode}
+                title={`全局解码模式（点击强制全部字段一起切换，清除单独设置）：${DECODE_MODES.map(l => MODE_LABEL[l]).join(' → ')}`}
+                style={{ padding: '2px 8px', borderRadius: 999, border: '1px solid #c7d2fe', background: decodeMode !== 'auto' ? '#4f46e5' : '#fff', color: decodeMode !== 'auto' ? '#fff' : '#4338ca', fontWeight: 700, fontSize: 11, cursor: 'pointer' }}
               >
-                复制 JSON
+                模式:{MODE_LABEL[decodeMode]}
               </button>
-            </div>
-            <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 10, flex: 1, minHeight: 0, overflowY: 'auto' }}>
-              {allocs.length === 0 ? (
-                <div style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center', padding: 16 }}>无分配 — 展开底部输入粘贴 Base64 或编辑 JSON 后解析</div>
-              ) : (
-                [...allocs]
-                  .map(a => ({ a, addr: parseAddr(a.addr as any, base) }))
-                  .sort((x, y) => x.addr - y.addr)
-                  .map(({ a, addr }) => {
-                    const fields = Array.isArray(a.fields) ? a.fields : [];
-                    return (
-                      <div
-                        key={a.key}
-                        id={`alloc-${a.key}`}
-                        onClick={() => setSelectedAddr(addr)}
-                        style={{
-                          border: `1.5px solid ${selectedAddr !== null && selectedAddr >= addr && selectedAddr < addr + a.size ? '#0ea5e9' : '#e2e8f0'}`,
-                          borderRadius: 10,
-                          overflow: 'hidden',
-                          background: '#fff',
-                          cursor: 'pointer',
-                          flexShrink: 0,
-                          animation: selectedAddr !== null && selectedAddr >= addr && selectedAddr < addr + a.size ? 'cardBlink 1.1s infinite' : undefined,
-                          boxShadow: selectedAddr !== null && selectedAddr >= addr && selectedAddr < addr + a.size ? '0 0 0 3px rgba(56,189,248,.5)' : undefined,
-                        }}
-                      >
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', background: `${a.color ?? '#4f46e5'}0d`, borderBottom: '1px solid #f1f5f9' }}>
-                          <span style={{ width: 10, height: 10, borderRadius: 3, background: a.color ?? '#4f46e5', flexShrink: 0 }} />
-                          <span style={{ fontWeight: 800, fontSize: 12 }}>{a.label ?? a.key}</span>
-                          <span style={{ fontSize: 11, color: '#64748b', fontFamily: 'monospace' }}>
-                            {a.key} · 0x{addr.toString(16)} · {a.size}B
-                          </span>
-                          <span style={{ flex: 1 }} />
-                          <span
-                            style={{
-                              fontSize: 10,
-                              fontFamily: 'monospace',
-                              background: '#0f172a',
-                              color: '#e2e8f0',
-                              padding: '2px 6px',
-                              borderRadius: 999,
-                            }}
-                          >
-                            0x{addr.toString(16)}–0x{(addr + a.size - 1).toString(16)}
-                          </span>
-                        </div>
-                        {fields.length > 0 ? (
-                          <div style={{ padding: 8 }}>
-                            <div style={{ display: 'flex', gap: 2, height: 14, borderRadius: 6, overflow: 'hidden', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
-                              {fields
-                                .slice()
-                                .sort((x, y) => x.offset - y.offset)
-                                .map(f => (
+            </span>
+            <span style={{ flex: 1 }} />
+            <button className="ghost" style={{ padding: '4px 8px', fontSize: 11 }} onClick={() => setSettingsOpen(true)}>
+              ⚙ 总体设置
+            </button>
+            <button
+              className="ghost"
+              style={{ padding: '4px 8px', fontSize: 11 }}
+              onClick={() => {
+                try {
+                  const raw = mode === 'b64' ? tryAtob((activeHex || b64).trim()) : jsonText;
+                  copy(raw);
+                } catch {
+                  copy(jsonText);
+                }
+              }}
+            >
+              复制 JSON
+            </button>
+          </div>
+          <div style={{ padding: 10, display: 'flex', flexDirection: 'column', gap: 10, flex: 1, minHeight: 0, overflowY: 'auto' }}>
+            {allocs.length === 0 ? (
+              <div style={{ fontSize: 12, color: '#94a3b8', textAlign: 'center', padding: 16 }}>无分配 — 展开底部输入粘贴 Base64 或编辑 JSON 后解析</div>
+            ) : (
+              [...allocs]
+                .map(a => ({ a, addr: parseAddr(a.addr as any, base) }))
+                .sort((x, y) => x.addr - y.addr)
+                .map(({ a, addr }) => {
+                  const fields = Array.isArray(a.fields) ? a.fields : [];
+                  return (
+                    <div
+                      key={a.key}
+                      id={`alloc-${a.key}`}
+                      onClick={() => setSelectedAddr(addr)}
+                      style={{
+                        border: `1.5px solid ${selectedAddr !== null && selectedAddr >= addr && selectedAddr < addr + a.size ? '#0ea5e9' : '#e2e8f0'}`,
+                        borderRadius: 10,
+                        overflow: 'hidden',
+                        background: '#fff',
+                        cursor: 'pointer',
+                        flexShrink: 0,
+                        animation: selectedAddr !== null && selectedAddr >= addr && selectedAddr < addr + a.size ? 'cardBlink 1.1s infinite' : undefined,
+                        boxShadow: selectedAddr !== null && selectedAddr >= addr && selectedAddr < addr + a.size ? '0 0 0 3px rgba(56,189,248,.5)' : undefined,
+                      }}
+                    >
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', background: `${a.color ?? '#4f46e5'}0d`, borderBottom: '1px solid #f1f5f9' }}>
+                        <span style={{ width: 10, height: 10, borderRadius: 3, background: a.color ?? '#4f46e5', flexShrink: 0 }} />
+                        <span style={{ fontWeight: 800, fontSize: 12 }}>{a.label ?? a.key}</span>
+                        <span style={{ fontSize: 11, color: '#64748b', fontFamily: 'monospace' }}>
+                          {a.key} · 0x{addr.toString(16)} · {a.size}B
+                        </span>
+                        <span style={{ flex: 1 }} />
+                        <span
+                          style={{
+                            fontSize: 10,
+                            fontFamily: 'monospace',
+                            background: '#0f172a',
+                            color: '#e2e8f0',
+                            padding: '2px 6px',
+                            borderRadius: 999,
+                          }}
+                        >
+                          0x{addr.toString(16)}–0x{(addr + a.size - 1).toString(16)}
+                        </span>
+                      </div>
+                      {fields.length > 0 ? (
+                        <div style={{ padding: 8 }}>
+                          <div style={{ display: 'flex', gap: 2, height: 14, borderRadius: 6, overflow: 'hidden', border: '1px solid #e2e8f0', background: '#f8fafc' }}>
+                            {fields
+                              .slice()
+                              .sort((x, y) => x.offset - y.offset)
+                              .map(f => (
+                                <div
+                                  key={f.name}
+                                  title={`${f.name} @+${f.offset} · ${f.size}B · ${f.type ?? ''}`}
+                                  style={{
+                                    flex: `${f.size} 1 0`,
+                                    background: f.color ?? a.color ?? '#4f46e5',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: 9,
+                                    color: '#fff',
+                                    fontWeight: 800,
+                                    minWidth: 0,
+                                    overflow: 'hidden',
+                                    whiteSpace: 'nowrap',
+                                    padding: '0 2px',
+                                  }}
+                                >
+                                  {f.size >= 3 ? f.name : ''}
+                                </div>
+                              ))}
+                          </div>
+                          <div style={{ marginTop: 8, display: 'grid', gap: 4 }}>
+                            {fields
+                              .slice()
+                              .sort((x, y) => x.offset - y.offset)
+                              .map(f => {
+                                const fAddr = addr + f.offset;
+                                const slice = bytes.slice(fAddr - base, fAddr - base + f.size);
+                                const hexSlice = Array.from(slice, b => toHexByte(b)).join(' ');
+                                const fieldKey = `${a.key}|${f.name}`;
+                                const overridden = fieldOverrides[fieldKey] !== undefined;
+                                const effMode = fieldOverrides[fieldKey] ?? decodeMode;
+                                const { text: decText, label: decLabel } = decodeByMode(bytes, fAddr - base, f.size, f.type, viewEndian, effMode, base, total);
+                                const typeColor = decodeMode === 'auto' ? (typeColors[decLabel] ?? null) : null;
+                                const selFieldHit = selScope !== null && selScope.field !== null && selScope.key === (a.key) && selScope.field.name === f.name;
+                                return (
                                   <div
                                     key={f.name}
-                                    title={`${f.name} @+${f.offset} · ${f.size}B · ${f.type ?? ''}`}
+                                    id={`alloc-${a.key}-f-${f.name}`}
+                                    onClick={e => {
+                                      e.stopPropagation();
+                                      selectAddr(fAddr);
+                                    }}
                                     style={{
-                                      flex: `${f.size} 1 0`,
-                                      background: f.color ?? a.color ?? '#4f46e5',
                                       display: 'flex',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      fontSize: 9,
-                                      color: '#fff',
-                                      fontWeight: 800,
-                                      minWidth: 0,
-                                      overflow: 'hidden',
-                                      whiteSpace: 'nowrap',
-                                      padding: '0 2px',
+                                      flexDirection: 'column',
+                                      gap: 4,
+                                      padding: '6px 8px',
+                                      borderRadius: 8,
+                                      background: selFieldHit ? '#e0f2fe' : '#f8fafc',
+                                      border: selFieldHit ? '1px solid #38bdf8' : '1px solid #f1f5f9',
+                                      animation: selFieldHit ? 'cardBlink 1.1s infinite' : undefined,
                                     }}
                                   >
-                                    {f.size >= 3 ? f.name : ''}
-                                  </div>
-                                ))}
-                            </div>
-                            <div style={{ marginTop: 8, display: 'grid', gap: 4 }}>
-                              {fields
-                                .slice()
-                                .sort((x, y) => x.offset - y.offset)
-                                .map(f => {
-                                  const fAddr = addr + f.offset;
-                                  const slice = bytes.slice(fAddr - base, fAddr - base + f.size);
-                                  const hexSlice = Array.from(slice, b => toHexByte(b)).join(' ');
-                                  const fieldKey = `${a.key}|${f.name}`;
-                                  const overridden = fieldOverrides[fieldKey] !== undefined;
-                                  const effMode = fieldOverrides[fieldKey] ?? decodeMode;
-                                  const { text: decText, label: decLabel } = decodeByMode(bytes, fAddr - base, f.size, f.type, viewEndian, effMode, base, total);
-                                  const typeColor = decodeMode === 'auto' ? (typeColors[decLabel] ?? null) : null;
-                                  const selFieldHit = selScope !== null && selScope.field !== null && selScope.key === (a.key) && selScope.field.name === f.name;
-                                  return (
-                                    <div
-                                      key={f.name}
-                                      id={`alloc-${a.key}-f-${f.name}`}
-                                      onClick={e => {
-                                        e.stopPropagation();
-                                        selectAddr(fAddr);
-                                      }}
-                                      style={{
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: 4,
-                                        padding: '6px 8px',
-                                        borderRadius: 8,
-                                        background: selFieldHit ? '#e0f2fe' : '#f8fafc',
-                                        border: selFieldHit ? '1px solid #38bdf8' : '1px solid #f1f5f9',
-                                        animation: selFieldHit ? 'cardBlink 1.1s infinite' : undefined,
-                                      }}
-                                    >
-                                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', minWidth: 0 }}>
-                                        <span style={{ width: 8, height: 8, borderRadius: 2, background: f.color ?? a.color ?? '#4f46e5', flexShrink: 0 }} />
-                                        <span style={{ fontWeight: 700, fontSize: 12 }}>{f.name}</span>
-                                        {f.type && (
-                                          <span style={{ fontSize: 10, color: '#64748b', background: '#fff', border: '1px solid #e2e8f0', padding: '1px 4px', borderRadius: 4 }}>
-                                            {f.type}
-                                          </span>
-                                        )}
-                                        <span style={{ fontSize: 11, color: '#64748b', fontFamily: 'monospace' }}>
-                                          +{f.offset} · {f.size}B · 0x{fAddr.toString(16)}
+                                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', minWidth: 0 }}>
+                                      <span style={{ width: 8, height: 8, borderRadius: 2, background: f.color ?? a.color ?? '#4f46e5', flexShrink: 0 }} />
+                                      <span style={{ fontWeight: 700, fontSize: 12 }}>{f.name}</span>
+                                      {f.type && (
+                                        <span style={{ fontSize: 10, color: '#64748b', background: '#fff', border: '1px solid #e2e8f0', padding: '1px 4px', borderRadius: 4 }}>
+                                          {f.type}
                                         </span>
-                                      </div>
-                                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', minWidth: 0 }}>
-                                        <code style={{ fontFamily: 'monospace', fontSize: 11, color: '#0f172a', wordBreak: 'break-all' }}>{hexSlice}</code>
-                                        <button
-                                          type="button"
-                                          onClick={e => {
-                                            e.stopPropagation();
-                                            cycleFieldMode(fieldKey);
-                                          }}
-                                          title={`解码：${decLabel}${overridden ? '（已单独设置）*' : ''} · 点击仅切换本字段（${DECODE_MODES.map(l => MODE_LABEL[l]).join(' → ')}）\n头部「模式:」按钮强制同步全部字段\n类型颜色在「总体设置」中调整\n${hexSlice}`}
-                                          style={{
-                                            fontFamily: 'monospace',
-                                            fontSize: 11,
-                                            fontWeight: 700,
-                                            color: typeColor ? '#fff' : (f.type ? '#4338ca' : '#475569'),
-                                            background: typeColor ?? (f.type ? '#eef2ff' : '#fff'),
-                                            border: `1px solid ${typeColor ?? (f.type ? '#c7d2fe' : '#e2e8f0')}`,
-                                            padding: '2px 6px',
-                                            borderRadius: 6,
-                                            whiteSpace: 'pre-wrap',
-                                            wordBreak: 'break-all',
-                                            cursor: 'pointer',
-                                            textAlign: 'left',
-                                          }}
-                                        >
-                                          {decText}
-                                          <span style={{ color: typeColor ? 'rgba(255,255,255,.85)' : '#64748b', fontWeight: 600, marginLeft: 3 }}>:{decLabel}{overridden ? '*' : ''}</span>
-                                        </button>
-                                      </div>
+                                      )}
+                                      <span style={{ fontSize: 11, color: '#64748b', fontFamily: 'monospace' }}>
+                                        +{f.offset} · {f.size}B · 0x{fAddr.toString(16)}
+                                      </span>
                                     </div>
-                                  );
-                                })}
-                            </div>
+                                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', minWidth: 0 }}>
+                                      <code style={{ fontFamily: 'monospace', fontSize: 11, color: '#0f172a', wordBreak: 'break-all' }}>{hexSlice}</code>
+                                      <button
+                                        type="button"
+                                        onClick={e => {
+                                          e.stopPropagation();
+                                          cycleFieldMode(fieldKey);
+                                        }}
+                                        title={`解码：${decLabel}${overridden ? '（已单独设置）*' : ''} · 点击仅切换本字段（${DECODE_MODES.map(l => MODE_LABEL[l]).join(' → ')}）\n头部「模式:」按钮强制同步全部字段\n类型颜色在「总体设置」中调整\n${hexSlice}`}
+                                        style={{
+                                          fontFamily: 'monospace',
+                                          fontSize: 11,
+                                          fontWeight: 700,
+                                          color: typeColor ? '#fff' : (f.type ? '#4338ca' : '#475569'),
+                                          background: typeColor ?? (f.type ? '#eef2ff' : '#fff'),
+                                          border: `1px solid ${typeColor ?? (f.type ? '#c7d2fe' : '#e2e8f0')}`,
+                                          padding: '2px 6px',
+                                          borderRadius: 6,
+                                          whiteSpace: 'pre-wrap',
+                                          wordBreak: 'break-all',
+                                          cursor: 'pointer',
+                                          textAlign: 'left',
+                                        }}
+                                      >
+                                        {decText}
+                                        <span style={{ color: typeColor ? 'rgba(255,255,255,.85)' : '#64748b', fontWeight: 600, marginLeft: 3 }}>:{decLabel}{overridden ? '*' : ''}</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
                           </div>
-                        ) : (
-                          <div style={{ padding: '8px 10px', fontFamily: 'monospace', fontSize: 11, color: '#334155', wordBreak: 'break-all', background: '#f8fafc' }}>
-                            {(() => {
-                              const off = addr - base;
-                              const slice = bytes.slice(off, off + Math.min(a.size, 32));
-                              const preview = Array.from(slice, b => toHexByte(b)).join(' ');
-                              return preview + (a.size > 32 ? ' …' : '');
-                            })()}
-                            {a.hex ? null : a.data ? `  // data="${a.data}"` : '  // 0x00 填充'}
-                            <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#64748b', marginTop: 4 }}>
-                              ascii: "{(() => { const o = addr - base; const s2 = bytes.slice(o, o + Math.min(a.size, 32)); return Array.from(s2, b => (b >= 32 && b <= 126 ? String.fromCharCode(b) : '.')).join(''); })()}" · 类型 {a.fields ? `${a.fields.length} 字段` : '未标注，无法按类型解码'}
-                            </div>
+                        </div>
+                      ) : (
+                        <div style={{ padding: '8px 10px', fontFamily: 'monospace', fontSize: 11, color: '#334155', wordBreak: 'break-all', background: '#f8fafc' }}>
+                          {(() => {
+                            const off = addr - base;
+                            const slice = bytes.slice(off, off + Math.min(a.size, 32));
+                            const preview = Array.from(slice, b => toHexByte(b)).join(' ');
+                            return preview + (a.size > 32 ? ' …' : '');
+                          })()}
+                          {a.hex ? null : a.data ? `  // data="${a.data}"` : '  // 0x00 填充'}
+                          <div style={{ fontFamily: 'monospace', fontSize: 10, color: '#64748b', marginTop: 4 }}>
+                            ascii: "{(() => { const o = addr - base; const s2 = bytes.slice(o, o + Math.min(a.size, 32)); return Array.from(s2, b => (b >= 32 && b <= 126 ? String.fromCharCode(b) : '.')).join(''); })()}" · 类型 {a.fields ? `${a.fields.length} 字段` : '未标注，无法按类型解码'}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })
-              )}
-            </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+            )}
+          </div>
         </div>
 
       </div>
