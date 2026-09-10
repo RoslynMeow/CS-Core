@@ -102,6 +102,8 @@ export function Stage({ mod }: { mod: ModuleDef }) {
   );
   // 统一：所有知识点进入不自动播放，停在首帧，需点“执行”或手动播放
   const isManual = true;
+  // 交互式画布：无播放条/无右侧栏，点击画布改 config 重算；播放器只负责出“当前状态”这一帧
+  const interactive = !!mod.interactive;
   const pb = usePlayback(frames, {
     autoPlay: !isManual,
     autoPlayOnMount: !isManual,
@@ -159,8 +161,10 @@ export function Stage({ mod }: { mod: ModuleDef }) {
           )}
         </div>
       )}
-      <PlaybackBar pb={pb} disabled={!!mod.blockedReason?.(config as never)} />
-      {mod.bare ? (
+      {!interactive && (
+        <PlaybackBar pb={pb} disabled={!!mod.blockedReason?.(config as never)} />
+      )}
+      {mod.bare || interactive ? (
         <div className="stage-body" style={{ gridTemplateColumns: "1fr" }}>
           <div className="canvas">
             {pb.frame && (

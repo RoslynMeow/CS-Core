@@ -1,5 +1,113 @@
 \section{数字逻辑基础}
 
+\subsection{CMOS 元件与门电路内部结构}
+
+现代数字芯片几乎全部用 CMOS（互补金属氧化物半导体）工艺实现。理解门电路的\textbf{内部}必须先认识晶体管及其开关模型。
+
+\subsubsection{MOSFET 开关模型}
+
+MOSFET（金属-氧化物-半导体场效应晶体管）可抽象为电压控制的\textbf{开关}，按导电载流子分两类：
+
+\begin{center}
+\begin{tikzpicture}
+% NMOS
+\node[nmos, xscale=0.75, yscale=0.75] (nmos) at (0,0) {};
+\draw (nmos.S) -- ++(-1.2,0) node[left] {$S$（源）};
+\draw (nmos.D) -- ++(-1.2,0) node[left] {$D$（漏）};
+\draw (nmos.G) -- ++(0,0.9) node[above] {$G$（栅）};
+\node[below] at (nmos.S) {\small NMOS};
+% PMOS
+\node[pmos, xscale=0.75, yscale=0.75] (pmos) at (5,0) {};
+\draw (pmos.S) -- ++(-1.2,0) node[left] {$S$（源）};
+\draw (pmos.D) -- ++(-1.2,0) node[left] {$D$（漏）};
+\draw (pmos.G) -- ++(0,0.9) node[above] {$G$（栅）};
+\node[below] at (pmos.S) {\small PMOS};
+\end{tikzpicture}
+\end{center}
+
+\begin{tabulary}{\textwidth}{CC}
+\toprule
+\textbf{NMOS} & \textbf{PMOS} \\
+\midrule
+栅极 $G=1$（高电平）时导通 & 栅极 $G=0$（低电平）时导通 \\
+栅极 $G=0$ 时断开 & 栅极 $G=1$ 时断开 \\
+下拉：把输出拉到 GND（0） & 上拉：把输出拉到 $V_{DD}$（1） \\
+\bottomrule
+\end{tabulary}
+
+PMOS 与 NMOS 恰好互补，这是"CMOS"中 C（Complementary）的含义。
+
+\subsubsection{CMOS 反相器（NOT）}
+
+反相器由 \textbf{1 个 PMOS（上拉）+ 1 个 NMOS（下拉）}串联构成，栅极并联作为输入 $A$，中间节点作为输出 $Y$：
+
+\begin{center}
+\begin{circuitikz}[scale=1.2]
+\draw (0,3) node[vdd] (vdd) {};
+\draw (vdd) -- (0,2.6) node[pmos, anchor=S] (pmos) {};
+\draw (pmos.D) -- (0,1.3) node[ocirc] (y) {};
+\draw (0,1.3) -- (0,1.0) node[nmos, anchor=D] (nmos) {};
+\draw (nmos.S) -- (0,0) node[ground] (gnd) {};
+\draw (pmos.G) -- ++(-1,0) node[left] {$A$};
+\draw (nmos.G) -- ++(-1,0) node[left] {$A$};
+\draw (y) -- ++(0.8,0) node[right] {$Y$};
+\end{circuitikz}
+\end{center}
+
+\begin{itemize}
+    \item $A=1$：NMOS 导通（下拉），PMOS 断开 → $Y=0$
+    \item $A=0$：PMOS 导通（上拉），NMOS 断开 → $Y=1$
+\end{itemize}
+
+两个晶体管\textbf{不同时导通}，故静态功耗几乎为零——这是 CMOS 的核心优点。任何时刻输出要么被上拉要么被下拉，\textbf{不存在浮空}。
+
+\subsubsection{CMOS NAND（与非门）}
+
+NAND 由 \textbf{2 个 PMOS 并联（上拉网络）+ 2 个 NMOS 串联（下拉网络）}构成：
+
+\begin{center}
+\begin{circuitikz}[scale=1.0]
+% 上拉网络：两个 PMOS 并联（A 与 B 任一为 0 则拉高）
+\draw (0,4.2) node[vdd] (vdd) {};
+\draw (vdd) -- (0,4.2) -- (0,3.7) node[pmos, anchor=S] (pA) {};
+\draw (pA.D) -- (0,2.7);
+\draw (pA.D) -- (2.6,2.7);
+\draw (2.6,3.7) node[pmos, anchor=S, xscale=-1] (pB) {};
+\draw (pB.D) -- (2.6,2.7);
+% 下拉网络：两个 NMOS 串联（A 与 B 都为 1 才拉低）
+\draw (0,2.7) node[ocirc] (y) {};
+\draw (0,2.7) -- (0,2.0) node[nmos, anchor=D] (nA) {};
+\draw (nA.S) -- (0,1.1) node[nmos, anchor=D] (nB) {};
+\draw (nB.S) -- (0,0.3) node[ground] (gnd) {};
+% 栅极输入
+\draw (pA.G) -- ++(-0.8,0) node[left] {$A$};
+\draw (nA.G) -- ++(-0.8,0) node[left] {$A$};
+\draw (pB.G) -- ++(1.0,0) node[right] {$B$};
+\draw (nB.G) -- ++(1.0,0) node[right] {$B$};
+\draw (y) -- ++(0.8,0) node[right] {$Y=\overline{A\cdot B}$};
+\end{circuitikz}
+\end{center}
+
+\begin{itemize}
+    \item $A=1,B=1$：两个 NMOS 都导通，输出被下拉到 0
+    \item 其余情况：至少一个 PMOS 导通，输出被上拉到 1
+\end{itemize}
+
+CMOS NOR 与之对偶：\textbf{PMOS 串联、NMOS 并联}。
+
+\subsubsection{由 NAND 派生其它门}
+
+NAND 是\textbf{万能门}，因为它本身就是 CMOS 的直接、最简实现；其它门用 NAND 组合即可：
+
+\begin{itemize}
+    \item NOT：$Y = \overline{A \cdot A} = \overline{A}$（两输入短接）
+    \item AND：$Y = \overline{\overline{A \cdot B}}$（NAND + NOT，共 6 个晶体管）
+    \item OR：$Y = \overline{\overline{A} \cdot \overline{B}}$（德·摩根）
+    \item XOR：$Y = \overline{A} \cdot B + A \cdot \overline{B}$（约需 4 个 NAND）
+\end{itemize}
+
+这就是"为什么 CMOS 工艺里 NAND 便宜、AND 反而要额外一层反相器"的原因：\textbf{AND 是用 NAND 堆出来的}。
+
 \subsection{布尔代数与门电路}
 
 数字电路的基础是布尔代数，变量取值 $\{0, 1\}$，三种基本运算：

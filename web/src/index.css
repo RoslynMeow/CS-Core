@@ -674,7 +674,8 @@ body {
 .stage-body {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  /* 允许内容超高时滚动(多板/长电路图), 内容不足时不出现滚动条 */
+  overflow: auto;
 }
 
 @media (max-width: 640px) {

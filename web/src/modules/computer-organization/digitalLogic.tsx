@@ -1,0 +1,1175 @@
+import { createElement } from "react";
+import { T } from "../../i18n/lang";
+import type { Frame, ModuleDef } from "../../engine/types";
+import { HwBoard } from "../../lib/hwboard/HwBoard";
+import { ElkBuilder } from "../../lib/hwboard/elk";
+
+// =====================================================================
+// 数字逻辑 · 单模块聚合 · 交互式画布
+//   cmos(元件层: 晶体管/反相器/NAND/NOR) → gates(门电路+万能门)
+//   → adder(半加/全加/行波进位) → muxdecode(MUX/译码器)
+//   → alu(1-bit ALU) → seq(锁存器/触发器/寄存器)
+//   interactive: 无播放条/无伪代码, 整页画布。点击画布输入切换 0/1,
+//   onChange 触发重算, 电路高亮实时更新。
+// =====================================================================
+
+type SubMode =
+  | "cmos"
+  | "gates"
+  | "adder"
+  | "muxdecode"
+  | "alu"
+  | "seq";
+
+// ===================== 看板辅助件(HTML) =====================
+/** 顶部输入控制条(HTML): 开关集中在此, 原理图内只留标准端子 */
+function InputBar({ items, result }: {
+  items: { label: string; val: number; onClick: () => void }[];
+  result?: string;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0", marginBottom: 8 }}>
+      <span style={{ fontSize: 11, fontWeight: 800, color: "#475569" }}>输入</span>
+      {items.map((it) => (
+        <button
+          key={it.label}
+          onClick={it.onClick}
+          style={{
+            minWidth: 58, padding: "4px 10px", borderRadius: 8, cursor: "pointer",
+            fontSize: 13, fontWeight: 800, fontFamily: "system-ui, sans-serif",
+            background: it.val === 1 ? "#dcfce7" : "#fef2f2",
+            color: it.val === 1 ? "#15803d" : "#b91c1c",
+            border: `1.6px solid ${it.val === 1 ? "#16a34a" : "#ef4444"}`,
+          }}
+        >
+          {`${it.label}=${it.val}`}
+        </button>
+      ))}
+      {result !== undefined && (
+        <span style={{ fontSize: 13, fontWeight: 800, color: "#1e40af" }}>{`→ ${result}`}</span>
+      )}
+    </div>
+  );
+}
+
+/** 真值表(HTML, 排版优于画布内文字) */
+function TruthTable({ head, rows, hit }: { head: string[]; rows: string[][]; hit: number }) {
+  return (
+    <table style={{ margin: "10px auto 0", borderCollapse: "collapse", fontSize: 12, fontFamily: "ui-monospace, monospace" }}>
+      <thead>
+        <tr>{head.map((h, i) => <th key={i} style={{ padding: "2px 10px", color: "#64748b", borderBottom: "1px solid #e2e8f0", fontWeight: 700 }}>{h}</th>)}</tr>
+      </thead>
+      <tbody>
+        {rows.map((r, k) => (
+          <tr key={k} style={k === hit ? { background: "#dcfce7", fontWeight: 800, color: "#15803d" } : { color: "#94a3b8" }}>
+            {r.map((c, i) => <td key={i} style={{ padding: "2px 10px", textAlign: "center" }}>{c}</td>)}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+// (手写 SVG 零件已退役: 电路统一走 HwBoard + d3-hwschematic 自动布局)
+
+// =====================================================================
+// 子模块 1: cmos —— 元件层(开关模型 / 反相器 / NAND / NOR)
+// =====================================================================
+type CmosMode = "switch" | "inverter" | "nand" | "nor";
+type CmosCfg = { mode: CmosMode; a: 0 | 1; b: 0 | 1 };
+const cmosDefault: CmosCfg = { mode: "switch", a: 1, b: 0 };
+type CmosScene = CmosCfg & { y: 0 | 1 };
+
+function cmosY(mode: CmosMode, a: 0 | 1, b: 0 | 1): 0 | 1 {
+  if (mode === "switch") return a;
+  if (mode === "inverter") return (a === 1 ? 0 : 1) as 0 | 1;
+  if (mode === "nand") return (a === 1 && b === 1 ? 0 : 1) as 0 | 1;
+  return (a === 1 || b === 1 ? 0 : 1) as 0 | 1;
+}
+
+const cmosScene = (c: CmosCfg): CmosScene => ({ ...c, y: cmosY(c.mode, c.a, c.b) });
+
+// ---- CMOS 元件: FET 级网表(Vdd 顶轨 / GND 底轨, 纵向电源流, 与门符号箭头同向) ----
+function cmosSwitchJson(a: 0 | 1) {
+  const el = new ElkBuilder();
+  const vdd = el.power("VDD");
+  const gnd = el.power("GND");
+  const inG = el.input("G", a);
+  const n = el.fet("NMOS", a === 1, a === 1);
+  const p = el.fet("PMOS", a === 0, a === 1);
+  el.net("Vdd", 1, "vdd", vdd.p, [n.d, p.s]);
+  el.net("G", a, "sig", inG.o, [n.g, p.g]);
+  el.net("GND", 0, "gnd", [n.s, p.d], [gnd.p]);
+  return el.build("DOWN");
+}
+
+function cmosInverterJson(a: 0 | 1, key = "A") {
+  const el = new ElkBuilder();
+  const vdd = el.power("VDD");
+  const gnd = el.power("GND");
+  const inA = el.input(key, a);
+  const y = (a === 1 ? 0 : 1) as 0 | 1;
+  const p = el.fet("PMOS", a === 0, a === 1);
+  const n = el.fet("NMOS", a === 1, a === 1);
+  const oY = el.output("Y", y);
+  el.net("Vdd", 1, "vdd", vdd.p, [p.s]);
+  el.net("A", a, "sig", inA.o, [p.g, n.g]);
+  el.net("Y", y, "sig", [p.d, n.d], [oY.i]);
+  el.net("GND", 0, "gnd", n.s, [gnd.p]);
+  return el.build("DOWN");
+}
+
+function cmosNandJson(a: 0 | 1, b: 0 | 1) {
+  const el = new ElkBuilder();
+  const vdd = el.power("VDD");
+  const gnd = el.power("GND");
+  const inA = el.input("A", a);
+  const inB = el.input("B", b);
+  const y = (a === 1 && b === 1 ? 0 : 1) as 0 | 1;
+  const pA = el.fet("PMOS", a === 0, a === 1);
+  const pB = el.fet("PMOS", b === 0, b === 1);
+  const nA = el.fet("NMOS", a === 1, a === 1);
+  const nB = el.fet("NMOS", b === 1, b === 1);
+  const oY = el.output("Y", y);
+  el.net("Vdd", 1, "vdd", vdd.p, [pA.s, pB.s]);
+  el.net("A", a, "sig", inA.o, [pA.g, nA.g]);
+  el.net("B", b, "sig", inB.o, [pB.g, nB.g]);
+  // 上拉并联 / 下拉串联: Y 在双 PMOS 漏极与 nA 漏极之间
+  el.net("Y", y, "sig", [pA.d, pB.d], [nA.d, oY.i]);
+  el.net("MID", (a === 1 && b === 0 ? 1 : 0) as 0 | 1, "sig", nA.s, [nB.d]);
+  el.net("GND", 0, "gnd", nB.s, [gnd.p]);
+  return el.build("DOWN");
+}
+
+function cmosNorJson(a: 0 | 1, b: 0 | 1) {
+  const el = new ElkBuilder();
+  const vdd = el.power("VDD");
+  const gnd = el.power("GND");
+  const inA = el.input("A", a);
+  const inB = el.input("B", b);
+  const y = (a === 1 || b === 1 ? 0 : 1) as 0 | 1;
+  const pA = el.fet("PMOS", a === 0, a === 1);
+  const pB = el.fet("PMOS", b === 0, b === 1);
+  const nA = el.fet("NMOS", a === 1, a === 1);
+  const nB = el.fet("NMOS", b === 1, b === 1);
+  const oY = el.output("Y", y);
+  el.net("Vdd", 1, "vdd", vdd.p, [pA.s]);
+  el.net("A", a, "sig", inA.o, [pA.g, nA.g]);
+  el.net("B", b, "sig", inB.o, [pB.g, nB.g]);
+  // 上拉串联: Vdd → pA → MIDP → pB → Y ; 下拉并联
+  el.net("MIDP", (a === 0 ? 1 : 0) as 0 | 1, "sig", pA.d, [pB.s]);
+  el.net("Y", y, "sig", pB.d, [nA.d, nB.d, oY.i]);
+  el.net("GND", 0, "gnd", [nA.s, nB.s], [gnd.p]);
+  return el.build("DOWN");
+}
+
+function CmosRender({ scene, onChange }: { scene: CmosScene; onChange: (c: CmosCfg) => void }) {
+  const { mode, a, b, y } = scene;
+  const toggleA = () => onChange({ ...scene, a: (a === 1 ? 0 : 1) as 0 | 1 });
+  const toggleB = () => onChange({ ...scene, b: (b === 1 ? 0 : 1) as 0 | 1 });
+  const inKey = mode === "switch" ? "G" : "A";
+  const barItems =
+    mode === "switch" ? [{ label: "G", val: a, onClick: toggleA }] :
+    mode === "inverter" ? [{ label: "A", val: a, onClick: toggleA }] :
+    [{ label: "A", val: a, onClick: toggleA }, { label: "B", val: b, onClick: toggleB }];
+  const barResult =
+    mode === "switch" ? `G=${a} → ${a === 1 ? "NMOS 导通 / PMOS 断开" : "NMOS 断开 / PMOS 导通"}` :
+    `Y=${y}`;
+  const onToggleKey = (key: string) => {
+    if (key === inKey) toggleA();
+    else if (key === "B") toggleB();
+  };
+  const json =
+    mode === "switch" ? cmosSwitchJson(a) :
+    mode === "inverter" ? cmosInverterJson(a) :
+    mode === "nand" ? cmosNandJson(a, b) : cmosNorJson(a, b);
+  return (
+    <div>
+      <InputBar items={barItems} result={barResult} />
+      <HwBoard json={json} height={mode === "switch" || mode === "inverter" ? 420 : 500} onToggle={onToggleKey} />
+    </div>
+  );
+}
+
+// =====================================================================
+// 子模块 2: gates —— 门电路符号 + NAND 万能门
+// =====================================================================
+type GateMode = "not" | "and" | "or" | "nand" | "nor" | "xor" | "universal";
+type GateView = "sym" | "cmos";
+type GateCfg = { mode: GateMode; a: 0 | 1; b: 0 | 1; view: GateView };
+const gateDefault: GateCfg = { mode: "and", a: 1, b: 1, view: "sym" };
+type GateScene = GateCfg;
+
+function gateOut(mode: GateMode, a: 0 | 1, b: 0 | 1): number {
+  switch (mode) {
+    case "not": return a === 1 ? 0 : 1;
+    case "and": return a && b ? 1 : 0;
+    case "or": return a || b ? 1 : 0;
+    case "nand": return a && b ? 0 : 1;
+    case "nor": return a || b ? 0 : 1;
+    case "xor": return a !== b ? 1 : 0;
+    default: return 0;
+  }
+}
+
+const TTLABEL: Record<string, string> = {
+  and: "AND", or: "OR", not: "NOT", nand: "NAND", nor: "NOR", xor: "XOR",
+};
+
+// ---- gates: CMOS 晶体管级内部(NOT/NAND/NOR 与 cmos 节同构;
+// AND/OR 单板(第一级 NAND/NOR + 第二级反相器, 6 管一张图); XOR 用 4-NAND) ----
+// XOR 的 CMOS 搭法: 4×NAND(每只 NAND 即 cmos 节 4 管结构, 传输门 8 管版自动布局太乱, 不用)
+// AND = NAND + 反相器: 上拉并联(pA∥pB) → N → 反相器(pI/nI) → Y
+function gateCmosAndJson(a: 0 | 1, b: 0 | 1) {
+  const el = new ElkBuilder();
+  const vdd = el.power("VDD");
+  const gnd = el.power("GND");
+  const inA = el.input("A", a);
+  const inB = el.input("B", b);
+  const n = (a === 1 && b === 1 ? 0 : 1) as 0 | 1;
+  const y = (a === 1 && b === 1 ? 1 : 0) as 0 | 1;
+  const pA = el.fet("PMOS", a === 0, a === 1);
+  const pB = el.fet("PMOS", b === 0, b === 1);
+  const nA = el.fet("NMOS", a === 1, a === 1);
+  const nB = el.fet("NMOS", b === 1, b === 1);
+  const pI = el.fet("PMOS", n === 0, n === 1);
+  const nI = el.fet("NMOS", n === 1, n === 1);
+  const oY = el.output("Y", y);
+  el.net("Vdd", 1, "vdd", vdd.p, [pA.s, pB.s, pI.s]);
+  el.net("A", a, "sig", inA.o, [pA.g, nA.g]);
+  el.net("B", b, "sig", inB.o, [pB.g, nB.g]);
+  // 第一级 NAND: N = 非(A·B)
+  el.net("N", n, "sig", [pA.d, pB.d], [nA.d, pI.g, nI.g]);
+  el.net("MID", (a === 1 && b === 0 ? 1 : 0) as 0 | 1, "sig", nA.s, [nB.d]);
+  // 第二级反相器: Y = 非N
+  el.net("Y", y, "sig", [pI.d, nI.d], [oY.i]);
+  el.net("GND", 0, "gnd", [nB.s, nI.s], [gnd.p]);
+  return el.build("DOWN");
+}
+
+// OR = NOR + 反相器: 上拉串联(pA→pB) → N → 反相器(pI/nI) → Y
+function gateCmosOrJson(a: 0 | 1, b: 0 | 1) {
+  const el = new ElkBuilder();
+  const vdd = el.power("VDD");
+  const gnd = el.power("GND");
+  const inA = el.input("A", a);
+  const inB = el.input("B", b);
+  const n = (a === 1 || b === 1 ? 0 : 1) as 0 | 1;
+  const y = (a === 1 || b === 1 ? 1 : 0) as 0 | 1;
+  const pA = el.fet("PMOS", a === 0, a === 1);
+  const pB = el.fet("PMOS", b === 0, b === 1);
+  const nA = el.fet("NMOS", a === 1, a === 1);
+  const nB = el.fet("NMOS", b === 1, b === 1);
+  const pI = el.fet("PMOS", n === 0, n === 1);
+  const nI = el.fet("NMOS", n === 1, n === 1);
+  const oY = el.output("Y", y);
+  el.net("Vdd", 1, "vdd", vdd.p, [pA.s, pI.s]);
+  el.net("A", a, "sig", inA.o, [pA.g, nA.g]);
+  el.net("B", b, "sig", inB.o, [pB.g, nB.g]);
+  // 第一级 NOR: N = 非(A+B), 上拉串联
+  el.net("MIDP", (a === 0 ? 1 : 0) as 0 | 1, "sig", pA.d, [pB.s]);
+  el.net("N", n, "sig", pB.d, [nA.d, nB.d, pI.g, nI.g]);
+  // 第二级反相器: Y = 非N
+  el.net("Y", y, "sig", [pI.d, nI.d], [oY.i]);
+  el.net("GND", 0, "gnd", [nA.s, nB.s, nI.s], [gnd.p]);
+  return el.build("DOWN");
+}
+function gateCmosXorJson(a: 0 | 1, b: 0 | 1) {
+  const el = new ElkBuilder();
+  const inA = el.input("A", a);
+  const inB = el.input("B", b);
+  const n1 = (a === 1 && b === 1 ? 0 : 1) as 0 | 1;
+  const n2 = (a === 1 && n1 === 1 ? 0 : 1) as 0 | 1;
+  const n3 = (b === 1 && n1 === 1 ? 0 : 1) as 0 | 1;
+  const y = (n2 === 1 && n3 === 1 ? 0 : 1) as 0 | 1;
+  const g1 = el.gate("NAND");
+  const g2 = el.gate("NAND");
+  const g3 = el.gate("NAND");
+  const g4 = el.gate("NAND");
+  const oY = el.output("Y", y);
+  el.net("A", a, "sig", inA.o, [g1.a, g2.a]);
+  el.net("B", b, "sig", inB.o, [g1.b, g3.a]);
+  el.net("N1", n1, "sig", g1.y, [g2.b, g3.b]);
+  el.net("N2", n2, "sig", g2.y, [g4.a]);
+  el.net("N3", n3, "sig", g3.y, [g4.b]);
+  el.net("Y", y, "sig", g4.y, [oY.i]);
+  return el.build("DOWN");
+}
+
+function gateCmosJson(mode: GateMode, a: 0 | 1, b: 0 | 1) {
+  switch (mode) {
+    case "not": return cmosInverterJson(a);
+    case "nand": return cmosNandJson(a, b);
+    case "nor": return cmosNorJson(a, b);
+    case "and": return gateCmosAndJson(a, b);
+    case "or": return gateCmosOrJson(a, b);
+    case "xor": return gateCmosXorJson(a, b);
+    default: return cmosNandJson(a, b);
+  }
+}
+
+function GateRender({ scene, onChange }: { scene: GateScene; onChange: (c: GateCfg) => void }) {
+  const { mode, a, b } = scene;
+  const view: GateView = (scene as GateCfg).view ?? "sym";
+  const cmos = view === "cmos" && mode !== "universal";
+  const toggleA = () => onChange({ ...scene, a: (a === 1 ? 0 : 1) as 0 | 1 });
+  const toggleB = () => onChange({ ...scene, b: (b === 1 ? 0 : 1) as 0 | 1 });
+  const barItems = [{ label: "A", val: a, onClick: toggleA }, { label: "B", val: b, onClick: toggleB }];
+  const onToggleKey = (key: string) => {
+    if (key === "A") toggleA();
+    else if (key === "B") toggleB();
+  };
+  if (mode === "universal") {
+    // 三种独立搭法(无法合并成一张图), 横向并排同屏可见
+    const mkNot = () => {
+      const el = new ElkBuilder();
+      const inA = el.input("A", a);
+      const n = el.gate("NAND");
+      const oY = el.output("Y", a === 1 ? 0 : 1);
+      el.net("A", a, "sig", inA.o, [n.a, n.b]);
+      el.net("Y", (a === 1 ? 0 : 1) as 0 | 1, "sig", n.y, [oY.i]);
+      return el.build();
+    };
+    const mkAnd = () => {
+      const el = new ElkBuilder();
+      const inA = el.input("A", a);
+      const inB = el.input("B", b);
+      const n = el.gate("NAND");
+      const nt = el.gate("NOT");
+      const oY = el.output("Y", gateOut("and", a, b));
+      el.net("A", a, "sig", inA.o, [n.a]);
+      el.net("B", b, "sig", inB.o, [n.b]);
+      el.net("N", gateOut("nand", a, b), "sig", n.y, [nt.a]);
+      el.net("Y", gateOut("and", a, b), "sig", nt.y, [oY.i]);
+      return el.build();
+    };
+    const mkOr = () => {
+      const el = new ElkBuilder();
+      const inA = el.input("A", a);
+      const inB = el.input("B", b);
+      const na = el.gate("NOT");
+      const nb = el.gate("NOT");
+      const n = el.gate("NAND");
+      const oY = el.output("Y", gateOut("or", a, b));
+      el.net("A", a, "sig", inA.o, [na.a]);
+      el.net("B", b, 'sig', inB.o, [nb.a]);
+      el.net("NA", (a === 1 ? 0 : 1) as 0 | 1, "sig", na.y, [n.a]);
+      el.net("NB", (b === 1 ? 0 : 1) as 0 | 1, "sig", nb.y, [n.b]);
+      el.net("Y", gateOut("or", a, b), "sig", n.y, [oY.i]);
+      return el.build();
+    };
+    const groups: { title: string; json: unknown }[] = [
+      { title: "1) NOT: 两输入短接", json: mkNot() },
+      { title: "2) AND = NAND + NOT", json: mkAnd() },
+      { title: "3) OR: 德·摩根 A+B = 非(非A · 非B)", json: mkOr() },
+    ];
+    return (
+      <div>
+        <InputBar items={barItems} result="三种搭法同步更新" />
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {groups.map((g) => (
+            <div key={g.title} style={{ flex: "1 1 320px", minWidth: 300 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: "#334155", margin: "0 0 4px 2px" }}>{g.title}</div>
+              <HwBoard json={g.json} height={280} onToggle={onToggleKey} />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  const out = gateOut(mode, a, b);
+  const op = mode.toUpperCase() as "AND" | "OR" | "NOT" | "NAND" | "NOR" | "XOR";
+  const json = cmos
+    ? gateCmosJson(mode, a, b)
+    : (() => {
+      const el = new ElkBuilder();
+      const inA = el.input("A", a);
+      const g = el.gate(op);
+      const oY = el.output("Y", out);
+      el.net("A", a, "sig", inA.o, [g.a]);
+      if (mode !== "not") {
+        const inB = el.input("B", b);
+        el.net("B", b, "sig", inB.o, [g.b]);
+      }
+      el.net("Y", out, "sig", g.y, [oY.i]);
+      return el.build();
+    })();
+  const combos = mode === "not" ? [[0], [1]] : TT2.map(([aa, bb]) => [aa, bb]);
+  const hit = combos.findIndex((r) => r[0] === a && (mode === "not" || r[1] === b));
+  return (
+    <div>
+      <InputBar items={barItems} result={`Y=${out}`} />
+      <div style={{ position: "relative" }}>
+        <HwBoard json={json} height={cmos ? 500 : 300} onToggle={onToggleKey} />
+        {/* 真值表直接画在画布内(右上角) */}
+        <div style={{ position: "absolute", top: 10, right: 10, background: "rgba(255,255,255,0.94)", border: "1px solid #e2e8f0", borderRadius: 10, padding: "2px 6px", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}>
+          <TruthTable
+            head={mode === "not" ? ["A", "Y"] : ["A", "B", "Y"]}
+            rows={combos.map((r) => (mode === "not" ? [`${r[0]}`, `${gateOut("not", r[0] as 0 | 1, 0)}`] : [`${r[0]}`, `${r[1]}`, `${gateOut(mode, r[0] as 0 | 1, r[1] as 0 | 1)}`]))}
+            hit={hit}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =====================================================================
+// 子模块 3: adder —— 半加器 / 全加器 / 行波进位
+// =====================================================================
+type AdderMode = "half" | "full" | "ripple";
+type AdderCfg = { mode: AdderMode; a: number; b: number; cin: 0 | 1; bits: number };
+const adderDefault: AdderCfg = { mode: "half", a: 1, b: 1, cin: 0, bits: 4 };
+type AdderScene = AdderCfg;
+
+function halfAdder(a: number, b: number) {
+  return { s: a ^ b, cout: a & b };
+}
+function fullAdder(a: number, b: number, cin: number) {
+  const h1 = halfAdder(a, b);
+  const s = h1.s ^ cin;
+  const cout = h1.cout | (h1.s & cin);
+  return { s, cout };
+}
+
+// ---- adder 试点: HwBoard 网表构建(门级半加/全加 + FA 盒链行波) ----
+function adderHalfJson(a: 0 | 1, b: 0 | 1) {
+  const el = new ElkBuilder();
+  const inA = el.input("A", a);
+  const inB = el.input("B", b);
+  const x = el.gate("XOR");
+  const nd = el.gate("AND");
+  const oS = el.output("S", (a ^ b) as 0 | 1);
+  const oC = el.output("Cout", (a & b) as 0 | 1);
+  el.net("A", a, "sig", inA.o, [x.a, nd.a]);
+  el.net("B", b, "sig", inB.o, [x.b, nd.b]);
+  el.net("S", (a ^ b) as 0 | 1, "sig", x.y, [oS.i]);
+  el.net("Cout", (a & b) as 0 | 1, "sig", nd.y, [oC.i]);
+  return el.build();
+}
+
+function adderFullJson(a: 0 | 1, b: 0 | 1, cin: 0 | 1) {
+  const el = new ElkBuilder();
+  const inA = el.input("A", a);
+  const inB = el.input("B", b);
+  const inC = el.input("Cin", cin);
+  const x1 = el.gate("XOR");
+  const x2 = el.gate("XOR");
+  const a1 = el.gate("AND");
+  const a2 = el.gate("AND");
+  const or = el.gate("OR");
+  const ab = (a ^ b) as 0 | 1;
+  const s = (ab ^ cin) as 0 | 1;
+  const cout = ((a & b) | (ab & cin)) as 0 | 1;
+  const oS = el.output("S", s);
+  const oC = el.output("Cout", cout);
+  el.net("A", a, "sig", inA.o, [x1.a, a1.a]);
+  el.net("B", b, "sig", inB.o, [x1.b, a1.b]);
+  el.net("Cin", cin, "sig", inC.o, [x2.b, a2.b]);
+  el.net("AB", ab, "sig", x1.y, [x2.a, a2.a]);
+  el.net("C1", (a & b) as 0 | 1, "sig", a1.y, [or.a]);
+  el.net("C2", (ab & cin) as 0 | 1, "sig", a2.y, [or.b]);
+  el.net("S", s, "sig", x2.y, [oS.i]);
+  el.net("Cout", cout, "sig", or.y, [oC.i]);
+  return el.build('DOWN');
+}
+
+// 行波链(单板支持任意级; 级多时用 DOWN 纵向, 避免横向折行互叠)
+function adderRippleChain(aBits: number, bBits: number, lo: number, count: number, cin: number, direction: 'RIGHT' | 'DOWN' = 'RIGHT') {
+  const el = new ElkBuilder();
+  const inC = el.input(`C${lo}`, cin);
+  const compact = direction === 'RIGHT' && count > 4;
+  const fas: { id: string; pins: Record<string, [string, string]> }[] = [];
+  let c = cin;
+  for (let k = 0; k < count; k++) {
+    const i = lo + k;
+    const ai = ((aBits >> i) & 1) as 0 | 1;
+    const bi = ((bBits >> i) & 1) as 0 | 1;
+    const cinI = c;
+    const r = fullAdder(ai, bi, cinI);
+    // 横向: 纯西进东出, 进位 Cout(东)→Cin(西)水平串接; 级多时盒去副标题+缩间距, 一排放下
+    const inA = el.input(`A${i}`, ai, 'EAST');
+    const inB = el.input(`B${i}`, bi, 'EAST');
+    const fa = el.box(`FA${i}`, ['A', 'B', 'Cin'], ['S', 'Cout'], compact ? '' : `bit${i}`);
+    const oS = el.output(`S${i}`, r.s as 0 | 1, 'WEST');
+    el.net(`A${i}`, ai, 'sig', inA.o, [fa.pins['A']]);
+    el.net(`B${i}`, bi, 'sig', inB.o, [fa.pins['B']]);
+    if (k === 0) {
+      el.net(`C${lo}`, cin as 0 | 1, 'sig', inC.o, [fa.pins['Cin']]);
+    } else {
+      el.net(`C${i}`, cinI as 0 | 1, 'sig', fas[k - 1].pins['Cout'], [fa.pins['Cin']]);
+    }
+    el.net(`S${i}`, r.s as 0 | 1, 'sig', fa.pins['S'], [oS.i]);
+    fas.push(fa);
+    c = r.cout;
+  }
+  const oC = el.output('Cout', c as 0 | 1, 'WEST');
+  el.net('Cout', c as 0 | 1, 'sig', fas[count - 1].pins['Cout'], [oC.i]);
+  return {
+    json: el.build('RIGHT', compact ? {
+      'org.eclipse.elk.layered.spacing.nodeNodeBetweenLayers': '24',
+      'org.eclipse.elk.spacing.nodeNode': '12',
+      'org.eclipse.elk.spacing.edgeNode': '10',
+    } : {}),
+    cout: c,
+  };
+}
+
+function AdderRender({ scene, onChange }: { scene: AdderScene; onChange: (c: AdderCfg) => void }) {
+  const { mode } = scene;
+  const aa = scene.a & 1;
+  const bb = scene.b & 1;
+  const cc = scene.cin;
+  const half = halfAdder(aa, bb);
+  const full = fullAdder(aa, bb, cc);
+  const toggleA = () => onChange({ ...scene, a: aa === 1 ? 0 : 1 });
+  const toggleB = () => onChange({ ...scene, b: bb === 1 ? 0 : 1 });
+  const toggleC = () => onChange({ ...scene, cin: (cc === 1 ? 0 : 1) as 0 | 1 });
+  if (mode === "ripple") {
+    const n = Math.max(2, Math.min(8, scene.bits | 0));
+    const aBits = (scene.a & ((1 << n) - 1)) >>> 0;
+    const bBits = (scene.b & ((1 << n) - 1)) >>> 0;
+    const sum = aBits + bBits;
+    // 单板: 始终横向一排(级多自动紧凑窄盒), 不再拆板
+    const low = adderRippleChain(aBits, bBits, 0, n, 0, 'RIGHT');
+    const chains: { title: string; json: unknown }[] = [{ title: "", json: low.json }];
+    const onToggleBit = (key: string) => {
+      const ma = /^A(\d+)$/.exec(key);
+      const mb = /^B(\d+)$/.exec(key);
+      if (ma) {
+        const i = Number(ma[1]);
+        onChange({ ...scene, a: (scene.a ^ (1 << i)) & ((1 << n) - 1) });
+      } else if (mb) {
+        const i = Number(mb[1]);
+        onChange({ ...scene, b: (scene.b ^ (1 << i)) & ((1 << n) - 1) });
+      }
+    };
+    return (
+      <div>
+        <InputBar
+          items={[
+            { label: "A", val: aBits, onClick: () => onChange({ ...scene, a: (scene.a + 1) & ((1 << n) - 1) } as AdderCfg) },
+            { label: "B", val: bBits, onClick: () => onChange({ ...scene, b: (scene.b + 1) & ((1 << n) - 1) } as AdderCfg) },
+          ]}
+          result={`${aBits}+${bBits}=${(aBits + bBits) & ((1 << n) - 1)} (${sum.toString(2).padStart(n, "0")})`}
+        />
+        {chains.map((ch) => (
+          <div key={ch.title || "all"} style={{ marginTop: ch.title ? 10 : 0 }}>
+            {ch.title && <div style={{ fontSize: 12, fontWeight: 800, color: "#334155", margin: "0 0 4px 2px" }}>{ch.title}</div>}
+            <HwBoard json={ch.json} height={n <= 4 ? 560 : 600} onToggle={onToggleBit} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  const show = mode === "half" ? half : full;
+  const halfFullBar = mode === "half" ? (
+    <InputBar items={[{ label: "A", val: aa, onClick: toggleA }, { label: "B", val: bb, onClick: toggleB }]} result={`S=${show.s} Cout=${show.cout}`} />
+  ) : (
+    <InputBar items={[{ label: "A", val: aa, onClick: toggleA }, { label: "B", val: bb, onClick: toggleB }, { label: "Cin", val: cc, onClick: toggleC }]} result={`S=${show.s} Cout=${show.cout}`} />
+  );
+  const onToggleKey = (key: string) => {
+    if (key === "A") toggleA();
+    else if (key === "B") toggleB();
+    else if (key === "Cin") toggleC();
+  };
+  const json = mode === "half"
+    ? adderHalfJson(aa as 0 | 1, bb as 0 | 1)
+    : adderFullJson(aa as 0 | 1, bb as 0 | 1, cc);
+  return (
+    <div>
+      {halfFullBar}
+      <HwBoard json={json} height={mode === "half" ? 300 : 420} onToggle={onToggleKey} />
+    </div>
+  );
+}
+
+// =====================================================================
+// 子模块 4: muxdecode —— 多路选择器 / 译码器
+// =====================================================================
+type MuxMode = "mux" | "decode";
+type MuxCfg = { mode: MuxMode; s: 0 | 1; d0: 0 | 1; d1: 0 | 1; a1: 0 | 1; a0: 0 | 1 };
+const muxDefault: MuxCfg = { mode: "mux", s: 1, d0: 0, d1: 1, a1: 1, a0: 0 };
+type MuxScene = MuxCfg;
+
+// ---- mux/decode: 门级网表(MUX = NOT + 2AND + OR; 译码器 = 2NOT + 4AND) ----
+function muxGateJson(s: 0 | 1, d0: 0 | 1, d1: 0 | 1) {
+  const el = new ElkBuilder();
+  const inS = el.input("S", s);
+  const inD0 = el.input("D0", d0);
+  const inD1 = el.input("D1", d1);
+  const ns = (s === 1 ? 0 : 1) as 0 | 1;
+  const m0 = (ns === 1 && d0 === 1 ? 1 : 0) as 0 | 1;
+  const m1 = (s === 1 && d1 === 1 ? 1 : 0) as 0 | 1;
+  const y = (m0 === 1 || m1 === 1 ? 1 : 0) as 0 | 1;
+  const nt = el.gate("NOT");
+  const a0 = el.gate("AND");
+  const a1 = el.gate("AND");
+  const or = el.gate("OR");
+  const oY = el.output("Y", y);
+  el.net("S", s, "sig", inS.o, [nt.a, a1.b]);
+  el.net("D0", d0, "sig", inD0.o, [a0.a]);
+  el.net("D1", d1, "sig", inD1.o, [a1.a]);
+  el.net("NS", ns, "sig", nt.y, [a0.b]);
+  el.net("M0", m0, "sig", a0.y, [or.a]);
+  el.net("M1", m1, "sig", a1.y, [or.b]);
+  el.net("Y", y, "sig", or.y, [oY.i]);
+  return el.build("DOWN");
+}
+
+function decodeJson(a1: 0 | 1, a0: 0 | 1) {
+  const el = new ElkBuilder();
+  const inA1 = el.input("A1", a1);
+  const inA0 = el.input("A0", a0);
+  const na1 = (a1 === 1 ? 0 : 1) as 0 | 1;
+  const na0 = (a0 === 1 ? 0 : 1) as 0 | 1;
+  const hit = a1 * 2 + a0;
+  const n1 = el.gate("NOT");
+  const n0 = el.gate("NOT");
+  const gs = [el.gate("AND"), el.gate("AND"), el.gate("AND"), el.gate("AND")];
+  const outs = [0, 1, 2, 3].map((i) => el.output(`Y${i}`, (i === hit ? 1 : 0) as 0 | 1));
+  // Y0=~A1·~A0 Y1=~A1·A0 Y2=A1·~A0 Y3=A1·A0
+  el.net("A1", a1, "sig", inA1.o, [n1.a, gs[2].a, gs[3].a]);
+  el.net("A0", a0, "sig", inA0.o, [n0.a, gs[1].b, gs[3].b]);
+  el.net("NA1", na1, "sig", n1.y, [gs[0].a, gs[1].a]);
+  el.net("NA0", na0, "sig", n0.y, [gs[0].b, gs[2].b]);
+  [0, 1, 2, 3].forEach((i) => {
+    el.net(`Y${i}`, (i === hit ? 1 : 0) as 0 | 1, "sig", gs[i].y, [outs[i].i]);
+  });
+  return el.build();
+}
+
+function MuxRender({ scene, onChange }: { scene: MuxScene; onChange: (c: MuxCfg) => void }) {
+  const { mode } = scene;
+  const set = (p: Partial<MuxCfg>) => onChange({ ...scene, ...p });
+  if (mode === "mux") {
+    const y = scene.s === 0 ? scene.d0 : scene.d1;
+    const onToggleKey = (key: string) => {
+      if (key === "S") set({ s: (scene.s === 1 ? 0 : 1) as 0 | 1 });
+      else if (key === "D0") set({ d0: (scene.d0 === 1 ? 0 : 1) as 0 | 1 });
+      else if (key === "D1") set({ d1: (scene.d1 === 1 ? 0 : 1) as 0 | 1 });
+    };
+    return (
+      <div>
+      <InputBar
+        items={[
+          { label: "S", val: scene.s, onClick: () => set({ s: (scene.s === 1 ? 0 : 1) as 0 | 1 }) },
+          { label: "D0", val: scene.d0, onClick: () => set({ d0: (scene.d0 === 1 ? 0 : 1) as 0 | 1 }) },
+          { label: "D1", val: scene.d1, onClick: () => set({ d1: (scene.d1 === 1 ? 0 : 1) as 0 | 1 }) },
+        ]}
+        result={`Y=${y}`}
+      />
+      <HwBoard json={muxGateJson(scene.s, scene.d0, scene.d1)} height={440} onToggle={onToggleKey} />
+      </div>
+    );
+  }
+  // 2-to-4 译码器: 恰好一个输出为 1
+  const hit = scene.a1 * 2 + scene.a0;
+  const onToggleKey = (key: string) => {
+    if (key === "A1") set({ a1: (scene.a1 === 1 ? 0 : 1) as 0 | 1 });
+    else if (key === "A0") set({ a0: (scene.a0 === 1 ? 0 : 1) as 0 | 1 });
+  };
+  return (
+    <div>
+    <InputBar
+      items={[
+        { label: "A1", val: scene.a1, onClick: () => set({ a1: (scene.a1 === 1 ? 0 : 1) as 0 | 1 }) },
+        { label: "A0", val: scene.a0, onClick: () => set({ a0: (scene.a0 === 1 ? 0 : 1) as 0 | 1 }) },
+      ]}
+      result={`Y${hit}=1`}
+    />
+    <HwBoard json={decodeJson(scene.a1, scene.a0)} height={480} onToggle={onToggleKey} />
+    </div>
+  );
+}
+
+// =====================================================================
+// 子模块 5: alu —— 1-bit ALU (AND/OR/ADD + MUX)
+// =====================================================================
+type AluCfg = { op: "and" | "or" | "add"; a: 0 | 1; b: 0 | 1; cin: 0 | 1 };
+const aluDefault: AluCfg = { op: "add", a: 1, b: 1, cin: 0 };
+type AluScene = AluCfg & { result: number; cout: number };
+
+// ---- alu: AND / OR / FA 三路 + MUX 盒选通(Op=[S1S0]: 00 AND / 01 OR / 10 ADD) ----
+function aluJson(op: "and" | "or" | "add", a: 0 | 1, b: 0 | 1) {
+  const el = new ElkBuilder();
+  const inA = el.input("A", a);
+  const inB = el.input("B", b);
+  const inC0 = el.input("C0", 0);
+  const s1 = (op === "add" ? 1 : 0) as 0 | 1;
+  const s0 = (op === "or" ? 1 : 0) as 0 | 1;
+  // 选择线从顶部进(数据从左进): 与 MUX 符号习惯一致, 减少左侧扇出拥堵
+  const inS1 = el.input("S1", s1, "SOUTH");
+  const inS0 = el.input("S0", s0, "SOUTH");
+  const d0 = (a & b) as 0 | 1;
+  const d1 = (a | b) as 0 | 1;
+  const fa = fullAdder(a, b, 0);
+  const result = (op === "and" ? d0 : op === "or" ? d1 : fa.s) as 0 | 1;
+  const cout = (op === "add" ? fa.cout : 0) as 0 | 1;
+  const gAnd = el.gate("AND");
+  const gOr = el.gate("OR");
+  const faBox = el.box("FA", ["A", "B", "Cin"], ["S", "Cout"], "全加器");
+  const mux = el.box(
+    "MUX",
+    ["D0", "D1", "D2", { name: "S1", side: "NORTH" }, { name: "S0", side: "NORTH" }],
+    ["R"],
+    "3选1",
+  );
+  const oR = el.output("R", result);
+  const oC = el.output("Cout", cout);
+  el.net("A", a, "sig", inA.o, [gAnd.a, gOr.a, faBox.pins["A"]]);
+  el.net("B", b, "sig", inB.o, [gAnd.b, gOr.b, faBox.pins["B"]]);
+  el.net("C0", 0, "sig", inC0.o, [faBox.pins["Cin"]]);
+  el.net("D0", d0, "sig", gAnd.y, [mux.pins["D0"]]);
+  el.net("D1", d1, "sig", gOr.y, [mux.pins["D1"]]);
+  el.net("D2", fa.s as 0 | 1, "sig", faBox.pins["S"], [mux.pins["D2"]]);
+  el.net("S1", s1, "sig", inS1.o, [mux.pins["S1"]]);
+  el.net("S0", s0, "sig", inS0.o, [mux.pins["S0"]]);
+  el.net("R", result, "sig", mux.pins["R"], [oR.i]);
+  el.net("Cout", cout, "sig", faBox.pins["Cout"], [oC.i]);
+  return el.build();
+}
+
+function AluRender({ scene, onChange }: { scene: AluScene; onChange: (c: AluCfg) => void }) {
+  const { op, a, b, result, cout } = scene;
+  const sel = op === "and" ? "00" : op === "or" ? "01" : "10";
+  const cycleOp = () => {
+    const next = op === "and" ? "or" : op === "or" ? "add" : "and";
+    onChange({ ...scene, op: next });
+  };
+  const onToggleKey = (key: string) => {
+    if (key === "A") onChange({ ...scene, a: (a === 1 ? 0 : 1) as 0 | 1 });
+    else if (key === "B") onChange({ ...scene, b: (b === 1 ? 0 : 1) as 0 | 1 });
+    else if (key === "S1" || key === "S0") cycleOp();
+  };
+  return (
+    <div>
+    <InputBar
+      items={[
+        { label: "A", val: a, onClick: () => onChange({ ...scene, a: (a === 1 ? 0 : 1) as 0 | 1 }) },
+        { label: "B", val: b, onClick: () => onChange({ ...scene, b: (b === 1 ? 0 : 1) as 0 | 1 }) },
+      ]}
+      result={`Op=${op === "add" ? "ADD" : op.toUpperCase()} Result=${result}`}
+    />
+    <HwBoard json={aluJson(op, a, b)} height={480} onToggle={onToggleKey} />
+    </div>
+  );
+}
+
+// =====================================================================
+// 子模块 6: seq —— SR 锁存器 / D 触发器 / 寄存器
+// =====================================================================
+type SeqMode = "latch" | "dff" | "register";
+type SeqCfg = { mode: SeqMode; s: 0 | 1; r: 0 | 1; d: 0 | 1; clk: 0 | 1; reg: string; write: 0 | 1 };
+const seqDefault: SeqCfg = { mode: "latch", s: 1, r: 0, d: 1, clk: 1, reg: "1011", write: 1 };
+type SeqScene = SeqCfg & { q: 0 | 1; qn: 0 | 1; illegal: boolean; loaded: boolean };
+
+function latchQ(s: 0 | 1, r: 0 | 1): { q: 0 | 1; qn: 0 | 1; illegal: boolean } {
+  if (s === 1 && r === 1) return { q: 0, qn: 0, illegal: true };
+  if (s === 1) return { q: 1, qn: 0, illegal: false };
+  if (r === 1) return { q: 0, qn: 1, illegal: false };
+  return { q: 0, qn: 1, illegal: false };
+}
+
+// ---- seq: SR 锁存(2×NOR 交叉耦合) / D 触发器盒 / n 位寄存器组 ----
+function seqLatchJson(s: 0 | 1, r: 0 | 1, q: 0 | 1, qn: 0 | 1) {
+  const el = new ElkBuilder();
+  const inS = el.input("S", s);
+  const inR = el.input("R", r);
+  const n1 = el.gate("NOR");
+  const n2 = el.gate("NOR");
+  const oQ = el.output("Q", q);
+  const oQN = el.output("QN", qn);
+  el.net("R", r, "sig", inR.o, [n1.a]);
+  el.net("S", s, "sig", inS.o, [n2.a]);
+  // 交叉耦合反馈: Q → NOR2 下输入, QN → NOR1 下输入(ELK 反向边绕回)
+  el.net("Q", q, "sig", n1.y, [oQ.i, n2.b]);
+  el.net("QN", qn, "sig", n2.y, [oQN.i, n1.b]);
+  return el.build();
+}
+
+function seqDffJson(d: 0 | 1, clk: 0 | 1, q: 0 | 1) {
+  const el = new ElkBuilder();
+  const inD = el.input("D", d);
+  const inClk = el.input("clk", clk);
+  const qn = (q === 1 ? 0 : 1) as 0 | 1;
+  const box = el.box("DFF", ["D", "CLK"], ["Q", "QN"], "边沿触发");
+  const oQ = el.output("Q", q);
+  const oQN = el.output("QN", qn);
+  el.net("D", d, "sig", inD.o, [box.pins["D"]]);
+  el.net("clk", clk, "sig", inClk.o, [box.pins["CLK"]]);
+  el.net("Q", q, "sig", box.pins["Q"], [oQ.i]);
+  el.net("QN", qn, "sig", box.pins["QN"], [oQN.i]);
+  return el.build();
+}
+
+function seqRegJson(bits: string, clk: 0 | 1, write: 0 | 1) {
+  const el = new ElkBuilder();
+  const n = bits.length;
+  // 每盒独立 clk/WE 端子链(4 链互不相连, ELK 按创建顺序网格打包, 行优先单调):
+  // 共享总线版会被交叉最小化打乱盒序(实测), 独立链无此问题。
+  // 端子 key 相同而 id 唯一, 点击任一 clk/WE 都翻转全局。
+  for (let i = 0; i < n; i++) {
+    const di = (bits[i] === "1" ? 1 : 0) as 0 | 1;
+    const inD = el.input(`D${i}`, di);
+    const inClk = el.input("clk", clk);
+    const inWE = el.input("WE", write);
+    const box = el.box(`DFF${i}`, ["D", "WE", "CLK"], [`Q${i}`], `bit${i}`);
+    const oQ = el.output(`Q${i}`, di);
+    el.net(`D${i}`, di, "sig", inD.o, [box.pins["D"]]);
+    el.net(`WE${i}`, write, "sig", inWE.o, [box.pins["WE"]]);
+    el.net(`clk${i}`, clk, "sig", inClk.o, [box.pins["CLK"]]);
+    el.net(`Q${i}`, di, "sig", box.pins[`Q${i}`], [oQ.i]);
+  }
+  return el.build();
+}
+
+function SeqRender({ scene, onChange }: { scene: SeqScene; onChange: (c: SeqCfg) => void }) {
+  const { mode } = scene;
+  const set = (p: Partial<SeqCfg>) => onChange({ ...scene, ...p });
+  const seqBar = mode === "latch" ? (
+    <InputBar
+      items={[
+        { label: "S", val: scene.s, onClick: () => set({ s: (scene.s === 1 ? 0 : 1) as 0 | 1 }) },
+        { label: "R", val: scene.r, onClick: () => set({ r: (scene.r === 1 ? 0 : 1) as 0 | 1 }) },
+      ]}
+      result={`Q=${scene.q}`}
+    />
+  ) : mode === "dff" ? (
+    <InputBar
+      items={[
+        { label: "D", val: scene.d, onClick: () => set({ d: (scene.d === 1 ? 0 : 1) as 0 | 1 }) },
+        { label: "clk", val: scene.clk, onClick: () => set({ clk: (scene.clk === 1 ? 0 : 1) as 0 | 1 }) },
+      ]}
+      result={`Q=${scene.q}`}
+    />
+  ) : (
+    <InputBar
+      items={[
+        { label: "clk", val: scene.clk, onClick: () => set({ clk: (scene.clk === 1 ? 0 : 1) as 0 | 1 }) },
+        { label: "WE", val: scene.write, onClick: () => set({ write: (scene.write === 1 ? 0 : 1) as 0 | 1 }) },
+      ]}
+      result={`Q=${scene.loaded ? scene.reg.replace(/[^01]/g, "").slice(0, 8) : "保持"}`}
+    />
+  );
+  if (mode === "latch") {
+    const { s, r, q, qn, illegal } = scene;
+    const onToggleKey = (key: string) => {
+      if (key === "S") set({ s: (s === 1 ? 0 : 1) as 0 | 1 });
+      else if (key === "R") set({ r: (r === 1 ? 0 : 1) as 0 | 1 });
+    };
+    return (
+      <div>
+      {seqBar}
+      <HwBoard json={seqLatchJson(s, r, q, qn)} height={440} onToggle={onToggleKey} />
+      <div style={{ textAlign: "center", fontSize: 13, fontWeight: 800, color: illegal ? "#dc2626" : "#059669", marginTop: 4 }}>
+        {illegal ? `S=R=1 非法 — Q 与 QN 都被拉到 0, 状态不确定` : `S=${s} R=${r} → Q=${q}`}
+      </div>
+      </div>
+    );
+  }
+  if (mode === "dff") {
+    const { d, clk, q } = scene;
+    const onToggleKey = (key: string) => {
+      if (key === "D") set({ d: (d === 1 ? 0 : 1) as 0 | 1 });
+      else if (key === "clk") set({ clk: (clk === 1 ? 0 : 1) as 0 | 1 });
+    };
+    return (
+      <div>
+      {seqBar}
+      <HwBoard json={seqDffJson(d, clk, q)} height={320} onToggle={onToggleKey} />
+      <div style={{ textAlign: "center", fontSize: 13, fontWeight: 800, color: "#1e40af", marginTop: 4 }}>
+        {clk === 1 ? `clk=1 (边沿) → Q 锁存 D=${d}` : `clk=0 → Q=${q} 保持`}
+      </div>
+      </div>
+    );
+  }
+  const bits = scene.reg.replace(/[^01]/g, "").slice(0, 8) || "0000";
+  const onToggleKey = (key: string) => {
+    const m = /^D(\d+)$/.exec(key);
+    if (m) {
+      const i = Number(m[1]);
+      const arr = bits.split("");
+      arr[i] = arr[i] === "1" ? "0" : "1";
+      set({ reg: arr.join("") });
+    } else if (key === "clk") set({ clk: (scene.clk === 1 ? 0 : 1) as 0 | 1 });
+    else if (key === "WE") set({ write: (scene.write === 1 ? 0 : 1) as 0 | 1 });
+  };
+  return (
+    <div>
+    {seqBar}
+    <HwBoard json={seqRegJson(bits, scene.clk, scene.write)} height={bits.length <= 4 ? 480 : 480 + (bits.length - 4) * 110} onToggle={onToggleKey} />
+    <div style={{ textAlign: "center", fontSize: 13, fontWeight: 800, color: "#1e40af", marginTop: 4 }}>
+      {`D=${bits}${scene.loaded ? ` → Q=${bits}` : " → 保持"}`}
+    </div>
+    </div>
+  );
+}
+
+// =====================================================================
+// 聚合: 单模块 (interactive: 无播放条/无伪代码, 整页画布)
+// =====================================================================
+type Cfg = { subMode: SubMode; [k: string]: any };
+
+function sceneOf(sub: SubMode, c: any): any {
+  if (sub === "cmos") return cmosScene(c);
+  if (sub === "gates") return c;
+  if (sub === "adder") return c;
+  if (sub === "muxdecode") return c;
+  if (sub === "alu") {
+    const full = fullAdder(c.a & 1, c.b & 1, c.cin);
+    return { ...c, result: c.op === "and" ? (c.a & c.b) : c.op === "or" ? (c.a | c.b) : full.s, cout: c.op === "add" ? full.cout : 0 };
+  }
+  if (sub === "seq") {
+    if (c.mode === "latch") {
+      const l = latchQ(c.s, c.r);
+      return { ...c, q: l.q, qn: l.qn, illegal: l.illegal, loaded: false };
+    }
+    if (c.mode === "dff") return { ...c, q: c.clk === 1 ? c.d : 0, qn: c.clk === 1 ? (c.d === 1 ? 0 : 1) : 1, illegal: false, loaded: false };
+    return { ...c, q: 0, qn: 1, illegal: false, loaded: c.clk === 1 && c.write === 1 };
+  }
+  return c;
+}
+
+const SUB: Record<SubMode, ModuleDef> = {
+  cmos: {
+    id: "cmos", title: T("CMOS 元件", "CMOS Devices"), tags: ["computer-organization", "digital-logic"],
+    defaultConfig: cmosDefault,
+    Controls: CmosControls, generate: (c: CmosCfg) => [{ caption: T("CMOS 元件", "CMOS"), scene: cmosScene(c) }] as never,
+    Render: CmosRender as never,
+  } as unknown as ModuleDef,
+  gates: {
+    id: "gates", title: T("门电路", "Logic Gates"), tags: ["computer-organization", "digital-logic"],
+    defaultConfig: gateDefault,
+    Controls: GateControls, generate: (c: GateCfg) => [{ caption: T("门电路", "Gates"), scene: c }] as never,
+    Render: GateRender as never,
+  } as unknown as ModuleDef,
+  adder: {
+    id: "adder", title: T("加法器", "Adders"), tags: ["computer-organization", "digital-logic"],
+    defaultConfig: adderDefault,
+    Controls: AdderControls, generate: (c: AdderCfg) => [{ caption: T("加法器", "Adders"), scene: c }] as never,
+    Render: AdderRender as never,
+  } as unknown as ModuleDef,
+  muxdecode: {
+    id: "muxdecode", title: T("MUX/译码器", "MUX/Decoder"), tags: ["computer-organization", "digital-logic"],
+    defaultConfig: muxDefault,
+    Controls: MuxControls, generate: (c: MuxCfg) => [{ caption: T("MUX/译码器", "MUX/Decoder"), scene: c }] as never,
+    Render: MuxRender as never,
+  } as unknown as ModuleDef,
+  alu: {
+    id: "alu", title: T("1-bit ALU", "1-bit ALU"), tags: ["computer-organization", "digital-logic"],
+    defaultConfig: aluDefault,
+    Controls: AluControls, generate: (c: AluCfg) => [{ caption: T("1-bit ALU", "1-bit ALU"), scene: sceneOf("alu", c) }] as never,
+    Render: AluRender as never,
+  } as unknown as ModuleDef,
+  seq: {
+    id: "seq", title: T("时序电路", "Sequential"), tags: ["computer-organization", "digital-logic"],
+    defaultConfig: seqDefault,
+    Controls: SeqControls, generate: (c: SeqCfg) => [{ caption: T("时序电路", "Sequential"), scene: sceneOf("seq", c) }] as never,
+    Render: SeqRender as never,
+  } as unknown as ModuleDef,
+};
+
+const MAP: Record<SubMode, ModuleDef> = SUB;
+const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
+  { label: "元件层", opts: [
+    { v: "cmos", zh: "CMOS 元件", en: "CMOS" },
+    { v: "gates", zh: "门电路", en: "Gates" },
+  ]},
+  { label: "组合电路", opts: [
+    { v: "adder", zh: "加法器", en: "Adder" },
+    { v: "muxdecode", zh: "MUX/译码器", en: "MUX/Dec" },
+    { v: "alu", zh: "1-bit ALU", en: "ALU" },
+  ]},
+  { label: "时序电路", opts: [
+    { v: "seq", zh: "锁存器/触发器", en: "FF/Latch" },
+  ]},
+];
+
+function activeOf(sub: unknown): ModuleDef {
+  return (MAP as Record<string, ModuleDef>)[sub as string] ?? SUB.cmos;
+}
+function subKeyOf(sub: unknown): SubMode {
+  return (MAP as Record<string, ModuleDef>)[sub as string] ? (sub as SubMode) : "cmos";
+}
+function safeCfg(sub: unknown, config: Cfg): Cfg {
+  const m = activeOf(sub) as any;
+  const d = (m.defaultConfig ?? {}) as any;
+  return { ...d, ...(config as any), subMode: subKeyOf(sub) } as Cfg;
+}
+
+const DEFAULT: Cfg = { subMode: "cmos", ...(SUB.cmos as any).defaultConfig };
+
+export const digitalLogicModule: ModuleDef<any, Cfg> = {
+  id: "digital-logic",
+  title: T("数字逻辑", "Digital Logic"),
+  desc: T("CMOS 元件 → 门电路 → 加法器 → MUX/译码器 → ALU → 时序电路。点击画布切换输入, 观察电路输出。", "CMOS → gates → adders → MUX → ALU → sequential. Click inputs on canvas."),
+  tags: ["computer-organization", "digital-logic"],
+  interactive: true,
+  defaultConfig: DEFAULT,
+  randomize(c) {
+    const safe = safeCfg(c.subMode, c);
+    const m = activeOf(c.subMode) as any;
+    if (!m.randomize) return safe;
+    return { ...safe, ...m.randomize(safe), subMode: safe.subMode };
+  },
+  Controls({ config, onChange, t }) {
+    const isZh = t(T("中文", "en")) !== "en";
+    const sub = subKeyOf(config.subMode);
+    const active = activeOf(sub) as any;
+    const safe = safeCfg(sub, config);
+    return (
+      <div style={{ display: "grid", gap: 8, width: "100%" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
+          <span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca" }}>{isZh ? "数字逻辑" : "DIGITAL LOGIC"}</span>
+          <select className="txt" value={sub} onChange={(e) => { const key = subKeyOf(e.target.value); const m = activeOf(key) as any; onChange({ ...config, ...((m.defaultConfig as any) ?? {}), subMode: key } as any); }} style={{ minWidth: 200, fontWeight: 700 }}>
+            {GROUPS.map((g) => (
+              <optgroup key={g.label} label={g.label}>
+                {g.opts.map((o) => <option key={o.v} value={o.v}>{isZh ? o.zh : o.en}</option>)}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+        {active?.Controls && createElement(active.Controls as any, { config: safe as any, onChange: onChange as any, t })}
+      </div>
+    ) as unknown as never;
+  },
+  generate(config) {
+    const safe = safeCfg((config as Cfg).subMode, config as Cfg);
+    const m = activeOf((config as Cfg).subMode) as any;
+    const res: any = m.generate(safe);
+    const frames: any[] = Array.isArray(res) ? res : res?.frames ?? [];
+    return frames.length ? frames : [{ caption: T("数字逻辑", "Digital Logic"), scene: safe }];
+  },
+  Render(props) {
+    const safe = safeCfg((props.config as Cfg).subMode, props.config as Cfg);
+    const m = activeOf((props.config as Cfg).subMode) as any;
+    // scene 直接从当前 config 生成(不依赖播放器帧): 播放器帧与 config 异步同步,
+    // 切换子模块时旧 scene 会让新子模块 Render 崩(如 alu 缺 op → op.toUpperCase() 崩)。
+    // 交互式画布本就是 config 驱动, 这里即时生成 scene, 切换即时正确、无需刷新。
+    const scene = sceneOf(safe.subMode, safe);
+    return createElement(m.Render as any, { ...(props as any), scene, config: safe } as any);
+  },
+};
+
+// =====================================================================
+// Controls (每个子模块一个, 仅模式切换; 输入全部移到画布点击)
+// =====================================================================
+function CmosControls({ config, onChange, t }: any) {
+  const isZh = t(T("中文", "en")) !== "en";
+  const modes: Array<[CmosMode, string, string]> = [
+    ["switch", "开关模型", "Switch"],
+    ["inverter", "反相器", "Inverter"],
+    ["nand", "NAND", "NAND"],
+    ["nor", "NOR", "NOR"],
+  ];
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+      <span style={{ fontSize: 11, fontWeight: 800, color: "#475569" }}>{isZh ? "电路" : "CIRCUIT"}</span>
+      <select className="txt" value={config.mode} onChange={(e) => onChange({ ...config, mode: e.target.value as CmosMode })}>
+        {modes.map(([v, zh, en]) => <option key={v} value={v}>{isZh ? zh : en}</option>)}
+      </select>
+    </div>
+  ) as unknown as never;
+}
+
+function GateControls({ config, onChange, t }: any) {
+  const isZh = t(T("中文", "en")) !== "en";
+  const modes: Array<[GateMode, string, string]> = [
+    ["and", "AND", "AND"], ["or", "OR", "OR"], ["not", "NOT", "NOT"],
+    ["nand", "NAND", "NAND"], ["nor", "NOR", "NOR"], ["xor", "XOR", "XOR"],
+    ["universal", "NAND 万能门", "Universal"],
+  ];
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+      <span style={{ fontSize: 11, fontWeight: 800, color: "#475569" }}>{isZh ? "门" : "GATE"}</span>
+      <select className="txt" value={config.mode} onChange={(e) => onChange({ ...config, mode: e.target.value as GateMode })}>
+        {modes.map(([v, zh, en]) => <option key={v} value={v}>{isZh ? zh : en}</option>)}
+      </select>
+      {config.mode !== "universal" && (
+        <select className="txt" value={config.view ?? "sym"} onChange={(e) => onChange({ ...config, view: e.target.value as GateView })}>
+          <option value="sym">{isZh ? "符号" : "Symbol"}</option>
+          <option value="cmos">{isZh ? "CMOS 内部" : "CMOS"}</option>
+        </select>
+      )}
+    </div>
+  ) as unknown as never;
+}
+
+function AdderControls({ config, onChange, t }: any) {
+  const isZh = t(T("中文", "en")) !== "en";
+  const modes: Array<[AdderMode, string, string]> = [
+    ["half", "半加器", "Half"], ["full", "全加器", "Full"], ["ripple", "行波进位", "Ripple"],
+  ];
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+      <span style={{ fontSize: 11, fontWeight: 800, color: "#475569" }}>{isZh ? "电路" : "CIRCUIT"}</span>
+      <select className="txt" value={config.mode} onChange={(e) => onChange({ ...config, mode: e.target.value as AdderMode })}>
+        {modes.map(([v, zh, en]) => <option key={v} value={v}>{isZh ? zh : en}</option>)}
+      </select>
+      {config.mode === "ripple" && (
+        <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}><span>{t(T("位数", "Bits"))}</span>
+          <select className="txt" value={config.bits} onChange={(e) => onChange({ ...config, bits: Number(e.target.value) })} style={{ width: 60 }}>
+            {[2, 3, 4, 5, 6, 7, 8].map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </label>
+      )}
+    </div>
+  ) as unknown as never;
+}
+
+function MuxControls({ config, onChange, t }: any) {
+  const isZh = t(T("中文", "en")) !== "en";
+  const modes: Array<[MuxMode, string, string]> = [
+    ["mux", "多路选择器", "MUX"], ["decode", "译码器", "Decoder"],
+  ];
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+      <span style={{ fontSize: 11, fontWeight: 800, color: "#475569" }}>{isZh ? "电路" : "CIRCUIT"}</span>
+      <select className="txt" value={config.mode} onChange={(e) => onChange({ ...config, mode: e.target.value as MuxMode })}>
+        {modes.map(([v, zh, en]) => <option key={v} value={v}>{isZh ? zh : en}</option>)}
+      </select>
+    </div>
+  ) as unknown as never;
+}
+
+function AluControls({ config, onChange, t }: any) {
+  const isZh = t(T("中文", "en")) !== "en";
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+      <span style={{ fontSize: 11, fontWeight: 800, color: "#475569" }}>{isZh ? "运算" : "OP"}</span>
+      <select className="txt" value={config.op} onChange={(e) => onChange({ ...config, op: e.target.value as AluCfg["op"] })}>
+        <option value="and">AND (00)</option>
+        <option value="or">OR (01)</option>
+        <option value="add">ADD (10)</option>
+      </select>
+    </div>
+  ) as unknown as never;
+}
+
+function SeqControls({ config, onChange, t }: any) {
+  const isZh = t(T("中文", "en")) !== "en";
+  const modes: Array<[SeqMode, string, string]> = [
+    ["latch", "SR 锁存器", "SR Latch"], ["dff", "D 触发器", "D-FF"], ["register", "寄存器", "Register"],
+  ];
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+      <span style={{ fontSize: 11, fontWeight: 800, color: "#475569" }}>{isZh ? "电路" : "CIRCUIT"}</span>
+      <select className="txt" value={config.mode} onChange={(e) => onChange({ ...config, mode: e.target.value as SeqMode })}>
+        {modes.map(([v, zh, en]) => <option key={v} value={v}>{isZh ? zh : en}</option>)}
+      </select>
+      {config.mode === "register" && (
+        <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}><span>{t(T("位数", "Bits"))}</span>
+          <select className="txt" value={config.reg} onChange={(e) => onChange({ ...config, reg: e.target.value })} style={{ width: 80 }}>
+            {["11", "101", "1011", "1101", "1111", "101011", "11010011"].map((s) => <option key={s} value={s}>{s}</option>)}
+          </select>
+        </label>
+      )}
+    </div>
+  ) as unknown as never;
+}
+
+// 2 输入真值表
+const TT2: Array<[number, number, number]> = [
+  [0, 0, 0], [0, 1, 0], [1, 0, 0], [1, 1, 1],
+];

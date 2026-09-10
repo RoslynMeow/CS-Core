@@ -5,6 +5,7 @@ import { treeUnifiedModule } from "./tree/unified";
 import { graphUnifiedModule } from "./graph/unified";
 import { arrayUnifiedModule } from "./array/unified";
 import { raceModule } from "./array/compare";
+import { digitalLogicModule } from "./computer-organization/digitalLogic";
 
 // SAFETY: 所有模块实现同一 ModuleDef 契约;泛型形参仅约束模块内部实现,运行时结构一致
 const asModule = (m: unknown): ModuleDef => m as ModuleDef;
@@ -16,6 +17,7 @@ export const KNOWLEDGE: Record<string, ModuleDef> = {
   [graphUnifiedModule.id]: asModule(graphUnifiedModule),
   [arrayUnifiedModule.id]: asModule(arrayUnifiedModule),
   [raceModule.id]: asModule(raceModule),
+  [digitalLogicModule.id]: asModule(digitalLogicModule),
 };
 
 export const allModules = Object.values(KNOWLEDGE);
