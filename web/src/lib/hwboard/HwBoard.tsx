@@ -111,7 +111,7 @@ function Board({
       }) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const el = d3.select(this as any);
-        const parent = (d?.hwMeta?.parent ?? {}) as { hwMeta?: { cssStyle?: string; cssClass?: string; cur?: boolean } };
+        const parent = (d?.hwMeta?.parent ?? {}) as { hwMeta?: { cssStyle?: string; cssClass?: string; cur?: boolean; kind?: string } };
         const meta = parent.hwMeta ?? (d?.hwMeta ?? {});
         if (meta.cssStyle) {
           // 电流(cur)超边里, 不流动的支路:

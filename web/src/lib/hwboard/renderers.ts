@@ -35,18 +35,14 @@ class FetRenderer {
     nodeG.each(function (this: Element, d: any) {
       const g = select(this as Element);
       const on = !!d.hwMeta.on;
-      const cur = !!d.hwMeta.cur;
       // 开关状态用红绿识别: 导通绿 / 截止红(不代表一定有电流)
       const col = on ? GREEN : RED;
       const nmos = d.hwMeta.name === 'NMOS';
       // D/S 细引线(上下各一段)
       g.append('line').attr('x1', 15).attr('y1', 0).attr('x2', 15).attr('y2', 12).attr('stroke', col).attr('stroke-width', 1.6);
       g.append('line').attr('x1', 15).attr('y1', 36).attr('x2', 15).attr('y2', 48).attr('stroke', col).attr('stroke-width', 1.6);
-      // 沟道短粗棒(一粗一细才是管子); 只有「电流路径(cur)」才加流动虚线 —— 开了≠有电流
-      const ch = g.append('line').attr('x1', 15).attr('y1', 12).attr('x2', 15).attr('y2', 36).attr('stroke', col).attr('stroke-width', 4).attr('stroke-linecap', 'butt');
-      if (cur) ch.attr('class', 'fet-flow');
-      // 电流方向: 电流路径上沟道中心画向下小三角(VDD 在上 → GND 在下, NMOS/PMOS 电流都向下)
-      if (cur) g.append('polygon').attr('points', '12,21 18,21 15,28').attr('fill', GREEN).attr('stroke', 'none');
+      // 沟道短粗棒(一粗一细才是管子); 导通即绿色实线, 不再做流动动画
+      g.append('line').attr('x1', 15).attr('y1', 12).attr('x2', 15).attr('y2', 36).attr('stroke', col).attr('stroke-width', 4).attr('stroke-linecap', 'butt');
       // 栅极(控制信号): 固定蓝色, 不表示电流
       const gc = '#3b82f6';
       g.append('line').attr('x1', 2).attr('y1', 24).attr('x2', 11).attr('y2', 24).attr('stroke', gc).attr('stroke-width', 1.8);
@@ -85,9 +81,9 @@ class PowerRenderer {
     nodeG.each(function (this: Element, d: any) {
       const g = select(this as Element);
       if (d.hwMeta.name === 'VDD') {
-        g.append('rect').attr('x', 3).attr('y', 2).attr('width', 24).attr('height', 5).attr('fill', RED).attr('stroke', 'none');
-        g.append('line').attr('x1', 15).attr('y1', 7).attr('x2', 15).attr('y2', 16).attr('stroke', RED).attr('stroke-width', 2);
-        g.append('text').attr('x', 15).attr('y', -2).attr('font-size', 9).attr('text-anchor', 'middle').attr('font-family', 'monospace').attr('fill', RED).text('Vdd');
+        g.append('rect').attr('x', 3).attr('y', 2).attr('width', 24).attr('height', 5).attr('fill', GREEN).attr('stroke', 'none');
+        g.append('line').attr('x1', 15).attr('y1', 7).attr('x2', 15).attr('y2', 16).attr('stroke', GREEN).attr('stroke-width', 2);
+        g.append('text').attr('x', 15).attr('y', -2).attr('font-size', 9).attr('text-anchor', 'middle').attr('font-family', 'monospace').attr('fill', GREEN).text('Vdd');
       } else {
         g.append('line').attr('x1', 13).attr('y1', 0).attr('x2', 13).attr('y2', 12).attr('stroke', DARK).attr('stroke-width', 2);
         g.append('line').attr('x1', 1).attr('y1', 12).attr('x2', 25).attr('y2', 12).attr('stroke', DARK).attr('stroke-width', 2);

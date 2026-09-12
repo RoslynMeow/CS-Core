@@ -1,4 +1,5 @@
-/* 统一看板主题: 标准符号白底灰边, 导通线流动画, 汇接圆点黑色。
+/* 统一看板主题: 标准符号白底灰边, 汇接圆点黑色。
+ * 导通支路用绿色实线表示, 不再做流动动画。
  * (d3-hwschematic 部分渲染器会用 hwMeta.cssClass 覆盖 class,
  *  因此凡是经过它的节点都自带 node/node-operator 基础类, 样式由这里接管) */
 .d3-hwschematic g.node {
@@ -21,20 +22,4 @@
 .d3-hwschematic circle.junction-point {
   fill: #334155;
   stroke: none;
-}
-/* 导通线流动画: 有电流的信号线虚线流动, 电源线常亮 */
-.d3-hwschematic .flow-on {
-  stroke-dasharray: 7 5;
-  animation: hwflow 0.7s linear infinite;
-}
-@keyframes hwflow {
-  to { stroke-dashoffset: -12; }
-}
-/* 导通 MOSFET 沟道: 虚线向下流动 = 电流从 VDD(上) 流向 GND(下) */
-.d3-hwschematic .fet-flow {
-  stroke-dasharray: 3 3;
-  animation: fetflow 0.45s linear infinite;
-}
-@keyframes fetflow {
-  to { stroke-dashoffset: -6; }
 }

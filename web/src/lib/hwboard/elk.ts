@@ -174,7 +174,7 @@ export class ElkBuilder {
    *        ctrl 控制信号(固定色、无流动, 不表示电流 —— 如 CMOS 栅极输入) */
   net(name: string, val: number, kind: NetKind, from: PortRef | PortRef[], to: (PortRef | null)[]) {
     const cssStyle =
-      (kind === 'vdd' ? 'stroke:#dc2626;stroke-width:2' :
+      (kind === 'vdd' ? 'stroke:#16a34a;stroke-width:2.2' :
       kind === 'gnd' ? 'stroke:#1f2937;stroke-width:2' :
       kind === 'ctrl' ? 'stroke:#3b82f6;stroke-width:2' :
       val === 1 ? 'stroke:#16a34a;stroke-width:2.2' : 'stroke:#64748b;stroke-width:1.6') + ';fill:none';
@@ -187,7 +187,6 @@ export class ElkBuilder {
         name,
         kind,
         cssStyle,
-        ...(kind === 'sig' && val === 1 ? { cssClass: 'flow-on' } : {}),
       },
     });
   }
@@ -281,51 +280,24 @@ export class ElkBuilder {
       }
       return keys;
     };
-    const distinctAcross = (A: Set<string>, B: Set<string>): boolean => {
-      for (const a of A) for (const b of B) if (a !== b) return true;
-      return false;
-    };
-    // —— 导线: 若某对端口位于不同端子间的通路上, 整条 net 记 cur ——
-    // (超边内截止管桩头的具体线段由 HwBoard 逐段 mask 置灰, 此处只定整网有无电流)
-    const curNets = new Set<string>();
+    // —— 上色: 「有电」= 该网与 VDD 连通(经导通管) → 绿色实线; 否则灰 ——
+    // 与 VDD 连通 = 该网处于高电平; 被截止管隔断的支路不再是高电平 → 灰。
+    // 栅极控制线保持蓝; 地线深灰; 全程无动画。
     for (const e of nets) {
       const arr = netPorts.get(e.id) ?? [];
-      let hit = false;
-      for (let i = 0; i < arr.length && !hit; i++) {
-        for (let j = i + 1; j < arr.length && !hit; j++) {
-          const A = reach(arr[i], { net: e.id, a: arr[i], b: arr[j] }, null);
-          const B = reach(arr[j], { net: e.id, a: arr[i], b: arr[j] }, null);
-          if (distinctAcross(A, B)) hit = true;
-        }
-      }
+      let hot = false;
+      for (const p of arr) { if (reach(p, null, null).has('VDD')) { hot = true; break; } }
       e.hwMeta = e.hwMeta ?? {};
-      e.hwMeta.cur = hit;
-      if (hit) curNets.add(e.id);
+      e.hwMeta.hot = hot;
     }
-    // —— 管子: 导通且源漏分处不同端子侧, 才算有电流穿过(开了≠有电流) ——
-    for (const n of nodes) {
-      if (n.hwMeta?.cls !== 'Mos') continue;
-      if (!n.hwMeta?.on) { n.hwMeta.cur = false; continue; }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ports: any[] = n.ports ?? [];
-      const north = ports.find((p) => p.properties?.side === 'NORTH');
-      const south = ports.find((p) => p.properties?.side === 'SOUTH');
-      if (!north || !south) { n.hwMeta.cur = false; continue; }
-      const A = reach(north.id, null, n);
-      const B = reach(south.id, null, n);
-      n.hwMeta.cur = distinctAcross(A, B);
-    }
-    // 上色: cur 绿流动; 非 cur 且非 ctrl → 灰; ctrl 保持蓝
     for (const e of edges) {
       const meta = e.hwMeta ?? {};
-      if (meta.cur) {
-        meta.cssStyle = 'stroke:#16a34a;stroke-width:2.2;fill:none';
-        meta.cssClass = 'flow-on';
-      } else if (meta.kind !== 'ctrl') {
-        // 无电流的连线: 普通灰线(不是"熄灭/禁用", 只是这条支路没有电流流过)
-        meta.cssStyle = 'stroke:#64748b;stroke-width:1.8;fill:none';
-        meta.cssClass = '';
-      }
+      if (meta.kind === 'ctrl') continue;
+      if (meta.kind === 'gnd') { meta.cssStyle = 'stroke:#1f2937;stroke-width:2;fill:none'; meta.cssClass = ''; continue; }
+      meta.cssStyle = meta.hot
+        ? 'stroke:#16a34a;stroke-width:2.2;fill:none'
+        : 'stroke:#64748b;stroke-width:1.8;fill:none';
+      meta.cssClass = '';
     }
     return graph;
   }
