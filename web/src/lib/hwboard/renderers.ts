@@ -35,15 +35,20 @@ class FetRenderer {
     nodeG.each(function (this: Element, d: any) {
       const g = select(this as Element);
       const on = !!d.hwMeta.on;
-      const col = on ? GREEN : GRAY;
+      const cur = !!d.hwMeta.cur;
+      // 开关状态用红绿识别: 导通绿 / 截止红(不代表一定有电流)
+      const col = on ? GREEN : RED;
       const nmos = d.hwMeta.name === 'NMOS';
       // D/S 细引线(上下各一段)
       g.append('line').attr('x1', 15).attr('y1', 0).attr('x2', 15).attr('y2', 12).attr('stroke', col).attr('stroke-width', 1.6);
       g.append('line').attr('x1', 15).attr('y1', 36).attr('x2', 15).attr('y2', 48).attr('stroke', col).attr('stroke-width', 1.6);
-      // 沟道短粗棒(一粗一细才是管子)
-      g.append('line').attr('x1', 15).attr('y1', 12).attr('x2', 15).attr('y2', 36).attr('stroke', col).attr('stroke-width', 4).attr('stroke-linecap', 'butt');
-      // 栅极(颜色跟栅信号)
-      const gc = d.hwMeta.gateOn ? GREEN : GRAY;
+      // 沟道短粗棒(一粗一细才是管子); 只有「电流路径(cur)」才加流动虚线 —— 开了≠有电流
+      const ch = g.append('line').attr('x1', 15).attr('y1', 12).attr('x2', 15).attr('y2', 36).attr('stroke', col).attr('stroke-width', 4).attr('stroke-linecap', 'butt');
+      if (cur) ch.attr('class', 'fet-flow');
+      // 电流方向: 电流路径上沟道中心画向下小三角(VDD 在上 → GND 在下, NMOS/PMOS 电流都向下)
+      if (cur) g.append('polygon').attr('points', '12,21 18,21 15,28').attr('fill', GREEN).attr('stroke', 'none');
+      // 栅极(控制信号): 固定蓝色, 不表示电流
+      const gc = '#3b82f6';
       g.append('line').attr('x1', 2).attr('y1', 24).attr('x2', 11).attr('y2', 24).attr('stroke', gc).attr('stroke-width', 1.8);
       // 源极箭头: NMOS 在下指向�?朝沟�?, PMOS 在上指向�?背离沟道)
       g.append('polygon')
@@ -52,7 +57,7 @@ class FetRenderer {
       // 引脚注字
       const fs = (x: number, y: number, t: string) => {
         g.append('text').attr('x', x).attr('y', y).attr('font-size', 8)
-          .attr('font-family', 'monospace').attr('fill', on ? '#059669' : '#475569').text(t);
+          .attr('font-family', 'monospace').attr('fill', on ? '#059669' : '#b91c1c').text(t);
       };
       fs(22, 8, nmos ? 'D' : 'S');
       fs(22, 44, nmos ? 'S' : 'D');

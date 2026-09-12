@@ -96,24 +96,61 @@ function Board({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const d3 = hwGlobal() as any;
       const root = d3.select(svgDom);
-      // 可见连线: 把网表颜色/流动画搬到可见 path 上(库只画到不可见 wrap 上)
+      // 可见连线: 把网表颜色/流动画搬到可见 .link 上。
+      // 库把 cssStyle/cssClass 放在 hwMeta.parent.hwMeta(hyper edge 展开后), 直接读 hwMeta 读不到。
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const nodeById: Record<string, any> = {};
+      for (const c of (json?.children ?? []) as { id?: string }[]) {
+        if (c.id) nodeById[c.id] = c;
+      }
       root.selectAll('path.link').each(function (this: Element, d: {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         hwMeta?: any;
+        source?: string;
+        target?: string;
       }) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const el = d3.select(this as any);
-        const meta = (d?.hwMeta ?? {}) as { cssStyle?: string; cssClass?: string };
-        if (meta.cssStyle) el.attr('style', meta.cssStyle);
+        const parent = (d?.hwMeta?.parent ?? {}) as { hwMeta?: { cssStyle?: string; cssClass?: string; cur?: boolean } };
+        const meta = parent.hwMeta ?? (d?.hwMeta ?? {});
+        if (meta.cssStyle) {
+          // 电流(cur)超边里, 不流动的支路:
+          //  - 连接到「截止管」: 电流只流经开的开关, 共享电源/地线到截止管那段保持灰
+          //  - 连接到「输出端子(out_)」: 电流从 VDD 流到断点为止, 输出端子只是观测点, 引线不流动
+          if (meta.cur) {
+            const src = nodeById[(d as { source?: string }).source ?? ''];
+            const tgt = nodeById[(d as { target?: string }).target ?? ''];
+            const srcId = (d as { source?: string }).source ?? '';
+            const tgtId = (d as { target?: string }).target ?? '';
+            const blocked =
+              (src?.hwMeta?.cls === 'Mos' && !src.hwMeta.on) ||
+              (tgt?.hwMeta?.cls === 'Mos' && !tgt.hwMeta.on) ||
+              srcId.startsWith('out_') ||
+              tgtId.startsWith('out_');
+            if (blocked) {
+              // 无电流流经的支路: 保持普通灰线
+              el.attr('style', 'stroke:#64748b;stroke-width:1.8;fill:none');
+              el.attr('class', 'link');
+              return;
+            }
+          }
+          el.attr('style', meta.cssStyle);
+        }
         if (meta.cssClass) el.attr('class', `link ${meta.cssClass}`);
       });
-      // 输入端子挂点击(节点 id 以 in_ 开头)
+      // 输入端子挂点击(节点 id 以 in_ 开头) + 声明了 toggleKey 的盒子(如 ALU 的 MUX)
       root
         .selectAll('g')
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .filter((d: any) => !!d?.id && String(d.id).startsWith('in_'))
+        .filter((d: any) =>
+          (!!d?.id && String(d.id).startsWith('in_')) || !!d?.hwMeta?.toggleKey,
+        )
         .style('cursor', 'pointer')
-        .on('click.toggle', (_ev: unknown, d: { id: string }) => {
+        .on('click.toggle', (_ev: unknown, d: { id: string; hwMeta?: { toggleKey?: string } }) => {
+          if (d?.hwMeta?.toggleKey) {
+            toggleRef.current?.(d.hwMeta.toggleKey);
+            return;
+          }
           const m = /^in_(.+)_\d+$/.exec(d.id);
           if (m) toggleRef.current?.(m[1]);
         });

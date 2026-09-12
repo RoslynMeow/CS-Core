@@ -30,3 +30,11 @@
 @keyframes hwflow {
   to { stroke-dashoffset: -12; }
 }
+/* 导通 MOSFET 沟道: 虚线向下流动 = 电流从 VDD(上) 流向 GND(下) */
+.d3-hwschematic .fet-flow {
+  stroke-dasharray: 3 3;
+  animation: fetflow 0.45s linear infinite;
+}
+@keyframes fetflow {
+  to { stroke-dashoffset: -6; }
+}

@@ -90,17 +90,35 @@ function cmosY(mode: CmosMode, a: 0 | 1, b: 0 | 1): 0 | 1 {
 const cmosScene = (c: CmosCfg): CmosScene => ({ ...c, y: cmosY(c.mode, c.a, c.b) });
 
 // ---- CMOS 元件: FET 级网表(Vdd 顶轨 / GND 底轨, 纵向电源流, 与门符号箭头同向) ----
-function cmosSwitchJson(a: 0 | 1) {
+// 电流模型: 开关状态(导通绿/截止红)与电流路径分离 —— 某段导线/管子当且仅当它位于
+// 两个不同端子(VDD/GND/输出)之间、只经导通管的通路上时才有电流(applyCurrent 标记 cur)。
+// 截止管相连的死端 stub 无电流 → 灰; HwBoard 再把超边内碰到截止管的具体线段逐段置灰。
+const cmosJson = (el: ElkBuilder) => ElkBuilder.applyCurrent(el.build("DOWN"));
+
+// 开关模型拆成 NMOS / PMOS 两块独立单管板(各用各的 VDD/GND, 主干不再共享):
+// 导通侧整板绿(VDD→管→GND), 截止侧整板灰(管红/线灰/栅蓝), 不再有共用主干绿盖灰的误读。
+function cmosSwitchNmosJson(a: 0 | 1) {
   const el = new ElkBuilder();
   const vdd = el.power("VDD");
   const gnd = el.power("GND");
   const inG = el.input("G", a);
   const n = el.fet("NMOS", a === 1, a === 1);
+  el.net("Vdd", 1, "vdd", vdd.p, [n.d]);
+  el.net("G", a, "ctrl", inG.o, [n.g]);
+  el.net("GND", 0, "gnd", n.s, [gnd.p]);
+  return cmosJson(el);
+}
+
+function cmosSwitchPmosJson(a: 0 | 1) {
+  const el = new ElkBuilder();
+  const vdd = el.power("VDD");
+  const gnd = el.power("GND");
+  const inG = el.input("G", a);
   const p = el.fet("PMOS", a === 0, a === 1);
-  el.net("Vdd", 1, "vdd", vdd.p, [n.d, p.s]);
-  el.net("G", a, "sig", inG.o, [n.g, p.g]);
-  el.net("GND", 0, "gnd", [n.s, p.d], [gnd.p]);
-  return el.build("DOWN");
+  el.net("Vdd", 1, "vdd", vdd.p, [p.s]);
+  el.net("G", a, "ctrl", inG.o, [p.g]);
+  el.net("GND", 0, "gnd", p.d, [gnd.p]);
+  return cmosJson(el);
 }
 
 function cmosInverterJson(a: 0 | 1, key = "A") {
@@ -113,10 +131,10 @@ function cmosInverterJson(a: 0 | 1, key = "A") {
   const n = el.fet("NMOS", a === 1, a === 1);
   const oY = el.output("Y", y);
   el.net("Vdd", 1, "vdd", vdd.p, [p.s]);
-  el.net("A", a, "sig", inA.o, [p.g, n.g]);
+  el.net("A", a, "ctrl", inA.o, [p.g, n.g]);
   el.net("Y", y, "sig", [p.d, n.d], [oY.i]);
   el.net("GND", 0, "gnd", n.s, [gnd.p]);
-  return el.build("DOWN");
+  return cmosJson(el);
 }
 
 function cmosNandJson(a: 0 | 1, b: 0 | 1) {
@@ -132,13 +150,13 @@ function cmosNandJson(a: 0 | 1, b: 0 | 1) {
   const nB = el.fet("NMOS", b === 1, b === 1);
   const oY = el.output("Y", y);
   el.net("Vdd", 1, "vdd", vdd.p, [pA.s, pB.s]);
-  el.net("A", a, "sig", inA.o, [pA.g, nA.g]);
-  el.net("B", b, "sig", inB.o, [pB.g, nB.g]);
+  el.net("A", a, "ctrl", inA.o, [pA.g, nA.g]);
+  el.net("B", b, "ctrl", inB.o, [pB.g, nB.g]);
   // 上拉并联 / 下拉串联: Y 在双 PMOS 漏极与 nA 漏极之间
   el.net("Y", y, "sig", [pA.d, pB.d], [nA.d, oY.i]);
   el.net("MID", (a === 1 && b === 0 ? 1 : 0) as 0 | 1, "sig", nA.s, [nB.d]);
   el.net("GND", 0, "gnd", nB.s, [gnd.p]);
-  return el.build("DOWN");
+  return cmosJson(el);
 }
 
 function cmosNorJson(a: 0 | 1, b: 0 | 1) {
@@ -154,41 +172,46 @@ function cmosNorJson(a: 0 | 1, b: 0 | 1) {
   const nB = el.fet("NMOS", b === 1, b === 1);
   const oY = el.output("Y", y);
   el.net("Vdd", 1, "vdd", vdd.p, [pA.s]);
-  el.net("A", a, "sig", inA.o, [pA.g, nA.g]);
-  el.net("B", b, "sig", inB.o, [pB.g, nB.g]);
+  el.net("A", a, "ctrl", inA.o, [pA.g, nA.g]);
+  el.net("B", b, "ctrl", inB.o, [pB.g, nB.g]);
   // 上拉串联: Vdd → pA → MIDP → pB → Y ; 下拉并联
   el.net("MIDP", (a === 0 ? 1 : 0) as 0 | 1, "sig", pA.d, [pB.s]);
   el.net("Y", y, "sig", pB.d, [nA.d, nB.d, oY.i]);
   el.net("GND", 0, "gnd", [nA.s, nB.s], [gnd.p]);
-  return el.build("DOWN");
+  return cmosJson(el);
 }
 
 function CmosRender({ scene, onChange }: { scene: CmosScene; onChange: (c: CmosCfg) => void }) {
-  const { mode, a, b, y } = scene;
+  const { mode, a, b } = scene;
   const toggleA = () => onChange({ ...scene, a: (a === 1 ? 0 : 1) as 0 | 1 });
   const toggleB = () => onChange({ ...scene, b: (b === 1 ? 0 : 1) as 0 | 1 });
   const inKey = mode === "switch" ? "G" : "A";
-  const barItems =
-    mode === "switch" ? [{ label: "G", val: a, onClick: toggleA }] :
-    mode === "inverter" ? [{ label: "A", val: a, onClick: toggleA }] :
-    [{ label: "A", val: a, onClick: toggleA }, { label: "B", val: b, onClick: toggleB }];
-  const barResult =
-    mode === "switch" ? `G=${a} → ${a === 1 ? "NMOS 导通 / PMOS 断开" : "NMOS 断开 / PMOS 导通"}` :
-    `Y=${y}`;
+  // 纯画布交互: 输入条已去掉, 点画布内的 G/A/B 端子直接翻转(经 onToggleKey 回调)
   const onToggleKey = (key: string) => {
     if (key === inKey) toggleA();
     else if (key === "B") toggleB();
   };
+  if (mode === "switch") {
+    // 双板并排: 左 NMOS / 右 PMOS, 各自独立电源轨
+    const boards = [
+      { id: "nmos", title: `NMOS 开关 (${a === 1 ? "导通" : "断开"})`, hot: a === 1, json: cmosSwitchNmosJson(a) },
+      { id: "pmos", title: `PMOS 开关 (${a === 0 ? "导通" : "断开"})`, hot: a === 0, json: cmosSwitchPmosJson(a) },
+    ];
+    return (
+      <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        {boards.map((bd) => (
+          <div key={bd.id} style={{ flex: "1 1 300px", minWidth: 280 }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: bd.hot ? "#15803d" : "#b91c1c", margin: "0 0 4px 2px" }}>{bd.title}</div>
+            <HwBoard json={bd.json} height={400} onToggle={onToggleKey} />
+          </div>
+        ))}
+      </div>
+    );
+  }
   const json =
-    mode === "switch" ? cmosSwitchJson(a) :
     mode === "inverter" ? cmosInverterJson(a) :
     mode === "nand" ? cmosNandJson(a, b) : cmosNorJson(a, b);
-  return (
-    <div>
-      <InputBar items={barItems} result={barResult} />
-      <HwBoard json={json} height={mode === "switch" || mode === "inverter" ? 420 : 500} onToggle={onToggleKey} />
-    </div>
-  );
+  return <HwBoard json={json} height={mode === "inverter" ? 420 : 500} onToggle={onToggleKey} />;
 }
 
 // =====================================================================
@@ -236,15 +259,15 @@ function gateCmosAndJson(a: 0 | 1, b: 0 | 1) {
   const nI = el.fet("NMOS", n === 1, n === 1);
   const oY = el.output("Y", y);
   el.net("Vdd", 1, "vdd", vdd.p, [pA.s, pB.s, pI.s]);
-  el.net("A", a, "sig", inA.o, [pA.g, nA.g]);
-  el.net("B", b, "sig", inB.o, [pB.g, nB.g]);
+  el.net("A", a, "ctrl", inA.o, [pA.g, nA.g]);
+  el.net("B", b, "ctrl", inB.o, [pB.g, nB.g]);
   // 第一级 NAND: N = 非(A·B)
   el.net("N", n, "sig", [pA.d, pB.d], [nA.d, pI.g, nI.g]);
   el.net("MID", (a === 1 && b === 0 ? 1 : 0) as 0 | 1, "sig", nA.s, [nB.d]);
   // 第二级反相器: Y = 非N
   el.net("Y", y, "sig", [pI.d, nI.d], [oY.i]);
   el.net("GND", 0, "gnd", [nB.s, nI.s], [gnd.p]);
-  return el.build("DOWN");
+  return ElkBuilder.applyCurrent(el.build('RIGHT'));
 }
 
 // OR = NOR + 反相器: 上拉串联(pA→pB) → N → 反相器(pI/nI) → Y
@@ -264,15 +287,15 @@ function gateCmosOrJson(a: 0 | 1, b: 0 | 1) {
   const nI = el.fet("NMOS", n === 1, n === 1);
   const oY = el.output("Y", y);
   el.net("Vdd", 1, "vdd", vdd.p, [pA.s, pI.s]);
-  el.net("A", a, "sig", inA.o, [pA.g, nA.g]);
-  el.net("B", b, "sig", inB.o, [pB.g, nB.g]);
+  el.net("A", a, "ctrl", inA.o, [pA.g, nA.g]);
+  el.net("B", b, "ctrl", inB.o, [pB.g, nB.g]);
   // 第一级 NOR: N = 非(A+B), 上拉串联
   el.net("MIDP", (a === 0 ? 1 : 0) as 0 | 1, "sig", pA.d, [pB.s]);
   el.net("N", n, "sig", pB.d, [nA.d, nB.d, pI.g, nI.g]);
   // 第二级反相器: Y = 非N
   el.net("Y", y, "sig", [pI.d, nI.d], [oY.i]);
   el.net("GND", 0, "gnd", [nA.s, nB.s, nI.s], [gnd.p]);
-  return el.build("DOWN");
+  return ElkBuilder.applyCurrent(el.build('RIGHT'));
 }
 function gateCmosXorJson(a: 0 | 1, b: 0 | 1) {
   const el = new ElkBuilder();
@@ -478,6 +501,7 @@ function adderFullJson(a: 0 | 1, b: 0 | 1, cin: 0 | 1) {
 function adderRippleChain(aBits: number, bBits: number, lo: number, count: number, cin: number, direction: 'RIGHT' | 'DOWN' = 'RIGHT') {
   const el = new ElkBuilder();
   const inC = el.input(`C${lo}`, cin);
+  const vertical = direction === 'DOWN';
   const compact = direction === 'RIGHT' && count > 4;
   const fas: { id: string; pins: Record<string, [string, string]> }[] = [];
   let c = cin;
@@ -487,11 +511,19 @@ function adderRippleChain(aBits: number, bBits: number, lo: number, count: numbe
     const bi = ((bBits >> i) & 1) as 0 | 1;
     const cinI = c;
     const r = fullAdder(ai, bi, cinI);
-    // 横向: 纯西进东出, 进位 Cout(东)→Cin(西)水平串接; 级多时盒去副标题+缩间距, 一排放下
-    const inA = el.input(`A${i}`, ai, 'EAST');
-    const inB = el.input(`B${i}`, bi, 'EAST');
-    const fa = el.box(`FA${i}`, ['A', 'B', 'Cin'], ['S', 'Cout'], compact ? '' : `bit${i}`);
-    const oS = el.output(`S${i}`, r.s as 0 | 1, 'WEST');
+    // 横向: 纯西进东出, 进位 Cout(东)→Cin(西)水平串接(级多紧凑窄盒);
+    // 纵向: A/B 北进、S/Cout 南出, 进位上下直连, 一列排下(位数多时更整齐)
+    const inA = el.input(`A${i}`, ai, vertical ? 'SOUTH' : 'EAST');
+    const inB = el.input(`B${i}`, bi, vertical ? 'SOUTH' : 'EAST');
+    const fa = vertical
+      ? el.box(
+        `FA${i}`,
+        [{ name: 'A', side: 'NORTH' }, { name: 'B', side: 'NORTH' }, { name: 'Cin', side: 'NORTH' }],
+        [{ name: 'S', side: 'SOUTH' }, { name: 'Cout', side: 'SOUTH' }],
+        `bit${i}`,
+      )
+      : el.box(`FA${i}`, ['A', 'B', 'Cin'], ['S', 'Cout'], compact ? '' : `bit${i}`);
+    const oS = el.output(`S${i}`, r.s as 0 | 1, vertical ? 'NORTH' : 'WEST');
     el.net(`A${i}`, ai, 'sig', inA.o, [fa.pins['A']]);
     el.net(`B${i}`, bi, 'sig', inB.o, [fa.pins['B']]);
     if (k === 0) {
@@ -503,10 +535,10 @@ function adderRippleChain(aBits: number, bBits: number, lo: number, count: numbe
     fas.push(fa);
     c = r.cout;
   }
-  const oC = el.output('Cout', c as 0 | 1, 'WEST');
+  const oC = el.output('Cout', c as 0 | 1, vertical ? 'NORTH' : 'WEST');
   el.net('Cout', c as 0 | 1, 'sig', fas[count - 1].pins['Cout'], [oC.i]);
   return {
-    json: el.build('RIGHT', compact ? {
+    json: el.build(direction, compact ? {
       'org.eclipse.elk.layered.spacing.nodeNodeBetweenLayers': '24',
       'org.eclipse.elk.spacing.nodeNode': '12',
       'org.eclipse.elk.spacing.edgeNode': '10',
@@ -530,7 +562,7 @@ function AdderRender({ scene, onChange }: { scene: AdderScene; onChange: (c: Add
     const aBits = (scene.a & ((1 << n) - 1)) >>> 0;
     const bBits = (scene.b & ((1 << n) - 1)) >>> 0;
     const sum = aBits + bBits;
-    // 单板: 始终横向一排(级多自动紧凑窄盒), 不再拆板
+    // 单板: 始终横向一排(级多紧凑窄盒), 不再拆板
     const low = adderRippleChain(aBits, bBits, 0, n, 0, 'RIGHT');
     const chains: { title: string; json: unknown }[] = [{ title: "", json: low.json }];
     const onToggleBit = (key: string) => {
@@ -698,9 +730,6 @@ function aluJson(op: "and" | "or" | "add", a: 0 | 1, b: 0 | 1) {
   const inC0 = el.input("C0", 0);
   const s1 = (op === "add" ? 1 : 0) as 0 | 1;
   const s0 = (op === "or" ? 1 : 0) as 0 | 1;
-  // 选择线从顶部进(数据从左进): 与 MUX 符号习惯一致, 减少左侧扇出拥堵
-  const inS1 = el.input("S1", s1, "SOUTH");
-  const inS0 = el.input("S0", s0, "SOUTH");
   const d0 = (a & b) as 0 | 1;
   const d1 = (a | b) as 0 | 1;
   const fa = fullAdder(a, b, 0);
@@ -709,11 +738,14 @@ function aluJson(op: "and" | "or" | "add", a: 0 | 1, b: 0 | 1) {
   const gAnd = el.gate("AND");
   const gOr = el.gate("OR");
   const faBox = el.box("FA", ["A", "B", "Cin"], ["S", "Cout"], "全加器");
+  // S1/S0 直接做 MUX 顶部端口(不拉长线), 当前选择值写进盒内 bodyText;
+  // toggleKey='op' 使点击 MUX 盒循环切换运算
   const mux = el.box(
     "MUX",
     ["D0", "D1", "D2", { name: "S1", side: "NORTH" }, { name: "S0", side: "NORTH" }],
     ["R"],
-    "3选1",
+    `3选1 [S1S0]=${s1}${s0}`,
+    "op",
   );
   const oR = el.output("R", result);
   const oC = el.output("Cout", cout);
@@ -723,8 +755,6 @@ function aluJson(op: "and" | "or" | "add", a: 0 | 1, b: 0 | 1) {
   el.net("D0", d0, "sig", gAnd.y, [mux.pins["D0"]]);
   el.net("D1", d1, "sig", gOr.y, [mux.pins["D1"]]);
   el.net("D2", fa.s as 0 | 1, "sig", faBox.pins["S"], [mux.pins["D2"]]);
-  el.net("S1", s1, "sig", inS1.o, [mux.pins["S1"]]);
-  el.net("S0", s0, "sig", inS0.o, [mux.pins["S0"]]);
   el.net("R", result, "sig", mux.pins["R"], [oR.i]);
   el.net("Cout", cout, "sig", faBox.pins["Cout"], [oC.i]);
   return el.build();
@@ -740,7 +770,7 @@ function AluRender({ scene, onChange }: { scene: AluScene; onChange: (c: AluCfg)
   const onToggleKey = (key: string) => {
     if (key === "A") onChange({ ...scene, a: (a === 1 ? 0 : 1) as 0 | 1 });
     else if (key === "B") onChange({ ...scene, b: (b === 1 ? 0 : 1) as 0 | 1 });
-    else if (key === "S1" || key === "S0") cycleOp();
+    else if (key === "op") cycleOp();
   };
   return (
     <div>

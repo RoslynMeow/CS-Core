@@ -5,17 +5,20 @@ import { allModules, findModule } from "./modules/registry";
 import { MathText } from "./lib/tex";
 import { Settings } from "./pages/Settings";
 import { MemoryVisualizer } from "./pages/MemoryVisualizer";
+import { CircuitVisualizer } from "./pages/CircuitVisualizer";
 
 type Route =
       | { kind: "home" }
       | { kind: "module"; id: string }
       | { kind: "settings" }
-      | { kind: "memory" };
+      | { kind: "memory" }
+      | { kind: "circuit" };
 function getRoute(): Route {
       const h = location.hash;
       if (h.startsWith("#/settings") || h.startsWith("#/alphabet"))
             return { kind: "settings" };
       if (h.startsWith("#/memory")) return { kind: "memory" };
+      if (h.startsWith("#/circuit")) return { kind: "circuit" };
       const m = h.match(/^#\/module\/(.+)/);
       if (m) return { kind: "module", id: m[1] };
       return { kind: "home" };
@@ -39,7 +42,9 @@ export function App() {
                         ? "设置"
                         : route.kind === "memory"
                               ? "内存可视化"
-                              : null;
+                              : route.kind === "circuit"
+                                    ? "电路可视化"
+                                    : null;
 
       return (
             <div className="app">
@@ -78,6 +83,13 @@ export function App() {
                         )}
                         <div className="spacer" />
                         <button
+                              className={`pill ${route.kind === "circuit" ? "active" : ""}`}
+                              onClick={() => (location.hash = "#/circuit")}
+                              title="电路可视化 — 原理图 + 直流工作点求解"
+                        >
+                              电路可视化
+                        </button>
+                        <button
                               className={`pill ${route.kind === "memory" ? "active" : ""}`}
                               onClick={() => (location.hash = "#/memory")}
                               title="HEX 内存可视化 — 支持 URL Base64 或手动输入"
@@ -96,6 +108,8 @@ export function App() {
                               <Settings />
                         ) : route.kind === "memory" ? (
                               <MemoryVisualizer />
+                        ) : route.kind === "circuit" ? (
+                              <CircuitVisualizer />
                         ) : mod ? (
                               <Stage mod={mod as never} />
                         ) : (

@@ -1,0 +1,14 @@
+﻿import puppeteer from 'puppeteer-core';
+const OUT='C:\\Users\\DAVIDM~1\\AppData\\Local\\Temp\\opencode\\';
+const b=await puppeteer.launch({executablePath:'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',headless:'new',args:['--no-sandbox','--disable-gpu','--window-size=1300,940']});
+const p=await b.newPage(); await p.setViewport({width:1300,height:940});
+await p.goto('http://localhost:5203/#/circuit',{waitUntil:'networkidle0',timeout:30000});
+await new Promise(r=>setTimeout(r,1200));
+const click=(t)=>p.evaluate(tx=>{const e=[...document.querySelectorAll('svg text, button')].find(x=>x.textContent.trim()===tx); if(e) e.dispatchEvent(new MouseEvent('click',{bubbles:true})); return !!e;},t);
+await p.select('select','half-adder'); await new Promise(r=>setTimeout(r,700));
+await p.screenshot({path:OUT+'d4-ha.png'});
+await click('HA'); await new Promise(r=>setTimeout(r,600));
+await p.screenshot({path:OUT+'d4-ha-inner.png'});
+await click('XOR'); await new Promise(r=>setTimeout(r,600));
+await p.screenshot({path:OUT+'d4-xor-inner.png'});
+await b.close(); console.log('done');

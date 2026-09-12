@@ -2,7 +2,7 @@
 // 用法: 建门/管子/电源/端子 → 用 net() 把端口连成网表 → build() 出图 JSON。
 // 布局由 ELK 自动完成; 数值/颜色变化只需重建 JSON 重渲染(结构不变则布局稳定)。
 
-export type NetKind = 'sig' | 'vdd' | 'gnd';
+export type NetKind = 'sig' | 'vdd' | 'gnd' | 'ctrl';
 export type Side = 'WEST' | 'EAST' | 'NORTH' | 'SOUTH';
 type PortRef = [nodeId: string, portId: string];
 
@@ -83,6 +83,7 @@ export class ElkBuilder {
     inputs: (string | { name: string; side: Side })[],
     outputs: (string | { name: string; side: Side })[],
     sub = '',
+    toggleKey?: string,
   ) {
     const id = this.id('box');
     const normIn = (e: string | { name: string; side: Side }) =>
@@ -95,7 +96,8 @@ export class ElkBuilder {
     ]);
     this.children.push({
       id,
-      hwMeta: { name: label, cls: 'Box', bodyText: sub ? `${label}\n${sub}` : label, cssClass: 'node' },
+      // toggleKey: 点击该盒子触发看板 onToggle(toggleKey)(如 ALU 点 MUX 切换运算, 免去远处端子+长线)
+      hwMeta: { name: label, cls: 'Box', bodyText: sub ? `${label}\n${sub}` : label, cssClass: 'node', toggleKey },
       properties: { ...FIXED },
       ports, children: [], edges: [],
     });
@@ -167,11 +169,14 @@ export class ElkBuilder {
     return { id, i: [id, (ports[0] as { id: string }).id] as PortRef };
   }
 
-  /** 连网表: from 驱动(可多源), to 负载; 颜色按值/种类自动(null 端口自动忽略) */
+  /** 连网表: from 驱动(可多源), to 负载; 颜色按值/种类自动(null 端口自动忽略)。
+   *  kind: sig 信号(1 绿流动, 0 灰) / vdd 电源红 / gnd 接地黑 /
+   *        ctrl 控制信号(固定色、无流动, 不表示电流 —— 如 CMOS 栅极输入) */
   net(name: string, val: number, kind: NetKind, from: PortRef | PortRef[], to: (PortRef | null)[]) {
     const cssStyle =
       (kind === 'vdd' ? 'stroke:#dc2626;stroke-width:2' :
       kind === 'gnd' ? 'stroke:#1f2937;stroke-width:2' :
+      kind === 'ctrl' ? 'stroke:#3b82f6;stroke-width:2' :
       val === 1 ? 'stroke:#16a34a;stroke-width:2.2' : 'stroke:#64748b;stroke-width:1.6') + ';fill:none';
     const srcs = (Array.isArray(from[0]) ? (from as PortRef[]) : [from as PortRef]);
     this.edges.push({
@@ -180,10 +185,149 @@ export class ElkBuilder {
       targets: to.filter((t): t is PortRef => !!t).map(([n, p]) => [n, p]),
       hwMeta: {
         name,
+        kind,
         cssStyle,
         ...(kind === 'sig' && val === 1 ? { cssClass: 'flow-on' } : {}),
       },
     });
+  }
+
+  /**
+   * 电流传播(CMOS): 端子—端子通路模型。
+   *  端子 = VDD / GND / 输出端子(out_, 每个输出各算一个端子; 输入 in_ 不算端子)。
+   *  无向图 = 导线(同一 net 内端口全互连) + 导通管源漏(NORTH↔SOUTH, 栅极 WEST 绝缘不参与)。
+   *  某段导线/某只管子当且仅当它位于某条「两个不同端子之间、只经导通管」的简单通路上时才有电流(cur):
+   *  上拉导通 VDD→Y / 下拉导通 Y→GND / 开关直通 VDD→GND 记 cur;
+   *  截止管相连的死端 stub(只连单侧端子、无对侧通路)无电流 → 灰。
+   *  ctrl 网表(蓝色栅极控制信号)不表示电流, 保持原样。
+   * 之后渲染层据此上色: cur 绿色流动, 非 cur 灰, ctrl 保持蓝。
+   */
+  static applyCurrent(graph: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    children?: any[];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    edges?: any[];
+  }) {
+    const nodes = graph.children ?? [];
+    const edges = graph.edges ?? [];
+    // —— 端口 / 管子 / 端子索引 ——
+    const portNode = new Map<string, unknown>();
+    // 导通管源漏配对(NORTH↔SOUTH); 栅极(WEST)绝缘, 不建边
+    const fetSib = new Map<string, string>();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fetOfPort = new Map<string, any>();
+    const termKey = new Map<string, string>();
+    for (const n of nodes) {
+      const cls = n.hwMeta?.cls;
+      const name = n.hwMeta?.name;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ports: any[] = n.ports ?? [];
+      for (const p of ports) portNode.set(p.id, n);
+      if (cls === 'Mos') {
+        for (const p of ports) fetOfPort.set(p.id, n);
+        if (n.hwMeta?.on) {
+          const north = ports.find((p) => p.properties?.side === 'NORTH');
+          const south = ports.find((p) => p.properties?.side === 'SOUTH');
+          if (north && south) {
+            fetSib.set(north.id, south.id);
+            fetSib.set(south.id, north.id);
+          }
+        }
+      }
+      if (cls === 'Power' && (name === 'VDD' || name === 'GND')) {
+        for (const p of ports) termKey.set(p.id, name as string);
+      } else if (typeof n.id === 'string' && n.id.startsWith('out_')) {
+        for (const p of ports) termKey.set(p.id, `OUT:${n.id}`);
+      }
+    }
+    // —— 参与电流计算的导线网(ctrl 除外) ——
+    const nets = edges.filter((e) => e.hwMeta?.kind !== 'ctrl');
+    const netPorts = new Map<string, string[]>();
+    for (const e of nets) {
+      const ps: [string, string][] = [...(e.sources ?? []), ...(e.targets ?? [])];
+      netPorts.set(e.id, ps.map(([, pid]) => pid).filter((pid) => portNode.has(pid)));
+    }
+    // 无向 BFS: start 在「去掉 excluded 后」能到达的端子 key 集合
+    const reach = (
+      start: string,
+      excludedWire: { net: string; a: string; b: string } | null,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      excludedFet: any | null,
+    ): Set<string> => {
+      const seen = new Set<string>([start]);
+      const q: string[] = [start];
+      const keys = new Set<string>();
+      while (q.length) {
+        const u = q.shift() as string;
+        const k = termKey.get(u);
+        if (k) keys.add(k);
+        // 导线邻居: 同 net 内其他端口(被去掉的那对除外)
+        for (const e of nets) {
+          const arr = netPorts.get(e.id) ?? [];
+          if (!arr.includes(u)) continue;
+          for (const v of arr) {
+            if (v === u) continue;
+            if (excludedWire && e.id === excludedWire.net &&
+              ((u === excludedWire.a && v === excludedWire.b) || (u === excludedWire.b && v === excludedWire.a))) continue;
+            if (!seen.has(v)) { seen.add(v); q.push(v); }
+          }
+        }
+        // 开关邻居: 导通管另一侧源漏
+        const s = fetSib.get(u);
+        if (s && !seen.has(s) && fetOfPort.get(u) !== excludedFet) {
+          seen.add(s);
+          q.push(s);
+        }
+      }
+      return keys;
+    };
+    const distinctAcross = (A: Set<string>, B: Set<string>): boolean => {
+      for (const a of A) for (const b of B) if (a !== b) return true;
+      return false;
+    };
+    // —— 导线: 若某对端口位于不同端子间的通路上, 整条 net 记 cur ——
+    // (超边内截止管桩头的具体线段由 HwBoard 逐段 mask 置灰, 此处只定整网有无电流)
+    const curNets = new Set<string>();
+    for (const e of nets) {
+      const arr = netPorts.get(e.id) ?? [];
+      let hit = false;
+      for (let i = 0; i < arr.length && !hit; i++) {
+        for (let j = i + 1; j < arr.length && !hit; j++) {
+          const A = reach(arr[i], { net: e.id, a: arr[i], b: arr[j] }, null);
+          const B = reach(arr[j], { net: e.id, a: arr[i], b: arr[j] }, null);
+          if (distinctAcross(A, B)) hit = true;
+        }
+      }
+      e.hwMeta = e.hwMeta ?? {};
+      e.hwMeta.cur = hit;
+      if (hit) curNets.add(e.id);
+    }
+    // —— 管子: 导通且源漏分处不同端子侧, 才算有电流穿过(开了≠有电流) ——
+    for (const n of nodes) {
+      if (n.hwMeta?.cls !== 'Mos') continue;
+      if (!n.hwMeta?.on) { n.hwMeta.cur = false; continue; }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ports: any[] = n.ports ?? [];
+      const north = ports.find((p) => p.properties?.side === 'NORTH');
+      const south = ports.find((p) => p.properties?.side === 'SOUTH');
+      if (!north || !south) { n.hwMeta.cur = false; continue; }
+      const A = reach(north.id, null, n);
+      const B = reach(south.id, null, n);
+      n.hwMeta.cur = distinctAcross(A, B);
+    }
+    // 上色: cur 绿流动; 非 cur 且非 ctrl → 灰; ctrl 保持蓝
+    for (const e of edges) {
+      const meta = e.hwMeta ?? {};
+      if (meta.cur) {
+        meta.cssStyle = 'stroke:#16a34a;stroke-width:2.2;fill:none';
+        meta.cssClass = 'flow-on';
+      } else if (meta.kind !== 'ctrl') {
+        // 无电流的连线: 普通灰线(不是"熄灭/禁用", 只是这条支路没有电流流过)
+        meta.cssStyle = 'stroke:#64748b;stroke-width:1.8;fill:none';
+        meta.cssClass = '';
+      }
+    }
+    return graph;
   }
 
   /** extra: 透传 ELK 根选项(如寄存器组用 considerModelOrder 锁定盒顺序) */
