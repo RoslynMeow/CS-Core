@@ -678,6 +678,20 @@ body {
   overflow: auto;
 }
 
+/* 纯演示卡（无播放/伪代码）：整体按内容宽度居中，不被视口拉满；
+   仅当内容本身需要更宽时才铺开（max-width 100%） */
+.stage--demo {
+  width: fit-content;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.stage--demo .stage-body,
+.stage--demo .stage-controls {
+  width: 100%;
+}
+
 @media (max-width: 640px) {
 
   html,

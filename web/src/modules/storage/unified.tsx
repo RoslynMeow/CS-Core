@@ -21,7 +21,7 @@ const MAP: Record<SubMode, ModuleDef> = {
   "stack": stackModule as unknown as ModuleDef,
   "queue": queueModule as unknown as ModuleDef,
 };
-const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
+export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
   { label: "线性表", opts: [
     { v: "sequential-list", zh: "顺序表", en: "SeqList" },
     { v: "linked-list", zh: "单链表", en: "Linked" },
@@ -79,14 +79,15 @@ export const storageUnifiedModule: ModuleDef<any, Cfg> = {
     const m = activeOf(cfg.subMode) as any;
     return m.onPlayEnd ? m.onPlayEnd(safeCfg(cfg.subMode, cfg)) : null;
   }) as any,
-  Controls({ config, onChange, t }) {
+  Controls({ config, onChange, t, embedded }: any) {
     const isZh = t(T("中文", "en")) !== "en";
     const sub = subKeyOf(config.subMode);
     const active = activeOf(sub) as any;
     const safe = safeCfg(sub, config);
+    if (embedded && !active?.Controls) return null;
     return (
       <div style={{ display: "grid", gap: 8, width: "100%" }}>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
+        {!embedded && <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
           <span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca" }}>存储</span>
           <select className="txt" value={sub} onChange={(e) => { const key = subKeyOf(e.target.value); const m = activeOf(key) as any; onChange({ ...config, ...((m.defaultConfig as any) ?? {}), subMode: key } as any); }} style={{ minWidth: 180, fontWeight: 700 }}>
             {GROUPS.map((g) => (
@@ -96,7 +97,7 @@ export const storageUnifiedModule: ModuleDef<any, Cfg> = {
             ))}
           </select>
           <span style={{ fontSize: 11, color: "#64748b" }}>{isZh ? "一章覆盖全部存储" : "one chapter"}</span>
-        </div>
+        </div>}
         {active?.Controls && createElement(active.Controls as any, { config: safe as any, onChange: onChange as any, t })}
       </div>
     ) as unknown as never;

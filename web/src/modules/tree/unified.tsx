@@ -36,7 +36,7 @@ import { TRAVERSE_CODES } from "./binary";
 import { fromImport as graphFromImport, graphScene, algoStateTables } from "../graph/source";
 
 type SubMode = "general" | "traverse" | "lca" | "bst" | "avl" | "heap" | "rb" | "btree" | "bplus";
-const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
+export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
   { label: "基础", opts: [{ v: "general", zh: "通用树编辑", en: "Edit" }, { v: "traverse", zh: "二叉树", en: "Binary Tree" }] },
   { label: "查询", opts: [{ v: "lca", zh: "LCA", en: "LCA" }] },
   { label: "BST/平衡", opts: [{ v: "bst", zh: "BST", en: "BST" }, { v: "avl", zh: "AVL", en: "AVL" }, { v: "rb", zh: "红黑", en: "RB" }] },
@@ -519,7 +519,7 @@ export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
   desc: T("通用树编辑 / 遍历 / LCA / BST / AVL / 堆 / 红黑 / B / B+", "Tree edit / Traverse / LCA / BST / AVL / Heap / RB / B-Tree"),
   tags: ["data-structures"],
   defaultConfig: DEFAULT,
-  Controls({ config, onChange, t }) {
+  Controls({ config, onChange, t, embedded }: any) {
     const isZh = t(T("中文", "en")) !== "en";
     const set = (p: Partial<Cfg>) => onChange({ ...config, ...p });
     const lab = (i: number) => {
@@ -544,14 +544,14 @@ export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
     return (
       <div style={{ display: "grid", gap: 8, width: "100%" }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
-          <span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca" }}>树</span>
+          {!embedded && <><span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca" }}>树</span>
           <select className="txt" value={config.subMode} onChange={(e) => set({ subMode: e.target.value as SubMode })} style={{ minWidth: 180, fontWeight: 700 }}>
             {GROUPS.map((g) => (
               <optgroup key={g.label} label={g.label}>
                 {g.opts.map((o) => <option key={o.v} value={o.v}>{isZh ? o.zh : o.en}</option>)}
               </optgroup>
             ))}
-          </select>
+          </select></>}
           {(config.subMode === "traverse") && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><select className="txt" value={config.traverseMode} onChange={(e) => set({ traverseMode: e.target.value as any })}><option value="pre">前序</option><option value="in">中序</option><option value="post">后序</option><option value="level">层序</option></select></>}
           {(config.subMode === "lca") && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca" }}>{isZh ? "选点" : "PICK"}</span><button className={`pill ${(config.pick ?? "u") === "u" ? "active" : ""}`} style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => set({ pick: "u" })}>u: <b>{lab(config.lcaU)}</b></button><button className={`pill ${(config.pick ?? "u") === "v" ? "active" : ""}`} style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => set({ pick: "v" })}>v: <b>{lab(config.lcaV)}</b></button><span style={{ fontSize: 11, color: "#64748b" }}>{isZh ? "右键·选择此点" : "right-click"}</span></>}
           {(config.subMode === "bst" || config.subMode === "rb") && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><select className="txt" value={config.bstMode} onChange={(e) => set({ bstMode: e.target.value as any })}><option value="build">建树</option><option value="search">查找</option><option value="insert">插入</option><option value="delete">删除</option></select>{(config.bstMode === "search" || config.bstMode === "delete") && <input className="txt" type="number" placeholder={isZh ? "键" : "key"} style={{ width: 70 }} value={Number.isNaN(config.target) ? "" : config.target} onChange={(e) => set({ target: e.target.value===""?NaN:Number(e.target.value) })} />}{config.bstMode === "insert" && <input className="txt" type="number" placeholder={isZh ? "插值" : "x"} style={{ width: 70 }} value={Number.isNaN(config.x) ? "" : config.x} onChange={(e) => set({ x: e.target.value===""?NaN:Number(e.target.value) })} />}{config.bstMode === "build" && syncBtn(config.subMode)}</>}

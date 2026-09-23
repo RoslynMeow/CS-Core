@@ -45,7 +45,7 @@ type SubMode =
   | "kosaraju" | "tarjan"
   | "dinic";
 
-const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
+export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
   { label: "遍历", opts: [{ v: "bfs", zh: "BFS 广度优先", en: "BFS" }, { v: "dfs", zh: "DFS 深度优先", en: "DFS" }] },
   { label: "最短路", opts: [
     { v: "dijkstra", zh: "Dijkstra (非负权)", en: "Dijkstra" },
@@ -336,7 +336,7 @@ export const graphUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
   tags: ["data-structures"],
   defaultConfig: DEFAULT,
   randomize(c) { return { ...randomCfg(c as GraphCfg) as Cfg, target: clampV(c.target, c.n), sourceNode: 0, sinkNode: Math.max(1, c.n - 1), subMode: c.subMode, heuristic: c.heuristic } as unknown as Cfg; },
-  Controls({ config, onChange, t }) {
+  Controls({ config, onChange, t, embedded }: any) {
     const isZh = t(T("中文", "en")) !== "en";
     const set = (p: Partial<Cfg>) => onChange({ ...config, ...p });
     const mode = config.subMode;
@@ -354,14 +354,14 @@ export const graphUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
     return (
       <div style={{ display: "grid", gap: 8, width: "100%" }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
-          <span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca" }}>图算法</span>
+          {!embedded && <><span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca" }}>图算法</span>
           <select className="txt" value={mode} onChange={(e) => set({ subMode: e.target.value as SubMode })} style={{ minWidth: 180, fontWeight: 700 }}>
             {GROUPS.map((g) => (
               <optgroup key={g.label} label={g.label}>
                 {g.opts.map((o) => <option key={o.v} value={o.v}>{isZh ? o.zh : o.en}</option>)}
               </optgroup>
             ))}
-          </select>
+          </select></>}
           {(mode === "bfs" || mode === "dfs" || mode === "dijkstra" || mode === "bellman" || mode === "prim") && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca" }}>{isZh ? "选点" : "PICK"}</span><Chip label={isZh ? "起点" : "src"} value={config.root} active={pick === "root"} onClick={() => set({ pick: "root" })} /><span style={{ fontSize: 11, color: "#64748b" }}>{isZh ? "右键点图选" : "right-click"}</span></>}
           {mode === "astar" && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca" }}>{isZh ? "选点" : "PICK"}</span><Chip label={isZh ? "起点" : "src"} value={config.root} active={pick === "root"} onClick={() => set({ pick: "root" })} /><Chip label={isZh ? "终点" : "dst"} value={config.target} active={pick === "target"} onClick={() => set({ pick: "target" })} /><span style={{ fontSize: 11, color: "#64748b" }}>{isZh ? "右键·选择此点" : "right-click"}</span></>}
           {mode === "topo" && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><Chip label={isZh ? "起点" : "src"} value={config.root} active={pick === "root"} onClick={() => set({ pick: "root" })} /><span style={{ fontSize: 11, color: "#64748b" }}>{isZh ? "右键点图选" : "right-click"}</span></>}

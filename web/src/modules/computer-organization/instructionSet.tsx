@@ -7,7 +7,7 @@ import { MathText } from "../../lib/tex";
 // 指令系统与汇编 · 单模块聚合 · 交互式
 //   isa(ISA 概念 + RISC/CISC) → regs(MIPS 寄存器约定)
 //   → format(R/I/J 指令格式: 位域编码器) → addressing(寻址方式)
-//   → call(过程调用/栈帧·占位) → x86(简介)
+//   → call(过程调用/栈帧, 逐步演示) → x86(简介)
 //   对应 tex/ComputerOrganization/chapters/instruction_set.tex
 // =====================================================================
 
@@ -229,7 +229,6 @@ function FmtControls({ config, onChange, t }: any) {
   );
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-      <span style={{ fontSize: 11, fontWeight: 800, color: "#475569" }}>{isZh ? "指令" : "INSTR"}</span>
       <select className="txt" value={config.instr} onChange={(e) => set({ instr: e.target.value })} style={{ fontWeight: 700 }}>
         {INSTR.map((i) => <option key={i.name} value={i.name}>{`${i.name} (${i.fmt})`}</option>)}
       </select>
@@ -319,7 +318,6 @@ function AddrControls({ config, onChange, t }: any) {
   );
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-      <span style={{ fontSize: 11, fontWeight: 800, color: "#475569" }}>{isZh ? "寻址" : "MODE"}</span>
       <select className="txt" value={config.mode} onChange={(e) => set({ mode: e.target.value as AddrMode })} style={{ fontWeight: 700 }}>
         {(Object.keys(ADDR) as AddrMode[]).map((m) => <option key={m} value={m}>{isZh ? ADDR[m].zh : ADDR[m].en}</option>)}
       </select>
@@ -384,36 +382,123 @@ function AddrRender({ config, t }: any) {
 }
 
 // ---------------------------------------------------------------------
-// call: 过程调用 / 栈帧 (占位)
+// call: 过程调用 / 栈帧 (逐步演示)
 // ---------------------------------------------------------------------
-function CallRender({ t }: any) {
+const CALL_CODE: { text: string; zh: string; en: string }[] = [
+  { text: "li   $a0, 5", zh: "参数 $a0 = 5", en: "arg $a0 = 5" },
+  { text: "jal  fact", zh: "$ra = PC+4; 跳转 fact", en: "$ra = PC+4; jump to fact" },
+  { text: "move $v0, $t0", zh: "返回点: 取返回值", en: "return point: read result" },
+  { text: "fact:", zh: "过程入口", en: "procedure entry" },
+  { text: "addi $sp, $sp, -8", zh: "分配栈帧", en: "allocate frame" },
+  { text: "sw   $ra, 4($sp)", zh: "保存返回地址", en: "save $ra" },
+  { text: "sw   $s0, 0($sp)", zh: "保存 $s0", en: "save $s0" },
+  { text: "   # 过程体 (计算 n!)", zh: "计算体", en: "body" },
+  { text: "lw   $s0, 0($sp)", zh: "恢复 $s0", en: "restore $s0" },
+  { text: "lw   $ra, 4($sp)", zh: "恢复 $ra", en: "restore $ra" },
+  { text: "addi $sp, $sp, 8", zh: "释放栈帧", en: "free frame" },
+  { text: "jr   $ra", zh: "返回调用者", en: "return" },
+];
+const CALL_RA = 0x00400008;
+const CALL_FACT = 0x0040000c;
+const SP0 = 0x7ffffffc;
+const SP1 = 0x7ffffff4;
+const SLOT_S0 = SP1;
+const SLOT_RA = SP1 + 4;
+const callHx = (n: number) => `0x${(n >>> 0).toString(16).toUpperCase().padStart(8, "0")}`;
+
+type CallState = { pc: number; ra: number; sp: number; s0: number; v0: number; a0: number; t0: number; mem: Record<number, number> };
+type CallStep = { line: number; state: CallState; zh: string; en: string };
+
+function buildCallSteps(): CallStep[] {
+  const steps: CallStep[] = [];
+  const s: CallState = { pc: 0x00400000, ra: 0, sp: SP0, s0: 0xcafe, v0: 0, a0: 0, t0: 0, mem: {} };
+  const push = (line: number, zh: string, en: string, patch: Partial<CallState> = {}) => {
+    Object.assign(s, patch);
+    steps.push({ line, state: { ...s, mem: { ...s.mem } }, zh, en });
+  };
+  push(0, "li: 参数 $a0 ← 5", "li: $a0 ← 5", { a0: 5 });
+  push(1, "$ra ← 返回地址 0x00400008; PC → fact", "jal: $ra ← PC+4, jump to fact", { ra: CALL_RA, pc: CALL_FACT });
+  push(4, "分配栈帧: $sp ← $sp − 8", "allocate frame: $sp −= 8", { sp: SP1 });
+  push(5, `把 $ra 存入 4($sp) = ${callHx(SLOT_RA)}`, "sw $ra, 4($sp)", { mem: { ...s.mem, [SLOT_RA]: s.ra } });
+  push(6, "把旧 $s0 = 0x0000CAFE 存入 0($sp)", "sw $s0, 0($sp)", { mem: { ...s.mem, [SLOT_S0]: s.s0 } });
+  push(7, "过程体: 计算 5! → $t0 = 120", "body: compute 5! = 120 → $t0", { t0: 120 });
+  push(8, "恢复 $s0 (从栈读回)", "restore $s0 from stack", { s0: s.mem[SLOT_S0] ?? s.s0 });
+  push(9, "恢复 $ra (从栈读回)", "restore $ra from stack", { ra: s.mem[SLOT_RA] ?? s.ra });
+  push(10, "释放栈帧: $sp ← $sp + 8", "free frame: $sp += 8", { sp: SP0 });
+  push(11, "jr $ra: PC ← $ra, 返回调用者", "jr $ra: return to caller", { pc: CALL_RA });
+  push(2, "返回点: $v0 ← $t0 = 120", "return point: $v0 ← 120", { v0: 120 });
+  return steps;
+}
+const CALL_STEPS = buildCallSteps();
+
+function CallControls({ config, onChange, t }: any) {
   const isZh = t(T("中文", "en")) !== "en";
-  const items = isZh
-    ? [
-      "jal my_func: $ra ← PC+4, 跳转; jr $ra 返回",
-      "栈帧分配: addi $sp, $sp, -8",
-      "保存现场: sw $ra / sw $s0 入栈",
-      "恢复现场: lw $s0 / lw $ra, 释放 addi $sp, $sp, 8",
-      "caller-saved ($t, $a) vs callee-saved ($s) 的保存责任",
-    ]
-    : [
-      "jal my_func: $ra ← PC+4, jump; jr $ra returns",
-      "Allocate frame: addi $sp, $sp, -8",
-      "Save: sw $ra / sw $s0",
-      "Restore: lw $s0 / lw $ra, then addi $sp, $sp, 8",
-      "caller-saved ($t, $a) vs callee-saved ($s)",
-    ];
+  const step = config.step ?? 0;
+  const max = CALL_STEPS.length - 1;
   return (
-    <div style={{ maxWidth: 720, margin: "28px auto", padding: "22px 26px", border: "1.5px dashed #c7d2fe", borderRadius: 16, background: "#f8faff" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <span style={{ fontSize: 20, fontWeight: 900, color: "#4338ca" }}>{isZh ? "过程调用与栈帧" : "Procedure Call & Stack Frame"}</span>
-        <span style={{ fontSize: 12, fontWeight: 800, padding: "2px 10px", borderRadius: 999, background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" }}>{isZh ? "建设中" : "WIP"}</span>
-      </div>
-      <div style={{ fontSize: 13, color: "#64748b", margin: "8px 0 14px" }}>{isZh ? "占位页 — 规划内容如下:" : "Placeholder — planned content:"}</div>
-      <ul style={{ margin: 0, paddingLeft: 20, color: "#334155", fontSize: 13, lineHeight: 2 }}>
-        {items.map((it, i) => <li key={i}>{it}</li>)}
-      </ul>
+    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+      <button className="ghost" disabled={step <= 0} onClick={() => onChange({ ...config, step: Math.max(0, step - 1) })}>{isZh ? "← 上一步" : "← Prev"}</button>
+      <button className="ghost" onClick={() => onChange({ ...config, step: Math.min(max, step + 1) })}>{isZh ? "下一步 →" : "Next →"}</button>
+      <button className="ghost" onClick={() => onChange({ ...config, step: 0 })}>{isZh ? "重置" : "Reset"}</button>
+      <span style={{ fontSize: 12, color: "#64748b", fontFamily: "ui-monospace, monospace" }}>{`${step + 1} / ${CALL_STEPS.length}`}</span>
     </div>
+  );
+}
+
+function CallRender({ config, t }: any) {
+  const isZh = t(T("中文", "en")) !== "en";
+  const step = Math.max(0, Math.min(CALL_STEPS.length - 1, config.step ?? 0));
+  const cur = CALL_STEPS[step];
+  const st = cur.state;
+  const reg = (name: string, val: string, hot = false) => (
+    <div style={{ display: "flex", justifyContent: "space-between", padding: "3px 8px", borderRadius: 6, background: hot ? "#eef2ff" : "#f8fafc", border: `1px solid ${hot ? "#c7d2fe" : "#e2e8f0"}`, fontSize: 12, fontFamily: "ui-monospace, monospace" }}>
+      <span style={{ color: "#64748b" }}>{name}</span><span style={{ fontWeight: 700, color: "#0f172a" }}>{val}</span>
+    </div>
+  );
+  return (
+    <Panel>
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(260px,1.4fr) minmax(220px,1fr)", gap: 12, alignItems: "start" }}>
+        <div>
+          <div style={{ fontSize: 12, fontWeight: 800, color: "#475569", marginBottom: 4 }}>{isZh ? "代码" : "Code"}</div>
+          <div style={{ display: "grid", gap: 2 }}>
+            {CALL_CODE.map((c, i) => (
+              <div key={i} style={{ display: "flex", gap: 8, padding: "3px 8px", borderRadius: 6, background: i === cur.line ? "#eef2ff" : "transparent", border: `1px solid ${i === cur.line ? "#c7d2fe" : "transparent"}`, fontFamily: "ui-monospace, monospace", fontSize: 12, color: i === cur.line ? "#3730a3" : "#475569", fontWeight: i === cur.line ? 700 : 400 }}>
+                <span style={{ color: "#cbd5e1", width: 18, textAlign: "right" }}>{i}</span>
+                <span>{c.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ display: "grid", gap: 10 }}>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: "#475569", marginBottom: 4 }}>{isZh ? "寄存器" : "Registers"}</div>
+            <div style={{ display: "grid", gap: 3 }}>
+              {reg("PC", callHx(st.pc), cur.line <= 1 || cur.line === 11)}
+              {reg("$ra", callHx(st.ra), cur.line === 1 || cur.line === 9 || cur.line === 11)}
+              {reg("$sp", callHx(st.sp), cur.line === 4 || cur.line === 10)}
+              {reg("$s0", callHx(st.s0), cur.line === 6 || cur.line === 8)}
+              {reg("$a0", `${st.a0}`, cur.line === 0)}
+              {reg("$v0", `${st.v0}`, cur.line === 2)}
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 800, color: "#475569", marginBottom: 4 }}>{isZh ? "栈 (栈帧)" : "Stack"}</div>
+            <div style={{ display: "grid", gap: 3 }}>
+              {[SLOT_RA, SLOT_S0].map((addr) => (
+                <div key={addr} style={{ display: "flex", justifyContent: "space-between", padding: "3px 8px", borderRadius: 6, background: addr in st.mem ? "#dcfce7" : "#f8fafc", border: `1px solid ${addr in st.mem ? "#16a34a" : "#e2e8f0"}`, fontSize: 11, fontFamily: "ui-monospace, monospace" }}>
+                  <span style={{ color: "#64748b" }}>{`${callHx(addr)}${addr === SLOT_RA ? " (4)" : " (0)"}`}</span>
+                  <span style={{ fontWeight: 700 }}>{addr in st.mem ? callHx(st.mem[addr]) : "—"}</span>
+                </div>
+              ))}
+              <div style={{ fontSize: 11, color: "#94a3b8" }}>{`$sp = ${callHx(st.sp)}`}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style={{ padding: "10px 14px", borderRadius: 10, background: "#eef2ff", border: "1px solid #c7d2fe", fontSize: 13, color: "#3730a3" }}>
+        {isZh ? cur.zh : cur.en}
+      </div>
+    </Panel>
   );
 }
 
@@ -455,12 +540,12 @@ const SUB: Record<SubMode, ModuleDef> = {
   regs: { id: "regs", title: T("MIPS 寄存器", "MIPS Registers"), defaultConfig: {}, generate: () => [{ caption: T("MIPS 寄存器约定", "MIPS register conventions"), scene: {} }] as never, Render: RegsRender as never } as unknown as ModuleDef,
   format: { id: "format", title: T("指令格式 R/I/J", "Instruction Formats"), defaultConfig: fmtDefault, Controls: FmtControls as never, generate: () => [{ caption: T("R/I/J 位域编码", "R/I/J bit-field encoding"), scene: {} }] as never, Render: FmtRender as never } as unknown as ModuleDef,
   addressing: { id: "addressing", title: T("寻址方式", "Addressing Modes"), defaultConfig: addrDefault, Controls: AddrControls as never, generate: () => [{ caption: T("寻址方式", "Addressing modes"), scene: {} }] as never, Render: AddrRender as never } as unknown as ModuleDef,
-  call: { id: "call", title: T("过程调用", "Procedure Call"), defaultConfig: {}, generate: () => [{ caption: T("过程调用(占位)", "Procedure Call (WIP)"), scene: {} }] as never, Render: CallRender as never } as unknown as ModuleDef,
+  call: { id: "call", title: T("过程调用", "Procedure Call"), defaultConfig: { step: 0 }, Controls: CallControls as never, generate: () => [{ caption: T("过程调用与栈帧", "Procedure call & stack frame"), scene: {} }] as never, Render: CallRender as never } as unknown as ModuleDef,
   x86: { id: "x86", title: T("x86 简介", "x86 Overview"), defaultConfig: {}, generate: () => [{ caption: T("x86 简介", "x86 overview"), scene: {} }] as never, Render: X86Render as never } as unknown as ModuleDef,
 };
 
 const MAP: Record<SubMode, ModuleDef> = SUB;
-const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
+export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
   { label: "接口", opts: [
     { v: "isa", zh: "ISA / RISC-CISC", en: "ISA" },
     { v: "regs", zh: "MIPS 寄存器", en: "Registers" },
@@ -500,14 +585,15 @@ export const instructionSetModule: ModuleDef<any, Cfg> = {
     const safe = safeCfg(c.subMode, c);
     return safe;
   },
-  Controls({ config, onChange, t }) {
+  Controls({ config, onChange, t, embedded }: any) {
     const isZh = t(T("中文", "en")) !== "en";
     const sub = subKeyOf(config.subMode);
     const active = activeOf(sub) as any;
     const safe = safeCfg(sub, config);
+    if (embedded && !active?.Controls) return null;
     return (
       <div style={{ display: "grid", gap: 8, width: "100%" }}>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
+        {!embedded && <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
           <span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca" }}>{isZh ? "指令系统" : "INSTRUCTION SET"}</span>
           <select className="txt" value={sub} onChange={(e) => { const key = subKeyOf(e.target.value); const m = activeOf(key) as any; onChange({ ...config, ...((m.defaultConfig as any) ?? {}), subMode: key } as any); }} style={{ minWidth: 200, fontWeight: 700 }}>
             {GROUPS.map((g) => (
@@ -516,7 +602,7 @@ export const instructionSetModule: ModuleDef<any, Cfg> = {
               </optgroup>
             ))}
           </select>
-        </div>
+        </div>}
         {active?.Controls && createElement(active.Controls as any, { config: safe as any, onChange: onChange as any, t })}
       </div>
     ) as unknown as never;

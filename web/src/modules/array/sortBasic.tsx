@@ -21,6 +21,7 @@ const BUBBLE_CODE = [
   T('  for $j \\gets 0$ to $n-i-2$:', '  for $j \\gets 0$ to $n-i-2$:'),
   T('    if $A[j] > A[j+1]$:', '    if $A[j] > A[j+1]$:'),
   T('      $\\text{swap}(A[j],A[j+1])$', '$\\text{swap}(A[j],A[j+1])$'),
+  T('return $A$', 'return $A$'),
 ];
 
 function bubbleGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
@@ -45,7 +46,7 @@ function bubbleGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
     s.done[n - 1 - i] = true;
   }
   s.done[0] = true;
-  frames.push({ line: 0, caption: T(`完成：$A=[${s.a.join(',')}]$，比较 ${s.cmp} 次，写回 ${s.mov} 次`, `Sorted, ${s.cmp} cmps, ${s.mov} writes`), scene: snap(s, []) });
+  frames.push({ line: 5, caption: T(`完成：$A=[${s.a.join(',')}]$，比较 ${s.cmp} 次，写回 ${s.mov} 次`, `Sorted, ${s.cmp} cmps, ${s.mov} writes`), scene: snap(s, []) });
   return frames;
 }
 
@@ -69,6 +70,7 @@ const SELECT_CODE = [
   T('    if $A[j]<A[m]$:', '    if $A[j]<A[m]$:'),
   T('      $m\\gets j$ // 更小', '      $m\\gets j$'),
   T('  $\\text{swap}(A[i],A[m])$ // 首位就位', '  $\\text{swap}(A[i],A[m])$'),
+  T('return $A$', 'return $A$'),
 ];
 
 function selectGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
@@ -99,7 +101,7 @@ function selectGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
     s.done[i] = true;
   }
   s.done[n - 1] = true;
-  frames.push({ line: 0, caption: T(`完成：$A=[${s.a.join(',')}]$，比较 ${s.cmp} 次`, `Sorted, ${s.cmp} cmps`), scene: snap(s, []) });
+  frames.push({ line: 6, caption: T(`完成：$A=[${s.a.join(',')}]$，比较 ${s.cmp} 次`, `Sorted, ${s.cmp} cmps`), scene: snap(s, []) });
   return frames;
 }
 
@@ -122,6 +124,7 @@ const INSERT_CODE = [
   T('  while $j\\ge0 \\land A[j]>x$:', '  while $j\\ge0 \\land A[j]>x$:'),
   T('    $A[j+1]\\gets A[j]$; $j{-}{-}$', '    $A[j+1]\\gets A[j]$; $j{-}{-}$'),
   T('  $A[j+1]\\gets x$ // 落位', '  $A[j+1]\\gets x$'),
+  T('return $A$', 'return $A$'),
 ];
 
 function insertGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
@@ -130,8 +133,8 @@ function insertGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
   const s = base(arr);
   const n = s.a.length;
   const frames: Frame<ArrayScene>[] = [];
+  frames.push({ line: 0, caption: T(`开始：$A[0]$ 自成有序区`, `Start: $A[0]$ sorted`), scene: snap(s, []) });
   s.done[0] = true;
-  frames.push({ line: 0, caption: T(`开始：$A[0]$ 自成有序区`, `Start: $A[0]$ sorted`), scene: snap(s, [0]) });
   for (let i = 1; i < n; i++) {
     const x = s.a[i];
     let j = i - 1;
@@ -152,7 +155,7 @@ function insertGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
     for (let k = 0; k <= i; k++) s.done[k] = true;
     frames.push({ line: 4, caption: T(`$A[${j + 1}]\\gets x=${x}$，前 ${i + 1} 个有序`, `place $x$ at ${j + 1}$`), scene: snap(s, [j + 1]) });
   }
-  frames.push({ line: 0, caption: T(`完成：$A=[${s.a.join(',')}]$，比较 ${s.cmp} 次，写回 ${s.mov} 次`, `Sorted, ${s.cmp} cmps`), scene: snap(s, []) });
+  frames.push({ line: 5, caption: T(`完成：$A=[${s.a.join(',')}]$，比较 ${s.cmp} 次，写回 ${s.mov} 次`, `Sorted, ${s.cmp} cmps`), scene: snap(s, []) });
   return frames;
 }
 

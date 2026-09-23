@@ -108,6 +108,9 @@ export function Stage({ mod }: { mod: ModuleDef }) {
     autoPlay: !isManual,
     autoPlayOnMount: !isManual,
   });
+  // 可播放 = 有过程(多帧)或有伪代码; 否则整页只作演示区(无播放条/讲解条/伪代码栏)
+  const hasProcess = pb.count > 1 || code.length > 0;
+  const bareLayout = interactive || !!mod.bare || !hasProcess;
   // 动画播到末帧结束时：模块可用 onPlayEnd 把结果自动写回 config（如 AVL/BST 建树后自动应用为新版本）
   const prevPlaying = useRef(false);
   useEffect(() => {
@@ -137,7 +140,7 @@ export function Stage({ mod }: { mod: ModuleDef }) {
   }, [pb.frame]);
 
   return (
-    <div className="stage" style={{ position: "relative" }}>
+    <div className={`stage${bareLayout ? " stage--demo" : ""}`} style={{ position: "relative" }}>
       {toast && (
         <div style={{ position: "fixed", top: 16, left: "50%", transform: "translateX(-50%)", background: "#92400e", color: "#fff", padding: "8px 16px", borderRadius: 999, fontSize: 13, fontWeight: 700, zIndex: 100, boxShadow: "0 8px 24px rgba(0,0,0,.2)", maxWidth: "90vw", textAlign: "center" }}>
           ⚠ {toast}
@@ -161,10 +164,10 @@ export function Stage({ mod }: { mod: ModuleDef }) {
           )}
         </div>
       )}
-      {!interactive && (
+      {!bareLayout && (
         <PlaybackBar pb={pb} disabled={!!mod.blockedReason?.(config as never)} />
       )}
-      {mod.bare || interactive ? (
+      {bareLayout ? (
         <div className="stage-body" style={{ gridTemplateColumns: "1fr" }}>
           <div className="canvas">
             {pb.frame && (

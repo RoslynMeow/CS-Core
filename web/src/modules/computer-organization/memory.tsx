@@ -58,11 +58,6 @@ function LevelsRender({ t }: any) {
     ];
   return (
     <Panel>
-      <div style={{ padding: "12px 16px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe", fontSize: 13, color: "#3730a3", lineHeight: 2 }}>
-        {isZh
-          ? "越靠近 CPU: 越快、越小、越贵。每一层缓存下一层的数据, 目标是用接近 L1 的速度访问接近磁盘的容量。"
-          : "Closer to CPU = faster/smaller/pricier. Each level caches the next; goal: L1 speed with disk capacity."}
-      </div>
       <Table head={isZh ? ["层次", "典型容量", "延迟", "实现"] : ["Level", "Size", "Latency", "Tech"]} rows={rows} />
     </Panel>
   );
@@ -75,7 +70,6 @@ function LocalityControls({ config, onChange, t }: any) {
   const isZh = t(T("中文", "en")) !== "en";
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-      <span style={{ fontSize: 11, fontWeight: 800, color: "#475569" }}>{isZh ? "步长" : "STRIDE"}</span>
       <select className="txt" value={config.stride} onChange={(e) => onChange({ ...config, stride: Number(e.target.value) })} style={{ fontWeight: 700 }}>
         {[1, 2, 4, 8].map((s) => <option key={s} value={s}>{s}</option>)}
       </select>
@@ -111,18 +105,6 @@ function LocalityRender({ config, t }: any) {
       <div style={{ display: "flex", gap: 16, flexWrap: "wrap", justifyContent: "center", fontSize: 13 }}>
         <span>{isZh ? "访问元素" : "touched"} = <b>{touched}</b></span>
         <span>{isZh ? "重复访问 (时间局部性)" : "reuse (temporal)"} = <b style={{ color: "#15803d" }}>{reuse}</b></span>
-      </div>
-      <div style={{ padding: "10px 14px", borderRadius: 10, background: "#f8fafc", border: "1px solid #e2e8f0", fontSize: 13, color: "#334155", lineHeight: 1.9 }}>
-        {isZh ? (
-          <>
-            <b>步长 1</b>: 顺序访问相邻地址 → <b>空间局部性</b>好, 一个 cache 块可命中多个元素。<br />
-            <b>步长大</b>: 每次跳到新块, 空间局部性差; 第二轮重复同一集合 → <b>时间局部性</b>。
-          </>
-        ) : (
-          <>
-            <b>Stride 1</b>: sequential → good spatial locality. <b>Large stride</b>: a new block each time; second pass reuses (temporal).
-          </>
-        )}
       </div>
     </Panel>
   );
@@ -280,11 +262,6 @@ function CacheRender({ config, t }: any) {
           </span>
         ))}
         {log.length > 0 && <span style={{ fontSize: 12, color: "#64748b", alignSelf: "center" }}>{isZh ? `命中率 ${hits}/${log.length}` : `hit ${hits}/${log.length}`}</span>}
-      </div>
-      <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.9 }}>
-        {isZh
-          ? "AMAT = 命中时间 + 缺失率 × 缺失代价。直接映射冲突多; 组相联折中; 全相联冲突最少但硬件贵(TLB 用)。"
-          : "AMAT = hit time + miss rate × miss penalty. Direct-mapped conflicts most; set-assoc balances; fully-assoc (TLB) least conflicts."}
       </div>
     </Panel>
   );
@@ -448,7 +425,7 @@ const SUB: Record<SubMode, ModuleDef> = {
 };
 
 const MAP: Record<SubMode, ModuleDef> = SUB;
-const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
+export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
   { label: "层次", opts: [
     { v: "levels", zh: "存储层次", en: "Levels" },
     { v: "locality", zh: "局部性", en: "Locality" },
@@ -484,14 +461,15 @@ export const memoryHierarchyModule: ModuleDef<any, Cfg> = {
   tags: ["computer-organization", "memory"],
   interactive: true,
   defaultConfig: DEFAULT,
-  Controls({ config, onChange, t }) {
+  Controls({ config, onChange, t, embedded }: any) {
     const isZh = t(T("中文", "en")) !== "en";
     const sub = subKeyOf(config.subMode);
     const active = activeOf(sub) as any;
     const safe = safeCfg(sub, config);
+    if (embedded && !active?.Controls) return null;
     return (
       <div style={{ display: "grid", gap: 8, width: "100%" }}>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
+        {!embedded && <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
           <span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca" }}>{isZh ? "存储层次" : "MEMORY"}</span>
           <select className="txt" value={sub} onChange={(e) => { const key = subKeyOf(e.target.value); const m = activeOf(key) as any; onChange({ ...config, ...((m.defaultConfig as any) ?? {}), subMode: key } as any); }} style={{ minWidth: 200, fontWeight: 700 }}>
             {GROUPS.map((g) => (
@@ -500,7 +478,7 @@ export const memoryHierarchyModule: ModuleDef<any, Cfg> = {
               </optgroup>
             ))}
           </select>
-        </div>
+        </div>}
         {active?.Controls && createElement(active.Controls as any, { config: safe as any, onChange: onChange as any, t })}
       </div>
     ) as unknown as never;

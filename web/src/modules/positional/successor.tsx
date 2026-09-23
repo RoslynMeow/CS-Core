@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { T } from '../../i18n/lang';
 import type { Frame, ModuleDef } from '../../engine/types';
 
@@ -17,14 +16,16 @@ export const successorModule: ModuleDef<Scene, Cfg> = {
   desc: T('演示 $P+1$ 的进位链：$P_i=n-1$ 则清零进位，否则 $P_i+1$ 终止。', 'Demo $P+1$: if $P_i=n-1$ zero and carry, else $P_i+1$ stops.'),
   tags: ['data-structures'],
   defaultConfig: { base: 10, numeral: '19' },
-  Controls({ config, onChange }) {
+  Controls({ config, onChange, t }) {
     return (
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <label>
-          base <input className="txt" type="number" min={2} max={16} value={config.base} onChange={e => onChange({ ...config, base: Math.max(2, Math.min(16, Number(e.target.value) || 10)) })} style={{ width: 72 }} />
+        <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+          <span>{t(T('进制', 'Base'))}</span>
+          <input className="txt" type="number" min={2} max={16} value={config.base} onChange={e => onChange({ ...config, base: Math.max(2, Math.min(16, Number(e.target.value) || 10)) })} style={{ width: 72 }} />
         </label>
-        <label>
-          numeral <input className="txt" value={config.numeral} onChange={e => onChange({ ...config, numeral: e.target.value })} style={{ width: 130 }} />
+        <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+          <span>{t(T('数码', 'Numeral'))}</span>
+          <input className="txt" value={config.numeral} onChange={e => onChange({ ...config, numeral: e.target.value })} style={{ width: 130 }} />
         </label>
       </div>
     ) as unknown as never;
@@ -35,6 +36,7 @@ export const successorModule: ModuleDef<Scene, Cfg> = {
     T('  $P_i \\gets 0$', '  $P_i \\gets 0$'),
     T('  $i \\gets i+1$', '  $i \\gets i+1$'),
     T('$P_i \\gets P_i+1$', '$P_i \\gets P_i+1$'),
+    T('return $P$', 'return $P$'),
   ],
   generate(cfg) {
     const orig = parseLSB(cfg.numeral, cfg.base);
@@ -63,7 +65,8 @@ export const successorModule: ModuleDef<Scene, Cfg> = {
       } else break;
     }
     p[i] = (p[i] ?? 0) + 1;
-    frames.push({ line: 4, caption: T(`$P_${i}\\gets${p[i] - 1}+1=${p[i]}$ 终止`, `$P_${i}\\gets${p[i] - 1}+1=${p[i]}$ done`), scene: { digits: trim(p), i, carry: false } });
+    frames.push({ line: 4, caption: T(`$P_{${i}}\\gets${p[i] - 1}+1=${p[i]}$`, `$P_{${i}}\\gets${p[i] - 1}+1=${p[i]}$`), scene: { digits: trim(p), i, carry: false } });
+    frames.push({ line: 5, caption: T(`return $P$：后继为 $${trim(p).join('')}$`, `return $P$ = ${trim(p).join('')}`), scene: { digits: trim(p), i: null, carry: false } });
     return frames;
   },
   Render({ scene: _scene }) {
@@ -73,7 +76,7 @@ export const successorModule: ModuleDef<Scene, Cfg> = {
     scene.carry = scene.carry ?? false;
     return (
       <div className="digits">
-        {scene.digits.map((d, idx) => {
+        {scene.digits.map((d: number, idx: number) => {
           const lsb = scene.digits.length - 1 - idx;
           const active = scene.i !== null && lsb === scene.i;
           return (

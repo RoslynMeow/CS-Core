@@ -115,7 +115,6 @@ function SignalsControls({ config, onChange, t }: any) {
   const isZh = t(T("中文", "en")) !== "en";
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-      <span style={{ fontSize: 11, fontWeight: 800, color: "#475569" }}>{isZh ? "指令" : "INSTR"}</span>
       <select className="txt" value={config.instr} onChange={(e) => onChange({ ...config, instr: e.target.value })} style={{ fontWeight: 700 }}>
         {CTRL_INSTR.map((i) => <option key={i.name} value={i.name}>{`${i.name} (${i.fmt})`}</option>)}
       </select>
@@ -220,11 +219,6 @@ function HardwiredRender({ t }: any) {
         <MathText text={`$\\text{控制信号} = f(\\text{opcode},\\ \\text{funct},\\ \\text{状态标志})$`} />
       </div>
       <Table head={isZh ? ["特征", "硬布线控制器", "微程序控制器"] : ["Aspect", "Hardwired", "Microprogrammed"]} rows={rows} />
-      <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.9 }}>
-        {isZh
-          ? "一句话: 硬布线用「门电路」把真值表固化, 微程序用「存微指令的 ROM」把控制序列程序化。"
-          : "In short: hardwired bakes the truth table into gates; microprogrammed stores the control sequence as microcode."}
-      </div>
     </Panel>
   );
 }
@@ -252,11 +246,6 @@ function CyclesRender({ t }: any) {
   return (
     <Panel>
       <Table head={isZh ? ["特征", "单周期", "多周期"] : ["Aspect", "Single-cycle", "Multi-cycle"]} rows={rows} />
-      <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.9 }}>
-        {isZh
-          ? "多周期是「单周期 → 流水线」的中间形态: 组件复用、不同指令占用不同周期数, 但仍有功能单元闲置。下一步的流水线让不同指令的不同阶段真正重叠。"
-          : "Multi-cycle bridges single-cycle and pipelining: reused components, per-instruction cycle counts, but units still idle. Pipelining then overlaps stages across instructions."}
-      </div>
     </Panel>
   );
 }
@@ -276,7 +265,7 @@ const SUB: Record<SubMode, ModuleDef> = {
 };
 
 const MAP: Record<SubMode, ModuleDef> = SUB;
-const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
+export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
   { label: "控制", opts: [
     { v: "signals", zh: "控制信号", en: "Signals" },
     { v: "alucontrol", zh: "ALU 控制", en: "ALU Control" },
@@ -308,14 +297,15 @@ export const cpuControlModule: ModuleDef<any, Cfg> = {
   tags: ["computer-organization", "cpu"],
   interactive: true,
   defaultConfig: DEFAULT,
-  Controls({ config, onChange, t }) {
+  Controls({ config, onChange, t, embedded }: any) {
     const isZh = t(T("中文", "en")) !== "en";
     const sub = subKeyOf(config.subMode);
     const active = activeOf(sub) as any;
     const safe = safeCfg(sub, config);
+    if (embedded && !active?.Controls) return null;
     return (
       <div style={{ display: "grid", gap: 8, width: "100%" }}>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
+        {!embedded && <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
           <span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca" }}>{isZh ? "控制器" : "CONTROL UNIT"}</span>
           <select className="txt" value={sub} onChange={(e) => { const key = subKeyOf(e.target.value); const m = activeOf(key) as any; onChange({ ...config, ...((m.defaultConfig as any) ?? {}), subMode: key } as any); }} style={{ minWidth: 200, fontWeight: 700 }}>
             {GROUPS.map((g) => (
@@ -324,7 +314,7 @@ export const cpuControlModule: ModuleDef<any, Cfg> = {
               </optgroup>
             ))}
           </select>
-        </div>
+        </div>}
         {active?.Controls && createElement(active.Controls as any, { config: safe as any, onChange: onChange as any, t })}
       </div>
     ) as unknown as never;

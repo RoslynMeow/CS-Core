@@ -17,17 +17,20 @@ export const additionModule: ModuleDef<Scene, Cfg> = {
   desc: T('逐列 $s=P_i+Q_i+c$，$R_i=s\\bmod n$，进位 $c=\\lfloor s/n\\rfloor$。', 'Per column $s=P_i+Q_i+c$, $R_i=s\\bmod n$, carry $c=\\lfloor s/n\\rfloor$.'),
   tags: ['data-structures'],
   defaultConfig: { base: 10, a: '27', b: '48' },
-  Controls({ config, onChange }) {
+  Controls({ config, onChange, t }) {
     return (
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <label>
-          base <input className="txt" type="number" min={2} max={16} value={config.base} onChange={e => onChange({ ...config, base: Math.max(2, Math.min(16, Number(e.target.value) || 10)) })} style={{ width: 72 }} />
+        <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+          <span>{t(T('进制', 'Base'))}</span>
+          <input className="txt" type="number" min={2} max={16} value={config.base} onChange={e => onChange({ ...config, base: Math.max(2, Math.min(16, Number(e.target.value) || 10)) })} style={{ width: 72 }} />
         </label>
-        <label>
-          a <input className="txt" value={config.a} onChange={e => onChange({ ...config, a: e.target.value })} style={{ width: 90 }} />
+        <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+          <span>{t(T('加数 A', 'A'))}</span>
+          <input className="txt" value={config.a} onChange={e => onChange({ ...config, a: e.target.value })} style={{ width: 90 }} />
         </label>
-        <label>
-          b <input className="txt" value={config.b} onChange={e => onChange({ ...config, b: e.target.value })} style={{ width: 90 }} />
+        <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+          <span>{t(T('加数 B', 'B'))}</span>
+          <input className="txt" value={config.b} onChange={e => onChange({ ...config, b: e.target.value })} style={{ width: 90 }} />
         </label>
       </div>
     ) as unknown as never;
@@ -40,6 +43,7 @@ export const additionModule: ModuleDef<Scene, Cfg> = {
     T('  $c \\gets \\lfloor s/n\\rfloor$', '  $c \\gets \\lfloor s/n\\rfloor$'),
     T('  $i \\gets i+1$', '  $i \\gets i+1$'),
     T('$c=1 \\implies R_k\\gets1$ // 末进位', '$c=1 \\implies R_k\\gets1$ // final carry'),
+    T('return $R$', 'return $R$'),
   ],
   generate(cfg) {
     const aLSB = parseLSB(cfg.a, cfg.base);
@@ -71,8 +75,9 @@ export const additionModule: ModuleDef<Scene, Cfg> = {
       res.push(1);
       frames.push({ line: 6, caption: T(`末进位 $c=1$，$R_${k}=1$`, `final carry $R_${k}=1`), scene: scene(k) });
     } else {
-      frames.push({ line: 6, caption: T(`末进位 $c=0$ 结束`, `no final carry`), scene: scene(null) });
+      frames.push({ line: 6, caption: T(`末进位 $c=0$`, `no final carry`), scene: scene(null) });
     }
+    frames.push({ line: 7, caption: T(`return $R$：和为 $${res.slice().reverse().join('')}$`, `return $R$ = ${res.slice().reverse().join('')}`), scene: scene(null) });
     return frames;
   },
   Render({ scene: _scene }) {

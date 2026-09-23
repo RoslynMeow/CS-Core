@@ -1,39 +1,51 @@
 import { createElement } from "react";
 import { T } from "../../i18n/lang";
 import type { ModuleDef } from "../../engine/types";
-import { positionalCoreModule } from "../positional/core";
+import { placeValueModule } from "../positional/placeValue";
 import { baseConversionModule } from "../positional/baseConversion";
 import { expansionModule } from "../positional/expansion";
 import { successorModule } from "../positional/successor";
 import { additionModule } from "../positional/addition";
 import { unsignedIntModule } from "../numeric/unsignedInt";
 import { twosComplementModule } from "../numeric/twosComplement";
+import { signRepresentationModule } from "../numeric/signRepresentation";
+import { overflowModule } from "../numeric/overflow";
 import { ieee754Module } from "../numeric/ieee754";
+import { floatOpsModule } from "../numeric/floatOps";
 import { characterEncodingModule } from "../text/characterEncoding";
 import { stringOpsModule } from "../text/stringOps";
 
-type SubMode = "positional-system" | "positional-expansion" | "positional-successor" | "positional-addition" | "base-conversion" | "unsigned-int" | "twos-complement" | "ieee754" | "character-encoding" | "string";
+type SubMode = "positional-system" | "positional-expansion" | "positional-successor" | "positional-addition" | "base-conversion" | "unsigned-int" | "twos-complement" | "sign-representation" | "overflow" | "ieee754" | "float-ops" | "character-encoding" | "string";
 const MAP: Record<SubMode, ModuleDef> = {
-  "positional-system": positionalCoreModule as unknown as ModuleDef,
+  "positional-system": placeValueModule as unknown as ModuleDef,
   "positional-expansion": expansionModule as unknown as ModuleDef,
   "positional-successor": successorModule as unknown as ModuleDef,
   "positional-addition": additionModule as unknown as ModuleDef,
   "base-conversion": baseConversionModule as unknown as ModuleDef,
   "unsigned-int": unsignedIntModule as unknown as ModuleDef,
   "twos-complement": twosComplementModule as unknown as ModuleDef,
+  "sign-representation": signRepresentationModule as unknown as ModuleDef,
+  "overflow": overflowModule as unknown as ModuleDef,
   "ieee754": ieee754Module as unknown as ModuleDef,
+  "float-ops": floatOpsModule as unknown as ModuleDef,
   "character-encoding": characterEncodingModule as unknown as ModuleDef,
   "string": stringOpsModule as unknown as ModuleDef,
 };
-const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
+export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
   { label: "位置制", opts: [
     { v: "positional-system", zh: "位权", en: "Positional" },
+    { v: "positional-expansion", zh: "按权展开", en: "Expansion" },
+    { v: "positional-successor", zh: "后继与进位", en: "Successor" },
+    { v: "positional-addition", zh: "列式加法", en: "Column Add" },
     { v: "base-conversion", zh: "进制转换", en: "BaseConv" },
   ]},
   { label: "数值", opts: [
     { v: "unsigned-int", zh: "无符号整数", en: "Unsigned" },
     { v: "twos-complement", zh: "补码", en: "TwosComp" },
+    { v: "sign-representation", zh: "原码/反码/移码", en: "Sign Codes" },
+    { v: "overflow", zh: "溢出检测", en: "Overflow" },
     { v: "ieee754", zh: "IEEE754", en: "IEEE754" },
+    { v: "float-ops", zh: "浮点运算", en: "Float Ops" },
   ]},
   { label: "文本", opts: [
     { v: "character-encoding", zh: "字符编码", en: "Encoding" },
@@ -42,12 +54,12 @@ const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[
 ];
 
 type Cfg = { subMode: SubMode; [k: string]: any };
-const DEFAULT: Cfg = { subMode: "positional-system", ...(positionalCoreModule as any).defaultConfig };
+const DEFAULT: Cfg = { subMode: "positional-system", ...(placeValueModule as any).defaultConfig };
 
 // 兜底：历史存档可能缺 subMode 或缺子模块字段（旧版“清空”曾丢 subMode）。
 // 未知 subMode 回退到位权，缺失字段用子模块默认值补齐，保证页面永不白屏。
 function activeOf(sub: unknown): ModuleDef {
-  return ((MAP as Record<string, ModuleDef>)[sub as string] ?? positionalCoreModule) as unknown as ModuleDef;
+  return ((MAP as Record<string, ModuleDef>)[sub as string] ?? placeValueModule) as unknown as ModuleDef;
 }
 function subKeyOf(sub: unknown): SubMode {
   return (MAP as Record<string, ModuleDef>)[sub as string] ? (sub as SubMode) : "positional-system";
@@ -72,7 +84,7 @@ function safeCfg(sub: unknown, config: Cfg): Cfg {
 export const dataUnifiedModule: ModuleDef<any, Cfg> = {
   id: "data-representation",
   title: T("数据的表示", "Data Representation"),
-  desc: T("位权 / 展开 / 后继 / 加法 / 进制转换 / 无符号 / 补码 / IEEE754 / 字符编码 / 字符串", "Positional / unsigned / twos-comp / IEEE754 / encoding / string"),
+  desc: T("位权 / 展开 / 后继 / 加法 / 进制转换 / 无符号 / 补码 / 原码反码移码 / 溢出 / IEEE754 / 浮点运算 / 字符编码 / 字符串", "Positional / unsigned / twos-comp / sign codes / overflow / IEEE754 / float / encoding / string"),
   tags: ["computer-organization"],
   defaultConfig: DEFAULT,
   randomize(c) {
@@ -85,14 +97,15 @@ export const dataUnifiedModule: ModuleDef<any, Cfg> = {
     const m = activeOf(cfg.subMode) as any;
     return m.onPlayEnd ? m.onPlayEnd(safeCfg(cfg.subMode, cfg)) : null;
   }) as any,
-  Controls({ config, onChange, t }) {
+  Controls({ config, onChange, t, embedded }: any) {
     const isZh = t(T("中文", "en")) !== "en";
     const sub = subKeyOf(config.subMode);
     const active = activeOf(sub) as any;
     const safe = safeCfg(sub, config);
+    if (embedded && !active?.Controls) return null;
     return (
       <div style={{ display: "grid", gap: 8, width: "100%" }}>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
+        {!embedded && <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
           <span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca" }}>数据的表示</span>
           <select className="txt" value={sub} onChange={(e) => { const key = subKeyOf(e.target.value); const m = activeOf(key) as any; onChange({ ...config, ...((m.defaultConfig as any) ?? {}), subMode: key } as any); }} style={{ minWidth: 200, fontWeight: 700 }}>
             {GROUPS.map((g) => (
@@ -102,7 +115,7 @@ export const dataUnifiedModule: ModuleDef<any, Cfg> = {
             ))}
           </select>
           <span style={{ fontSize: 11, color: "#64748b" }}>{isZh ? "一章覆盖全部数据的表示" : "one chapter"}</span>
-        </div>
+        </div>}
         {active?.Controls && createElement(active.Controls as any, { config: safe as any, onChange: onChange as any, t })}
       </div>
     ) as unknown as never;

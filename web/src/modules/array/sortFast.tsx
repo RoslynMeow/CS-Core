@@ -22,6 +22,7 @@ const SHELL_CODE = [
   T('    while $j\\ge0 \\land A[j]>x$:', '    while $j\\ge0 \\land A[j]>x$:'),
   T('      $A[j+gap]\\gets A[j]$; $j{-}{=}gap$', '      $A[j+gap]\\gets A[j]$; $j{-}{=}gap$'),
   T('    $A[j+gap]\\gets x$ // 落位', '    $A[j+gap]\\gets x$'),
+  T('return $A$', 'return $A$'),
 ];
 
 function shellGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
@@ -56,7 +57,7 @@ function shellGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
     }
   }
   s.done = s.a.map(() => true);
-  frames.push({ line: 0, caption: T(`完成：$A=[${s.a.join(',')}]$，比较 ${s.cmp} 次`, `Sorted, ${s.cmp} cmps`), scene: snap(s, []) });
+  frames.push({ line: 6, caption: T(`完成：$A=[${s.a.join(',')}]$，比较 ${s.cmp} 次`, `Sorted, ${s.cmp} cmps`), scene: snap(s, []) });
   return frames;
 }
 
@@ -78,6 +79,7 @@ const MERGE_CODE = [
   T('  if $l\\ge r$: return // 单个元素有序', '  if $l\\ge r$: return'),
   T('  $m\\gets\\lfloor(l+r)/2\\rfloor$; $\\text{MergeSort}(l,m)$; $\\text{MergeSort}(m+1,r)$ // 分半递归', '  $m\\gets\\lfloor(l+r)/2\\rfloor$; recurse halves'),
   T('  $tmp[k{+}{+}]\\gets\\min(A[i],A[j])$; $A[l..r]\\gets tmp$ // 逐个取小合并后拷回', '  merge into $tmp$; copy back'),
+  T('return $A$', 'return $A$'),
 ];
 
 function mergeGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
@@ -126,7 +128,7 @@ function mergeGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
     frames.push({ line: 3, caption: T(`$[${l},${r}]$ 有序`, `$[${l},${r}]$ sorted`), scene: snap(s, [], showTmp()) });
   };
   sort(0, n - 1);
-  frames.push({ line: 0, caption: T(`完成：$A=[${s.a.join(',')}]$，比较 ${s.cmp} 次，写回 ${s.mov} 次`, `Sorted, ${s.cmp} cmps`), scene: snap(s, [], showTmp()) });
+  frames.push({ line: 4, caption: T(`完成：$A=[${s.a.join(',')}]$，比较 ${s.cmp} 次，写回 ${s.mov} 次`, `Sorted, ${s.cmp} cmps`), scene: snap(s, [], showTmp()) });
   return frames;
 }
 
@@ -153,6 +155,7 @@ const QUICK_CODE = [
   T('    $i{+}{+}$; $\\text{swap}(A[i],A[j])$', '    $i{+}{+}$; $\\text{swap}(A[i],A[j])$'),
   T('  $p\\gets i+1$; $\\text{swap}(A[p],A[r])$ // 主元就位', '  $p\\gets i+1$; $\\text{swap}(A[p],A[r])$'),
   T('  $\\text{QuickSort}(l,p-1)$; $\\text{QuickSort}(p+1,r)$ // 递归两边', '  recurse both halves'),
+  T('return $A$', 'return $A$'),
 ];
 
 function quickGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
@@ -196,7 +199,7 @@ function quickGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
     sort(p + 1, r);
   };
   sort(0, s.a.length - 1);
-  frames.push({ line: 0, caption: T(`完成：$A=[${s.a.join(',')}]$，比较 ${s.cmp} 次`, `Sorted, ${s.cmp} cmps`), scene: snap(s, []) });
+  frames.push({ line: 9, caption: T(`完成：$A=[${s.a.join(',')}]$，比较 ${s.cmp} 次`, `Sorted, ${s.cmp} cmps`), scene: snap(s, []) });
   return frames;
 }
 

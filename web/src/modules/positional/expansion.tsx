@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { T } from '../../i18n/lang';
 import type { ModuleDef, Frame } from '../../engine/types';
 import { MathText } from '../../lib/tex';
@@ -23,14 +22,16 @@ export const expansionModule: ModuleDef<Scene, Cfg> = {
   desc: T('数码序列 $\\{P_i\\}$ 按位权 $n^i$ 展开求值：$y=\\sum P_i\\cdot n^i$，逐位累加演示守恒。', 'Expand $\\{P_i\\}$ by $y=\\sum P_i n^i$, accumulating term by term.'),
   tags: ['data-structures'],
   defaultConfig: { base: 2, numeral: '1011' },
-  Controls({ config, onChange }) {
+  Controls({ config, onChange, t }) {
     return (
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-        <label>
-          base <input className="txt" type="number" min={2} max={16} value={config.base} onChange={e => onChange({ ...config, base: Math.max(2, Math.min(16, Number(e.target.value) || 2)) })} style={{ width: 72 }} />
+        <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+          <span>{t(T('进制', 'Base'))}</span>
+          <input className="txt" type="number" min={2} max={16} value={config.base} onChange={e => onChange({ ...config, base: Math.max(2, Math.min(16, Number(e.target.value) || 2)) })} style={{ width: 72 }} />
         </label>
-        <label>
-          numeral <input className="txt" value={config.numeral} onChange={e => onChange({ ...config, numeral: e.target.value })} style={{ width: 130 }} />
+        <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
+          <span>{t(T('数码', 'Numeral'))}</span>
+          <input className="txt" value={config.numeral} onChange={e => onChange({ ...config, numeral: e.target.value })} style={{ width: 130 }} />
         </label>
       </div>
     ) as unknown as never;
@@ -72,7 +73,7 @@ export const expansionModule: ModuleDef<Scene, Cfg> = {
     return (
       <div>
         <div className="digits">
-          {scene.digits.map((d, i) => {
+          {scene.digits.map((d: number, i: number) => {
             const lsbIdx = scene.digits.length - 1 - i;
             const active = scene.highlight === i;
             return (

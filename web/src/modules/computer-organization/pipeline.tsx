@@ -80,7 +80,6 @@ function PrincipleControls({ config, onChange, t }: any) {
   const isZh = t(T("中文", "en")) !== "en";
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-      <span style={{ fontSize: 11, fontWeight: 800, color: "#475569" }}>{isZh ? "指令数" : "INSTR"}</span>
       <input type="range" min={2} max={8} value={config.n} onChange={(e) => onChange({ ...config, n: Number(e.target.value) })} />
       <span style={{ fontFamily: "ui-monospace, monospace", fontWeight: 800, color: "#4338ca" }}>{config.n}</span>
     </div>
@@ -163,7 +162,6 @@ function HazardsControls({ config, onChange, t }: any) {
   const isZh = t(T("中文", "en")) !== "en";
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-      <span style={{ fontSize: 11, fontWeight: 800, color: "#475569" }}>{isZh ? "冒险" : "HAZARD"}</span>
       <select className="txt" value={config.kind} onChange={(e) => onChange({ ...config, kind: e.target.value })} style={{ fontWeight: 700 }}>
         <option value="data">{isZh ? "数据冒险" : "Data"}</option>
         <option value="structural">{isZh ? "结构冒险" : "Structural"}</option>
@@ -226,9 +224,6 @@ function HazardsRender({ config, t }: any) {
           { label: "lw", cells: ["IF", "ID", "EX", "MEM", "WB"] },
           { label: "instr", cells: [null, "IF", "ID", "EX", "MEM", "WB"] },
         ]} />
-        <div style={{ padding: "10px 14px", borderRadius: 10, background: "#fef3c7", border: "1px solid #f59e0b", fontSize: 13, color: "#92400e" }}>
-          {isZh ? "对策: 指令/数据存储器分开(哈佛结构)、加端口、或插入停顿。" : "Fixes: separate I/D memories (Harvard), more ports, or stall."}
-        </div>
       </Panel>
     );
   }
@@ -387,11 +382,6 @@ function LimitRender({ config, t }: any) {
           <div style={{ fontSize: 26, fontWeight: 900, color: "#b45309", fontFamily: "ui-monospace, monospace" }}>{(speedup * 100).toFixed(0)}%</div>
         </div>
       </div>
-      <div style={{ fontSize: 12, color: "#64748b", textAlign: "center", lineHeight: 1.9 }}>
-        {isZh
-          ? "理想 CPI = 1; 实际 CPI = 1 + 停顿。分支越多、预测越差、流水越深, 停顿越大。"
-          : "Ideal CPI = 1; actual = 1 + stalls. More branches / worse prediction / deeper pipeline → more stalls."}
-      </div>
     </Panel>
   );
 }
@@ -411,7 +401,7 @@ const SUB: Record<SubMode, ModuleDef> = {
 };
 
 const MAP: Record<SubMode, ModuleDef> = SUB;
-const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
+export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
   { label: "原理", opts: [
     { v: "principle", zh: "时空图", en: "Space-time" },
     { v: "stages", zh: "五级流水线", en: "5-Stage" },
@@ -447,14 +437,15 @@ export const pipelineModule: ModuleDef<any, Cfg> = {
   tags: ["computer-organization", "pipeline"],
   interactive: true,
   defaultConfig: DEFAULT,
-  Controls({ config, onChange, t }) {
+  Controls({ config, onChange, t, embedded }: any) {
     const isZh = t(T("中文", "en")) !== "en";
     const sub = subKeyOf(config.subMode);
     const active = activeOf(sub) as any;
     const safe = safeCfg(sub, config);
+    if (embedded && !active?.Controls) return null;
     return (
       <div style={{ display: "grid", gap: 8, width: "100%" }}>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
+        {!embedded && <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
           <span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca" }}>{isZh ? "流水线" : "PIPELINE"}</span>
           <select className="txt" value={sub} onChange={(e) => { const key = subKeyOf(e.target.value); const m = activeOf(key) as any; onChange({ ...config, ...((m.defaultConfig as any) ?? {}), subMode: key } as any); }} style={{ minWidth: 200, fontWeight: 700 }}>
             {GROUPS.map((g) => (
@@ -463,7 +454,7 @@ export const pipelineModule: ModuleDef<any, Cfg> = {
               </optgroup>
             ))}
           </select>
-        </div>
+        </div>}
         {active?.Controls && createElement(active.Controls as any, { config: safe as any, onChange: onChange as any, t })}
       </div>
     ) as unknown as never;

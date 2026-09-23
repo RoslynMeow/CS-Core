@@ -3,6 +3,7 @@ import { T } from "../../i18n/lang";
 import type { Frame, ModuleDef } from "../../engine/types";
 import { HwBoard } from "../../lib/hwboard/HwBoard";
 import { ElkBuilder } from "../../lib/hwboard/elk";
+import { MathText } from "../../lib/tex";
 
 // =====================================================================
 // 数字逻辑 · 单模块聚合 · 交互式画布
@@ -25,68 +26,387 @@ type SubMode =
   | "seq";
 
 // =====================================================================
-// 占位子模块: 布尔代数化简 / 卡诺图 / 超前进位加法器
-//   先占位, 后续按 STUB_INFO 规划逐项实现(交互式画布)。
+// 子模块: 布尔代数化简 / 卡诺图 / 超前进位加法器
 // =====================================================================
-type StubMode = "boolalg" | "kmap" | "cla";
+const VAR_NAMES = ["A", "B", "C", "D"];
 
-const STUB_INFO: Record<StubMode, { title: string; en: string; items: { zh: string; en: string }[] }> = {
-  boolalg: {
-    title: "布尔代数化简", en: "Boolean Algebra",
-    items: [
-      { zh: "基本定律: 交换 / 结合 / 分配 / 吸收 / 德·摩根", en: "Laws: commutative / associative / distributive / absorption / De Morgan" },
-      { zh: "真值表 → 标准与或式(SOP) / 全加器布尔式", en: "Truth table → canonical SOP" },
-      { zh: "代数化简: 逐步合并相邻项, 消去冗余变量", en: "Algebraic simplification: absorb adjacent terms" },
+// ---------------------- 布尔代数化简 ----------------------
+const BOOL_EXAMPLES: { zh: string; en: string; steps: { expr: string; law: string }[] }[] = [
+  {
+    zh: "吸收律: A + A·B = A", en: "Absorption: A + A·B = A",
+    steps: [
+      { expr: "A + AB", law: "原式" },
+      { expr: "A(1 + B)", law: "分配律" },
+      { expr: "A \\cdot 1", law: "1 + B = 1 (零一律)" },
+      { expr: "A", law: "A·1 = A (同一律)" },
     ],
   },
-  kmap: {
-    title: "卡诺图", en: "Karnaugh Map",
-    items: [
-      { zh: "格雷码排列行列 (00 / 01 / 11 / 10), 相邻仅一位不同", en: "Gray-code ordering, adjacent cells differ by one bit" },
-      { zh: "1 格分组: 圈 1 / 2 / 4 / 8 个相邻项, 圈越大项越少", en: "Group 1/2/4/8 adjacent cells; larger group → fewer terms" },
-      { zh: "圈可跨边界环绕; 每个 1 至少被一圈覆盖", en: "Wraparound allowed; every 1 must be covered" },
-      { zh: "任意项(don't care)按有利原则取 0/1", en: "Exploit don't-care terms" },
+  {
+    zh: "合并律: A·B + A·B̄ = A", en: "Combine: A·B + A·B̄ = A",
+    steps: [
+      { expr: "AB + A\\overline{B}", law: "原式" },
+      { expr: "A(B + \\overline{B})", law: "分配律" },
+      { expr: "A \\cdot 1", law: "B + B̄ = 1 (互补律)" },
+      { expr: "A", law: "A·1 = A" },
     ],
   },
-  cla: {
-    title: "超前进位加法器", en: "Carry Lookahead Adder",
-    items: [
-      { zh: "进位生成 $G_i=A_iB_i$ / 传播 $P_i=A_i\\oplus B_i$", en: "Generate $G_i=A_iB_i$ / propagate $P_i=A_i\\oplus B_i$" },
-      { zh: "并行展开: $C_{i+1}=G_i+P_iC_i$ 逐层代入, 消除串行进位", en: "Parallel expansion $C_{i+1}=G_i+P_iC_i$" },
-      { zh: "延迟 $O(\\log n)$, 对比行波进位 $O(n)$", en: "Delay $O(\\log n)$ vs ripple $O(n)$" },
+  {
+    zh: "德·摩根: 非(A+B) = Ā·B̄", en: "De Morgan: ¬(A+B) = Ā·B̄",
+    steps: [
+      { expr: "\\overline{A + B}", law: "原式" },
+      { expr: "\\overline{A}\\cdot\\overline{B}", law: "德·摩根定律" },
     ],
   },
-};
+  {
+    zh: "冗余项: AB + AC + BC = AB + AC", en: "Consensus: AB + AC + BC = AB + AC",
+    steps: [
+      { expr: "AB + AC + BC", law: "原式" },
+      { expr: "AB + AC + BC(A + \\overline{A})", law: "A + Ā = 1 (展开冗余项)" },
+      { expr: "AB + AC + ABC + \\overline{A}BC", law: "分配律" },
+      { expr: "AB(1 + C) + AC(1 + B)", law: "重排 + 吸收" },
+      { expr: "AB + AC", law: "1 + C = 1" },
+    ],
+  },
+];
 
-function StubRender({ config, t }: any) {
-  const key = (config?.subMode ?? "boolalg") as StubMode;
-  const info = STUB_INFO[key] ?? STUB_INFO.boolalg;
+function BoolAlgControls({ config, onChange, t }: any) {
   const isZh = t(T("中文", "en")) !== "en";
   return (
-    <div style={{ maxWidth: 720, margin: "28px auto", padding: "22px 26px", border: "1.5px dashed #c7d2fe", borderRadius: 16, background: "#f8faff" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <span style={{ fontSize: 20, fontWeight: 900, color: "#4338ca" }}>{isZh ? info.title : info.en}</span>
-        <span style={{ fontSize: 12, fontWeight: 800, padding: "2px 10px", borderRadius: 999, background: "#fef3c7", color: "#92400e", border: "1px solid #fde68a" }}>{isZh ? "建设中" : "WIP"}</span>
-      </div>
-      <div style={{ fontSize: 13, color: "#64748b", margin: "8px 0 14px" }}>{isZh ? "占位页 — 规划内容如下:" : "Placeholder — planned content:"}</div>
-      <ul style={{ margin: 0, paddingLeft: 20, color: "#334155", fontSize: 13, lineHeight: 2 }}>
-        {info.items.map((it, i) => <li key={i}>{isZh ? it.zh : it.en}</li>)}
-      </ul>
+    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+        <select className="txt" value={config.ex} onChange={(e) => onChange({ ...config, ex: Number(e.target.value) })} style={{ fontWeight: 700, minWidth: 240 }}>
+        {BOOL_EXAMPLES.map((x, i) => <option key={i} value={i}>{isZh ? x.zh : x.en}</option>)}
+      </select>
     </div>
   );
 }
 
-function makeStub(key: StubMode): ModuleDef {
-  const info = STUB_INFO[key];
-  return {
-    id: key,
-    title: T(info.title, info.en),
-    tags: ["computer-organization", "digital-logic"],
-    defaultConfig: {} as unknown as never,
-    generate: () => [{ caption: T(`${info.title}(占位)`, `${info.en} (WIP)`), scene: { subMode: key } }] as never,
-    Render: StubRender as never,
-  } as unknown as ModuleDef;
+function BoolAlgRender({ config, t }: any) {
+  const isZh = t(T("中文", "en")) !== "en";
+  const ex = BOOL_EXAMPLES[config.ex ?? 0] ?? BOOL_EXAMPLES[0];
+  const laws: [string, string][] = isZh
+    ? [["交换律", "A+B = B+A; AB = BA"], ["结合律", "(A+B)+C = A+(B+C); (AB)C = A(BC)"], ["分配律", "A(B+C) = AB+AC"], ["同一律", "A+0 = A; A·1 = A"], ["零一律", "A+1 = 1; A·0 = 0"], ["互补律", "A+Ā = 1; A·Ā = 0"], ["吸收律", "A+AB = A; A(A+B) = A"], ["德·摩根", "非(A+B) = Ā·B̄; 非(AB) = Ā+B̄"]]
+    : [["Commutative", "A+B = B+A; AB = BA"], ["Associative", "(A+B)+C = A+(B+C)"], ["Distributive", "A(B+C) = AB+AC"], ["Identity", "A+0 = A; A·1 = A"], ["Null", "A+1 = 1; A·0 = 0"], ["Complement", "A+Ā = 1; A·Ā = 0"], ["Absorption", "A+AB = A; A(A+B) = A"], ["De Morgan", "¬(A+B) = Ā·B̄; ¬(AB) = Ā+B̄"]];
+  return (
+    <div style={{ maxWidth: 820, margin: "0 auto", display: "grid", gap: 12 }}>
+      <div style={{ display: "grid", gap: 6 }}>
+        {ex.steps.map((s, i) => (
+          <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", borderRadius: 10, background: i === ex.steps.length - 1 ? "#dcfce7" : "#f8fafc", border: `1px solid ${i === ex.steps.length - 1 ? "#16a34a" : "#e2e8f0"}` }}>
+            <span style={{ width: 20, fontSize: 11, color: "#94a3b8", fontWeight: 800 }}>{i + 1}</span>
+            <MathText text={`$${s.expr}$`} />
+            <span style={{ marginLeft: "auto", fontSize: 11, color: i === ex.steps.length - 1 ? "#15803d" : "#64748b", fontWeight: 700 }}>{s.law}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontWeight: 800, color: "#334155", fontSize: 13 }}>{isZh ? "常用定律" : "Common laws"}</div>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, fontFamily: "ui-monospace, monospace", background: "#fff" }}>
+        <tbody>
+          {laws.map(([n, f], i) => (
+            <tr key={n} style={{ background: i % 2 ? "#f8fafc" : "#fff" }}>
+              <td style={{ padding: "5px 10px", fontWeight: 700, color: "#0f172a", borderBottom: "1px solid #f1f5f9", width: 120 }}>{n}</td>
+              <td style={{ padding: "5px 10px", color: "#475569", borderBottom: "1px solid #f1f5f9" }}>{f}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
+
+const BOOLALG_SUB: ModuleDef = {
+  id: "boolalg", title: T("布尔代数化简", "Boolean Algebra"), tags: ["computer-organization", "digital-logic"],
+  defaultConfig: { ex: 0 },
+  Controls: BoolAlgControls as never,
+  generate: (c: any) => [{ caption: T("布尔代数化简", "Boolean algebra"), scene: c }] as never,
+  Render: BoolAlgRender as never,
+} as unknown as ModuleDef;
+
+// ---------------------- 卡诺图 (Quine-McCluskey) ----------------------
+type Cube = { bits: number[]; covers: number[] }; // bits: 0/1/2(=任意/'-')
+function toBits(m: number, n: number): number[] {
+  return Array.from({ length: n }, (_, i) => (m >> (n - 1 - i)) & 1);
+}
+function combine(a: number[], b: number[]): number[] | null {
+  let diff = -1;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] === b[i]) continue;
+    if (a[i] === 2 || b[i] === 2 || diff >= 0) return null;
+    diff = i;
+  }
+  if (diff < 0) return null;
+  const out = a.slice();
+  out[diff] = 2;
+  return out;
+}
+function primeImplicants(ones: number[], dcs: number[], n: number): Cube[] {
+  let cubes: Cube[] = [...new Set([...ones, ...dcs])].sort((a, b) => a - b).map((m) => ({ bits: toBits(m, n), covers: [m] }));
+  const primes: Cube[] = [];
+  while (cubes.length) {
+    const used = new Array(cubes.length).fill(false);
+    const next: Cube[] = [];
+    const seen = new Set<string>();
+    for (let i = 0; i < cubes.length; i++) for (let j = i + 1; j < cubes.length; j++) {
+      const m = combine(cubes[i].bits, cubes[j].bits);
+      if (!m) continue;
+      used[i] = used[j] = true;
+      const key = m.join("");
+      if (!seen.has(key)) {
+        seen.add(key);
+        next.push({ bits: m, covers: [...new Set([...cubes[i].covers, ...cubes[j].covers])].sort((a, b) => a - b) });
+      }
+    }
+    for (let i = 0; i < cubes.length; i++) if (!used[i]) primes.push(cubes[i]);
+    cubes = next;
+  }
+  const uniq = new Map<string, Cube>();
+  for (const p of primes) uniq.set(p.bits.join(""), p);
+  return [...uniq.values()];
+}
+function minimalCover(primes: Cube[], ones: number[]): Cube[] {
+  const chosen: Cube[] = [];
+  const has = (m: number) => chosen.some((p) => p.covers.includes(m));
+  for (const m of ones) {
+    const covering = primes.filter((p) => p.covers.includes(m));
+    if (covering.length === 1 && !has(m)) chosen.push(covering[0]);
+  }
+  while (ones.some((m) => !has(m))) {
+    let best: Cube | null = null; let bestN = 0;
+    for (const p of primes) {
+      const k = p.covers.filter((m) => ones.includes(m) && !has(m)).length;
+      if (k > bestN) { bestN = k; best = p; }
+    }
+    if (!best || bestN === 0) break;
+    chosen.push(best);
+  }
+  return chosen;
+}
+function termLatex(cube: Cube, n: number): string {
+  const parts: string[] = [];
+  for (let i = 0; i < n; i++) { if (cube.bits[i] === 2) continue; parts.push(cube.bits[i] === 1 ? VAR_NAMES[i] : `\\overline{${VAR_NAMES[i]}}`); }
+  return parts.length ? parts.join("") : "1";
+}
+const GRAY2 = [0, 1, 3, 2];
+type AxisCell = { label: string; bits: number[] };
+function kmapLayout(vars: number): { rows: AxisCell[]; cols: AxisCell[]; idx: (r: number, c: number) => number; rowLabel: string; colLabel: string } {
+  const bitsOf = (v: number, len: number) => Array.from({ length: len }, (_, i) => (v >> (len - 1 - i)) & 1);
+  if (vars === 2) {
+    const rows = [0, 1].map((v) => ({ label: `${v}`, bits: [v] }));
+    const cols = [0, 1].map((v) => ({ label: `${v}`, bits: [v] }));
+    return { rows, cols, idx: (r, c) => (rows[r].bits[0] << 1) | cols[c].bits[0], rowLabel: "A", colLabel: "B" };
+  }
+  if (vars === 3) {
+    const rows = [0, 1].map((v) => ({ label: `${v}`, bits: [v] }));
+    const cols = GRAY2.map((v) => ({ label: bitsOf(v, 2).join(""), bits: bitsOf(v, 2) }));
+    return { rows, cols, idx: (r, c) => (rows[r].bits[0] << 2) | (cols[c].bits[0] << 1) | cols[c].bits[1], rowLabel: "A", colLabel: "BC" };
+  }
+  const rows = GRAY2.map((v) => ({ label: bitsOf(v, 2).join(""), bits: bitsOf(v, 2) }));
+  const cols = GRAY2.map((v) => ({ label: bitsOf(v, 2).join(""), bits: bitsOf(v, 2) }));
+  return { rows, cols, idx: (r, c) => (rows[r].bits[0] << 3) | (rows[r].bits[1] << 2) | (cols[c].bits[0] << 1) | cols[c].bits[1], rowLabel: "AB", colLabel: "CD" };
+}
+const GROUP_COLORS = [
+  { bg: "#dcfce7", bd: "#16a34a" }, { bg: "#dbeafe", bd: "#2563eb" }, { bg: "#fef3c7", bd: "#d97706" },
+  { bg: "#fae8ff", bd: "#a21caf" }, { bg: "#ffe4e6", bd: "#e11d48" }, { bg: "#e0e7ff", bd: "#4f46e5" },
+];
+
+function KmapControls({ config, onChange, t }: any) {
+  const isZh = t(T("中文", "en")) !== "en";
+  const setVars = (v: number) => onChange({ ...config, vars: v, ones: [], dcs: [] });
+  const preset = (ones: number[], dcs: number[] = []) => onChange({ ...config, ones, dcs });
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+      <select className="txt" value={config.vars} onChange={(e) => setVars(Number(e.target.value))} style={{ fontWeight: 700 }}>
+        {[2, 3, 4].map((v) => <option key={v} value={v}>{v}</option>)}
+      </select>
+      {config.vars === 3 && (
+        <button className="ghost" onClick={() => preset([3, 5, 6, 7])}>{isZh ? "多数表决 Σ(3,5,6,7)" : "Majority"}</button>
+      )}
+      <button className="ghost" onClick={() => preset([])}>{isZh ? "清空" : "Clear"}</button>
+      <span style={{ fontSize: 11, color: "#94a3b8" }}>{isZh ? "点格子: 0 → 1 → X → 0" : "click: 0 → 1 → X → 0"}</span>
+    </div>
+  );
+}
+
+function KmapRender({ config, onChange, t }: any) {
+  const isZh = t(T("中文", "en")) !== "en";
+  const vars = config.vars ?? 3;
+  const ones: number[] = config.ones ?? [];
+  const dcs: number[] = config.dcs ?? [];
+  const lay = kmapLayout(vars);
+  const primes = primeImplicants(ones, dcs, vars);
+  const cover = minimalCover(primes, ones);
+  const groupOf = (m: number) => cover.findIndex((c) => c.covers.includes(m));
+  const expr = cover.length ? cover.map((c) => termLatex(c, vars)).join(" + ") : (ones.length || dcs.length ? "0" : "0");
+  const cycle = (m: number) => {
+    if (ones.includes(m)) onChange({ ...config, ones: ones.filter((x) => x !== m), dcs: [...dcs, m].sort((a, b) => a - b) });
+    else if (dcs.includes(m)) onChange({ ...config, dcs: dcs.filter((x) => x !== m) });
+    else onChange({ ...config, ones: [...ones, m].sort((a, b) => a - b) });
+  };
+  return (
+    <div style={{ maxWidth: 860, margin: "0 auto", display: "grid", gap: 14 }}>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ borderCollapse: "separate", borderSpacing: 4, margin: "0 auto", fontFamily: "ui-monospace, monospace" }}>
+          <thead>
+            <tr>
+              <th style={{ fontSize: 11, color: "#64748b", padding: 2 }}>{lay.rowLabel} \ {lay.colLabel}</th>
+              {lay.cols.map((c, ci) => <th key={ci} style={{ fontSize: 12, color: "#4338ca", padding: 2 }}>{c.label}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {lay.rows.map((r, ri) => (
+              <tr key={ri}>
+                <th style={{ fontSize: 12, color: "#4338ca", padding: "0 6px" }}>{r.label}</th>
+                {lay.cols.map((_, ci) => {
+                  const m = lay.idx(ri, ci);
+                  const isOne = ones.includes(m);
+                  const isDc = dcs.includes(m);
+                  const gi = groupOf(m);
+                  const col = gi >= 0 ? GROUP_COLORS[gi % GROUP_COLORS.length] : null;
+                  return (
+                    <td key={ci} onClick={() => cycle(m)} style={{
+                      cursor: "pointer", width: 56, height: 48, textAlign: "center", verticalAlign: "middle",
+                      border: `2px solid ${col ? col.bd : isOne ? "#16a34a" : isDc ? "#d97706" : "#e2e8f0"}`,
+                      borderRadius: 8, background: col ? col.bg : isOne ? "#f0fdf4" : isDc ? "#fffbeb" : "#fff",
+                    }}>
+                      <div style={{ fontSize: 10, color: "#94a3b8" }}>{m}</div>
+                      <div style={{ fontSize: 16, fontWeight: 900, color: isOne ? "#15803d" : isDc ? "#b45309" : "#cbd5e1" }}>{isOne ? "1" : isDc ? "X" : "0"}</div>
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ textAlign: "center", fontSize: 15 }}>
+        <span style={{ fontWeight: 800, color: "#334155", marginRight: 8 }}>F =</span>
+        <MathText text={`$${expr}$`} />
+      </div>
+      <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", fontSize: 12, color: "#64748b" }}>
+        <span>{isZh ? "主蕴含项" : "prime implicants"}: <b>{primes.length}</b></span>
+        <span>{isZh ? "选用圈数" : "groups"}: <b>{cover.length}</b></span>
+        {cover.map((c, i) => (
+          <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+            <span style={{ width: 12, height: 12, borderRadius: 3, background: GROUP_COLORS[i % GROUP_COLORS.length].bg, border: `2px solid ${GROUP_COLORS[i % GROUP_COLORS.length].bd}` }} />
+            <MathText text={`$${termLatex(c, vars)}$`} />
+          </span>
+        ))}
+      </div>
+      <div style={{ fontSize: 12, color: "#94a3b8", textAlign: "center" }}>
+        {isZh ? "行列按格雷码排列, 相邻仅 1 位不同, 圈可跨边界环绕; X 为任意项, 可按有利原则当作 0/1。" : "Gray-coded axes; groups may wrap; X = don't care."}
+      </div>
+    </div>
+  );
+}
+
+const KMAP_SUB: ModuleDef = {
+  id: "kmap", title: T("卡诺图", "Karnaugh Map"), tags: ["computer-organization", "digital-logic"],
+  defaultConfig: { vars: 3, ones: [3, 5, 6, 7], dcs: [] },
+  Controls: KmapControls as never,
+  generate: (c: any) => [{ caption: T("卡诺图", "Karnaugh map"), scene: c }] as never,
+  Render: KmapRender as never,
+} as unknown as ModuleDef;
+
+// ---------------------- 超前进位加法器 ----------------------
+const CLA_DEFAULT = { a: 0b1011, b: 0b0110, cin: 0 as 0 | 1, bits: 4 };
+
+function ClaControls({ config, onChange, t }: any) {
+  const isZh = t(T("中文", "en")) !== "en";
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+      <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}><span>A</span>
+        <input className="txt" value={`0b${(config.a & 0b1111).toString(2).padStart(4, "0")}`} onChange={(e) => onChange({ ...config, a: parseInt(e.target.value.replace(/[^01]/g, ""), 2) & 0b1111 || 0 })} style={{ width: 92, fontFamily: "ui-monospace, monospace" }} />
+      </label>
+      <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13 }}><span>B</span>
+        <input className="txt" value={`0b${(config.b & 0b1111).toString(2).padStart(4, "0")}`} onChange={(e) => onChange({ ...config, b: parseInt(e.target.value.replace(/[^01]/g, ""), 2) & 0b1111 || 0 })} style={{ width: 92, fontFamily: "ui-monospace, monospace" }} />
+      </label>
+      <button className="ghost" onClick={() => onChange({ ...config, cin: (config.cin === 1 ? 0 : 1) as 0 | 1 })}>{`C0=${config.cin}`}</button>
+      <span style={{ fontSize: 11, color: "#94a3b8" }}>{isZh ? "点下方 A/B 位也可翻转" : "click bits below"}</span>
+    </div>
+  );
+}
+
+function ClaRender({ config, onChange, t }: any) {
+  const isZh = t(T("中文", "en")) !== "en";
+  const n = 4;
+  const a = config.a & 0b1111;
+  const b = config.b & 0b1111;
+  const gi: number[] = [], pi: number[] = [], ci: number[] = [], si: number[] = [];
+  let carry = config.cin;
+  for (let i = 0; i < n; i++) {
+    const ai = (a >> i) & 1, bi = (b >> i) & 1;
+    const g = ai & bi, p = ai ^ bi;
+    ci.push(carry);
+    si.push(p ^ carry);
+    gi.push(g); pi.push(p);
+    carry = g | (p & carry);
+  }
+  const cout = carry;
+  const toggle = (which: "a" | "b", i: number) => {
+    const cur = (which === "a" ? a : b) ^ (1 << i);
+    onChange({ ...config, [which]: cur & 0b1111 });
+  };
+  const cla: string[] = [];
+  for (let i = 0; i < n; i++) {
+    const terms = [`G_{${i}}`];
+    let prod = `P_{${i}}`;
+    for (let j = i - 1; j >= 0; j--) { prod += `P_{${j}}`; terms.push(prod + (j === 0 ? "C_0" : `G_{${j}}`)); }
+    cla.push(`C_{${i + 1}} = ${terms.join(" + ")}`);
+  }
+  const cell = (v: number, on: boolean, onClick?: () => void, hi = false) => (
+    <td onClick={onClick} style={{ textAlign: "center", width: 34, fontSize: 13, fontFamily: "ui-monospace, monospace", fontWeight: 800, cursor: onClick ? "pointer" : "default", color: hi ? "#b45309" : v ? "#15803d" : "#94a3b8" }}>{v}</td>
+  );
+  const rippleDelay = 2 * n;
+  const claDelay = 2 + Math.ceil(Math.log2(n)) * 2;
+  return (
+    <div style={{ maxWidth: 820, margin: "0 auto", display: "grid", gap: 14 }}>
+      <table style={{ borderCollapse: "collapse", margin: "0 auto", fontSize: 13, background: "#fff", border: "1px solid #e2e8f0" }}>
+        <thead>
+          <tr style={{ background: "#f8fafc", color: "#64748b", fontSize: 11 }}>
+            <th style={{ padding: "4px 8px" }}>i</th><th>3</th><th>2</th><th>1</th><th>0</th>
+          </tr>
+        </thead>
+        <tbody style={{ textAlign: "center" }}>
+          <tr><td style={{ padding: "3px 8px", color: "#475569", fontWeight: 700 }}>A</td>{[3, 2, 1, 0].map((i) => cell((a >> i) & 1, true, () => toggle("a", i)))}</tr>
+          <tr><td style={{ padding: "3px 8px", color: "#475569", fontWeight: 700 }}>B</td>{[3, 2, 1, 0].map((i) => cell((b >> i) & 1, true, () => toggle("b", i)))}</tr>
+          <tr><td style={{ padding: "3px 8px", color: "#6d28d9", fontWeight: 700 }}>G</td>{[3, 2, 1, 0].map((i) => cell(gi[i], true))}</tr>
+          <tr><td style={{ padding: "3px 8px", color: "#0369a1", fontWeight: 700 }}>P</td>{[3, 2, 1, 0].map((i) => cell(pi[i], true))}</tr>
+          <tr><td style={{ padding: "3px 8px", color: "#b45309", fontWeight: 700 }}>C</td>{[3, 2, 1, 0].map((i) => cell(ci[i], true, undefined, true))}</tr>
+          <tr><td style={{ padding: "3px 8px", color: "#0f172a", fontWeight: 700 }}>S</td>{[3, 2, 1, 0].map((i) => cell(si[i], true))}</tr>
+        </tbody>
+      </table>
+      <div style={{ textAlign: "center", fontSize: 14, fontFamily: "ui-monospace, monospace", color: "#1e40af", fontWeight: 800 }}>
+        {`A + B + C0 = ${a} + ${b} + ${config.cin} = ${(a + b + config.cin) & 0b11111}  (S=${si.reverse().join("")} Cout=${cout})`}
+      </div>
+      <div style={{ fontSize: 12, fontWeight: 800, color: "#475569" }}>{isZh ? "进位并行展开 (CLA)" : "Parallel carry expansion (CLA)"}</div>
+      <div style={{ display: "grid", gap: 3 }}>
+        {cla.map((c, i) => (
+          <div key={i} style={{ padding: "4px 10px", borderRadius: 8, background: "#f8fafc", border: "1px solid #e2e8f0", fontSize: 13 }}>
+            <MathText text={`$${c}$`} />
+          </div>
+        ))}
+      </div>
+      <div style={{ display: "grid", gap: 6 }}>
+        <div style={{ fontSize: 12, fontWeight: 800, color: "#475569" }}>{isZh ? "延迟对比 (相对门延迟, 示意)" : "Delay (illustrative)"}</div>
+        {[{ name: isZh ? `行波进位 O(n)` : "Ripple O(n)", v: rippleDelay, c: "#fecaca" }, { name: isZh ? `超前进位 O(log n)` : "CLA O(log n)", v: claDelay, c: "#bbf7d0" }].map((x) => (
+          <div key={x.name} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ width: 140, fontSize: 12, color: "#475569" }}>{x.name}</span>
+            <div style={{ flex: 1, height: 16, background: "#f1f5f9", borderRadius: 8, overflow: "hidden" }}>
+              <div style={{ width: `${(x.v / rippleDelay) * 100}%`, height: "100%", background: x.c }} />
+            </div>
+            <span style={{ width: 24, textAlign: "right", fontSize: 12, fontFamily: "ui-monospace, monospace", color: "#475569" }}>{x.v}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const CLA_SUB: ModuleDef = {
+  id: "cla", title: T("超前进位加法器", "Carry Lookahead"), tags: ["computer-organization", "digital-logic"],
+  defaultConfig: CLA_DEFAULT,
+  Controls: ClaControls as never,
+  generate: (c: any) => [{ caption: T("超前进位加法器", "Carry lookahead"), scene: c }] as never,
+  Render: ClaRender as never,
+} as unknown as ModuleDef;
 
 // ===================== 看板辅助件(HTML) =====================
 /** 真值表(HTML, 排版优于画布内文字) */
@@ -844,9 +1164,9 @@ function sceneOf(sub: SubMode, c: any): any {
 }
 
 const SUB: Record<SubMode, ModuleDef> = {
-  boolalg: makeStub("boolalg"),
-  kmap: makeStub("kmap"),
-  cla: makeStub("cla"),
+  boolalg: BOOLALG_SUB,
+  kmap: KMAP_SUB,
+  cla: CLA_SUB,
   cmos: {
     id: "cmos", title: T("CMOS 元件", "CMOS Devices"), tags: ["computer-organization", "digital-logic"],
     defaultConfig: cmosDefault,
@@ -886,7 +1206,7 @@ const SUB: Record<SubMode, ModuleDef> = {
 };
 
 const MAP: Record<SubMode, ModuleDef> = SUB;
-const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
+export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
   { label: "元件层", opts: [
     { v: "cmos", zh: "CMOS 元件", en: "CMOS" },
     { v: "gates", zh: "门电路", en: "Gates" },
@@ -933,22 +1253,23 @@ export const digitalLogicModule: ModuleDef<any, Cfg> = {
     if (!m.randomize) return safe;
     return { ...safe, ...m.randomize(safe), subMode: safe.subMode };
   },
-  Controls({ config, onChange, t }) {
+  Controls({ config, onChange, t, embedded }: any) {
     const isZh = t(T("中文", "en")) !== "en";
     const sub = subKeyOf(config.subMode);
     const active = activeOf(sub) as any;
     const safe = safeCfg(sub, config);
+    if (embedded && !active?.Controls) return null;
     return (
       <div style={{ display: "grid", gap: 8, width: "100%" }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
-          <span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca" }}>{isZh ? "数字逻辑" : "DIGITAL LOGIC"}</span>
+          {!embedded && <><span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca" }}>{isZh ? "数字逻辑" : "DIGITAL LOGIC"}</span>
           <select className="txt" value={sub} onChange={(e) => { const key = subKeyOf(e.target.value); const m = activeOf(key) as any; onChange({ ...config, ...((m.defaultConfig as any) ?? {}), subMode: key } as any); }} style={{ minWidth: 200, fontWeight: 700 }}>
             {GROUPS.map((g) => (
               <optgroup key={g.label} label={g.label}>
                 {g.opts.map((o) => <option key={o.v} value={o.v}>{isZh ? o.zh : o.en}</option>)}
               </optgroup>
             ))}
-          </select>
+          </select></>}
           {active?.Controls && createElement(active.Controls as any, { config: safe as any, onChange: onChange as any, t })}
         </div>
       </div>
@@ -985,7 +1306,6 @@ function CmosControls({ config, onChange, t }: any) {
   ];
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-      <span style={{ fontSize: 11, fontWeight: 800, color: "#475569" }}>{isZh ? "电路" : "CIRCUIT"}</span>
       <select className="txt" value={config.mode} onChange={(e) => onChange({ ...config, mode: e.target.value as CmosMode })}>
         {modes.map(([v, zh, en]) => <option key={v} value={v}>{isZh ? zh : en}</option>)}
       </select>
@@ -1002,7 +1322,6 @@ function GateControls({ config, onChange, t }: any) {
   ];
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-      <span style={{ fontSize: 11, fontWeight: 800, color: "#475569" }}>{isZh ? "门" : "GATE"}</span>
       <select className="txt" value={config.mode} onChange={(e) => onChange({ ...config, mode: e.target.value as GateMode })}>
         {modes.map(([v, zh, en]) => <option key={v} value={v}>{isZh ? zh : en}</option>)}
       </select>
@@ -1017,7 +1336,6 @@ function AdderControls({ config, onChange, t }: any) {
   ];
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-      <span style={{ fontSize: 11, fontWeight: 800, color: "#475569" }}>{isZh ? "电路" : "CIRCUIT"}</span>
       <select className="txt" value={config.mode} onChange={(e) => onChange({ ...config, mode: e.target.value as AdderMode })}>
         {modes.map(([v, zh, en]) => <option key={v} value={v}>{isZh ? zh : en}</option>)}
       </select>
@@ -1039,7 +1357,6 @@ function MuxControls({ config, onChange, t }: any) {
   ];
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-      <span style={{ fontSize: 11, fontWeight: 800, color: "#475569" }}>{isZh ? "电路" : "CIRCUIT"}</span>
       <select className="txt" value={config.mode} onChange={(e) => onChange({ ...config, mode: e.target.value as MuxMode })}>
         {modes.map(([v, zh, en]) => <option key={v} value={v}>{isZh ? zh : en}</option>)}
       </select>
@@ -1051,7 +1368,6 @@ function AluControls({ config, onChange, t }: any) {
   const isZh = t(T("中文", "en")) !== "en";
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-      <span style={{ fontSize: 11, fontWeight: 800, color: "#475569" }}>{isZh ? "运算" : "OP"}</span>
       <select className="txt" value={config.op} onChange={(e) => onChange({ ...config, op: e.target.value as AluCfg["op"] })}>
         <option value="and">AND (00)</option>
         <option value="or">OR (01)</option>
@@ -1068,7 +1384,6 @@ function SeqControls({ config, onChange, t }: any) {
   ];
   return (
     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-      <span style={{ fontSize: 11, fontWeight: 800, color: "#475569" }}>{isZh ? "电路" : "CIRCUIT"}</span>
       <select className="txt" value={config.mode} onChange={(e) => onChange({ ...config, mode: e.target.value as SeqMode })}>
         {modes.map(([v, zh, en]) => <option key={v} value={v}>{isZh ? zh : en}</option>)}
       </select>

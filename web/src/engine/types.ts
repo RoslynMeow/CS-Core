@@ -23,6 +23,8 @@ export interface ModuleDef<S = unknown, C = unknown> {
     config: C;
     onChange: (c: C) => void;
     t: (x: Text) => string;
+    /** 嵌入独立知识点卡时置 true: 章节级切换器应隐藏, 只留该知识点自身控件 */
+    embedded?: boolean;
   }>;
   randomize?: (c: C) => C;
   generate: (config: C) => FramesOrInfinite<S>;
@@ -56,4 +58,7 @@ export interface ModuleDef<S = unknown, C = unknown> {
   interactive?: boolean;
   /** 门禁：当前配置跑不动本模块时返回原因（展示虚化罩），返回 null 表示可跑 */
   blockedReason?: (config: C) => string | null;
+  /** 首页展示元数据（扁平化后由 registry 注入，非功能字段） */
+  chapter?: Text;
+  subject?: string;
 }

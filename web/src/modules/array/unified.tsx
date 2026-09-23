@@ -29,7 +29,7 @@ const MAP: Record<SubMode, ModuleDef> = {
   "block-search": blockSearchModule as unknown as ModuleDef,
 };
 
-const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
+export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
   { label: "排序", opts: [
     { v: "bubble-sort", zh: "冒泡", en: "Bubble" },
     { v: "selection-sort", zh: "选择", en: "Selection" },
@@ -81,14 +81,15 @@ export const arrayUnifiedModule: ModuleDef<any, Cfg> = {
     const m = activeOf(cfg.subMode) as any;
     return m.onPlayEnd ? m.onPlayEnd(safeCfg(cfg.subMode, cfg)) : null;
   }) as any,
-  Controls({ config, onChange, t }) {
+  Controls({ config, onChange, t, embedded }: any) {
     const isZh = t(T("中文", "en")) !== "en";
     const sub = subKeyOf(config.subMode);
     const active = activeOf(sub) as any;
     const safe = safeCfg(sub, config);
+    if (embedded && !active?.Controls) return null;
     return (
       <div style={{ display: "grid", gap: 8, width: "100%" }}>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
+        {!embedded && <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
           <span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca" }}>数组算法</span>
           <select className="txt" value={sub} onChange={(e) => { const key = subKeyOf(e.target.value); const m = activeOf(key) as any; const d = ((m.defaultConfig as any) ?? {}) as any; const n = Number.isFinite((config as any).n) ? (config as any).n : d.n; const parsed = parseArr(String((config as any).valuesStr ?? "")); const valuesStr = parsed && parsed.length === n ? (config as any).valuesStr : randArray(n).join(","); onChange({ ...config, ...d, n, valuesStr, subMode: key } as any); }} style={{ minWidth: 180, fontWeight: 700 }}>
             {GROUPS.map((g) => (
@@ -98,7 +99,7 @@ export const arrayUnifiedModule: ModuleDef<any, Cfg> = {
             ))}
           </select>
           <span style={{ fontSize: 11, color: "#64748b" }}>{isZh ? "一章覆盖排序与查找" : "sorts & searches"}</span>
-        </div>
+        </div>}
         {active?.Controls && createElement(active.Controls as any, { config: safe as any, onChange: onChange as any, t })}
       </div>
     ) as unknown as never;

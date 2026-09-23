@@ -20,7 +20,7 @@ const HEAP_CODE = [
   T('  $\\text{siftDown}(i,n-1)$ // 下沉到堆尾', '  $\\text{siftDown}(i,n-1)$'),
   T('for $end\\gets n-1$ downto $1$: // 取顶', 'for $end$ downto $1$: extract'),
   T('  $\\text{swap}(A[0],A[end])$; $\\text{siftDown}(0,end-1)$ // 末位就位', '  $\\text{swap}(A[0],A[end])$; $\\text{siftDown}(0,end-1)$'),
-  T('$\\text{done}$ // 堆结构见“树”章节', '$\\text{done}$ // heap: see Tree chapter'),
+  T('return $A$ // 堆结构见“树”章节', 'return $A$ // heap: see Tree chapter'),
 ];
 
 function heapGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
@@ -143,6 +143,7 @@ const COUNT_CODE = [
   T('  $cnt[i]\\gets cnt[i]+cnt[i-1]$', '  $cnt[i]\\gets cnt[i]+cnt[i-1]$'),
   T('for $i\\gets n-1$ downto $0$: // 稳定输出', 'for $i$ downto $0$: output'),
   T('  $out[{--}cnt[A[i]]]\\gets A[i]$', '  $out[{--}cnt[A[i]]]\\gets A[i]$'),
+  T('return $out$', 'return $out$'),
 ];
 
 function countGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
@@ -176,7 +177,7 @@ function countGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
   }
   s.a = out;
   s.done = s.a.map(() => true);
-  frames.push({ line: 5, caption: T(`完成：$A=[${s.a.join(',')}]$，写回 ${s.mov} 次`, `Sorted, ${s.mov} writes`), scene: snap(s, [], cnt) });
+  frames.push({ line: 6, caption: T(`完成：$A=[${s.a.join(',')}]$，写回 ${s.mov} 次`, `Sorted, ${s.mov} writes`), scene: snap(s, [], cnt) });
   return frames;
 }
 
@@ -197,6 +198,7 @@ const RADIX_CODE = [
   T('$d\\gets0,1,\\dots$ // 从个位到最高位', '$d\\gets0,1,\\dots$ // LSD to MSD'),
   T('  $distribute(A,d)\\to B[0..9]$ // 按第$d$位稳定分桶', '  $distribute(A,d)\\to B[0..9]$'),
   T('  $A\\gets concat(B[0..9])$ // 按桶号收回', '  $A\\gets concat(B[0..9])$'),
+  T('return $A$', 'return $A$'),
 ];
 
 function radixGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
@@ -230,7 +232,7 @@ function radixGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
     }
   }
   s.done = s.a.map(() => true);
-  frames.push({ line: 0, caption: T(`完成：$A=[${s.a.join(',')}]$，写回 ${s.mov} 次`, `Sorted, ${s.mov} writes`), scene: snap(s, []) });
+  frames.push({ line: 3, caption: T(`完成：$A=[${s.a.join(',')}]$，写回 ${s.mov} 次`, `Sorted, ${s.mov} writes`), scene: snap(s, []) });
   return frames;
 }
 
@@ -251,6 +253,7 @@ const BUCKET_CODE = [
   T('$b(x)\\gets\\lfloor x\\cdot B/(max+1)\\rfloor$ // 按值域分桶', '$b(x)\\gets\\lfloor x\\cdot B/(max+1)\\rfloor$'),
   T('  $\\text{InsertionSort}(B[b])$ // 桶内排序', '  $\\text{InsertionSort}(B[b])$'),
   T('$A\\gets concat(B)$ // 按桶拼接', '$A\\gets concat(B)$'),
+  T('return $A$', 'return $A$'),
 ];
 
 function bucketGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
@@ -283,7 +286,7 @@ function bucketGen(cfg: ArrayCfg): Frame<ArrayScene>[] {
     }
   }
   s.done = s.a.map(() => true);
-  frames.push({ line: 0, caption: T(`完成：$A=[${s.a.join(',')}]$`, `Sorted`), scene: snap(s, []) });
+  frames.push({ line: 3, caption: T(`完成：$A=[${s.a.join(',')}]$`, `Sorted`), scene: snap(s, []) });
   return frames;
 }
 
