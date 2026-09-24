@@ -1,6 +1,7 @@
 import { T } from '../../i18n/lang';
 import type { Frame, ModuleDef } from '../../engine/types';
 import { MathText } from '../../lib/tex';
+import { DigitRows } from './glyphs';
 
 type Cfg = { base: number; a: string; b: string };
 type Scene = { aDigits: number[]; bDigits: number[]; res: number[]; i: number | null; carry: number };
@@ -80,13 +81,14 @@ export const additionModule: ModuleDef<Scene, Cfg> = {
     frames.push({ line: 7, caption: T(`return $R$：和为 $${res.slice().reverse().join('')}$`, `return $R$ = ${res.slice().reverse().join('')}`), scene: scene(null) });
     return frames;
   },
-  Render({ scene: _scene }) {
+  Render({ scene: _scene, config }) {
     const scene = (_scene as any) ?? {};
     scene.aDigits = scene.aDigits ?? [];
     scene.bDigits = scene.bDigits ?? [];
     scene.res = scene.res ?? [];
     scene.carry = scene.carry ?? 0;
     scene.i = scene.i ?? null;
+    const base = (config as any)?.base ?? 10;
     const cols = Math.max(scene.aDigits.length, scene.bDigits.length, scene.res.length || 0);
     const pad = (arr: number[]) => {
       const cp = [...arr];
@@ -124,6 +126,11 @@ export const additionModule: ModuleDef<Scene, Cfg> = {
               {v}
             </div>
           ))}
+        </div>
+        <div style={{ display: 'grid', gap: 4, justifyItems: 'center', marginTop: 8 }}>
+          <DigitRows digits={A} base={base} highlight={scene.i !== null ? cols - 1 - scene.i : null} only="custom" />
+          <DigitRows digits={B} base={base} highlight={scene.i !== null ? cols - 1 - scene.i : null} only="custom" />
+          {scene.res.length > 0 && <DigitRows digits={R} base={base} highlight={scene.i !== null ? cols - 1 - scene.i : null} only="custom" />}
         </div>
         <div style={{ textAlign: 'center', fontSize: 12, color: '#64748b', marginTop: 6 }}>
           <MathText text={`进位 $c$ = ${scene.carry}`} />

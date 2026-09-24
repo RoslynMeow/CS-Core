@@ -177,7 +177,6 @@ export const matrixModule: ModuleDef<Scene, Cfg> = {
     return (
       <div style={{ display: 'grid', gap: 8, width: '100%' }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 12, background: '#eef2ff', border: '1px solid #c7d2fe', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11, fontWeight: 800, color: '#4338ca' }}>{isZh ? '模式' : 'MODE'}</span>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('元素', 'Elem'))}</span><select className="txt" value={draft.elemType} disabled={draft.inited} onChange={e => set({ elemType: e.target.value as ElemType })}><option value="i32">i32 (4B)</option><option value="i16">i16 (2B)</option><option value="u8">u8 (1B)</option></select></label>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>Endian</span><select className="txt" value={draft.endian} onChange={e => set({ endian: e.target.value as any })}><option value="little">little</option><option value="big">big</option></select></label>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>行 R</span><input className="txt" type="number" min={1} max={8} value={draft.rows} disabled={draft.inited} onChange={e => { const v = Math.max(1, Math.min(8, Number(e.target.value) || 3)); set({ rows: v }); onChange({ ...draft, rows: v, op: 'idle' as Op, execTick: 0 }); }} style={{ width: 52 }} /></label>
@@ -188,9 +187,6 @@ export const matrixModule: ModuleDef<Scene, Cfg> = {
           </select></label>
           {!draft.inited && <button className="pill active" onClick={init}>{t(T('初始化', 'Init'))}</button>}
           <button className="ghost" onClick={clearAll}>{t(T('清空', 'Clear'))}</button>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0', flexWrap: 'wrap', opacity: draft.inited ? 1 : 0.5, pointerEvents: draft.inited ? 'auto' : 'none' }}>
-          <span style={{ fontSize: 11, fontWeight: 800, color: '#475569' }}>{isZh ? '参数' : 'PARAMS'}</span>
           <button className="ghost" onClick={() => onChange(matrixModule.randomize!(draft))}>↻ {t(T('重新生成', 'Regenerate'))}</button>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('操作', 'Op'))}</span><select className="txt" value={draft.op} onChange={e => set({ op: e.target.value as Op })}>
             <option value="idle">{t(T('— 选择操作 —', '— pick —'))}</option><option value="get">{t(T('访问', 'Get'))}</option><option value="set">{t(T('写入', 'Set'))}</option>

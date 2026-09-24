@@ -191,7 +191,6 @@ export const queueModule: ModuleDef<Scene, Cfg> = {
     return (
       <div style={{ display: 'grid', gap: 8, width: '100%' }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 12, background: '#eef2ff', border: '1px solid #c7d2fe', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11, fontWeight: 800, color: '#4338ca' }}>{isZh ? '模式' : 'MODE'}</span>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('实现', 'Impl'))}</span><select className="txt" value={draft.impl} onChange={e => set({ impl: e.target.value as Impl })}>
             <option value="array">{t(T('循环队列', 'Array'))}</option><option value="linked">{t(T('链式队列', 'Linked'))}</option>
           </select></label>
@@ -200,9 +199,6 @@ export const queueModule: ModuleDef<Scene, Cfg> = {
           {draft.impl === 'array' && <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('容量', 'Cap'))}</span><input className="txt" type="number" min={2} max={16} value={draft.capacity} disabled={draft.inited} onChange={e => set({ capacity: Math.max(2, Math.min(16, Number(e.target.value) || 6)) })} style={{ width: 52 }} /></label>}
           {needInit && <button className="pill active" onClick={init}>{t(T('初始化', 'Init'))}</button>}
           <button className="ghost" onClick={clearAll}>{t(T('清空', 'Clear'))}</button>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0', flexWrap: 'wrap', opacity: needInit ? 0.5 : 1, pointerEvents: needInit ? 'none' : 'auto' }}>
-          <span style={{ fontSize: 11, fontWeight: 800, color: '#475569' }}>{isZh ? '参数' : 'PARAMS'}</span>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}><span>{t(T('操作', 'Op'))}</span><select className="txt" value={draft.op} onChange={e => set({ op: e.target.value as Op })}>
             <option value="idle">{t(T('— 选择操作 —', '— pick —'))}</option><option value="enqueue">{t(T('入队 Enqueue', 'Enqueue'))}</option><option value="dequeue">{t(T('出队 Dequeue', 'Dequeue'))}</option><option value="peek">{t(T('读队首 Peek', 'Peek'))}</option>
           </select></label>

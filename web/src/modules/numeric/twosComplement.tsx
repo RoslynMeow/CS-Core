@@ -113,7 +113,6 @@ export const twosComplementModule: ModuleDef<Scene, Cfg> = {
     return (
       <div style={{ display: 'grid', gap: 8, width: '100%' }}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 12, background: '#eef2ff', border: '1px solid #c7d2fe', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11, fontWeight: 800, color: '#4338ca' }}>{isZh ? '模式' : 'MODE'}</span>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
             <span><MathText text="$n$" /></span>
             <input className="txt" type="number" min={2} max={16} value={config.width} onChange={e => {
@@ -124,9 +123,6 @@ export const twosComplementModule: ModuleDef<Scene, Cfg> = {
             }} style={{ width: 64 }} />
             <span style={{ fontSize: 11, color: '#64748b' }}>位</span>
           </label>
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 11, fontWeight: 800, color: '#475569' }}>{isZh ? '参数' : 'PARAMS'}</span>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
             <span><MathText text="$b$" /></span>
             <input className="txt" value={config.bits} onChange={e => onChange({ ...config, bits: e.target.value.replace(/[^01]/g, '') })} style={{ width: 140, fontFamily: 'ui-monospace, monospace' }} />

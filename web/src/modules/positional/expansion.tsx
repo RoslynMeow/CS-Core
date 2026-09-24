@@ -1,6 +1,7 @@
 import { T } from '../../i18n/lang';
 import type { ModuleDef, Frame } from '../../engine/types';
 import { MathText } from '../../lib/tex';
+import { DigitRows } from './glyphs';
 
 type Cfg = { base: number; numeral: string };
 type Scene = { base: number; digits: number[]; value: number; highlight: number | null; partials: number[] };
@@ -89,6 +90,7 @@ export const expansionModule: ModuleDef<Scene, Cfg> = {
             );
           })}
         </div>
+        <DigitRows digits={scene.digits} base={scene.base} highlight={scene.highlight} only="custom" />
         <div style={{ textAlign: 'center', marginTop: 10, fontSize: 13 }}>
           <MathText text={`$y$ = ${scene.value}`} />
           {scene.partials.length > 0 && <span style={{ marginLeft: 8, color: '#64748b' }}>({scene.partials.join(' + ')})</span>}

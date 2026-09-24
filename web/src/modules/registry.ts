@@ -57,28 +57,29 @@ const CHAPTERS: Chapter[] = [
 // 默认 subMode 设为该子卡; 章节内下拉仍可切换(就地导航)。
 function wrapCard(module: ModuleDef, o: Opt, subject: SubjectKey): ModuleDef {
   const chapter = module as any;
+  const force = (c: any) => ({ ...(c ?? {}), subMode: o.v });
   return {
     id: `${module.id}/${o.v}`,
     title: T(o.zh, o.en),
     desc: module.desc,
     tags: module.tags,
     interactive: module.interactive,
-    persistExclude: module.persistExclude,
+    persistExclude: [...(module.persistExclude ?? []), "subMode"],
     chapter: module.title,
     subject,
     defaultConfig: { ...(chapter.defaultConfig ?? {}), subMode: o.v },
     Controls: (module.Controls
-      ? ((props: any) => createElement(module.Controls as any, { ...props, embedded: true }))
+      ? ((props: any) => createElement(module.Controls as any, { ...props, config: force(props.config), embedded: true }))
       : undefined) as any,
     Side: (module.Side
-      ? ((props: any) => createElement(module.Side as any, props))
+      ? ((props: any) => createElement(module.Side as any, { ...props, config: force(props.config) }))
       : undefined) as any,
     randomize: (module.randomize as any),
-    generate: (c: any) => chapter.generate(c),
-    codeFor: (module.codeFor ? ((c: any) => chapter.codeFor(c)) : undefined) as any,
-    onPlayEnd: (module.onPlayEnd ? ((c: any) => chapter.onPlayEnd(c)) : undefined) as any,
-    blockedReason: (module.blockedReason ? ((c: any) => chapter.blockedReason(c)) : undefined) as any,
-    Render: (props: any) => createElement(module.Render as any, props),
+    generate: (c: any) => chapter.generate(force(c)),
+    codeFor: (module.codeFor ? ((c: any) => chapter.codeFor(force(c))) : undefined) as any,
+    onPlayEnd: (module.onPlayEnd ? ((c: any) => chapter.onPlayEnd(force(c))) : undefined) as any,
+    blockedReason: (module.blockedReason ? ((c: any) => chapter.blockedReason(force(c))) : undefined) as any,
+    Render: (props: any) => createElement(module.Render as any, { ...props, config: force(props.config) }),
   } as unknown as ModuleDef;
 }
 

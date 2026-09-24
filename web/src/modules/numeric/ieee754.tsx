@@ -641,9 +641,6 @@ export const ieee754Module: ModuleDef<Scene, Cfg> = {
             flexWrap: "wrap",
           }}
         >
-          <span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca" }}>
-            {isZh ? "模式" : "MODE"}
-          </span>
           <label
             style={{
               display: "flex",
@@ -737,22 +734,6 @@ export const ieee754Module: ModuleDef<Scene, Cfg> = {
               ))}
             </select>
           </label>
-        </div>
-        <div
-          style={{
-            display: "flex",
-            gap: 8,
-            alignItems: "center",
-            padding: "8px 10px",
-            borderRadius: 12,
-            background: "#f8fafc",
-            border: "1px solid #e2e8f0",
-            flexWrap: "wrap",
-          }}
-        >
-          <span style={{ fontSize: 11, fontWeight: 800, color: "#475569" }}>
-            {isZh ? "参数" : "PARAMS"}
-          </span>
           {config.mode === "encode" ? (
             <label
               style={{

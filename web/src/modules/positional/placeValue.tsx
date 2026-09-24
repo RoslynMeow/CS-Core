@@ -1,6 +1,7 @@
 import { T } from '../../i18n/lang';
 import type { Frame, ModuleDef } from '../../engine/types';
 import { MathText } from '../../lib/tex';
+import { DigitRows } from './glyphs';
 
 // 位权 (Place Value): 同一数码在不同位置, 权不同 n^i, 贡献 P_i·n^i
 type Cfg = { base: number; numeral: string };
@@ -96,6 +97,7 @@ export const placeValueModule: ModuleDef<Scene, Cfg> = {
             );
           })}
         </div>
+        <DigitRows digits={s.digits} base={s.base} highlight={0} only="custom" />
         <table style={{ margin: '0 auto', borderCollapse: 'collapse', fontSize: 13, background: '#fff', border: '1px solid #e2e8f0' }}>
           <thead>
             <tr style={{ background: '#f8fafc', color: '#64748b', fontSize: 11 }}>

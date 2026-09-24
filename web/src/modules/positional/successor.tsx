@@ -1,5 +1,6 @@
 import { T } from '../../i18n/lang';
 import type { Frame, ModuleDef } from '../../engine/types';
+import { DigitRows } from './glyphs';
 
 type Cfg = { base: number; numeral: string };
 type Scene = { digits: number[]; i: number | null; carry: boolean };
@@ -69,12 +70,14 @@ export const successorModule: ModuleDef<Scene, Cfg> = {
     frames.push({ line: 5, caption: T(`return $P$：后继为 $${trim(p).join('')}$`, `return $P$ = ${trim(p).join('')}`), scene: { digits: trim(p), i: null, carry: false } });
     return frames;
   },
-  Render({ scene: _scene }) {
+  Render({ scene: _scene, config }) {
     const scene = (_scene as any) ?? {};
     scene.digits = scene.digits ?? [];
     scene.i = scene.i ?? null;
     scene.carry = scene.carry ?? false;
+    const base = (config as any)?.base ?? 10;
     return (
+      <div style={{ display: 'grid', gap: 8 }}>
       <div className="digits">
         {scene.digits.map((d: number, idx: number) => {
           const lsb = scene.digits.length - 1 - idx;
@@ -86,6 +89,8 @@ export const successorModule: ModuleDef<Scene, Cfg> = {
             </div>
           );
         })}
+      </div>
+      <DigitRows digits={scene.digits} base={base} highlight={scene.i !== null ? scene.digits.length - 1 - scene.i : null} only="custom" />
       </div>
     ) as unknown as never;
   },
