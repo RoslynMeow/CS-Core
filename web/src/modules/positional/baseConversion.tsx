@@ -23,7 +23,13 @@ type Scene = {
 };
 
 const POOL = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-function charToVal(ch: string): number { return POOL.indexOf(ch.toUpperCase()); }
+function charToVal(ch: string, base: number): number {
+  const alpha = defaultAlphabet(base);
+  let idx = alpha.indexOf(ch);
+  if (idx < 0) idx = alpha.indexOf(ch.toUpperCase());
+  if (idx < 0) idx = alpha.indexOf(ch.toLowerCase());
+  return idx;
+}
 function valToChar(v: number): string { return POOL[v] ?? '?'; }
 function valToGlyph(v: number, base: number): string { return (defaultAlphabet(base)[v] ?? valToChar(v)); }
 
@@ -40,13 +46,13 @@ function parseNumeral(s: string, base: number): Parsed | null {
   // validate int
   const intDigits: number[] = [];
   for (const ch of intStr) {
-    const v = charToVal(ch);
+    const v = charToVal(ch, base);
     if (v < 0 || v >= base) return null;
     intDigits.push(v);
   }
   const fracDigits: number[] = [];
   for (const ch of fracStr) {
-    const v = charToVal(ch);
+    const v = charToVal(ch, base);
     if (v < 0 || v >= base) return null;
     fracDigits.push(v);
   }
@@ -88,7 +94,7 @@ const CODE: Record<Mode, ReturnType<NonNullable<ModuleDef['codeFor']>>> = {
   ] as never,
 };
 
-function digitsToString(d: number[]): string { return d.map(valToChar).join(''); }
+function digitsToString(d: number[], base: number): string { return d.map((v) => valToGlyph(v, base)).join(''); }
 const EPS = 1e-12;
 const MAX_FRAC = 12;
 
@@ -133,7 +139,7 @@ function generateByMode(cfg: Cfg): Frame<Scene>[] {
       frames.push({ line: 4, caption: T(`$y_${k + 1}=\\lfloor${yk}/${cfg.toBase}\\rfloor=${nxt}$`, `$y_${k + 1}=\\lfloor${yk}/${cfg.toBase}\\rfloor=${nxt}$`), scene: baseScene({ y, toInt: [...q].reverse(), phase: 'int', step: k, rem: rk, yk: nxt }) });
       yk = nxt; k++;
     }
-    const out = digitsToString([...q].reverse());
+    const out = digitsToString([...q].reverse(), cfg.toBase);
     frames.push({ line: 5, caption: T(`完成：$(${intStr})_{${cfg.fromBase}} = (${out})_{${cfg.toBase}}$`, `Done: $(${intStr})_{${cfg.fromBase}} = (${out})_{${cfg.toBase}}$`), scene: baseScene({ y, toInt: [...q].reverse(), phase: 'done', step: k - 1, yk: 0 }) });
     return frames;
   }
@@ -161,7 +167,7 @@ function generateByMode(cfg: Cfg): Frame<Scene>[] {
       yj = nxtClamped; j--;
     }
     truncated = yj > EPS;
-    const out = digitsToString(q);
+    const out = digitsToString(q, cfg.toBase);
     const tail = truncated ? '\\dots' : '';
     frames.push({ line: 5, caption: truncated ? T(`截断：$(0.${fracStr})_{${cfg.fromBase}} \\approx (0.${out}${tail})_{${cfg.toBase}}$ 已达 ${MAX_FRAC} 位`, `Truncated: $(0.${fracStr})\\approx(0.${out}\\dots)_{${cfg.toBase}}$`) : T(`完成：$(0.${fracStr})_{${cfg.fromBase}} = (0.${out})_{${cfg.toBase}}$`, `Done: $(0.${fracStr})=(0.${out})$`), scene: baseScene({ y, toFrac: [...q], phase: 'done', truncated, yk: yj }) });
     return frames;
@@ -188,7 +194,7 @@ function generateByMode(cfg: Cfg): Frame<Scene>[] {
   if (qInt.length === 0) qInt.push(0);
   // if no fractional part, finish integer only but still need to show frac empty path
   if (fracVal < EPS) {
-    const outInt = digitsToString([...qInt].reverse());
+    const outInt = digitsToString([...qInt].reverse(), cfg.toBase);
     frames.push({ line: 5, caption: T(`小数 $y_{-1}=0$ 跳过`, `No frac`), scene: baseScene({ y, toInt: [...qInt].reverse(), toFrac: [], phase: 'done', yk: 0 }) });
     frames.push({ line: 9, caption: T(`完成：$(${intStr}${dot})_{${cfg.fromBase}} = (${outInt})_{${cfg.toBase}}$`, `Done: $(${intStr}) = (${outInt})$`), scene: baseScene({ y, toInt: [...qInt].reverse(), toFrac: [], phase: 'done', yk: 0 }) });
     return frames;
@@ -208,8 +214,8 @@ function generateByMode(cfg: Cfg): Frame<Scene>[] {
     yj = nxtClamped; j--;
   }
   const truncated = yj > EPS;
-  const outInt2 = digitsToString([...qInt].reverse());
-  const outFrac2 = digitsToString(qFrac);
+  const outInt2 = digitsToString([...qInt].reverse(), cfg.toBase);
+  const outFrac2 = digitsToString(qFrac, cfg.toBase);
   const outFull = `${outInt2}.${outFrac2}${truncated ? '\\dots' : ''}`;
   frames.push({ line: 9, caption: truncated ? T(`截断 ${MAX_FRAC} 位：$(${cfg.numeral})_{${cfg.fromBase}} \\approx (${outFull})_{${cfg.toBase}}$`, `Truncated: $(${cfg.numeral})\\approx(${outFull})$`) : T(`完成：$(${cfg.numeral})_{${cfg.fromBase}} = (${outFull})_{${cfg.toBase}}$ 守恒 $\\sum Q_j m^j = ${y}$`, `Done: $(${cfg.numeral}) = (${outFull})$`), scene: baseScene({ y, toInt: [...qInt].reverse(), toFrac: [...qFrac], phase: 'done', truncated, yk: yj }) });
   return frames;
@@ -246,11 +252,11 @@ export const baseConversionModule: ModuleDef<Scene, Cfg> = {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 10px', borderRadius: 12, background: '#eef2ff', border: '1px solid #c7d2fe', flexWrap: 'wrap' }}>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
             <span><MathText text="$n$" /></span>
-            <input className="txt" type="number" min={2} max={36} value={config.fromBase} onChange={e => onChange({ ...config, fromBase: Math.max(2, Math.min(36, Number(e.target.value) || 10)) })} style={{ width: 64 }} />
+            <input className="txt" type="number" min={2} max={64} value={config.fromBase} onChange={e => onChange({ ...config, fromBase: Math.max(2, Math.min(64, Number(e.target.value) || 10)) })} style={{ width: 80 }} />
           </label>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
             <span><MathText text="$m$" /></span>
-            <input className="txt" type="number" min={2} max={36} value={config.toBase} onChange={e => onChange({ ...config, toBase: Math.max(2, Math.min(36, Number(e.target.value) || 2)) })} style={{ width: 64 }} />
+            <input className="txt" type="number" min={2} max={64} value={config.toBase} onChange={e => onChange({ ...config, toBase: Math.max(2, Math.min(64, Number(e.target.value) || 2)) })} style={{ width: 80 }} />
           </label>
           <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
             <span>{t(T('模式', 'Mode'))}</span>
@@ -368,7 +374,7 @@ export const baseConversionModule: ModuleDef<Scene, Cfg> = {
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', fontSize: 12, color: '#64748b' }}>
           <span><MathText text={`$y=${yText}$`} /></span>
           <span><MathText text={`$y_k=${ykText}$`} /></span>
-          {scene.rem !== null && <span><MathText text={`余/取整 $Q$ = ${valToChar(scene.rem)}`} /></span>}
+          {scene.rem !== null && <span><MathText text={`余/取整 $Q$ = ${valToGlyph(scene.rem, scene.toBase)}`} /></span>}
           {scene.truncated && <span style={{ color: '#f59e0b' }}>已达 {MAX_FRAC} 位截断（无限小数）</span>}
         </div>
         <div style={{ textAlign: 'center', fontSize: 11, color: '#94a3b8' }}>

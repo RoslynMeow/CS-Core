@@ -28,7 +28,7 @@ function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
   );
 }
 function Panel({ children }: { children: React.ReactNode }) {
-  return <div style={{ maxWidth: 900, margin: "0 auto", display: "grid", gap: 12 }}>{children}</div>;
+  return <div style={{ maxWidth: "100%", margin: "0 auto", display: "grid", gap: 12 }}>{children}</div>;
 }
 const hx = (n: number, w = 8) => `0x${(n >>> 0).toString(16).toUpperCase().padStart(w, "0")}`;
 const bits = (n: number, w: number) => (n >>> 0).toString(2).padStart(w, "0");

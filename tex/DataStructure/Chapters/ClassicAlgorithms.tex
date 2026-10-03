@@ -1,6 +1,16 @@
+\clearpage
+\begingroup
+\let\clearpage\relax
+\let\cleardoublepage\relax
+\vspace*{\fill}
 \chapter{动态经典算法与核心算子}
-
+\begin{center}
 本章探讨从静态结构向动态算子的演进，涵盖算法设计范式、排序、查找以及高级图论算法。
+\end{center}
+\vspace*{\fill}
+\endgroup
+\clearpage
+
 
 \section{顶层设计范式}
 
@@ -9,6 +19,25 @@
     \item \textbf{对象}：规模 $n$ 的问题 $P$ 划分为 $a$ 个规模 $n/b$ 的子问题。
     \item \textbf{递推}：$T(n)=aT(n/b)+f(n)$，由主定理决定渐进阶。
 \end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    bx/.style={draw, rounded corners, minimum width=1.5cm, minimum height=0.6cm, font=\small},
+    e/.style={draw, thick},
+    lbl/.style={font=\small}
+]
+    \node[bx] (r) at (0,0) {$T(n)$};
+    \node[bx] (a) at (-2.6,-1.1) {$T(n/b)$};
+    \node[bx] (mid) at (0,-1.1) {$\cdots$};
+    \node[bx] (c) at (2.6,-1.1) {$T(n/b)$};
+    \draw[e] (r)--(a); \draw[e] (r)--(mid); \draw[e] (r)--(c);
+    \node[lbl] at (0,-1.95) {$a$ 个规模 $n/b$ 的子问题，每层代价 $f(n)$};
+    \node[lbl] at (0,-2.55) {层数 $\log_b n$ $\Rightarrow$ $T(n)=aT(n/b)+f(n)$};
+\end{tikzpicture}
+\caption{分治递归树（主定理的直观解释）}
+\label{fig:divide_conquer_tree}
+\end{figure}
 
 \subsection{贪心算法 (Greedy)}
 每步取局部最优 $s_i=\arg\max_{x\in C}\mathcal{F}(x)$。全局最优需：
@@ -53,6 +82,28 @@
 \end{algorithmic}
 \end{algorithm}
 
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    cell/.style={draw, minimum size=0.65cm, font=\small},
+    e/.style={->, >=latex, thick, red},
+    lbl/.style={font=\small}
+]
+    \matrix (m) [matrix of nodes, nodes={cell}, column sep=-\pgflinewidth, row sep=-\pgflinewidth] {
+         & B & D & C \\
+        A & 0 & 0 & 0 \\
+        B & 1 & 1 & 1 \\
+        C & 1 & 1 & 2 \\
+    };
+    \draw[e] (m-4-4.center) to[out=-135,in=45] (m-3-3.center);
+    \draw[e] (m-3-3.center) -- (m-3-2.center);
+    \draw[e] (m-3-2.center) to[out=-135,in=45] (m-2-1.center);
+    \node[lbl] at (0,-1.8) {对角线=字符匹配（$+1$），否则取上/左最大；回溯路径即 LCS};
+\end{tikzpicture}
+\caption{LCS 动态规划填表与回溯路径（$X=ABC,\ Y=BDC$，LCS $=BC$）}
+\label{fig:lcs_dp_table}
+\end{figure}
+
 \newpage
 
 \section{排序算法算子 (Sort)}
@@ -86,6 +137,28 @@
 \EndProcedure
 \end{algorithmic}
 \end{algorithm}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    cell/.style={draw, minimum width=0.8cm, minimum height=0.7cm, font=\small},
+    pv/.style={draw, minimum width=0.8cm, minimum height=0.7cm, font=\small, fill=red!25},
+    le/.style={draw, minimum width=0.8cm, minimum height=0.7cm, font=\small, fill=green!15},
+    gt/.style={draw, minimum width=0.8cm, minimum height=0.7cm, font=\small, fill=blue!15},
+    lbl/.style={font=\small}
+]
+    \matrix (a) [matrix of nodes, nodes={cell}, column sep=-\pgflinewidth, row sep=0] at (0,0) {3 & 7 & 1 & 5 & 9 & 2 & 8 & 6 \\};
+    \node[lbl] at (0,0.85) {原始 $A$（末元素 $6$ 为基准）};
+    \node[le] (b1) at (-2.4,-2.0) {3}; \node[le] (b2) at (-1.6,-2.0) {1};
+    \node[le] (b3) at (-0.8,-2.0) {5}; \node[le] (b4) at (0.0,-2.0) {2};
+    \node[pv] (p) at (0.8,-2.0) {6};
+    \node[gt] (b5) at (1.6,-2.0) {7}; \node[gt] (b6) at (2.4,-2.0) {9};
+    \node[gt] (b7) at (3.2,-2.0) {8};
+    \node[lbl] at (0.4,-2.85) {绿 $\{x\le p\}$｜红 $p$｜蓝 $\{x>p\}$};
+\end{tikzpicture}
+\caption{快速排序的基准划分（Partition）}
+\label{fig:quicksort_partition}
+\end{figure}
 
 \subsection{非比较类排序}
 \begin{enumerate}
@@ -183,6 +256,48 @@
 \end{algorithmic}
 \end{algorithm}
 
+\subsection{插值查找 (Interpolation Search)}
+\begin{itemize}
+    \item \textbf{对象}：有序且近似均匀分布的数组 $A$，按值的比例估计目标位置。
+    \item \textbf{不变式}：$m=l+\left\lfloor\dfrac{x-A[l]}{A[r]-A[l]}(r-l)\right\rfloor$，据 $A[m]$ 与 $x$ 的比较收缩区间。
+    \item \textbf{定理}：均匀分布下期望时间 $O(\log\log n)$；分布偏斜时退化至 $O(n)$。需 $A[r]\neq A[l]$ 以防除零。
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{插值查找规约}
+\begin{algorithmic}[1]
+\Procedure{InterpolationSearch}{$A,x$}
+    \State $l\gets0; r\gets|A|-1$
+    \While{$l\le r\land A[l]\le x\le A[r]$}
+        \If{$A[r]=A[l]$} \State $m\gets l$ \Else $m\gets l+\lfloor (x-A[l])(r-l)/(A[r]-A[l])\rfloor$ \EndIf
+        \If{$A[m]=x$} \Return $m$ \ElsIf{$A[m]<x$} $l\gets m+1$ \Else $r\gets m-1$ \EndIf
+    \EndWhile
+    \State \Return $-1$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{分块查找 (Block Search)}
+\begin{itemize}
+    \item \textbf{对象}：数组分块，块内无序、块间有序；对每块取关键字上界建索引表。
+    \item \textbf{操作}：先对索引表块间定位（顺序或二分），再在目标块内顺序查找。
+    \item \textbf{定理}：设块数 $b$、块长 $s$、$n=bs$，平均查找长度 $\text{ASL}\approx\dfrac{b+1}{2}+\dfrac{s+1}{2}$，取 $s=\sqrt n$ 时最小，为 $O(\sqrt n)$。
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{分块查找规约}
+\begin{algorithmic}[1]
+\Procedure{BlockSearch}{$A,x,idx,s$}
+    \State $k\gets$ 索引表中最小的 $k$ 使 $x\le idx[k]$ \Comment{块间定位}
+    \If{$k$ 不存在} \Return $-1$ \EndIf
+    \For{$i\gets k\cdot s$ \textbf{to} $\min(|A|-1,(k+1)s-1)$} \Comment{块内顺序}
+        \If{$A[i]=x$} \Return $i$ \EndIf
+    \EndFor
+    \State \Return $-1$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
 \subsection{并查集 (Union-Find)}
 \begin{itemize}
     \item \textbf{对象}：不相交集合族 $\mathcal{S}=\{S_1,\dots,S_k\}$。
@@ -259,6 +374,35 @@
 
 
 
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    v/.style={circle, draw, minimum size=0.65cm, font=\small},
+    e/.style={draw, thick},
+    ee/.style={draw, very thick, red},
+    w/.style={font=\scriptsize, fill=white, inner sep=1pt},
+    d/.style={font=\scriptsize, blue},
+    lbl/.style={font=\small}
+]
+    \node[v] (s) at (0,0) {$s$};
+    \node[v] (a) at (-2,-1.1) {$a$};
+    \node[v] (b) at (0,-1.8) {$b$};
+    \node[v] (c) at (2,-1.1) {$c$};
+    \draw[e] (s)--(a) node[midway,w]{1};
+    \draw[e] (s)--(b) node[midway,w]{4};
+    \draw[ee] (s)--(c) node[midway,w]{2};
+    \draw[e] (a)--(b) node[midway,w]{2};
+    \draw[ee] (b)--(c) node[midway,w]{1};
+    \node[d] at (s.west) {$0$};
+    \node[d] at (a.north) {$1$};
+    \node[d] at (c.north) {$2$};
+    \node[d, below=1pt] at (b.south) {$3$};
+    \node[lbl] at (0,-2.55) {松弛 $D[b]:=\min(4,\ D[c]+w(c,b))=\min(4,3)=3$};
+\end{tikzpicture}
+\caption{Dijkstra 松弛（红边为已定的最短路径树，蓝值为 $D$）}
+\label{fig:dijkstra_relax}
+\end{figure}
+
 \subsection{最小生成树 (MST)}
 \begin{enumerate}
     \item \textbf{Prim}：任意 $r\in V$，维护 $T$，取横切边最小者入 $T$（割定理），$O(|E|\log|V|)$。
@@ -286,6 +430,31 @@
 \State \Return $A$
 \end{algorithmic}
 \end{algorithm}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    v/.style={circle, draw, minimum size=0.65cm, font=\small},
+    e/.style={draw, thick, gray},
+    t/.style={draw, very thick, green!60!black},
+    w/.style={font=\scriptsize, fill=white, inner sep=1pt},
+    lbl/.style={font=\small}
+]
+    \node[v] (a) at (0,0) {$A$};
+    \node[v] (b) at (2.2,0) {$B$};
+    \node[v] (c) at (1.1,-1.8) {$C$};
+    \node[v] (d) at (3.3,-1.8) {$D$};
+    \draw[t] (a)--(b) node[midway,w]{1};
+    \draw[t] (b)--(c) node[midway,w]{2};
+    \draw[t] (c)--(d) node[midway,w]{3};
+    \draw[e] (a)--(c) node[midway,w]{4};
+    \draw[e] (b)--(d) node[midway,w]{5};
+    \draw[e] (a)--(d) node[pos=0.82,w]{6};
+    \node[lbl] at (1.6,-2.6) {绿边为 MST：$|V|-1=3$ 条，总权 $6$};
+\end{tikzpicture}
+\caption{Kruskal：按权升序取不构成环的边（灰边被弃）}
+\label{fig:mst_kruskal}
+\end{figure}
 
 \subsection{拓扑排序：Kahn 算法}
 \begin{itemize}
@@ -363,6 +532,31 @@
 \end{algorithmic}
 \end{algorithm}
 
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    v/.style={circle, draw, minimum size=0.7cm, font=\small},
+    e/.style={draw, thick, ->, >=latex},
+    bb/.style={draw, thick, ->, >=latex, blue},
+    w/.style={font=\scriptsize, fill=white, inner sep=1pt},
+    lbl/.style={font=\small}
+]
+    \node[v] (s) at (0,0) {$s$};
+    \node[v] (u) at (2.2,1) {$u$};
+    \node[v] (ww) at (2.2,-1) {$w$};
+    \node[v] (t) at (4.4,0) {$t$};
+    \draw[e] (s)--(u) node[midway,w]{$3/3$};
+    \draw[e] (s)--(ww) node[midway,w]{$2/2$};
+    \draw[e] (u)--(t) node[midway,w]{$2/3$};
+    \draw[e] (ww)--(t) node[midway,w]{$1/2$};
+    \draw[bb] (u) to[out=205,in=155] node[midway,w,below]{$0/3$} (ww);
+    \node[lbl] at (2.2,1.9) {容量/流量标注 $f/c$};
+    \node[lbl] at (2.2,-2.1) {分层 $s\to\{u,w\}\to t$；蓝为反向残量边（可退流）};
+\end{tikzpicture}
+\caption{网络流残量网络与分层图（Dinic）}
+\label{fig:network_flow}
+\end{figure}
+
 \subsection{二分图最大匹配}
 \begin{itemize}
     \item \textbf{对象}：$G=(X\cup Y,E)$，匹配 $M\subseteq E$ 无公共点。
@@ -390,6 +584,30 @@
 \EndProcedure
 \end{algorithmic}
 \end{algorithm}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    xx/.style={circle, draw, minimum size=0.7cm, font=\small, fill=blue!10},
+    yy/.style={circle, draw, minimum size=0.7cm, font=\small, fill=orange!18},
+    mm/.style={draw, very thick, red},
+    e/.style={draw, thick},
+    aa/.style={draw, very thick, red, dashed, ->, >=latex},
+    lbl/.style={font=\small}
+]
+    \node[xx] (x1) at (0,0.9) {$x_1$};
+    \node[xx] (x2) at (0,-0.9) {$x_2$};
+    \node[yy] (y1) at (3,0.9) {$y_1$};
+    \node[yy] (y2) at (3,-0.9) {$y_2$};
+    \draw[mm] (x1)--(y1);
+    \draw[aa] (x2)--(y1);
+    \draw[aa] (x1)--(y2);
+    \node[lbl] at (1.5,-1.9) {实红=匹配 $M=\{x_1y_1\}$；虚红=增广路 $x_2-y_1-x_1-y_2$};
+    \node[lbl] at (1.5,-2.5) {翻转后 $M'=\{x_2y_1,\ x_1y_2\}$，$|M'|=|M|+1$};
+\end{tikzpicture}
+\caption{二分图最大匹配：沿增广路翻转（Berge 定理）}
+\label{fig:bipartite_augment}
+\end{figure}
 
 \subsection{强连通分量 (SCC)：Tarjan 算法}
 \begin{itemize}

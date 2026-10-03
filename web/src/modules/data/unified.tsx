@@ -14,8 +14,10 @@ import { ieee754Module } from "../numeric/ieee754";
 import { floatOpsModule } from "../numeric/floatOps";
 import { characterEncodingModule } from "../text/characterEncoding";
 import { stringOpsModule } from "../text/stringOps";
+import { trieModule } from "../text/trie";
+import { kmpModule } from "../text/kmp";
 
-type SubMode = "positional-system" | "positional-expansion" | "positional-successor" | "positional-addition" | "base-conversion" | "unsigned-int" | "twos-complement" | "sign-representation" | "overflow" | "ieee754" | "float-ops" | "character-encoding" | "string";
+type SubMode = "positional-system" | "positional-expansion" | "positional-successor" | "positional-addition" | "base-conversion" | "unsigned-int" | "twos-complement" | "sign-representation" | "overflow" | "ieee754" | "float-ops" | "character-encoding" | "string" | "trie" | "kmp";
 const MAP: Record<SubMode, ModuleDef> = {
   "positional-system": placeValueModule as unknown as ModuleDef,
   "positional-expansion": expansionModule as unknown as ModuleDef,
@@ -30,6 +32,8 @@ const MAP: Record<SubMode, ModuleDef> = {
   "float-ops": floatOpsModule as unknown as ModuleDef,
   "character-encoding": characterEncodingModule as unknown as ModuleDef,
   "string": stringOpsModule as unknown as ModuleDef,
+  "trie": trieModule as unknown as ModuleDef,
+  "kmp": kmpModule as unknown as ModuleDef,
 };
 export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
   { label: "位置制", opts: [
@@ -50,6 +54,8 @@ export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string
   { label: "文本", opts: [
     { v: "character-encoding", zh: "字符编码", en: "Encoding" },
     { v: "string", zh: "字符串", en: "String" },
+    { v: "trie", zh: "字典树", en: "Trie" },
+    { v: "kmp", zh: "串匹配 KMP", en: "KMP" },
   ]},
 ];
 

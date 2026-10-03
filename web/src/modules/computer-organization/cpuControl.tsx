@@ -96,7 +96,7 @@ function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
 }
 
 function Panel({ children }: { children: React.ReactNode }) {
-  return <div style={{ maxWidth: 860, margin: "0 auto", display: "grid", gap: 12 }}>{children}</div>;
+  return <div style={{ maxWidth: "100%", margin: "0 auto", display: "grid", gap: 12 }}>{children}</div>;
 }
 
 function SigBadge({ v }: { v: CtlVal }) {

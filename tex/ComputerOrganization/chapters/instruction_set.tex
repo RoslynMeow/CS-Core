@@ -1,4 +1,9 @@
+\clearpage
+\vspace*{\fill}
 \section{指令系统与汇编}
+\vspace*{\fill}
+\clearpage
+
 
 \subsection{指令集架构（ISA）}
 
@@ -64,6 +69,37 @@ MIPS 是经典 RISC 架构，32 个 32 位通用寄存器（\$0 始终为 0）�
     \item \textbf{I 型}（立即数型）：op(6) + rs(5) + rt(5) + immediate(16)
     \item \textbf{J 型}（跳转型）：op(6) + address(26)
 \end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    f6/.style={draw, minimum width=1.1cm, minimum height=0.7cm, font=\small},
+    f5/.style={draw, minimum width=1.0cm, minimum height=0.7cm, font=\small},
+    f16/.style={draw, minimum width=2.9cm, minimum height=0.7cm, font=\small},
+    f26/.style={draw, minimum width=4.6cm, minimum height=0.7cm, font=\small},
+    lbl/.style={font=\small}
+]
+    \node[f6] (r1) at (0,0) {op};
+    \node[f5, right=0pt of r1] (r2) {rs};
+    \node[f5, right=0pt of r2] (r3) {rt};
+    \node[f5, right=0pt of r3] (r4) {rd};
+    \node[f5, right=0pt of r4] (r5) {shamt};
+    \node[f6, right=0pt of r5] (r6) {funct};
+    \node[lbl, left=0.25cm of r1] {R 型};
+
+    \node[f6] (i1) at (0,-1.0) {op};
+    \node[f5, right=0pt of i1] (i2) {rs};
+    \node[f5, right=0pt of i2] (i3) {rt};
+    \node[f16, right=0pt of i3] (i4) {immediate};
+    \node[lbl, left=0.25cm of i1] {I 型};
+
+    \node[f6] (j1) at (0,-2.0) {op};
+    \node[f26, right=0pt of j1] (j2) {address};
+    \node[lbl, left=0.25cm of j1] {J 型};
+\end{tikzpicture}
+\caption{MIPS 三种指令格式（R：6/5/5/5/5/6，I：6/5/5/16，J：6/26）}
+\label{fig:mips_formats}
+\end{figure}
 
 \begin{example}[MIPS 指令示例]
 \begin{lstlisting}[caption={MIPS 汇编示例：数组求和}]

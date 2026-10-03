@@ -69,7 +69,7 @@ export const floatOpsModule: ModuleDef<Record<string, never>, Cfg> = {
       </div>
     );
     return (
-      <div style={{ display: 'grid', gap: 12, maxWidth: 820, margin: '0 auto' }}>
+      <div style={{ display: 'grid', gap: 12, maxWidth: '100%', margin: '0 auto' }}>
         <div style={{ fontSize: 12, color: '#475569' }}>
           <b>{isZh ? '格式' : 'Format'}</b>: sign(1) | exponent(8, bias 127) | fraction(23) — {isZh ? '隐含前导 1' : 'implicit leading 1'}
         </div>

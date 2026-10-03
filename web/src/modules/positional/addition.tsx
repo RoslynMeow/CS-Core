@@ -1,14 +1,14 @@
 import { T } from '../../i18n/lang';
 import type { Frame, ModuleDef } from '../../engine/types';
 import { MathText } from '../../lib/tex';
-import { DigitRows } from './glyphs';
+import { DigitRows, digitVal } from './glyphs';
 
 type Cfg = { base: number; a: string; b: string };
 type Scene = { aDigits: number[]; bDigits: number[]; res: number[]; i: number | null; carry: number };
 
 function parseLSB(s: string, base: number): number[] | null {
-  const msb = s.trim().split('').map(ch => parseInt(ch, base));
-  if (msb.length === 0 || msb.some(v => Number.isNaN(v) || v < 0 || v >= base)) return null;
+  const msb = s.trim().split('').map(ch => digitVal(ch, base));
+  if (msb.length === 0 || msb.some(v => v < 0 || v >= base)) return null;
   return msb.reverse();
 }
 
@@ -23,7 +23,7 @@ export const additionModule: ModuleDef<Scene, Cfg> = {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
           <span>{t(T('进制', 'Base'))}</span>
-          <input className="txt" type="number" min={2} max={16} value={config.base} onChange={e => onChange({ ...config, base: Math.max(2, Math.min(16, Number(e.target.value) || 10)) })} style={{ width: 72 }} />
+          <input className="txt" type="number" min={2} max={64} value={config.base} onChange={e => onChange({ ...config, base: Math.max(2, Math.min(64, Number(e.target.value) || 10)) })} style={{ width: 80 }} />
         </label>
         <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
           <span>{t(T('加数 A', 'A'))}</span>

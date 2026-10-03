@@ -1,4 +1,9 @@
-﻿\section{I/O 系统与总线}
+\clearpage
+\vspace*{\fill}
+\section{I/O 系统与总线}
+\vspace*{\fill}
+\clearpage
+
 
 \subsection{I/O 系统的层次}
 
@@ -58,6 +63,34 @@ DMA 控制器直接控制总线，在设备和内存之间搬移数据，不经�
     \item DMA 独立完成传输
     \item 完成后向 CPU 发中断通知
 \end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    cpu/.style={draw, minimum width=1.0cm, minimum height=0.6cm, font=\tiny, fill=blue!15},
+    idle/.style={draw, minimum width=1.0cm, minimum height=0.6cm, font=\tiny, fill=gray!12},
+    dev/.style={draw, minimum width=1.0cm, minimum height=0.6cm, font=\tiny, fill=green!20},
+    rl/.style={font=\small, anchor=east},
+    lbl/.style={font=\scriptsize}
+]
+    \def\cw{1.06}
+    \node[rl] at (-0.3,0) {轮询（CPU 忙等）};
+    \foreach \c in {1,...,6} { \node[cpu] at (\c*\cw,0) {CPU}; }
+
+    \node[rl] at (-0.3,-1.1) {中断（就绪才打断）};
+    \node[cpu] at (\cw,-1.1){CPU}; \node[idle] at (2*\cw,-1.1){};
+    \node[dev] at (3*\cw,-1.1){IO}; \node[cpu] at (4*\cw,-1.1){CPU};
+    \node[cpu] at (5*\cw,-1.1){CPU}; \node[cpu] at (6*\cw,-1.1){CPU};
+
+    \node[rl] at (-0.3,-2.2) {DMA（控制器搬数据）};
+    \node[cpu] at (\cw,-2.2){CPU}; \node[idle] at (2*\cw,-2.2){};
+    \node[idle] at (3*\cw,-2.2){}; \node[idle] at (4*\cw,-2.2){};
+    \node[idle] at (5*\cw,-2.2){}; \node[cpu] at (6*\cw,-2.2){CPU};
+    \node[lbl] at (3,-3.0) {蓝=CPU 执行，灰=CPU 等待，绿=设备/DMA 活动};
+\end{tikzpicture}
+\caption{轮询、中断与 DMA 的 CPU 时间占用对比}
+\label{fig:io_timeline}
+\end{figure}
 
 \subsection{总线}
 

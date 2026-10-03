@@ -1,6 +1,16 @@
+\clearpage
+\begingroup
+\let\clearpage\relax
+\let\cleardoublepage\relax
+\vspace*{\fill}
 \chapter{非线性结构 I：树与二叉树}
-
+\begin{center}
 树是一种一对多的非线性层次逻辑结构。在图论中，树被严密定义为：任意两个顶点间有且仅有一条路径的无环连通图。
+\end{center}
+\vspace*{\fill}
+\endgroup
+\clearpage
+
 
 \section{通用树的基础属性}
 
@@ -169,6 +179,31 @@
     \item \textbf{性质}：线索化后，遍历操作退化为线性扫描，空间复杂度降至 $O(1)$。
 \end{itemize}
 
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    n/.style={circle, draw, minimum size=0.6cm, font=\ttfamily, inner sep=1pt},
+    e/.style={draw, thick},
+    th/.style={draw, dashed, ->, >=latex, red},
+    lbl/.style={font=\small}
+]
+    \node[n] (A) at (0,0) {A};
+    \node[n] (B) at (-1.6,-1.2) {B};
+    \node[n] (C) at (1.6,-1.2) {C};
+    \node[n] (D) at (-2.4,-2.4) {D};
+    \node[n] (E) at (-0.8,-2.4) {E};
+    \draw[e] (A)--(B); \draw[e] (A)--(C);
+    \draw[e] (B)--(D); \draw[e] (B)--(E);
+    \draw[th] (D.east) to[out=-30,in=-90] (B.south);
+    \draw[th] (E.west) to[out=210,in=-90] (B.south);
+    \draw[th] (E.east) to[out=-30,in=-90] (A.south east);
+    \draw[th] (C.west) to[out=210,in=-90] (A.south);
+    \node[lbl] at (0,-3.4) {虚线=线索指针；中序序列 $D\,B\,E\,A\,C$};
+\end{tikzpicture}
+\caption{中序线索二叉树（红虚线指向中序前驱/后继）}
+\label{fig:threaded_tree}
+\end{figure}
+
 \subsection{遍历序列与树的唯一性}
 
 \begin{enumerate}
@@ -256,6 +291,43 @@
 \end{algorithmic}
 \end{algorithm}
 
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    n/.style={circle, draw, minimum size=0.55cm, font=\ttfamily, inner sep=1pt},
+    e/.style={draw, thick},
+    lbl/.style={font=\small\bfseries}
+]
+    \node[n] (a1) at (0,0) {$z$};
+    \node[n] (a2) at (-0.5,-0.8) {$y$};
+    \node[n] (a3) at (-0.9,-1.6) {$x$};
+    \draw[e] (a1)--(a2); \draw[e] (a2)--(a3);
+    \node[lbl, red, align=center] at (-0.45,-2.35) {LL\\右旋 $z$};
+
+    \node[n] (b1) at (3.2,0) {$z$};
+    \node[n] (b2) at (3.7,-0.8) {$y$};
+    \node[n] (b3) at (4.1,-1.6) {$x$};
+    \draw[e] (b1)--(b2); \draw[e] (b2)--(b3);
+    \node[lbl, red, align=center] at (3.65,-2.35) {RR\\左旋 $z$};
+
+    \node[n] (c1) at (6.4,0) {$z$};
+    \node[n] (c2) at (5.9,-0.8) {$x$};
+    \node[n] (c3) at (6.4,-1.6) {$y$};
+    \draw[e] (c1)--(c2); \draw[e] (c2)--(c3);
+    \node[lbl, red, align=center] at (6.15,-2.5) {LR\\左旋 $x$\\右旋 $z$};
+
+    \node[n] (d1) at (9.6,0) {$z$};
+    \node[n] (d2) at (10.1,-0.8) {$x$};
+    \node[n] (d3) at (9.6,-1.6) {$y$};
+    \draw[e] (d1)--(d2); \draw[e] (d2)--(d3);
+    \node[lbl, red, align=center] at (9.85,-2.5) {RL\\右旋 $x$\\左旋 $z$};
+\end{tikzpicture}
+\caption{AVL 四种失衡形态与对应旋转（$z$ 为失衡点，$y$ 孩子，$x$ 孙）}
+\label{fig:avl_rotations}
+\end{figure}
+
+\section{红黑树 (Red-Black Tree)}
+
 \begin{itemize}
     \item \textbf{对象}：BST 附加颜色函数 $c: V \to \{\text{红}, \text{黑}\}$，引入外部黑哨兵叶。
     \item \textbf{不变式}：(1) 根为黑；(2) 红节点的子节点皆黑；(3) 任一根--叶路径黑高 $bh$ 一致；(4) 新插入节点初染红。
@@ -281,6 +353,31 @@
 \end{algorithmic}
 \end{algorithm}
 
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    r/.style={circle, draw, minimum size=0.62cm, font=\ttfamily, inner sep=1pt, fill=red!70, text=white},
+    b/.style={circle, draw, minimum size=0.62cm, font=\ttfamily, inner sep=1pt, fill=black, text=white},
+    e/.style={draw, thick}, lbl/.style={font=\small}
+]
+    \node[b] (r13) at (0,0) {13};
+    \node[r] (r8) at (-1.2,-0.9) {8};
+    \node[r] (r17) at (1.2,-0.9) {17};
+    \node[b] (r1) at (-1.8,-1.8) {1};
+    \node[b] (r11) at (-0.6,-1.8) {11};
+    \node[b] (r15) at (0.6,-1.8) {15};
+    \node[b] (r25) at (1.8,-1.8) {25};
+    \draw[e] (r13)--(r8); \draw[e] (r13)--(r17);
+    \draw[e] (r8)--(r1); \draw[e] (r8)--(r11);
+    \draw[e] (r17)--(r15); \draw[e] (r17)--(r25);
+    \node[lbl] at (0,-2.5) {红节点子必黑；任一根--叶路径黑高 $bh$ 一致};
+\end{tikzpicture}
+\caption{红黑树着色示例（黑底为黑节点，红底为红节点）}
+\label{fig:rb_coloring}
+\end{figure}
+
+\section{B 树与 B+ 树 (B-Tree / B+ Tree)}
+
 \begin{itemize}
     \item \textbf{对象}：多路搜索树，阶为 $m$（网页实例取 $m \in \{3,4,5\}$）。内节点存有序键与子树指针。
     \item \textbf{不变式（B 树）}：除根外每节点键数 $k \in [\lceil m/2 \rceil - 1, m-1]$，子数 $k+1$；键有序分隔子树区间；所有叶等深。
@@ -300,6 +397,81 @@
 \EndProcedure
 \end{algorithmic}
 \end{algorithm}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    nd/.style={draw, rounded corners, minimum height=0.7cm, font=\small, fill=blue!8},
+    leaf/.style={draw, rounded corners, minimum height=0.7cm, font=\small, fill=green!12},
+    e/.style={draw, thick}, lbl/.style={font=\small}
+]
+    \node[nd] (root) at (0,0) {$[17]$};
+    \node[nd] (l) at (-1.8,-1.2) {$[5\ 11]$};
+    \node[nd] (r) at (1.8,-1.2) {$[23]$};
+    \draw[e] (root)--(l); \draw[e] (root)--(r);
+    \node[lbl] at (0,-2) {B 树：满则中键上提（分裂）};
+
+    \node[leaf] (a1) at (4.6,0) {$5$};
+    \node[leaf] (a2) at (5.8,0) {$11$};
+    \node[leaf] (a3) at (7.0,0) {$17$};
+    \node[leaf] (a4) at (8.2,0) {$23$};
+    \draw[e, ->] (a1)--(a2); \draw[e, ->] (a2)--(a3); \draw[e, ->] (a3)--(a4);
+    \node[lbl] at (6.4,-1) {B+ 树：数据全在叶层，叶链顺序相连};
+\end{tikzpicture}
+\caption{B 树节点分裂与 B+ 树叶链表}
+\label{fig:btree_bplus}
+\end{figure}
+
+\section{伸展树 (Splay Tree)}
+
+\begin{itemize}
+    \item \textbf{对象}：BST，节点不含高度/颜色等平衡辅助字段；仅在访问路径上做伸展旋转。
+    \item \textbf{不变式（自调整）}：每次查找/插入/删除后，将被访问节点 $x$ 经 zig / zig-zig / zig-zag 旋转移到根；结构随访问序列自适应。
+    \item \textbf{定理（摊还界）}：取势能 $\Phi(T)=\sum_{v}\log_2 size(v)$（$size(v)$ 为子树大小），单次操作摊还代价 $O(\log n)$，$m$ 次操作总 $O(m\log n)$；单次最坏仍为 $O(n)$。
+    \item \textbf{与 AVL / 红黑对比}：无需存储平衡信息，实现更简；摊还意义下接近最优（对非均匀访问序列优于严格平衡树），但最坏单次 $O(n)$，不适合硬实时场景。
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{伸展规约 (Splay)}
+\begin{algorithmic}[1]
+\While{$x.parent\neq\text{nil}$}
+    \State $p\gets x.parent$; $g\gets p.parent$
+    \If{$g=\text{nil}$} \State 单旋 $x$ 至根 \Comment{zig}
+    \ElsIf{$x$ 与 $p$ 同侧} \State 先旋 $p$，再旋 $x$ \Comment{zig-zig}
+    \Else \State 先旋 $x$（绕 $p$），再旋 $x$（绕 $g$） \Comment{zig-zag}
+    \EndIf
+\EndWhile
+\State \Return $x$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    n/.style={circle, draw, minimum size=0.55cm, font=\ttfamily, inner sep=1pt},
+    sx/.style={circle, draw, minimum size=0.55cm, font=\ttfamily, inner sep=1pt, fill=red!70, text=white},
+    e/.style={draw, thick}, lbl/.style={font=\small\bfseries}
+]
+    \node[sx] (z1) at (0,0) {$x$};
+    \node[n] (z2) at (-0.7,-0.8) {$p$};
+    \draw[e] (z2)--(z1);
+    \node[lbl, align=center] at (-0.35,-1.6) {zig\\（单旋）};
+
+    \node[n] (g1) at (3.4,0) {$g$};
+    \node[n] (g2) at (2.9,-0.8) {$p$};
+    \node[sx] (g3) at (2.4,-1.6) {$x$};
+    \draw[e] (g1)--(g2); \draw[e] (g2)--(g3);
+    \node[lbl, align=center] at (2.9,-2.6) {zig-zig\\同侧：先旋 $p$，再旋 $x$};
+
+    \node[n] (k1) at (7.4,0) {$g$};
+    \node[n] (k2) at (6.9,-0.8) {$p$};
+    \node[sx] (k3) at (7.4,-1.6) {$x$};
+    \draw[e] (k1)--(k2); \draw[e] (k2)--(k3);
+    \node[lbl, align=center] at (7.15,-2.6) {zig-zag\\异侧：先旋 $x$，再旋 $g$};
+\end{tikzpicture}
+\caption{Splay 的三种旋转情形（被访问节点 $x$ 旋到根）}
+\label{fig:splay_rotations}
+\end{figure}
 
 \section{Huffman 最优树}
 
@@ -321,6 +493,32 @@
 \State \Return $\text{ExtractMin}(Q)$
 \end{algorithmic}
 \end{algorithm}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    inn/.style={circle, draw, minimum size=0.6cm, font=\small, inner sep=1pt},
+    lf/.style={circle, draw, minimum size=0.6cm, font=\small, inner sep=1pt, fill=green!12},
+    e/.style={draw, thick}, w/.style={font=\scriptsize, fill=white, inner sep=0.5pt}
+]
+    \node[inn] (root) at (0,0) {$100$};
+    \node[inn] (a55) at (-2,-1) {$55$};
+    \node[lf] (f45) at (2,-1) {$f{:}45$};
+    \node[inn] (c25) at (-3,-2) {$25$};
+    \node[lf] (e30) at (-1,-2) {$e{:}30$};
+    \node[lf] (a10) at (-3.6,-3) {$a{:}10$};
+    \node[lf] (b15) at (-2.4,-3) {$b{:}15$};
+    \draw[e] (root)--(a55) node[midway,w]{0};
+    \draw[e] (root)--(f45) node[midway,w]{1};
+    \draw[e] (a55)--(c25) node[midway,w]{0};
+    \draw[e] (a55)--(e30) node[midway,w]{1};
+    \draw[e] (c25)--(a10) node[midway,w]{0};
+    \draw[e] (c25)--(b15) node[midway,w]{1};
+    \node[font=\small] at (0,-3.9) {边标 $0/1$ 即前缀码；$WPL$ 最小};
+\end{tikzpicture}
+\caption{Huffman 最优树（叶为「字符:频次」，边标 $0/1$）}
+\label{fig:huffman_tree}
+\end{figure}
 
 \section{堆体系 (Heap)}
 
@@ -370,6 +568,34 @@
     \item \textbf{定理}：建堆时间为 $O(n)$。高度 $h$ 层至多 $\lceil n/2^{h+1}\rceil$ 个节点下滤 $O(h)$，总和 $\sum_{h\ge0} n h/2^{h+1} = O(n)$。
 \end{itemize}
 
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    n/.style={circle, draw, minimum size=0.6cm, font=\small, inner sep=1pt},
+    e/.style={draw, thick},
+    cell/.style={draw, minimum width=0.8cm, minimum height=0.7cm, font=\small},
+    lbl/.style={font=\small}, idx/.style={font=\scriptsize}
+]
+    \matrix (m) [matrix of nodes, nodes={cell}, column sep=-\pgflinewidth, row sep=0] at (0,0) {90 & 70 & 80 & 30 & 40 & 60 \\};
+    \node[lbl] at (0,0.85) {数组 $A$（层序存储）};
+    \node[idx] at (-2.0,-0.75) {0}; \node[idx] at (-1.2,-0.75) {1};
+    \node[idx] at (-0.4,-0.75) {2}; \node[idx] at (0.4,-0.75) {3};
+    \node[idx] at (1.2,-0.75) {4}; \node[idx] at (2.0,-0.75) {5};
+
+    \node[n] (t0) at (0,-2.2) {90};
+    \node[n] (t1) at (-1.1,-3.2) {70};
+    \node[n] (t2) at (1.1,-3.2) {80};
+    \node[n] (t3) at (-1.7,-4.2) {30};
+    \node[n] (t4) at (-0.5,-4.2) {40};
+    \node[n] (t5) at (1.1,-4.2) {60};
+    \draw[e] (t0)--(t1); \draw[e] (t0)--(t2);
+    \draw[e] (t1)--(t3); \draw[e] (t1)--(t4); \draw[e] (t2)--(t5);
+    \node[lbl] at (0,-4.9) {大顶堆树形（$l(i)=2i+1,\ r(i)=2i+2$）};
+\end{tikzpicture}
+\caption{堆：层序数组与完全二叉树一一对应}
+\label{fig:heap_array_tree}
+\end{figure}
+
 \section{树上查询：LCA 倍增}
 \begin{itemize}
     \item \textbf{对象}：有根树 $T$，$depth[v]$，$up[v][j]=v$ 的 $2^j$ 祖先，$LOG=\lceil\log_2|V|\rceil$。
@@ -392,3 +618,31 @@
 \EndProcedure
 \end{algorithmic}
 \end{algorithm}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    n/.style={circle, draw, minimum size=0.6cm, font=\small, inner sep=1pt},
+    e/.style={draw, thick},
+    lca/.style={circle, draw, thick, minimum size=0.6cm, font=\small, inner sep=1pt, fill=green!25},
+    uu/.style={circle, draw, thick, minimum size=0.6cm, font=\small, inner sep=1pt, fill=red!25},
+    vv/.style={circle, draw, thick, minimum size=0.6cm, font=\small, inner sep=1pt, fill=blue!25},
+    lbl/.style={font=\small}
+]
+    \node[lca] (n1) at (0,0) {1};
+    \node[n] (n2) at (-2,-1) {2};
+    \node[n] (n3) at (2,-1) {3};
+    \node[n] (n4) at (-3,-2) {4};
+    \node[n] (n5) at (-1,-2) {5};
+    \node[n] (n6) at (1,-2) {6};
+    \node[n] (n7) at (3,-2) {7};
+    \node[uu] (n8) at (-3.6,-3) {8};
+    \draw[e] (n1)--(n2); \draw[e] (n1)--(n3);
+    \draw[e] (n2)--(n4); \draw[e] (n2)--(n5);
+    \draw[e] (n3)--(n6); \draw[e] (n3)--(n7);
+    \draw[e] (n4)--(n8);
+    \node[lbl] at (0,-3.9) {绿=LCA，红=$u$，蓝=$v$；先提 $u$ 至同深，再同步上跳};
+\end{tikzpicture}
+\caption{LCA 倍增：同深对齐后二进制逐级上跳}
+\label{fig:lca_binary_lifting}
+\end{figure}

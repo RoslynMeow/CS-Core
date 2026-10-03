@@ -12,6 +12,15 @@ export function customGlyph(v: number): string | null {
   return g?.glyphs?.[v] ?? null;
 }
 
+/** 数码字符 → 数值（支持 2..64 进制；字母大小写容错，进制 >36 时按字母表精确匹配） */
+export function digitVal(ch: string, base: number): number {
+  const alpha = defaultAlphabet(base);
+  let idx = alpha.indexOf(ch);
+  if (idx < 0) idx = alpha.indexOf(ch.toUpperCase());
+  if (idx < 0) idx = alpha.indexOf(ch.toLowerCase());
+  return idx;
+}
+
 export function DigitRows({ digits, base, highlight, only = 'both', label = true }: {
   digits: number[];
   base: number;
@@ -22,7 +31,7 @@ export function DigitRows({ digits, base, highlight, only = 'both', label = true
   return (
     <div style={{ display: 'grid', gap: 6, justifyItems: 'center' }}>
       {only !== 'custom' && (
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
           {label && <span style={{ fontSize: 11, color: '#64748b', minWidth: 28 }}>数码</span>}
           {digits.map((d, i) => (
             <div key={i} className={`digit ${highlight === i ? 'active' : ''}`} style={{ width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -32,7 +41,7 @@ export function DigitRows({ digits, base, highlight, only = 'both', label = true
         </div>
       )}
       {only !== 'default' && (
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap' }}>
           {label && <span style={{ fontSize: 11, color: '#64748b', minWidth: 28 }}>手绘</span>}
           {digits.map((d, i) => {
             const img = customGlyph(d);

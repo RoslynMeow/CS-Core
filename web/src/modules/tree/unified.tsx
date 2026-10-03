@@ -25,6 +25,10 @@ import {
   bhAnn,
 } from "../../lib/rbtree";
 import {
+  splayInsertSteps, splaySearchOnTree, splayInsertOne, splayDeleteOnTree,
+  SPLAY_CODE, SPLAY_INSERT_CODE, SPLAY_DELETE_CODE,
+} from "../../lib/splay";
+import {
   bTreeInsertSteps, bTreeDeleteOnTree,
   bPlusInsertSteps, bPlusLeaves,
   bTreeLayout,
@@ -35,11 +39,11 @@ import { buildDualFrames, bfAnn } from "./source";
 import { TRAVERSE_CODES } from "./binary";
 import { fromImport as graphFromImport, graphScene, algoStateTables } from "../graph/source";
 
-type SubMode = "general" | "traverse" | "lca" | "bst" | "avl" | "heap" | "rb" | "btree" | "bplus";
+type SubMode = "traverse" | "threaded" | "lca" | "bst" | "avl" | "heap" | "rb" | "splay" | "btree" | "bplus";
 export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
-  { label: "基础", opts: [{ v: "general", zh: "通用树编辑", en: "Edit" }, { v: "traverse", zh: "二叉树", en: "Binary Tree" }] },
+  { label: "基础", opts: [{ v: "traverse", zh: "二叉树", en: "Binary Tree" }, { v: "threaded", zh: "线索二叉树", en: "Threaded" }] },
   { label: "查询", opts: [{ v: "lca", zh: "LCA", en: "LCA" }] },
-  { label: "BST/平衡", opts: [{ v: "bst", zh: "BST", en: "BST" }, { v: "avl", zh: "AVL", en: "AVL" }, { v: "rb", zh: "红黑", en: "RB" }] },
+  { label: "BST/平衡", opts: [{ v: "bst", zh: "BST", en: "BST" }, { v: "avl", zh: "AVL", en: "AVL" }, { v: "rb", zh: "红黑", en: "RB" }, { v: "splay", zh: "伸展树", en: "Splay" }] },
   { label: "堆/B树", opts: [{ v: "heap", zh: "堆", en: "Heap" }, { v: "btree", zh: "B 树", en: "B-Tree" }, { v: "bplus", zh: "B+ 树", en: "B+ Tree" }] },
 ];
 
@@ -59,9 +63,11 @@ type Cfg = {
   pick?: "u" | "v";
 };
 
+const DEFAULT_IMP: ImportedGraph = { n: 7, spec: "0-1,0-2,1-3,1-4,2-5,2-6", labels: ["4","2","6","1","3","5","7"], directed: false, root: 0, layout: "tree" };
+
 const DEFAULT: Cfg = {
   subMode: "bst",
-  treeImp: { n: 7, spec: "0-1,0-2,1-3,1-4,2-5,2-6", labels: ["4","2","6","1","3","5","7"], directed: false, root: 0, layout: "tree" },
+  treeImp: DEFAULT_IMP,
   traverseMode: "pre",
   bstMode: "build",
   target: 3,
@@ -76,13 +82,14 @@ const DEFAULT: Cfg = {
 };
 
 const CODE_MAP: Record<SubMode, any> = {
-  general: [],
   traverse: LEVEL_CODE,
   lca: LCA_CODE,
   bst: BST_INSERT_CODE,
   avl: AVL_CODE,
   heap: HEAP_BUILD_CODE as any,
   rb: RB_INSERT_CODE as any,
+  splay: SPLAY_INSERT_CODE as any,
+  threaded: [] as any,
   btree: BTREE_INSERT_CODE as any,
   bplus: BTREE_INSERT_CODE as any,
 };
@@ -145,29 +152,6 @@ function isCompleteRooted(g: GraphCls, root: number): boolean {
   return true;
 }
 
-/** 建树结果写回通用树：节点 id→顶点，左右链→无向边，值→标签 */
-function syncTreeOf(nodes: Array<{ id: number; val: number; left: number | null; right: number | null }>, root: number): ImportedGraph | null {
-  if (!nodes.length) return null;
-  const edges: string[] = [];
-  for (const n of nodes) {
-    if (n.left != null) edges.push(`${n.id}-${n.left}`);
-    if (n.right != null) edges.push(`${n.id}-${n.right}`);
-  }
-  return { n: nodes.length, spec: edges.join(","), labels: nodes.map((n) => String(n.val)), directed: false, root, layout: "tree" };
-}
-
-/** 各建树模式的同步结果（纯函数，与 buildFrames 同输入同输出；B/B+ 多 keys 写不回编辑器） */
-function syncImpOf(sub: SubMode, g: GraphCls): ImportedGraph | null {
-  const nv = numericVals(g);
-  if (!nv) return null;
-  const vals = nv.vals;
-  if (sub === "bst") return syncTreeOf(bstFromValues(vals), 0);
-  if (sub === "avl") { const s = avlInsertSteps(vals).slice(-1)[0]; return s ? syncTreeOf(s.nodes, s.root) : null; }
-  if (sub === "rb") { const s = rbInsertSteps(vals).slice(-1)[0]; return s ? syncTreeOf(s.nodes, s.root) : null; }
-  if (sub === "heap") { const v = heapBuildSteps(vals).slice(-1)[0]?.values ?? vals; return syncTreeOf(completeTree(v), 0); }
-  return null;
-}
-
 /** BST 操作要求二叉提示帧（左右子作映射） */
 function needBinaryOpFrame(g: GraphCls): Frame<GraphCanvasScene> {
   return {
@@ -201,10 +185,9 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
   const toFrame = (s: any, scene: GraphCanvasScene): Frame<GraphCanvasScene> => ({ line: s.line, caption: s.msg, scene: { ...(scene as any), activeLine: s.line } as any });
 
   switch (cfg.subMode) {
-    case "general": {
-      // 纯编辑模式：无伪代码（CODE_MAP 为空）、无数值块
-      const scene = graphScene(g, {}, { root: 0, layout: "tree" });
-      return [{ line: 0, caption: T("通用树编辑 · 在画布中直接编辑", "Tree editor · edit on canvas"), scene } as any];
+    case "threaded": {
+      if (!isBinaryRooted(g, 0)) return [{ line: 0, caption: T("线索二叉树需二叉树（每个节点至多两个子节点）", "Threaded needs a binary tree"), scene: graphScene(g, {}, { root: 0, layout: "tree" }) as GraphCanvasScene }];
+      return [{ line: 0, caption: T("中序线索化：空指针指向中序前驱/后继", "Inorder threading: null pointers → pred/succ"), scene: graphScene(g, {}, { root: 0, layout: "tree" }) as GraphCanvasScene }];
     }
     case "traverse": {
       if (!isBinaryRooted(g, 0)) return [{ line: 0, caption: T("二叉遍历需二叉树：存在节点超过两个子节点（或不连通）", "Traverse needs a binary tree"), scene: graphScene(g, {}, { root: 0, layout: "tree" }) as GraphCanvasScene }];
@@ -374,6 +357,41 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
         return { ...sc, current: s.focus, edge: s.edge, annotate: ann } as any;
       })()));
     }
+    case "splay": {
+      const nv = numericVals(g);
+      if (!nv) return [needNumericFrame(g)];
+      const { vals } = nv;
+      const labelNodes = (nodes: any[]) => nodes.map((n: any) => ({ ...n, label: n.label ?? g.labels[n.id] ?? String(n.val) }));
+      if (cfg.bstMode === "build") {
+        const steps = splayInsertSteps(vals);
+        const frames = buildDualFrames(steps, vals, editorBinNodes(g, vals), T("伸展树 · 正在建立", "Splay · building"), undefined, T("目前的树 · 输入", "Current tree · input"));
+        frames.forEach((f, i) => {
+          const ino = inorderOf(steps[i].nodes);
+          (f.scene as any).stateTables = [{ title: "数值", header: ino.map(String), rows: [{ name: "inorder", cells: ino.map(String) }] }];
+        });
+        return frames;
+      }
+      const base = ((): any[] => { const r = splayInsertSteps(vals); return r[r.length - 1]?.nodes ?? []; })();
+      const toSplayScene = (s: any) => {
+        const scene = graphScene(binToGraph(labelNodes(s.nodes)), { current: s.focus ?? null, edge: s.edge ?? null }, { root: s.root ?? 0, layout: "tree" });
+        const ino = inorderOf(s.nodes);
+        (scene as any).stateTables = [{ title: "数值", header: ino.map(String), rows: [{ name: "inorder", cells: ino.map(String) }] }];
+        return scene;
+      };
+      if (cfg.bstMode === "search") {
+        const target = Number.isFinite(cfg.target) ? cfg.target : vals[0] ?? 0;
+        const { steps } = splaySearchOnTree(base as any, 0, target);
+        return steps.map((s: any) => toFrame(s, toSplayScene(s)));
+      }
+      if (cfg.bstMode === "insert") {
+        const x = Number.isFinite(cfg.x) ? cfg.x : Math.max(...vals, 0) + 1;
+        const { steps } = splayInsertOne(base as any, 0, x);
+        return steps.map((s: any) => toFrame(s, toSplayScene(s)));
+      }
+      const target = Number.isFinite(cfg.target) ? cfg.target : vals[0] ?? 0;
+      const out = splayDeleteOnTree(base as any, 0, target);
+      return out.steps.map((s: any) => toFrame(s, toSplayScene(s)));
+    }
     case "btree": {
       const m = Math.max(3, Math.min(5, cfg.btreeOrder | 0));
       const nv = numericVals(g);
@@ -510,7 +528,7 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
       });
     }
   }
-  return [{ line: 0, caption: T("未实现", "todo"), scene: graphScene(g, {}, { root: 0, layout: "tree" }) }];
+  return [{ line: 0, caption: T("树", "Tree"), scene: graphScene(g, {}, { root: 0, layout: "tree" }) }];
 }
 
 export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
@@ -527,20 +545,6 @@ export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
       if (ls && ls[i] !== undefined) return ls[i];
       return String.fromCharCode(65 + ((i % 26 + 26) % 26));
     };
-    // 同步通用树按钮：把建好的树写回编辑器（先播放观看构造，再点此同步；之后操作全跑编辑器树）
-    const syncG = (() => {
-      try {
-        if (!config.treeImp) return null;
-        const gg = new Graph(config.treeImp.n, { directed: false, labels: config.treeImp.labels });
-        return gg.fromSpec(config.treeImp.spec).ok ? gg : null;
-      } catch { return null; }
-    })();
-    const syncBtn = (sub: SubMode) => {
-      if (!syncG) return null;
-      const imp = syncImpOf(sub, syncG);
-      if (!imp) return null;
-      return <button className="ghost" style={{ padding: "4px 10px", fontSize: 12 }} title={isZh ? "先播放观看构造，再点此将建好的树写回通用树编辑器" : "Watch the build first, then write the built tree back to the editor"} onClick={() => set({ treeImp: imp } as Partial<Cfg>)}>{isZh ? "同步通用树" : "Sync tree"}</button>;
-    };
     return (
       <div style={{ display: "grid", gap: 8, width: "100%" }}>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
@@ -554,9 +558,8 @@ export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
           </select></>}
           {(config.subMode === "traverse") && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><select className="txt" value={config.traverseMode} onChange={(e) => set({ traverseMode: e.target.value as any })}><option value="pre">前序</option><option value="in">中序</option><option value="post">后序</option><option value="level">层序</option></select></>}
           {(config.subMode === "lca") && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca" }}>{isZh ? "选点" : "PICK"}</span><button className={`pill ${(config.pick ?? "u") === "u" ? "active" : ""}`} style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => set({ pick: "u" })}>u: <b>{lab(config.lcaU)}</b></button><button className={`pill ${(config.pick ?? "u") === "v" ? "active" : ""}`} style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => set({ pick: "v" })}>v: <b>{lab(config.lcaV)}</b></button><span style={{ fontSize: 11, color: "#64748b" }}>{isZh ? "右键·选择此点" : "right-click"}</span></>}
-          {(config.subMode === "bst" || config.subMode === "rb") && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><select className="txt" value={config.bstMode} onChange={(e) => set({ bstMode: e.target.value as any })}><option value="build">建树</option><option value="search">查找</option><option value="insert">插入</option><option value="delete">删除</option></select>{(config.bstMode === "search" || config.bstMode === "delete") && <input className="txt" type="number" placeholder={isZh ? "键" : "key"} style={{ width: 70 }} value={Number.isNaN(config.target) ? "" : config.target} onChange={(e) => set({ target: e.target.value===""?NaN:Number(e.target.value) })} />}{config.bstMode === "insert" && <input className="txt" type="number" placeholder={isZh ? "插值" : "x"} style={{ width: 70 }} value={Number.isNaN(config.x) ? "" : config.x} onChange={(e) => set({ x: e.target.value===""?NaN:Number(e.target.value) })} />}{config.bstMode === "build" && syncBtn(config.subMode)}</>}
-          {config.subMode === "avl" && (() => { const b = syncBtn("avl"); return b && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} />{b}</>; })()}
-          {config.subMode === "heap" && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><select className="txt" value={config.heapMode} onChange={(e) => set({ heapMode: e.target.value as any })}><option value="build">建堆</option><option value="insert">插入</option><option value="pop">弹出</option></select>{config.heapMode === "insert" && <input className="txt" type="number" style={{ width: 70 }} value={config.heapVal} onChange={(e) => set({ heapVal: Number(e.target.value) })} />}{config.heapMode === "build" && syncBtn("heap")}</>}
+          {(config.subMode === "bst" || config.subMode === "rb" || config.subMode === "splay") && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><select className="txt" value={config.bstMode} onChange={(e) => set({ bstMode: e.target.value as any })}><option value="build">建树</option><option value="search">查找</option><option value="insert">插入</option><option value="delete">删除</option></select>{(config.bstMode === "search" || config.bstMode === "delete") && <input className="txt" type="number" placeholder={isZh ? "键" : "key"} style={{ width: 70 }} value={Number.isNaN(config.target) ? "" : config.target} onChange={(e) => set({ target: e.target.value===""?NaN:Number(e.target.value) })} />}{config.bstMode === "insert" && <input className="txt" type="number" placeholder={isZh ? "插值" : "x"} style={{ width: 70 }} value={Number.isNaN(config.x) ? "" : config.x} onChange={(e) => set({ x: e.target.value===""?NaN:Number(e.target.value) })} />}</>}
+          {config.subMode === "heap" && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><select className="txt" value={config.heapMode} onChange={(e) => set({ heapMode: e.target.value as any })}><option value="build">建堆</option><option value="insert">插入</option><option value="pop">弹出</option></select>{config.heapMode === "insert" && <input className="txt" type="number" style={{ width: 70 }} value={config.heapVal} onChange={(e) => set({ heapVal: Number(e.target.value) })} />}</>}
           {(config.subMode === "btree" || config.subMode === "bplus") && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><label className="txt-label">阶<input className="txt" type="number" style={{ width: 60 }} value={config.btreeOrder} onChange={(e) => set({ btreeOrder: Math.max(3, Number(e.target.value)) })} /></label><input className="txt" type="number" style={{ width: 70 }} value={config.btreeVal} onChange={(e) => set({ btreeVal: Number(e.target.value) })} /></>}
         </div>
       </div>
@@ -577,6 +580,11 @@ export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
       if (c.bstMode === "search") return BST_SEARCH_CODE as never;
       if (c.bstMode === "delete") return RB_DELETE_CODE as never;
       return RB_INSERT_CODE as never;
+    }
+    if (c.subMode === "splay") {
+      if (c.bstMode === "search") return SPLAY_CODE as never;
+      if (c.bstMode === "delete") return SPLAY_DELETE_CODE as never;
+      return SPLAY_INSERT_CODE as never;
     }
     if (c.subMode === "heap") {
       if (c.heapMode === "insert") return HEAP_INSERT_CODE as never;
@@ -599,7 +607,7 @@ export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
   blockedReason(cfg) {
     const c = cfg as Cfg;
     if (c.subMode !== "lca" && c.subMode !== "traverse"
-      && c.subMode !== "bst" && c.subMode !== "avl" && c.subMode !== "rb"
+      && c.subMode !== "bst" && c.subMode !== "avl" && c.subMode !== "rb" && c.subMode !== "splay"
       && c.subMode !== "heap" && c.subMode !== "btree" && c.subMode !== "bplus") return null;
     try {
       if (c.treeImp) {
@@ -607,7 +615,7 @@ export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
         gg.fromSpec(c.treeImp.spec);
         if (c.subMode === "lca" && !gg.isTree()) return "LCA 要求无环连通图（树）。可点随机树或手动改成树";
         if (c.subMode === "traverse" && !isBinaryRooted(gg, 0)) return "二叉遍历要求二叉树（每个节点至多两个子节点）。可点随机二叉树或手动修改";
-        if ((c.subMode === "bst" || c.subMode === "avl" || c.subMode === "rb" || c.subMode === "heap" || c.subMode === "btree" || c.subMode === "bplus") && !numericVals(gg)) return "该算法需要数字标签作比较。可点随机数字标签或手动改成数字";
+        if ((c.subMode === "bst" || c.subMode === "avl" || c.subMode === "rb" || c.subMode === "splay" || c.subMode === "heap" || c.subMode === "btree" || c.subMode === "bplus") && !numericVals(gg)) return "该算法需要数字标签作比较。可点随机数字标签或手动改成数字";
         if (c.subMode === "bst" && c.bstMode !== "build" && !isBinaryRooted(gg, 0)) return "BST 查找/插入/删除要求二叉树。可点随机一棵二叉树或手动修改";
         if (c.subMode === "heap" && c.heapMode !== "build" && (!isBinaryRooted(gg, 0) || !isCompleteRooted(gg, 0))) return "堆插入/弹出要求完全二叉树。可先去建堆再同步";
       }
@@ -629,9 +637,10 @@ export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
     const sceneTone = (scene as any).tone as Record<number, number> | undefined;
     const highlight = { current: (scene as any).current ?? null, visited: (scene as any).visited ?? [], frontier: (scene as any).frontier ?? [], edge: (scene as any).edge ?? null, tone: { ...pickTone, ...(sceneTone ?? {}) } };
     const [memOpen, setMemOpen] = useState(false);
+    const [editInput, setEditInput] = useState(false);
     const needTree = cfg.subMode === "lca" && !gForMem.isTree();
-    const needBinary = cfg.subMode === "traverse" && !isBinaryRooted(gForMem, 0);
-    const needNumeric = (cfg.subMode === "bst" || cfg.subMode === "avl" || cfg.subMode === "rb" || cfg.subMode === "heap" || cfg.subMode === "btree" || cfg.subMode === "bplus") && !numericVals(gForMem);
+    const needBinary = (cfg.subMode === "traverse" || cfg.subMode === "threaded") && !isBinaryRooted(gForMem, 0);
+    const needNumeric = (cfg.subMode === "bst" || cfg.subMode === "avl" || cfg.subMode === "rb" || cfg.subMode === "splay" || cfg.subMode === "heap" || cfg.subMode === "btree" || cfg.subMode === "bplus") && !numericVals(gForMem);
     const needBinaryBST = cfg.subMode === "bst" && cfg.bstMode !== "build" && !isBinaryRooted(gForMem, 0);
     const needComplete = cfg.subMode === "heap" && cfg.heapMode !== "build" && (!isBinaryRooted(gForMem, 0) || !isCompleteRooted(gForMem, 0));
     const applyHeapBuildFix = () => {
@@ -668,7 +677,7 @@ export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
       else onChange?.({ ...cfg, lcaU: id } as unknown as Cfg);
     };
     // 六大家族走动画画布（帧场景自带布局：双面板建树 / 构造快照）；编辑类走编辑器
-    const useCanvas = cfg.subMode === "bst" || cfg.subMode === "avl" || cfg.subMode === "rb" || cfg.subMode === "heap" || cfg.subMode === "btree" || cfg.subMode === "bplus";
+    const useCanvas = cfg.subMode === "bst" || cfg.subMode === "avl" || cfg.subMode === "rb" || cfg.subMode === "splay" || cfg.subMode === "heap" || cfg.subMode === "btree" || cfg.subMode === "bplus";
     const memSection = (<>
       <div onClick={() => setMemOpen(!memOpen)} style={{ height: 28, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#eef2ff", border: "1px solid #c7d2fe", borderRadius: 8, cursor: "pointer", marginTop: 6 }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: "#4338ca" }}>{memOpen ? (isZh ? "收起内存表示 ▾" : "Hide Memory ▾") : (isZh ? "展开内存表示 ▸" : "Show Memory ▸")}</span>
@@ -680,11 +689,29 @@ export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
         </div>
       )}
     </>);
-    const body = useCanvas ? (
+    const body = cfg.subMode === "threaded" ? (
+      <ThreadedView g={gForMem} isZh={isZh} />
+    ) : useCanvas ? (
       <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, position: "relative" }}>
         <div style={{ flex: memOpen ? "0 0 50%" : "1", minHeight: 0, border: "1px solid #c7d2fe", borderRadius: 12, overflow: "hidden", background: "#fff", display: "flex", flexDirection: "column" }}>
-          <GraphCanvas scene={scene} t={t} />
+          {editInput ? (
+            <GraphEditor
+              key={`tree-input-${cfg.subMode}-${currentImp?.n ?? 0}-${currentImp?.spec ?? ""}`}
+              initialGraph={currentImp ?? DEFAULT_IMP}
+              constraints={{ mustBeTree: true, hint: isZh ? "树需 n-1 边且无环" : "needs tree" }}
+              highlight={highlight}
+              embedded
+              onPickVertex={onPickVertex}
+              onConfirm={(g) => onChange?.({ ...cfg, treeImp: g } as unknown as Cfg)}
+              title={isZh ? "输入树编辑器" : "Input tree"}
+            />
+          ) : (
+            <GraphCanvas scene={scene} t={t} />
+          )}
         </div>
+        <button className="ghost" style={{ marginTop: 6, alignSelf: "center", padding: "4px 12px", fontSize: 12 }} onClick={() => setEditInput((v) => !v)}>
+          {editInput ? (isZh ? "返回演示 ▸" : "Back to demo ▸") : (isZh ? "编辑输入树 ✎" : "Edit input tree ✎")}
+        </button>
         {memSection}
       </div>
     ) : (
@@ -692,7 +719,7 @@ export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
         <div style={{ flex: memOpen ? "0 0 50%" : "1", minHeight: 0, border: "1px solid #c7d2fe", borderRadius: 12, overflow: "hidden", background: "#fff", display: "flex", flexDirection: "column" }}>
           <GraphEditor
             key={`tree-${cfg.subMode}-${currentImp?.n ?? 0}-${currentImp?.spec ?? ""}`}
-            initialGraph={currentImp ?? { n: 7, spec: "0-1,0-2,1-3,1-4,2-5,2-6", labels: ["4","2","6","1","3","5","7"], directed: false, root: 0, layout: "tree" }}
+            initialGraph={currentImp ?? DEFAULT_IMP}
             constraints={{ mustBeTree: true, hint: isZh ? "树需 n-1 边且无环" : "needs tree" }}
             highlight={highlight}
             embedded
@@ -726,8 +753,6 @@ export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
     );
   },
   Side({ scene, t, config }) {
-    // 通用树编辑：纯编辑模式，不渲染数值块
-    if ((config as Cfg | undefined)?.subMode === "general") return null;
     const isZh = t(T("中文", "en")) !== "en";
     const tables = (scene as any).stateTables as any;
     if (!tables || tables.length === 0) return <div style={{ fontSize: 12, color: "#64748b", padding: 12 }}>{isZh ? "当前帧无额外内存" : "No extra memory"}</div>;
@@ -819,3 +844,56 @@ function LeftMemoryPanel({ g, isZh }: { g: Graph | null; isZh: boolean }) {
 }
 
 function clampV(v: number, n: number) { return Math.min(Math.max(0, v), Math.max(0, n - 1)); }
+
+/** 线索二叉树：中序序列 + 空指针改为前驱/后继线索 */
+function ThreadedView({ g, isZh }: { g: any; isZh: boolean }) {
+  if (!g || g.n === 0) return <div style={{ color: '#94a3b8', textAlign: 'center', padding: 20 }}>{isZh ? '空' : 'empty'}</div> as unknown as never;
+  const { parent, order } = g.bfs(0);
+  const children: number[][] = Array.from({ length: g.n }, () => []);
+  for (const v of order) if (v !== 0 && parent[v] !== -1) children[parent[v]].push(v);
+  const left = children.map((c) => (c[0] ?? null));
+  const right = children.map((c) => (c[1] ?? null));
+  const ino: number[] = [];
+  const rec = (u: number | null) => { if (u === null) return; rec(left[u]); ino.push(u); rec(right[u]); };
+  rec(0);
+  const rows = ino.map((u, i) => ({
+    u,
+    label: g.labels[u],
+    l: left[u],
+    r: right[u],
+    pred: left[u] === null && i - 1 >= 0 ? ino[i - 1] : null,
+    succ: right[u] === null && i + 1 < ino.length ? ino[i + 1] : null,
+  }));
+  return (
+    <div style={{ display: 'grid', gap: 10, height: '100%', overflow: 'auto', padding: 4 }}>
+      <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' }}>
+        {ino.map((u, i) => (
+          <div key={u} style={{ display: 'flex', alignItems: 'center' }}>
+            <div className="digit" style={{ width: 46, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><strong>{g.labels[u]}</strong></div>
+            {i < ino.length - 1 && <span style={{ color: right[u] === null ? '#f59e0b' : '#cbd5e1', padding: '0 3px', fontWeight: 800 }}>{right[u] === null ? '⇢' : '→'}</span>}
+          </div>
+        ))}
+      </div>
+      <table style={{ margin: '0 auto', borderCollapse: 'collapse', fontSize: 12, fontFamily: 'ui-monospace, monospace', background: '#fff', border: '1px solid #e2e8f0' }}>
+        <thead><tr style={{ background: '#f8fafc', color: '#64748b' }}>
+          <th style={{ padding: '4px 10px' }}>{isZh ? '中序' : '#'}</th><th style={{ padding: '4px 10px' }}>node</th><th style={{ padding: '4px 10px' }}>left</th><th style={{ padding: '4px 10px' }}>right</th><th style={{ padding: '4px 10px' }}>pred</th><th style={{ padding: '4px 10px' }}>succ</th>
+        </tr></thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={r.u}>
+              <td style={{ padding: '3px 10px', color: '#94a3b8' }}>{i + 1}</td>
+              <td style={{ padding: '3px 10px', fontWeight: 800 }}>{r.label}</td>
+              <td style={{ padding: '3px 10px', color: '#475569' }}>{r.l === null ? 'null' : g.labels[r.l]}</td>
+              <td style={{ padding: '3px 10px', color: '#475569' }}>{r.r === null ? 'null' : g.labels[r.r]}</td>
+              <td style={{ padding: '3px 10px', color: r.pred !== null ? '#f59e0b' : '#cbd5e1' }}>{r.pred !== null ? g.labels[r.pred] : '-'}</td>
+              <td style={{ padding: '3px 10px', color: r.succ !== null ? '#f59e0b' : '#cbd5e1' }}>{r.succ !== null ? g.labels[r.succ] : '-'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <div style={{ fontSize: 12, color: '#64748b', textAlign: 'center' }}>
+        {isZh ? '橙色 ⇢ / pred·succ 列 = 空指针改为指向中序前驱/后继（线索）。线索化后中序遍历无需栈。' : 'Orange = null pointers become pred/succ threads (inorder).'}
+      </div>
+    </div>
+  ) as unknown as never;
+}

@@ -96,9 +96,9 @@ function splayUp(nodes: BinNode[], root: number, u: number, snap: Snap): number 
       root = pIsLeft ? rotR(nodes, root, p) : rotL(nodes, root, p);
       snap(1, u, `zig-zig：$x=${nodes[u].val}$ 与父同侧 → 双旋（先父后 $x$）`, `zig-zig: ${nodes[u].val}`);
     } else {
-      // zig-zag：异侧 → 先旋 x 再旋父
+      // zig-zag：异侧 → 先旋 x 再旋原祖父 g（第二次方向与第一次相反）
       root = uIsLeft ? rotR(nodes, root, p) : rotL(nodes, root, p);
-      root = pIsLeft ? rotL(nodes, root, gp) : rotR(nodes, root, gp);
+      root = uIsLeft ? rotL(nodes, root, gp) : rotR(nodes, root, gp);
       snap(2, u, `zig-zag：$x=${nodes[u].val}$ 与父异侧 → 双旋（先 $x$ 后父）`, `zig-zag: ${nodes[u].val}`);
     }
   }

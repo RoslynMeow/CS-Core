@@ -1,7 +1,7 @@
 import { T } from '../../i18n/lang';
 import type { ModuleDef, Frame } from '../../engine/types';
 import { MathText } from '../../lib/tex';
-import { DigitRows } from './glyphs';
+import { DigitRows, digitVal } from './glyphs';
 
 type Cfg = { base: number; numeral: string };
 type Scene = { base: number; digits: number[]; value: number; highlight: number | null; partials: number[] };
@@ -9,11 +9,8 @@ type Scene = { base: number; digits: number[]; value: number; highlight: number 
 function parseDigits(numeral: string, base: number): number[] | null {
   const s = numeral.trim();
   if (!s) return null;
-  const msb = s.split('').map(ch => {
-    const v = parseInt(ch, base);
-    return Number.isNaN(v) ? NaN : v;
-  });
-  if (msb.some(v => Number.isNaN(v) || v < 0 || v >= base)) return null;
+  const msb = s.split('').map(ch => digitVal(ch, base));
+  if (msb.some(v => v < 0 || v >= base)) return null;
   return msb.reverse();
 }
 
@@ -28,7 +25,7 @@ export const expansionModule: ModuleDef<Scene, Cfg> = {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
         <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
           <span>{t(T('进制', 'Base'))}</span>
-          <input className="txt" type="number" min={2} max={16} value={config.base} onChange={e => onChange({ ...config, base: Math.max(2, Math.min(16, Number(e.target.value) || 2)) })} style={{ width: 72 }} />
+          <input className="txt" type="number" min={2} max={64} value={config.base} onChange={e => onChange({ ...config, base: Math.max(2, Math.min(64, Number(e.target.value) || 2)) })} style={{ width: 80 }} />
         </label>
         <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
           <span>{t(T('数码', 'Numeral'))}</span>

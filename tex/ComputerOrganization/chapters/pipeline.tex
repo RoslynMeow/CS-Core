@@ -1,4 +1,9 @@
+\clearpage
+\vspace*{\fill}
 \section{流水线与指令级并行}
+\vspace*{\fill}
+\clearpage
+
 
 \subsection{流水线原理}
 
@@ -23,6 +28,34 @@ MIPS 五级流水线：
     \item \textbf{MEM}（Memory Access）：访存（读/写数据存储器）
     \item \textbf{WB}（Write Back）：结果写回寄存器
 \end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    cell/.style={draw, minimum width=1.05cm, minimum height=0.6cm, font=\scriptsize, inner sep=0pt},
+    st1/.style={cell, fill=red!18},
+    st2/.style={cell, fill=blue!18},
+    st3/.style={cell, fill=green!22},
+    st4/.style={cell, fill=orange!25},
+    st5/.style={cell, fill=violet!20},
+    lbl/.style={font=\scriptsize}, hd/.style={font=\scriptsize\bfseries}
+]
+    \def\cs{1.07}
+    \foreach \c in {1,...,9} { \node[hd] at ({\c*\cs-0.5*\cs}, 0.5) {C\c}; }
+    \foreach \i/\n in {1/{$I_1$},2/{$I_2$},3/{$I_3$},4/{$I_4$},5/{$I_5$}} {
+        \node[lbl] at (-0.7, {-\i*\cs}) {\n};
+    }
+    \foreach \i in {1,...,5} {
+        \foreach \s/\st in {1/IF,2/ID,3/EX,4/MEM,5/WB} {
+            \pgfmathtruncatemacro{\c}{\i+\s-1}
+            \node[st\s] at ({\c*\cs-0.5*\cs}, {-\i*\cs}) {\st};
+        }
+    }
+    \node[lbl] at ({5*\cs}, {-6.1*\cs}) {理想流水线：$n$ 条指令耗时 $n+k-1$ 周期（$k=5$）};
+\end{tikzpicture}
+\caption{五级流水线时空图（无冒险，$S\approx k$）}
+\label{fig:pipeline_spacetime}
+\end{figure}
 
 \subsection{流水线冒险（Pipeline Hazards）}
 

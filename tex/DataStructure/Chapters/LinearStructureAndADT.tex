@@ -1,4 +1,13 @@
+\clearpage
+\begingroup
+\let\clearpage\relax
+\let\cleardoublepage\relax
+\vspace*{\fill}
 \chapter{线性结构与抽象数据类型}
+\vspace*{\fill}
+\endgroup
+\clearpage
+
 
 \section{物理存储结构：线性表（Linear List）}
 
@@ -614,4 +623,32 @@
 \caption{链地址法与动态重构模型}
 \label{fig:hash_chaining}
 \end{figure}
+
+\section{字典树 (Trie) 与前缀检索}
+
+\begin{itemize}
+    \item \textbf{对象}：字母表 $\Sigma$ 上的字符串集 $W\subseteq\Sigma^*$。构造字符树：根为空串，每条边标记一个字符，从根到某节点的路径即一个前缀。
+    \item \textbf{不变式}：节点子节点以字符为键唯一；节点置词尾标记 $end(u)$，当且仅当根到 $u$ 的路径是一个完整词（以此区分完整词与纯前缀）。
+    \item \textbf{定理}：插入/查找时间 $O(|w|)$，与词表大小无关；总空间 $O(\sum_{w\in W}|w|)$。前缀查询、最长公共前缀 (LCP) 天然高效，是自动补全与拼写检查的基础。
+    \item \textbf{基数树 (Radix / Patricia)}：将无分支的单链路径压缩为一条边（边标签为子串），节点数降为 $O(\text{叶数})$，读边标即可还原路径；是 Trie 的空间优化变体。
+\end{itemize}
+
+\begin{algorithm}[H]
+\caption{字典树插入与查找规约}
+\begin{algorithmic}[1]
+\Procedure{TrieInsert}{$root,w$}
+    \State $p\gets root$; $i\gets0$
+    \While{$i<|w|$}
+        \If{$w_i\notin p.children$} $p.children[w_i]\gets\text{node}()$ \EndIf
+        \State $p\gets p.children[w_i]$; $i\gets i+1$
+    \EndWhile
+    \State $p.end\gets\text{true}$
+\EndProcedure
+\Procedure{TrieSearch}{$root,w$}
+    \State $p\gets root$
+    \For{$c$ \textbf{in} $w$} \If{$c\notin p.children$} \Return \textbf{false} \EndIf \State $p\gets p.children[c]$ \EndFor
+    \State \Return $p.end$ \Comment{词尾才算命中（前缀不算）}
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
 

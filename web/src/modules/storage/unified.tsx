@@ -9,8 +9,9 @@ import { hashTableModule } from "./hashTable";
 import { matrixModule } from "./matrix";
 import { stackModule } from "./stack";
 import { queueModule } from "./queue";
+import { dequeModule } from "./deque";
 
-type SubMode = "sequential-list" | "linked-list" | "circular-linked-list" | "doubly-linked-list" | "hash-table" | "matrix" | "stack" | "queue";
+type SubMode = "sequential-list" | "linked-list" | "circular-linked-list" | "doubly-linked-list" | "hash-table" | "matrix" | "stack" | "queue" | "deque";
 const MAP: Record<SubMode, ModuleDef> = {
   "sequential-list": sequentialListModule as unknown as ModuleDef,
   "linked-list": linkedListModule as unknown as ModuleDef,
@@ -20,6 +21,7 @@ const MAP: Record<SubMode, ModuleDef> = {
   "matrix": matrixModule as unknown as ModuleDef,
   "stack": stackModule as unknown as ModuleDef,
   "queue": queueModule as unknown as ModuleDef,
+  "deque": dequeModule as unknown as ModuleDef,
 };
 export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
   { label: "线性表", opts: [
@@ -32,6 +34,7 @@ export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string
   { label: "栈队列散列", opts: [
     { v: "stack", zh: "栈", en: "Stack" },
     { v: "queue", zh: "队列", en: "Queue" },
+    { v: "deque", zh: "双端队列", en: "Deque" },
     { v: "hash-table", zh: "哈希表", en: "Hash" },
   ]},
 ];

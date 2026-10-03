@@ -1,4 +1,9 @@
-﻿\section{处理器：控制器}
+\clearpage
+\vspace*{\fill}
+\section{处理器：控制器}
+\vspace*{\fill}
+\clearpage
+
 
 \subsection{控制器的功能}
 
@@ -31,6 +36,28 @@ ALUOp & ALU 操作选择 & 00=加, 01=减, 10=funct码决定 \\
 \bottomrule
 \end{tabulary}
 \end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    b/.style={draw, rounded corners, minimum width=2.6cm, minimum height=1.1cm, font=\small, fill=blue!8, align=center},
+    s/.style={draw, rounded corners, minimum width=3.2cm, minimum height=0.6cm, font=\scriptsize, fill=green!12, align=center},
+    e/.style={->, >=latex, thick},
+    lbl/.style={font=\scriptsize}
+]
+    \node[b] (ctrl) at (0,0) {控制器};
+    \node[s] (d1) at (5.0,1.5) {RegWrite, MemRead, MemWrite, MemToReg};
+    \node[s] (d2) at (5.0,0) {ALUSrc, ALUOp, PCSrc};
+    \node[s] (d3) at (5.0,-1.5) {Branch / Jump};
+    \draw[e] (ctrl) -- (d1);
+    \draw[e] (ctrl) -- (d2);
+    \draw[e] (ctrl) -- (d3);
+    \draw[e] (-1.9,0)--(ctrl) node[lbl,midway,above]{op(6)};
+    \draw[e] (-1.9,-0.7)--(ctrl) node[lbl,midway,below]{funct(6)};
+\end{tikzpicture}
+\caption{控制器：由操作码与功能码生成控制信号}
+\label{fig:control_signals}
+\end{figure}
 
 \subsection{ALU 控制}
 

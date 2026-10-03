@@ -1,4 +1,9 @@
+\clearpage
+\vspace*{\fill}
 \section{计算机系统概述}
+\vspace*{\fill}
+\clearpage
+
 
 \subsection{计算机是什么}
 
@@ -32,6 +37,27 @@
 &\text{执行: } \text{ALU运算 / 访存 / 跳转}
 \end{aligned}
 \end{equation}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    bx/.style={draw, rounded corners, minimum width=2.5cm, minimum height=0.9cm, font=\small, fill=blue!8},
+    e/.style={->, >=latex, thick},
+    lbl/.style={font=\small}
+]
+    \node[bx] (f) at (0,0) {取指 Fetch};
+    \node[bx] (d) at (4,0) {译码 Decode};
+    \node[bx] (x) at (4,-1.8) {执行 Execute};
+    \node[bx] (w) at (0,-1.8) {更新 PC};
+    \draw[e] (f)--(d);
+    \draw[e] (d)--(x);
+    \draw[e] (x)--(w);
+    \draw[e] (w)--(f);
+    \node[lbl] at (2,-2.7) {指令与数据同存，顺序驱动：冯·诺依曼循环};
+\end{tikzpicture}
+\caption{存储程序原理：取指—译码—执行循环}
+\label{fig:von_neumann_cycle}
+\end{figure}
 
 \subsection{计算机层次结构}
 

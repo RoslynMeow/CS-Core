@@ -5703,3 +5703,134 @@ export function reconstructPathFromParent(parent: number[], target: number): num
   }
   return path;
 }
+
+// ===================== 割点 / 桥（Tarjan 低链接） =====================
+export type ArticStep = AlgoStep & { disc: number[]; low: number[]; artic: boolean[]; bridges: [number, number][] };
+
+export const ARTIC_CODE: Text[] = [
+  { zh: "$disc[u] \\gets low[u] \\gets ++timer$ // 首次访问", en: "$disc[u] \\gets low[u] \\gets ++timer$" },
+  { zh: "for $v$ in $adj[u]$: // 树边下探 / 回边压低 $low$", en: "for v in adj[u]: tree/back edge" },
+  { zh: "  if $low[v] > disc[u]$: 桥 $(u,v)$", en: "  if low[v]>disc[u]: bridge" },
+  { zh: "  if $low[v] \\ge disc[u]$: $u$ 为割点", en: "  if low[v]>=disc[u]: articulation" },
+  { zh: "$done$ // 输出割点与桥", en: "done" },
+];
+
+export function articulationSteps(g: Graph, start = 0, labels: string[] = g.labels): ArticStep[] {
+  const n = g.n;
+  const adj = g.adj();
+  const disc = new Array(n).fill(-1);
+  const low = new Array(n).fill(0);
+  const artic = new Array(n).fill(false);
+  const bridges: [number, number][] = [];
+  let timer = 0;
+  const steps: ArticStep[] = [];
+  const S = (i: number) => labels[i] ?? String(i);
+  const visitedList = () => disc.map((_, i) => i).filter((i) => disc[i] >= 0);
+  const push = (line: number, current: number | null, exploring: number | null, edge: [number, number] | null, zh: string, en: string) =>
+    steps.push({ line, current, exploring, visited: visitedList(), frontier: [], order: [], edge, disc: [...disc], low: [...low], artic: [...artic], bridges: [...bridges], msg: { zh, en } });
+  const dfs = (u: number, parent: number, isRoot: boolean) => {
+    disc[u] = low[u] = ++timer;
+    push(0, u, u, null, `访问 ${S(u)}：$disc=low=${timer}$`, `visit ${S(u)}`);
+    let children = 0;
+    for (const [v] of adj[u]) {
+      if (v === parent) continue;
+      push(1, u, u, [u, v], `检查边 ${S(u)}-${S(v)}`, `edge ${S(u)}-${S(v)}`);
+      if (disc[v] === -1) {
+        children++;
+        dfs(v, u, false);
+        low[u] = Math.min(low[u], low[v]);
+        if (low[v] > disc[u]) {
+          bridges.push([u, v]);
+          push(2, u, v, [u, v], `桥：${S(u)}-${S(v)}（$low[${S(v)}]=${low[v]}>disc[${S(u)}]=${disc[u]}$）`, `bridge ${S(u)}-${S(v)}`);
+        }
+        if (!isRoot && low[v] >= disc[u] && !artic[u]) {
+          artic[u] = true;
+          push(3, u, v, [u, v], `割点：${S(u)}（$low[${S(v)}]\\ge disc[${S(u)}]$）`, `articulation ${S(u)}`);
+        }
+      } else if (disc[v] < disc[u]) {
+        low[u] = Math.min(low[u], disc[v]);
+        push(1, u, u, [u, v], `回边 → $low[${S(u)}]=${low[u]}$`, `back edge`);
+      }
+    }
+    if (isRoot && children > 1 && !artic[u]) {
+      artic[u] = true;
+      push(3, u, null, null, `割点：${S(u)}（根，${children} 棵子树）`, `articulation root ${S(u)}`);
+    }
+  };
+  if (n > 0) {
+    const r = Math.min(Math.max(0, start), n - 1);
+    dfs(r, -1, true);
+    for (let i = 0; i < n; i++) if (disc[i] === -1) dfs(i, -1, true);
+  }
+  const ap = artic.map((a, i) => (a ? S(i) : null)).filter(Boolean).join(",") || (n ? "无" : "");
+  const br = bridges.map(([a, b]) => `${S(a)}-${S(b)}`).join(",") || "无";
+  push(4, null, null, null, `完成：割点 [${ap}]；桥 [${br}]`, `done: AP [${ap}]; bridges [${br}]`);
+  return steps;
+}
+
+// ===================== 二分图最大匹配（匈牙利 / Kuhn） =====================
+export type MatchStep = AlgoStep & { side: number[]; match: number[]; augment: number[] };
+
+export const BIPARTITE_CODE: Text[] = [
+  { zh: "2-染色：把图划分为左右两侧", en: "2-color: split L / R" },
+  { zh: "for $u$ in 左侧:", en: "for u in L:" },
+  { zh: "  $dfs(u)$: 沿未匹配边找增广路", en: "  dfs(u): augmenting path" },
+  { zh: "  if 成功: 匹配数 $+1$", en: "  if ok: +1" },
+  { zh: "$done$ // 最大匹配", en: "done" },
+];
+
+export function bipartiteMatchSteps(g: Graph, labels: string[] = g.labels): MatchStep[] {
+  const n = g.n;
+  const adj = g.adj();
+  const side = new Array(n).fill(-1);
+  const matchL = new Array(n).fill(-1);
+  const matchR = new Array(n).fill(-1);
+  const order: number[] = [];
+  const steps: MatchStep[] = [];
+  const S = (i: number) => labels[i] ?? String(i);
+  const pushStep = (line: number, current: number | null, exploring: number | null, edge: [number, number] | null, augment: number[], order: number[], zh: string, en: string) =>
+    steps.push({ line, current, exploring, visited: [], frontier: [], order, edge, side: [...side], match: [...matchL], augment: [...augment], msg: { zh, en } });
+  // 2-染色
+  for (let s = 0; s < n; s++) {
+    if (side[s] >= 0) continue;
+    side[s] = 0;
+    const q = [s];
+    while (q.length) {
+      const u = q.shift() as number;
+      for (const [v] of adj[u]) {
+        if (side[v] === -1) { side[v] = 1 - side[u]; q.push(v); }
+        else if (side[v] === side[u]) {
+          pushStep(0, u, v, [u, v], [], [], `非二分图：${S(u)}-${S(v)} 同侧冲突`, `not bipartite`);
+          return steps;
+        }
+      }
+    }
+  }
+  pushStep(0, null, null, null, [], [], `2-染色完成：左侧 ${side.filter((x) => x === 0).length} 个`, `bipartition done`);
+  const tryAug = (u: number, seen: boolean[], path: number[], edge: [number, number] | null): boolean => {
+    for (const [v] of adj[u]) {
+      if (seen[v]) continue;
+      seen[v] = true;
+      path.push(v);
+      pushStep(2, u, v, [u, v], [...path], [...order], `尝试 ${S(u)}-${S(v)}`, `try ${S(u)}-${S(v)}`);
+      if (matchR[v] === -1 || tryAug(matchR[v], seen, path, [matchR[v], v])) {
+        matchL[u] = v;
+        matchR[v] = u;
+        pushStep(3, u, v, [u, v], [...path], [...order], `匹配 ${S(u)}-${S(v)}`, `match ${S(u)}-${S(v)}`);
+        path.pop();
+        return true;
+      }
+      path.pop();
+    }
+    return false;
+  };
+  for (let u = 0; u < n; u++) {
+    if (side[u] !== 0) continue;
+    const seen = new Array(n).fill(false);
+    if (tryAug(u, seen, [], null)) order.push(u);
+  }
+  const cnt = matchL.filter((x) => x >= 0).length;
+  pushStep(4, null, null, null, [], [...order], `完成：最大匹配 ${cnt} 对`, `done: max matching ${cnt}`);
+  return steps;
+}
+

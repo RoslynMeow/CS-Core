@@ -1,7 +1,8 @@
 import { T } from '../../i18n/lang';
 import type { Frame, ModuleDef } from '../../engine/types';
 import { MathText } from '../../lib/tex';
-import { DigitRows } from './glyphs';
+import { defaultAlphabet } from '../../lib/alphabet';
+import { DigitRows, digitVal } from './glyphs';
 
 // 位权 (Place Value): 同一数码在不同位置, 权不同 n^i, 贡献 P_i·n^i
 type Cfg = { base: number; numeral: string };
@@ -19,15 +20,15 @@ const DEFAULT_CFG: Cfg = { base: 10, numeral: '3507' };
 function parse(numeral: string, base: number): number[] | null {
   const s = numeral.trim();
   if (!s) return null;
-  const msb = s.split('').map((ch) => parseInt(ch, base));
-  if (msb.some((v) => Number.isNaN(v) || v < 0 || v >= base)) return null;
+  const msb = s.split('').map((ch) => digitVal(ch, base));
+  if (msb.some((v) => v < 0 || v >= base)) return null;
   return msb;
 }
 function randNumeral(base: number, len: number): string {
-  const pool = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const pool = defaultAlphabet(base);
   let s = '';
   for (let i = 0; i < len; i++) s += pool[Math.floor(Math.random() * base)];
-  if (s.length > 1 && s[0] === '0') s = pool[1 + Math.floor(Math.random() * (base - 1))] + s.slice(1);
+  if (s.length > 1 && s[0] === pool[0]) s = pool[1 + Math.floor(Math.random() * (base - 1))] + s.slice(1);
   return s;
 }
 function build(cfg: Cfg): Scene {
@@ -55,11 +56,11 @@ export const placeValueModule: ModuleDef<Scene, Cfg> = {
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '8px 10px', borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
         <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
           <span>{t(T('进制', 'Base'))}</span>
-          <input className="txt" type="number" min={2} max={36} value={config.base}
+          <input className="txt" type="number" min={2} max={64} value={config.base}
             onChange={(e) => {
-              const base = Math.max(2, Math.min(36, Number(e.target.value) || 10));
+              const base = Math.max(2, Math.min(64, Number(e.target.value) || 10));
               onChange({ ...config, base, numeral: randNumeral(base, config.numeral.trim().length || 4) });
-            }} style={{ width: 72 }} />
+            }} style={{ width: 80 }} />
         </label>
         <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 13 }}>
           <span>{t(T('数码', 'Numeral'))}</span>
@@ -80,19 +81,19 @@ export const placeValueModule: ModuleDef<Scene, Cfg> = {
     }
     const k = s.digits.length;
     return (
-      <div style={{ display: 'grid', gap: 12, maxWidth: 860, margin: '0 auto' }}>
+      <div style={{ display: 'grid', gap: 12, maxWidth: '100%', margin: '0 auto' }}>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'center', alignItems: 'flex-end', flexWrap: 'wrap' }}>
           {s.digits.map((d, idx) => {
             const i = k - 1 - idx; // LSB index
             const hot = i === k - 1; // 最高位强调
             return (
-              <div key={idx} style={{ textAlign: 'center' }}>
+              <div key={idx} style={{ textAlign: 'center', width: 92, minWidth: 0 }}>
                 <div style={{ fontSize: 10, color: '#94a3b8' }}>{`第 ${i} 位`}</div>
-                <div className="digit" style={{ width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', background: hot ? '#eef2ff' : '#fff' }}>
+                <div className="digit" style={{ width: 52, height: 52, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', background: hot ? '#eef2ff' : '#fff' }}>
                   <strong style={{ color: hot ? '#4338ca' : undefined }}>{d}</strong>
                 </div>
                 <div style={{ fontSize: 11, color: '#0369a1', marginTop: 2 }}><MathText text={`$\\times ${s.base}^{${i}}$`} /></div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#b45309' }}>= {s.contribs[idx]}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#b45309', wordBreak: 'break-all', lineHeight: 1.25 }}>= {s.contribs[idx]}</div>
               </div>
             );
           })}

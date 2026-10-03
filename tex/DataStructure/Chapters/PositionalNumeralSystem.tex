@@ -1,6 +1,16 @@
+\clearpage
+\begingroup
+\let\clearpage\relax
+\let\cleardoublepage\relax
+\vspace*{\fill}
 \chapter{位置记数系统}
-
+\begin{center}
 在数学中，\textbf{$n$ 进制}（进位计数制，Positional Numeral System）是指用一组固定的符号来表示任意实数的计数方法。其严谨的数学形式化定义由以下三个核心要素构成：
+\end{center}
+\vspace*{\fill}
+\endgroup
+\clearpage
+
 
 \section{任意进制定义}
 
@@ -29,6 +39,23 @@ $$y = \mathcal{I}_n(\{P_i\}) = \sum_{i=-\infty}^{\infty} P_i \cdot n^i$$
 展开为 $y = \dots + P_2 n^2 + P_1 n^1 + P_0 n^0 + P_{-1} n^{-1} + P_{-2} n^{-2} + \dots$。
     \item \textbf{不变式}：整数部分 $i \ge 0$ 与小数部分 $i < 0$ 同一公式分区，仅指数符号不同。
 \end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    cell/.style={draw, minimum width=0.8cm, minimum height=0.72cm, font=\small},
+    pw/.style={draw, minimum width=0.8cm, minimum height=0.72cm, font=\scriptsize, fill=gray!12},
+    lbl/.style={font=\small}
+]
+    \matrix (m) [matrix of nodes, nodes={cell}, column sep=-\pgflinewidth, row sep=-\pgflinewidth] {
+        $2^3$ & $2^2$ & $2^1$ & $2^0$ & $. $ & $2^{-1}$ & $2^{-2}$ & $2^{-3}$ \\
+        $1$ & $0$ & $1$ & $1$ & $. $ & $1$ & $0$ & $1$ \\
+    };
+    \node[lbl] at (0,-1.15) {$y=\sum_i P_i 2^i=1\!\cdot\!2^3+0\!\cdot\!2^2+1\!\cdot\!2^1+1\!\cdot\!2^0+1\!\cdot\!2^{-1}+0\!\cdot\!2^{-2}+1\!\cdot\!2^{-3}=11.625$};
+\end{tikzpicture}
+\caption{按权展开：位权与数码一一对应（$(1011.101)_2=11.625$）}
+\label{fig:polynomial_expansion}
+\end{figure}
 
 \section{\texorpdfstring{任意进制转换定义 ($n \to m$)}{任意进制转换定义 (n 转 m)}}
 
@@ -101,6 +128,27 @@ $$s_i = P_i + c_i, \quad Q_i = s_i \bmod n, \quad c_{i+1} = \left\lfloor s_i / n
 \end{algorithmic}
 \end{algorithm}
 
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    cell/.style={draw, minimum width=0.8cm, minimum height=0.72cm, font=\small},
+    hl/.style={draw, minimum width=0.8cm, minimum height=0.72cm, font=\small, fill=orange!25},
+    lbl/.style={font=\small}, c/.style={->, >=latex, thick, red}
+]
+    \matrix (a) [matrix of nodes, nodes={cell}, column sep=-\pgflinewidth, row sep=-\pgflinewidth] {
+        $1$ & $1$ & $1$ & $0$ \\
+    };
+    \node[lbl, above=2pt] at (a.north) {低位 $\to$ 高位};
+    \draw[c] (-3.0,-0.15) -- (-3.0,-1.55) node[lbl, midway, left, black] {$c=1$ 传播};
+    \matrix (b) [matrix of nodes, nodes={hl}, column sep=-\pgflinewidth, row sep=-\pgflinewidth] at (0,-2.2) {
+        $0$ & $0$ & $0$ & $1$ \\
+    };
+    \node[lbl] at (0,-3.15) {$(0111)_2+1=(1000)_2$：进位链在首个非 $n{-}1$ 位终止};
+\end{tikzpicture}
+\caption{后继：进位链最长 $O(k)$}
+\label{fig:successor_carry}
+\end{figure}
+
 \section{列式加法 (Column Addition)}
 
 \begin{itemize}
@@ -121,6 +169,27 @@ $$s_i = P_i + Q_i + c_i, \quad R_i = s_i \bmod n, \quad c_{i+1} = \lfloor s_i / 
 \If{$c=1$} $R_k \gets 1$ \EndIf
 \end{algorithmic}
 \end{algorithm}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    cell/.style={draw, minimum width=0.8cm, minimum height=0.7cm, font=\small},
+    res/.style={draw, minimum width=0.8cm, minimum height=0.7cm, font=\small, fill=green!12},
+    car/.style={font=\scriptsize, blue},
+    lbl/.style={font=\small}
+]
+    \node[car] at (-1.2,0.85) {$c_1{=}1$};
+    \node[car] at (-0.4,0.85) {$c_2{=}1$};
+    \node[car] at (0.4,0.85) {$c_3{=}1$};
+    \node[car] at (1.2,0.85) {$c_4{=}0$};
+    \matrix (p) [matrix of nodes, nodes={cell}, column sep=-\pgflinewidth] at (0,0) {$1$ & $1$ & $1$ & $0$ \\};
+    \matrix (q) [matrix of nodes, nodes={cell}, column sep=-\pgflinewidth] at (0,-0.7) {$1$ & $0$ & $0$ & $0$ \\};
+    \matrix (r) [matrix of nodes, nodes={res}, column sep=-\pgflinewidth] at (0,-1.4) {$0$ & $0$ & $0$ & $1$ \\};
+    \node[lbl] at (0,-2.25) {低位在左：$(0111)_2+(0001)_2=(1000)_2$，进位逐列向左传播};
+\end{tikzpicture}
+\caption{列式加法：$s_i=P_i+Q_i+c_i$，$R_i=s_i\bmod n$，$c_{i+1}=\lfloor s_i/n\rfloor$}
+\label{fig:column_addition}
+\end{figure}
 
 \section{闭式到递推的细化（进制转换的迭代实现）}
 

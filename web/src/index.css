@@ -678,18 +678,25 @@ body {
   overflow: auto;
 }
 
-/* 纯演示卡（无播放/伪代码）：整体按内容宽度居中，不被视口拉满；
-   仅当内容本身需要更宽时才铺开（max-width 100%） */
+/* 纯演示卡（无播放/伪代码）：随内容撑大，最大撑到视口尺寸；
+   内容不足时按内容宽度居中，超出视口时在卡片内滚动 */
 .stage--demo {
   width: fit-content;
   max-width: 100%;
+  max-height: 100%;
   margin-left: auto;
   margin-right: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
-.stage--demo .stage-body,
 .stage--demo .stage-controls {
   width: 100%;
+}
+
+.stage--demo .stage-body {
+  flex: none;
+  overflow: visible;
 }
 
 @media (max-width: 640px) {

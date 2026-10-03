@@ -9,7 +9,7 @@ import { MathText } from "../../lib/tex";
 //   paradigms(分治/贪心/DP + 斐波那契) / unionfind(并查集) / coverage(与其它模块的对应)
 // =====================================================================
 
-type SubMode = "paradigms" | "unionfind" | "coverage";
+type SubMode = "paradigms" | "unionfind" | "huffman" | "coverage";
 
 function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
   return (
@@ -28,7 +28,7 @@ function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
   );
 }
 function Panel({ children }: { children: React.ReactNode }) {
-  return <div style={{ maxWidth: 900, margin: "0 auto", display: "grid", gap: 12 }}>{children}</div>;
+  return <div style={{ maxWidth: "100%", margin: "0 auto", display: "grid", gap: 12 }}>{children}</div>;
 }
 
 // ---------------------------------------------------------------------
@@ -190,9 +190,85 @@ function CoverageRender({ t }: any) {
 // =====================================================================
 type Cfg = { subMode: SubMode; [k: string]: any };
 
+// ---------------------------------------------------------------------
+// huffman: 贪心合并最小两棵树 + 前缀编码
+// ---------------------------------------------------------------------
+type HNode = { id: number; w: number; label: string; left: HNode | null; right: HNode | null };
+const HUFF_DEFAULT = { data: 'a:5, b:9, c:12, d:13, e:16, f:45' };
+function parseHuff(s: string): { ch: string; w: number }[] {
+  const out: { ch: string; w: number }[] = [];
+  for (const part of (s || '').split(/[,，\s]+/)) {
+    const p = part.trim();
+    if (!p) continue;
+    const m = p.split(/[:：=]/);
+    const ch = (m.length > 1 ? m[0] : p).trim();
+    const w = Number((m.length > 1 ? m[1] : m[0]).trim());
+    if (ch && Number.isFinite(w) && w > 0) out.push({ ch, w });
+  }
+  return out.slice(0, 12);
+}
+function huffman(pairs: { ch: string; w: number }[]) {
+  let nodes: HNode[] = pairs.map((p, i) => ({ id: i, w: p.w, label: p.ch, left: null, right: null }));
+  const log: string[] = [];
+  let id = nodes.length;
+  while (nodes.length > 1) {
+    nodes = nodes.slice().sort((a, b) => a.w - b.w);
+    const x = nodes.shift() as HNode;
+    const y = nodes.shift() as HNode;
+    const parent: HNode = { id: id++, w: x.w + y.w, label: `${x.label}·${y.label}`, left: x, right: y };
+    log.push(`${x.label}(${x.w}) + ${y.label}(${y.w}) → ${parent.w}`);
+    nodes.push(parent);
+  }
+  const codes: { ch: string; w: number; code: string }[] = [];
+  const dfs = (n: HNode | null, code: string) => {
+    if (!n) return;
+    if (!n.left && !n.right) { codes.push({ ch: n.label, w: n.w, code: code || '0' }); return; }
+    dfs(n.left, code + '0');
+    dfs(n.right, code + '1');
+  };
+  dfs(nodes[0] ?? null, '');
+  return { log, codes };
+}
+function HuffmanControls({ config, onChange, t }: any) {
+  const isZh = t(T('中文', 'en')) !== 'en';
+  return (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', padding: '8px 10px', borderRadius: 12, background: '#f8fafc', border: '1px solid #e2e8f0' }}>
+      <span style={{ fontSize: 11, fontWeight: 800, color: '#475569' }}>{isZh ? '字符:频率' : 'ch:freq'}</span>
+      <input className="txt" value={config.data} onChange={(e) => onChange({ ...config, data: e.target.value })} style={{ width: 280, fontFamily: 'ui-monospace, monospace' }} />
+    </div>
+  );
+}
+function HuffmanRender({ config, t }: any) {
+  const isZh = t(T('中文', 'en')) !== 'en';
+  const pairs = parseHuff(config.data);
+  if (pairs.length < 2) return <Panel><div style={{ color: '#94a3b8', textAlign: 'center', padding: 16 }}>{isZh ? '至少两个符号（格式 a:5, b:9 …）' : 'need >= 2 symbols'}</div></Panel>;
+  const { log, codes } = huffman(pairs);
+  const total = codes.reduce((s, c) => s + c.w, 0);
+  const weighted = codes.reduce((s, c) => s + c.w * c.code.length, 0);
+  return (
+    <Panel>
+      <div style={{ fontWeight: 800, color: '#334155', fontSize: 13 }}>{isZh ? '贪心合并（每次取最小两棵）' : 'Greedy merges'}</div>
+      <div style={{ display: 'grid', gap: 3 }}>
+        {log.map((l, i) => (
+          <div key={i} style={{ padding: '5px 10px', borderRadius: 8, background: '#f8fafc', border: '1px solid #e2e8f0', fontSize: 13, fontFamily: 'ui-monospace, monospace' }}>{l}</div>
+        ))}
+      </div>
+      <div style={{ fontWeight: 800, color: '#334155', fontSize: 13 }}>{isZh ? '前缀编码' : 'Prefix codes'}</div>
+      <Table
+        head={isZh ? ['字符', '频率', '编码', '位数'] : ['Char', 'Freq', 'Code', 'Bits']}
+        rows={codes.map((c) => [c.ch, c.w, <span key="c" style={{ fontFamily: 'ui-monospace, monospace', color: '#4338ca', fontWeight: 800 }}>{c.code}</span>, c.w * c.code.length])}
+      />
+      <div style={{ textAlign: 'center', fontSize: 13 }}>
+        {isZh ? `加权路径长度 WPL = ${weighted}；若等长编码需 ${total === 0 ? 0 : Math.ceil(Math.log2(codes.length)) * total} 位` : `WPL = ${weighted}`}
+      </div>
+    </Panel>
+  );
+}
+
 const SUB: Record<SubMode, ModuleDef> = {
   paradigms: { id: "paradigms", title: T("算法范式", "Paradigms"), defaultConfig: DP_DEFAULT, Controls: ParadigmControls as never, generate: () => [{ caption: T("分治 / 贪心 / DP", "D&C / Greedy / DP"), scene: {} }] as never, Render: ParadigmRender as never } as unknown as ModuleDef,
   unionfind: { id: "unionfind", title: T("并查集", "Union-Find"), defaultConfig: UF_DEFAULT, Controls: UfControls as never, generate: () => [{ caption: T("并查集", "Union-Find"), scene: {} }] as never, Render: UfRender as never } as unknown as ModuleDef,
+  huffman: { id: "huffman", title: T("Huffman 编码", "Huffman"), defaultConfig: HUFF_DEFAULT, Controls: HuffmanControls as never, generate: () => [{ caption: T("Huffman 编码", "Huffman coding"), scene: {} }] as never, Render: HuffmanRender as never } as unknown as ModuleDef,
   coverage: { id: "coverage", title: T("覆盖映射", "Coverage"), defaultConfig: {}, generate: () => [{ caption: T("算法覆盖", "Algorithm coverage"), scene: {} }] as never, Render: CoverageRender as never } as unknown as ModuleDef,
 };
 
@@ -201,6 +277,7 @@ export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string
   { label: "范式", opts: [
     { v: "paradigms", zh: "分治/贪心/DP", en: "Paradigms" },
     { v: "unionfind", zh: "并查集", en: "Union-Find" },
+    { v: "huffman", zh: "Huffman 编码", en: "Huffman" },
     { v: "coverage", zh: "覆盖映射", en: "Coverage" },
   ]},
 ];

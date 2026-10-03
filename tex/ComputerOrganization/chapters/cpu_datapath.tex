@@ -1,4 +1,9 @@
-﻿\section{处理器：数据通路}
+\clearpage
+\vspace*{\fill}
+\section{处理器：数据通路}
+\vspace*{\fill}
+\clearpage
+
 
 \subsection{单周期 CPU 概述}
 
@@ -72,6 +77,33 @@ ALU 做减法判断是否相等。若相等，PC 取分支目标（PC+4 + offset
     \item \textbf{访存阶段}：读/写数据存储器（仅 lw / sw）
     \item \textbf{写回阶段}：结果写回寄存器堆（ALU 结果 / 存储器数据）
 \end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    b/.style={draw, rounded corners, minimum width=1.9cm, minimum height=0.85cm, font=\small, fill=blue!8, align=center},
+    e/.style={->, >=latex, thick},
+    lbl/.style={font=\scriptsize, fill=white, inner sep=1pt}
+]
+    \node[b] (pc)  at (0,0) {PC};
+    \node[b] (im)  at (2.8,0) {指令存储器};
+    \node[b] (rf)  at (5.9,1.2) {寄存器堆};
+    \node[b] (alu) at (5.9,-1.2) {ALU};
+    \node[b] (dm)  at (9.0,0) {数据存储器};
+    \node[b] (mux) at (11.7,0) {写回 MUX};
+    \draw[e] (pc)--(im) node[lbl,midway,below]{地址};
+    \draw[e] (im)--(rf) node[lbl,midway,above]{指令};
+    \draw[e] (im) |- (alu);
+    \draw[e] (rf)--(alu) node[lbl,midway,right]{rs,rt};
+    \draw[e] (alu)--(dm) node[lbl,midway,above]{地址};
+    \draw[e] (dm)--(mux);
+    \draw[e] (alu) -| (mux);
+    \draw[e] (mux) |- (rf);
+    \node[lbl] at (5.9,-2.5){取指 $\to$ 译码 $\to$ 执行 $\to$ 访存 $\to$ 写回，单周期内完成};
+\end{tikzpicture}
+\caption{MIPS 单周期数据通路（ALU 算地址，写回经 MUX 选择）}
+\label{fig:single_cycle_datapath}
+\end{figure}
 
 \subsection{关键路径与性能}
 

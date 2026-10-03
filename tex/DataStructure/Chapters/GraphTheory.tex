@@ -1,6 +1,16 @@
+\clearpage
+\begingroup
+\let\clearpage\relax
+\let\cleardoublepage\relax
+\vspace*{\fill}
 \chapter{非线性结构 II：图论}
-
+\begin{center}
 图是一种多对多的网状逻辑结构，用于建模现实世界中复杂的关联网络。
+\end{center}
+\vspace*{\fill}
+\endgroup
+\clearpage
+
 
 \section{图的形式化定义}
 
@@ -96,6 +106,30 @@
 \end{algorithmic}
 \end{algorithm}
 
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    g/.style={circle, draw, minimum size=0.62cm, font=\ttfamily, inner sep=1pt},
+    cut/.style={circle, draw, very thick, minimum size=0.62cm, font=\ttfamily, inner sep=1pt, fill=red!25},
+    e/.style={draw, thick},
+    br/.style={draw, very thick, red, double},
+    lbl/.style={font=\small}
+]
+    \node[g] (a) at (0,0) {A};
+    \node[g] (b) at (1.6,0) {B};
+    \node[cut] (c) at (3.2,0) {C};
+    \node[g] (d) at (4.8,0.9) {D};
+    \node[g] (e2) at (4.8,-0.9) {E};
+    \draw[e] (a)--(b);
+    \draw[e] (b)--(c);
+    \draw[br] (c)--(d);
+    \draw[br] (c)--(e2);
+    \node[lbl] at (2.4,-1.7) {红双线=桥；$C$ 为割点：移除后连通分量数增加};
+\end{tikzpicture}
+\caption{割点与桥的判定（$LOW[v]\ge DFN[u]$）}
+\label{fig:cut_vertex_bridge}
+\end{figure}
+
 \section{图的遍历与降维}
 
 \subsection{遍历规约}
@@ -124,6 +158,32 @@
 \end{algorithmic}
 \end{algorithm}
 
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    g/.style={circle, draw, minimum size=0.6cm, font=\small, inner sep=1pt},
+    t/.style={draw, very thick, blue},
+    e/.style={draw, thick, gray},
+    lbl/.style={font=\small}
+]
+    \node[g] (r) at (0,0) {1};
+    \node[g] (a) at (-1,-1) {2}; \node[g] (b) at (1,-1) {3};
+    \node[g] (c) at (-1.8,-2) {4}; \node[g] (d) at (-0.2,-2) {5};
+    \draw[t] (r)--(a); \draw[t] (r)--(b); \draw[t] (a)--(c); \draw[t] (a)--(d);
+    \draw[e] (r)--(c); \draw[e] (b)--(d);
+    \node[lbl] at (0,-2.7) {BFS 生成树（队列按层）};
+
+    \node[g] (r2) at (4.5,0) {1};
+    \node[g] (a2) at (3.5,-1) {2}; \node[g] (b2) at (5.5,-1) {3};
+    \node[g] (c2) at (2.7,-2) {4}; \node[g] (d2) at (4.3,-2) {5};
+    \draw[t] (r2)--(a2); \draw[t] (a2)--(c2); \draw[t] (a2)--(d2); \draw[t] (r2)--(b2);
+    \draw[e] (r2)--(d2);
+    \node[lbl] at (4.5,-2.7) {DFS 生成树（递归/栈）};
+\end{tikzpicture}
+\caption{BFS 与 DFS 生成树（蓝=树边，灰=非树边）}
+\label{fig:bfs_dfs_tree}
+\end{figure}
+
 \subsection{拓扑排序}
 
 \begin{itemize}
@@ -132,12 +192,64 @@
     \item \textbf{定理}：$G$ 有拓扑序 $\iff$ $G$ 为 DAG；Kahn 算法（反复取零入度集）与 DFS 逆后序均为构造性证明，时间 $O(|V|+|E|)$。
 \end{itemize}
 
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    g/.style={circle, draw, minimum size=0.62cm, font=\small, inner sep=1pt},
+    e/.style={draw, thick, ->, >=latex},
+    lbl/.style={font=\small}
+]
+    \node[g] (a) at (0,0) {A};
+    \node[g] (b) at (1.6,0.85) {B};
+    \node[g] (c) at (1.6,-0.85) {C};
+    \node[g] (d) at (3.2,0) {D};
+    \draw[e] (a)--(b); \draw[e] (a)--(c); \draw[e] (b)--(d); \draw[e] (c)--(d);
+    \node[lbl] at (1.6,-1.7) {入度 $(A,B,C,D)=(0,1,1,2)$};
+    \node[lbl] at (1.6,-2.25) {拓扑序：$A,B,C,D$ 或 $A,C,B,D$};
+\end{tikzpicture}
+\caption{DAG 与拓扑序（Kahn：反复取零入度顶点）}
+\label{fig:topological_sort}
+\end{figure}
+
 \section{图的物理存储实现}
 
 \begin{enumerate}
     \item \textbf{邻接矩阵}：$A\in\{0,1\}^{n\times n}$，$A_{ij}=1\iff(v_i,v_j)\in E$；带权 $A_{ij}=w(v_i,v_j)$ 或 $\infty$。空间 $O(|V|^2)$，稠密图实例优。
     \item \textbf{邻接表}：$\text{Adj}[1..n]$，$\text{Adj}[i]=\{v\mid(v_i,v)\in E\}$ 以链表存储。空间 $O(|V|+|E|)$，稀疏图实例优。
 \end{enumerate}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    cell/.style={draw, minimum size=0.6cm, font=\small},
+    hd/.style={draw, minimum size=0.6cm, font=\small, fill=gray!15},
+    lbl/.style={font=\small},
+    g/.style={circle, draw, minimum size=0.55cm, font=\small},
+    e/.style={draw, thick}, ar/.style={->, >=latex}
+]
+    \node[g] (v1) at (0,0) {1}; \node[g] (v2) at (1.4,0) {2}; \node[g] (v3) at (0.7,-1.3) {3};
+    \draw[e] (v1)--(v2); \draw[e] (v1)--(v3); \draw[e] (v2)--(v3);
+    \node[lbl] at (0.7,-2) {$K_3$};
+
+    \matrix (m) [matrix of nodes, nodes={cell}, column sep=-\pgflinewidth, row sep=-\pgflinewidth] at (4.6,-0.65) {
+        \node[hd]{ }; & \node[hd]{1}; & \node[hd]{2}; & \node[hd]{3}; \\
+        \node[hd]{1}; & 0 & 1 & 1 \\
+        \node[hd]{2}; & 1 & 0 & 1 \\
+        \node[hd]{3}; & 1 & 1 & 0 \\
+    };
+    \node[lbl] at (4.6,0.98) {邻接矩阵 $O(|V|^2)$};
+
+    \node[lbl] at (8.7,0.55) {邻接表 $O(|V|+|E|)$};
+    \node[cell] (a1) at (8.7,0) {1}; \node[cell] (a2) at (9.5,0) {2}; \node[cell] (a3) at (10.3,0) {3};
+    \draw[ar] (a1)--(a2); \draw[ar] (a2)--(a3);
+    \node[cell] (b1) at (8.7,-0.7) {2}; \node[cell] (b2) at (9.5,-0.7) {1}; \node[cell] (b3) at (10.3,-0.7) {3};
+    \draw[ar] (b1)--(b2); \draw[ar] (b2)--(b3);
+    \node[cell] (c1) at (8.7,-1.4) {3}; \node[cell] (c2) at (9.5,-1.4) {1}; \node[cell] (c3) at (10.3,-1.4) {2};
+    \draw[ar] (c1)--(c2); \draw[ar] (c2)--(c3);
+\end{tikzpicture}
+\caption{图的两种存储：邻接矩阵与邻接表}
+\label{fig:graph_storage}
+\end{figure}
 
 \begin{itemize}
     \item \textbf{定理}：两存储在图同构意义下等价，仅时空权衡不同。

@@ -33,7 +33,9 @@ import {
   // 兼容旧配置：LCA 已移至树模块；此处仅保留码表/提示，不再作为子模式
   LCA_CODE,
   reconstructPathFromParent,
+  articulationSteps, ARTIC_CODE, bipartiteMatchSteps, BIPARTITE_CODE,
   type AStarStep, type FloydStep, type SCCStep, type MaxFlowStep,
+  type ArticStep, type MatchStep,
 } from "../../lib/graph";
 
 // ── 子模式：一个下拉覆盖全部图知识点 ──
@@ -43,7 +45,8 @@ type SubMode =
   | "topo"
   | "prim" | "kruskal"
   | "kosaraju" | "tarjan"
-  | "dinic";
+  | "dinic"
+  | "articulation" | "matching";
 
 export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
   { label: "遍历", opts: [{ v: "bfs", zh: "BFS 广度优先", en: "BFS" }, { v: "dfs", zh: "DFS 深度优先", en: "DFS" }] },
@@ -62,6 +65,10 @@ export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string
     { v: "kosaraju", zh: "Kosaraju SCC", en: "Kosaraju" },
     { v: "tarjan", zh: "Tarjan SCC", en: "Tarjan" },
     { v: "dinic", zh: "Dinic 最大流", en: "Dinic" },
+  ]},
+  { label: "进阶", opts: [
+    { v: "articulation", zh: "割点 / 桥", en: "Cut / Bridge" },
+    { v: "matching", zh: "二分图最大匹配", en: "Matching" },
   ]},
 ];
 
@@ -320,6 +327,36 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
         return toFrame(step, base);
       });
     }
+    case "articulation": {
+      const steps: ArticStep[] = articulationSteps(g, start, g.labels);
+      return steps.map((s) => {
+        const annotate: Record<number, string> = {};
+        for (let i = 0; i < n; i++) if (s.disc[i] >= 0) annotate[i] = `${s.disc[i]}/${s.low[i]}`;
+        const tone: Record<number, number> = {};
+        s.artic.forEach((a, i) => { if (a) tone[i] = 0; });
+        const base = graphScene(g, { current: s.current, exploring: s.exploring, visited: s.visited, frontier: [], order: [], edge: s.edge }, { root: start, annotate, ...(importGraph ? { import: importGraph } : {}) });
+        (base as any).tone = tone;
+        (base as any).stateTables = numTables({ labels: g.labels, arrays: [
+          { name: "disc", values: s.disc.map((v) => (v < 0 ? "-" : String(v))) },
+          { name: "low", values: s.low.map((v) => String(v)) },
+          { name: "artic", values: s.artic.map((a) => (a ? "●" : "-")) },
+        ]});
+        return toFrame(s, base);
+      });
+    }
+    case "matching": {
+      const steps: MatchStep[] = bipartiteMatchSteps(g, g.labels);
+      return steps.map((s) => {
+        const tone: Record<number, number> = {};
+        s.side.forEach((sd, i) => { tone[i] = sd === 0 ? 0 : 1; });
+        const base = graphScene(g, { current: s.current, exploring: s.exploring, visited: [], frontier: [], order: s.order, edge: s.edge }, { root: start, ...(importGraph ? { import: importGraph } : { layout: "force" }) });
+        (base as any).tone = tone;
+        (base as any).stateTables = numTables({ labels: g.labels, arrays: [
+          { name: "match", values: s.match.map((m) => (m < 0 ? "-" : g.labels[m])) },
+        ]});
+        return toFrame(s, base);
+      });
+    }
   }
 }
 
@@ -365,7 +402,7 @@ export const graphUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
           {(mode === "bfs" || mode === "dfs" || mode === "dijkstra" || mode === "bellman" || mode === "prim") && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca" }}>{isZh ? "选点" : "PICK"}</span><Chip label={isZh ? "起点" : "src"} value={config.root} active={pick === "root"} onClick={() => set({ pick: "root" })} /><span style={{ fontSize: 11, color: "#64748b" }}>{isZh ? "右键点图选" : "right-click"}</span></>}
           {mode === "astar" && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><span style={{ fontSize: 11, fontWeight: 800, color: "#4338ca" }}>{isZh ? "选点" : "PICK"}</span><Chip label={isZh ? "起点" : "src"} value={config.root} active={pick === "root"} onClick={() => set({ pick: "root" })} /><Chip label={isZh ? "终点" : "dst"} value={config.target} active={pick === "target"} onClick={() => set({ pick: "target" })} /><span style={{ fontSize: 11, color: "#64748b" }}>{isZh ? "右键·选择此点" : "right-click"}</span></>}
           {mode === "topo" && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><Chip label={isZh ? "起点" : "src"} value={config.root} active={pick === "root"} onClick={() => set({ pick: "root" })} /><span style={{ fontSize: 11, color: "#64748b" }}>{isZh ? "右键点图选" : "right-click"}</span></>}
-          {(mode === "kosaraju" || mode === "tarjan" || mode === "floyd" || mode === "kruskal") && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><span style={{ fontSize: 11, color: "#64748b" }}>{isZh ? "无需选点" : "no pick"}</span></>}
+          {(mode === "kosaraju" || mode === "tarjan" || mode === "floyd" || mode === "kruskal" || mode === "articulation" || mode === "matching") && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><span style={{ fontSize: 11, color: "#64748b" }}>{isZh ? "无需选点" : "no pick"}</span></>}
           {mode === "dinic" && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><Chip label="S" value={config.sourceNode} active={pick === "source"} onClick={() => set({ pick: "source" })} /><Chip label="T" value={config.sinkNode} active={pick === "sink"} onClick={() => set({ pick: "sink" })} /><span style={{ fontSize: 11, color: "#64748b" }}>{isZh ? "右键·选择此点" : "right-click"}</span></>}
           {showHeuristic && <><span style={{ width: 1, height: 18, background: "#c7d2fe" }} /><label className="txt-label">{isZh ? "启发式" : "h"}<select className="txt" value={config.heuristic} onChange={(e) => set({ heuristic: e.target.value as Cfg["heuristic"] })}><option value="zero">h=0</option><option value="manhattan">manhattan</option><option value="euclidean">euclidean</option></select></label></>}
         </div>
@@ -388,6 +425,8 @@ export const graphUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
       case "kosaraju": return KOSARAJU_CODE;
       case "tarjan": return TARJAN_CODE;
       case "dinic": return DINIC_CODE;
+      case "articulation": return ARTIC_CODE;
+      case "matching": return BIPARTITE_CODE;
     }
   },
   generate(config) { return buildFrames(config); },

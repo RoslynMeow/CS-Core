@@ -1,4 +1,9 @@
-﻿\section{数据表示与运算}
+\clearpage
+\vspace*{\fill}
+\section{数据表示与运算}
+\vspace*{\fill}
+\clearpage
+
 
 \subsection{数制与编码}
 
@@ -86,6 +91,26 @@ T(X) = -x_{n-1} \cdot 2^{n-1} + \sum_{i=0}^{n-2} x_i \cdot 2^i
 (-1)^S \times (1.M) \times 2^{E - 127}
 \]
 \end{definition}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    sgn/.style={draw, minimum width=0.9cm, minimum height=0.9cm, font=\small, fill=red!15},
+    exp/.style={draw, minimum width=2.4cm, minimum height=0.9cm, font=\small, fill=blue!12},
+    man/.style={draw, minimum width=5.8cm, minimum height=0.9cm, font=\small, fill=green!12},
+    lbl/.style={font=\scriptsize, gray}
+]
+    \node[sgn] (s) at (0,0) {$S$};
+    \node[exp, right=0pt of s] (e) {$E$（阶码 8 位）};
+    \node[man, right=0pt of e] (m) {$M$（尾数 23 位，隐含 1）};
+    \node[lbl] at ([yshift=2pt]s.north) {31};
+    \node[lbl] at ([yshift=2pt]e.north) {30\,$\cdots$\,23};
+    \node[lbl] at ([yshift=2pt]m.north) {22\,$\cdots$\,0};
+    \node[font=\small] at (4.2,-0.95) {$(-1)^S \times (1.M) \times 2^{E-127}$};
+\end{tikzpicture}
+\caption{IEEE 754 单精度（32 位）位域划分}
+\label{fig:ieee754_fields}
+\end{figure}
 
 \begin{table}[H]
 \centering

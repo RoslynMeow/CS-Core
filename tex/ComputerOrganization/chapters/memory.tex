@@ -1,4 +1,9 @@
+\clearpage
+\vspace*{\fill}
 \section{存储层次与缓存}
+\vspace*{\fill}
+\clearpage
+
 
 \subsection{存储层次概述}
 
@@ -7,6 +12,23 @@
 \begin{equation}
 \text{寄存器} \ll \text{L1 缓存} \ll \text{L2 缓存} \ll \text{L3 缓存} \ll \text{主存} \ll \text{磁盘/SSD}
 \end{equation}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    lv/.style={draw, minimum height=0.7cm, font=\small, align=center},
+    lbl/.style={font=\scriptsize}
+]
+    \node[lv, minimum width=2.2cm, fill=red!25] (a) at (0,2.1) {寄存器};
+    \node[lv, minimum width=3.4cm, fill=orange!25] (b) at (0,1.4) {L1 / L2 / L3 缓存};
+    \node[lv, minimum width=4.6cm, fill=yellow!35] (c) at (0,0.7) {主存 DRAM};
+    \node[lv, minimum width=5.8cm, fill=green!20] (d) at (0,0) {磁盘 / SSD};
+    \node[lbl, anchor=west] at (3.6,2.1) {越快、越小、越贵};
+    \node[lbl, anchor=west] at (3.6,0) {越慢、越大、越便宜};
+\end{tikzpicture}
+\caption{存储层次金字塔（利用局部性弥补速度差）}
+\label{fig:memory_hierarchy}
+\end{figure}
 
 \subsection{局部性原理}
 
@@ -58,6 +80,27 @@
     \item Index：选择缓存行（直接映射）或缓存组（组相联）
     \item Tag：验证该缓存行是否存的是所需数据
 \end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    f/.style={draw, minimum height=0.75cm, font=\small},
+    lbl/.style={font=\scriptsize, gray},
+    sub/.style={font=\scriptsize}
+]
+    \node[f, minimum width=2.4cm, fill=blue!12] (tag) at (0,0) {Tag};
+    \node[f, minimum width=2.4cm, fill=green!18, right=0pt of tag] (idx) {Index};
+    \node[f, minimum width=2.4cm, fill=orange!22, right=0pt of idx] (off) {Block Offset};
+    \node[lbl] at ([yshift=1pt]tag.north) {$\cdots31$};
+    \node[lbl] at ([yshift=1pt]off.north) {$\cdots0$};
+    \node[sub] at (tag.south) [yshift=-3pt] {验证命中};
+    \node[sub] at (idx.south) [yshift=-3pt] {选行/选组};
+    \node[sub] at (off.south) [yshift=-3pt] {块内偏移};
+    \node[font=\small] at (3.6,-1.5) {$\text{地址}=[\text{Tag}\mid\text{Index}\mid\text{Block Offset}]$};
+\end{tikzpicture}
+\caption{缓存地址划分（Tag / Index / Block Offset）}
+\label{fig:cache_address_split}
+\end{figure}
 
 \subsubsection{缓存缺失与写策略}
 

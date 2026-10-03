@@ -87,7 +87,7 @@ function BoolAlgRender({ config, t }: any) {
     ? [["交换律", "A+B = B+A; AB = BA"], ["结合律", "(A+B)+C = A+(B+C); (AB)C = A(BC)"], ["分配律", "A(B+C) = AB+AC"], ["同一律", "A+0 = A; A·1 = A"], ["零一律", "A+1 = 1; A·0 = 0"], ["互补律", "A+Ā = 1; A·Ā = 0"], ["吸收律", "A+AB = A; A(A+B) = A"], ["德·摩根", "非(A+B) = Ā·B̄; 非(AB) = Ā+B̄"]]
     : [["Commutative", "A+B = B+A; AB = BA"], ["Associative", "(A+B)+C = A+(B+C)"], ["Distributive", "A(B+C) = AB+AC"], ["Identity", "A+0 = A; A·1 = A"], ["Null", "A+1 = 1; A·0 = 0"], ["Complement", "A+Ā = 1; A·Ā = 0"], ["Absorption", "A+AB = A; A(A+B) = A"], ["De Morgan", "¬(A+B) = Ā·B̄; ¬(AB) = Ā+B̄"]];
   return (
-    <div style={{ maxWidth: 820, margin: "0 auto", display: "grid", gap: 12 }}>
+    <div style={{ maxWidth: "100%", margin: "0 auto", display: "grid", gap: 12 }}>
       <div style={{ display: "grid", gap: 6 }}>
         {ex.steps.map((s, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 12px", borderRadius: 10, background: i === ex.steps.length - 1 ? "#dcfce7" : "#f8fafc", border: `1px solid ${i === ex.steps.length - 1 ? "#16a34a" : "#e2e8f0"}` }}>
@@ -241,7 +241,7 @@ function KmapRender({ config, onChange, t }: any) {
     else onChange({ ...config, ones: [...ones, m].sort((a, b) => a - b) });
   };
   return (
-    <div style={{ maxWidth: 860, margin: "0 auto", display: "grid", gap: 14 }}>
+    <div style={{ maxWidth: "100%", margin: "0 auto", display: "grid", gap: 14 }}>
       <div style={{ overflowX: "auto" }}>
         <table style={{ borderCollapse: "separate", borderSpacing: 4, margin: "0 auto", fontFamily: "ui-monospace, monospace" }}>
           <thead>
@@ -357,7 +357,7 @@ function ClaRender({ config, onChange, t }: any) {
   const rippleDelay = 2 * n;
   const claDelay = 2 + Math.ceil(Math.log2(n)) * 2;
   return (
-    <div style={{ maxWidth: 820, margin: "0 auto", display: "grid", gap: 14 }}>
+    <div style={{ maxWidth: "100%", margin: "0 auto", display: "grid", gap: 14 }}>
       <table style={{ borderCollapse: "collapse", margin: "0 auto", fontSize: 13, background: "#fff", border: "1px solid #e2e8f0" }}>
         <thead>
           <tr style={{ background: "#f8fafc", color: "#64748b", fontSize: 11 }}>
