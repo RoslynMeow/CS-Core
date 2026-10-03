@@ -14,6 +14,10 @@
 \usepackage{tikz}
 \usetikzlibrary{shapes.multipart, decorations.pathreplacing, arrows.meta, positioning, matrix, calc}
 \usepackage{float}
+\usepackage{needspace}
+\AddToHook{cmd/section/before}{\needspace{13\baselineskip}}
+\AddToHook{cmd/subsection/before}{\needspace{8\baselineskip}}
+\AddToHook{cmd/subsubsection/before}{\needspace{5\baselineskip}}
 \usepackage{booktabs}
 \usepackage{tabularx}
 \usepackage{tabulary}

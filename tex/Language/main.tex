@@ -5,6 +5,9 @@
 \usepackage{geometry}
 \usepackage{booktabs}
 \usepackage{float}
+\usepackage{needspace}
+\AddToHook{cmd/subsection/before}{\needspace{13\baselineskip}}
+\AddToHook{cmd/subsubsection/before}{\needspace{8\baselineskip}}
 \usepackage{tabularx}
 \usepackage{tabulary}
 \usepackage{tikz}

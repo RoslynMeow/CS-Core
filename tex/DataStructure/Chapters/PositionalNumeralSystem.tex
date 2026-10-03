@@ -43,14 +43,16 @@ $$y = \mathcal{I}_n(\{P_i\}) = \sum_{i=-\infty}^{\infty} P_i \cdot n^i$$
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[
-    cell/.style={draw, minimum width=0.8cm, minimum height=0.72cm, font=\small},
+    cell/.style={draw, minimum width=1.0cm, minimum height=0.72cm, font=\small},
     pw/.style={draw, minimum width=0.8cm, minimum height=0.72cm, font=\scriptsize, fill=gray!12},
     lbl/.style={font=\small}
 ]
     \matrix (m) [matrix of nodes, nodes={cell}, column sep=-\pgflinewidth, row sep=-\pgflinewidth] {
-        $2^3$ & $2^2$ & $2^1$ & $2^0$ & $. $ & $2^{-1}$ & $2^{-2}$ & $2^{-3}$ \\
-        $1$ & $0$ & $1$ & $1$ & $. $ & $1$ & $0$ & $1$ \\
+        $2^3$ & $2^2$ & $2^1$ & $2^0$ & $\phantom{2^0}$ & $2^{-1}$ & $2^{-2}$ & $2^{-3}$ \\
+        $1$ & $0$ & $1$ & $1$ & $\phantom{0}$ & $1$ & $0$ & $1$ \\
     };
+    \fill (m-1-5.center) circle (0.7pt);
+    \fill (m-2-5.center) circle (0.7pt);
     \node[lbl] at (0,-1.15) {$y=\sum_i P_i 2^i=1\!\cdot\!2^3+0\!\cdot\!2^2+1\!\cdot\!2^1+1\!\cdot\!2^0+1\!\cdot\!2^{-1}+0\!\cdot\!2^{-2}+1\!\cdot\!2^{-3}=11.625$};
 \end{tikzpicture}
 \caption{按权展开：位权与数码一一对应（$(1011.101)_2=11.625$）}

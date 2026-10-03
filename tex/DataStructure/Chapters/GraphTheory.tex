@@ -232,10 +232,10 @@
     \node[lbl] at (0.7,-2) {$K_3$};
 
     \matrix (m) [matrix of nodes, nodes={cell}, column sep=-\pgflinewidth, row sep=-\pgflinewidth] at (4.6,-0.65) {
-        \node[hd]{ }; & \node[hd]{1}; & \node[hd]{2}; & \node[hd]{3}; \\
-        \node[hd]{1}; & 0 & 1 & 1 \\
-        \node[hd]{2}; & 1 & 0 & 1 \\
-        \node[hd]{3}; & 1 & 1 & 0 \\
+        |[hd]| \phantom{0} & |[hd]| 1 & |[hd]| 2 & |[hd]| 3 \\
+        |[hd]| 1 & 0 & 1 & 1 \\
+        |[hd]| 2 & 1 & 0 & 1 \\
+        |[hd]| 3 & 1 & 1 & 0 \\
     };
     \node[lbl] at (4.6,0.98) {邻接矩阵 $O(|V|^2)$};
 
