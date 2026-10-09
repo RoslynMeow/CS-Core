@@ -186,7 +186,7 @@ export function Stage({ mod }: { mod: ModuleDef }) {
           )}
         </div>
       )}
-      {!bareLayout && (
+      {!bareLayout && !mod.advanceOnCanvas && (
         <PlaybackBar pb={pb} disabled={!!mod.blockedReason?.(config as never)} />
       )}
       {bareLayout ? (
