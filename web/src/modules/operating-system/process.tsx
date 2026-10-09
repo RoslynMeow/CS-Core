@@ -1,4 +1,4 @@
-import { T } from "../../i18n/lang";
+import { T, type Text } from "../../i18n/lang";
 import { MathText } from "../../lib/tex";
 import type { Frame } from "../../engine/types";
 import { Panel, Table, Note, NumField, TextField, Row, Steps, isZh, makeChapter, type SubDef } from "../common/chapter";
@@ -11,6 +11,28 @@ import { Panel, Table, Note, NumField, TextField, Row, Steps, isZh, makeChapter,
 // =====================================================================
 
 type SubMode = "process-model" | "pcb" | "context-switch";
+
+// 用户驱动的「状态 / 数值」面板：展示当前步的关键取值，并提供推进按钮
+function StepPanel({ t, title, rows, onNext, nextLabel, showNext }: {
+  t: (x: Text) => string;
+  title: string;
+  rows: [string, string][];
+  onNext?: () => void;
+  nextLabel: string;
+  showNext: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", borderRadius: 10, background: "#0f172a", color: "#e2e8f0", fontSize: 12 }}>
+      <span style={{ fontWeight: 800, color: "#a5b4fc" }}>{title}</span>
+      {rows.map(([k, v]) => (
+        <span key={k} style={{ fontFamily: "ui-monospace, monospace", whiteSpace: "nowrap" }}>{k} = <b style={{ color: "#fde047" }}>{v}</b></span>
+      ))}
+      {showNext && onNext && (
+        <button className="primary" style={{ marginLeft: "auto" }} onClick={(e) => { e.stopPropagation(); onNext(); }}>{nextLabel}</button>
+      )}
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------
 // process-model (逐帧：五状态机转换)
@@ -26,10 +48,18 @@ const MODEL_EVENTS: { id: string; zh: string; en: string; arrow: string }[] = [
   { id: "exit", zh: "退出", en: "Exit", arrow: "running → terminated" },
 ];
 
-function ProcessModelRender({ scene, t }: any) {
+const MODEL_SEQUENCE = ["", "admitted", "dispatch", "io-wait", "io-done", "dispatch", "exit"];
+
+function ProcessModelRender({ scene, t, onNext, step, count }: any) {
   const zh = isZh(t);
   const s = (scene ?? { state: "new", event: "" }) as ProcessScene;
   const cur = MODEL_EVENTS.find((e) => e.id === s.event);
+  const canNext = !!onNext && (typeof count !== "number" || step < count - 1);
+  const nextEvent = MODEL_SEQUENCE[Math.min((step ?? 0) + 1, MODEL_SEQUENCE.length - 1)];
+  const stateLabel = zh
+    ? ({ new: "新建 new", ready: "就绪 ready", running: "运行 running", blocked: "阻塞 blocked", terminated: "终止 terminated" } as Record<ProcessState, string>)[s.state]
+    : s.state;
+  const nextLabel = T("点击事件芯片触发状态转换", "click an event chip to fire a transition");
   const states: { key: ProcessState; label: string; desc: string }[] = [
     { key: "new", label: zh ? "新建 new" : "new", desc: zh ? "PCB 已分配，尚未进入就绪队列" : "PCB allocated, not yet ready" },
     { key: "ready", label: zh ? "就绪 ready" : "ready", desc: zh ? "获得除 CPU 外的全部资源，等待调度" : "all resources but CPU; waiting to run" },
@@ -53,14 +83,24 @@ function ProcessModelRender({ scene, t }: any) {
       <div style={{ display: "grid", gap: 6 }}>
         {MODEL_EVENTS.map((e) => {
           const on = e.id === s.event;
+          const fire = e.id === nextEvent && canNext;
           return (
-            <div key={e.id} style={{ display: "flex", gap: 12, padding: "8px 14px", borderRadius: 10, background: on ? "#eef2ff" : "#f8fafc", border: `1px solid ${on ? "#c7d2fe" : "#e2e8f0"}`, opacity: on || !s.event ? 1 : 0.5 }}>
-              <span style={{ fontWeight: 800, color: on ? "#4338ca" : "#3730a3", width: 104, flexShrink: 0 }}>{zh ? e.zh : e.en}</span>
+            <div key={e.id} onClick={fire ? (ev: any) => { ev.stopPropagation(); onNext(); } : undefined}
+              style={{ display: "flex", gap: 12, padding: "8px 14px", borderRadius: 10, background: on ? "#eef2ff" : fire ? "#f5f3ff" : "#f8fafc", border: `1px solid ${on ? "#c7d2fe" : fire ? "#c4b5fd" : "#e2e8f0"}`, opacity: on || fire || !s.event ? 1 : 0.5, cursor: fire ? "pointer" : "default" }}>
+              <span style={{ fontWeight: 800, color: on || fire ? "#4338ca" : "#3730a3", width: 104, flexShrink: 0 }}>{zh ? e.zh : e.en}</span>
               <span style={{ fontSize: 13, color: "#334155", fontFamily: "ui-monospace, monospace" }}>{e.arrow}</span>
+              {fire && <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, color: "#4338ca", whiteSpace: "nowrap" }}>{zh ? "点我触发" : "click"}</span>}
             </div>
           );
         })}
       </div>
+      <StepPanel t={t} title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("当前状态", "State")), stateLabel],
+          [t(T("触发事件", "Event")), cur ? (zh ? cur.zh : cur.en) : "—"],
+          [t(T("步骤", "Step")), `${(step ?? 0) + 1}/${count ?? 7}`],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(nextLabel)} />
       <Row>
         <span style={{ fontSize: 13, fontWeight: 700, color: "#3730a3" }}>{zh ? "当前状态" : "State"}</span>
         <span style={{ fontSize: 15, fontWeight: 900, color: "#4338ca", fontFamily: "ui-monospace, monospace" }}>{s.state}</span>
@@ -121,10 +161,17 @@ const PCB_OP: Record<PcbOp, { bg: string; fg: string; zh: string; en: string }> 
   rw: { bg: "#ede9fe", fg: "#5b21b6", zh: "读/写", en: "read/write" },
 };
 
-function PcbRender({ scene, t }: any) {
+function PcbRender({ scene, t, onNext, step, count }: any) {
   const zh = isZh(t);
   const s = (scene ?? { fields: PCB_FIELDS, active: -1 }) as PcbScene;
   const fields = s.fields ?? PCB_FIELDS;
+  const canNext = !!onNext && (typeof count !== "number" || step < count - 1);
+  const active = s.active ?? -1;
+  const cur = active >= 0 ? fields[active] : undefined;
+  const curOp = cur ? (PCB_OP[cur.op] ?? PCB_OP.read) : undefined;
+  const nextLabel = active >= fields.length - 1
+    ? T("重新读写 PCB", "read/write PCB again")
+    : T("点击 PCB 字段读/写", "click a PCB field to read/write");
   return (
     <Panel>
       <div style={{ textAlign: "center", padding: "8px 14px", borderRadius: 10, background: "#0f172a", color: "#e2e8f0", fontWeight: 800, fontSize: 13, letterSpacing: 1 }}>
@@ -132,17 +179,28 @@ function PcbRender({ scene, t }: any) {
       </div>
       <div style={{ display: "grid", gap: 6 }}>
         {fields.map((f, i) => {
-          const on = i === s.active;
+          const on = i === active;
           const op = PCB_OP[f.op] ?? PCB_OP.read;
+          const clickable = on && canNext;
           return (
-            <div key={f.key} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 14px", borderRadius: 10, background: on ? "#eef2ff" : "#f8fafc", border: `2px solid ${on ? "#6366f1" : "#e2e8f0"}`, boxShadow: on ? "0 0 0 3px rgba(99,102,241,.15)" : "none", transition: "all .2s" }}>
+            <div key={f.key} onClick={clickable ? (e: any) => { e.stopPropagation(); onNext(); } : undefined}
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 14px", borderRadius: 10, background: on ? "#eef2ff" : "#f8fafc", border: `2px solid ${on ? "#6366f1" : "#e2e8f0"}`, boxShadow: on ? "0 0 0 3px rgba(99,102,241,.15)" : "none", transition: "all .2s", cursor: clickable ? "pointer" : "default" }}>
               <span style={{ fontWeight: 800, color: on ? "#4338ca" : "#1e293b", fontSize: 13, width: 168, flexShrink: 0, fontFamily: "ui-monospace, monospace" }}>{zh ? f.zh : f.en}</span>
               <span style={{ fontSize: 12, color: "#475569", fontFamily: "ui-monospace, monospace", flex: 1 }}>{f.value}</span>
               <span style={{ padding: "2px 10px", borderRadius: 8, fontSize: 11, fontWeight: 800, background: op.bg, color: op.fg }}>{zh ? op.zh : op.en}</span>
+              {clickable && <span style={{ fontSize: 11, fontWeight: 700, color: "#4338ca", whiteSpace: "nowrap" }}>{zh ? "点我读/写" : "click"}</span>}
             </div>
           );
         })}
       </div>
+      <StepPanel t={t} title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("字段", "Field")), `${active + 1}/${fields.length}`],
+          [t(T("名称", "Name")), cur ? (zh ? cur.zh : cur.en) : "—"],
+          [t(T("操作", "Op")), curOp ? (zh ? curOp.zh : curOp.en) : "—"],
+          [t(T("数值", "Value")), cur ? cur.value : "—"],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(nextLabel)} />
       <div style={{ textAlign: "center", fontSize: 14 }}>
         <MathText text="$进程 = 程序段 + 数据段 + PCB$" />
       </div>
@@ -193,7 +251,7 @@ function ContextSwitchControls({ config, onChange, t }: any) {
 }
 type CtxScene = { step: number; who: string };
 
-function ContextSwitchRender({ scene, config, t }: any) {
+function ContextSwitchRender({ scene, config, t, onNext, step, count }: any) {
   const zh = isZh(t);
   const s = (scene ?? { step: 0, who: "P0" }) as CtxScene;
   const switchNs = Number(config.switchNs ?? 0);
@@ -201,6 +259,7 @@ function ContextSwitchRender({ scene, config, t }: any) {
   const switchMs = switchNs / 1e6;
   const overheadPct = sliceMs > 0 ? (switchMs / sliceMs) * 100 : 0;
   const switchPerSec = sliceMs > 0 ? 1000 / sliceMs : 0;
+  const canNext = !!onNext && (typeof count !== "number" || step < count - 1);
   const phases: { zh: string; en: string }[] = [
     { zh: "$P_0$ 运行", en: "$P_0$ running" },
     { zh: "保存 $P_0$ 现场", en: "save $P_0$ context" },
@@ -208,6 +267,14 @@ function ContextSwitchRender({ scene, config, t }: any) {
     { zh: "恢复 $P_1$ 现场", en: "restore $P_1$ context" },
     { zh: "$P_1$ 运行", en: "$P_1$ running" },
   ];
+  const NEXT_LABELS: [string, string][] = [
+    ["点击「P0」保存现场", "click P0 to save context"],
+    ["点击「P1」调度选中", "click P1 to dispatch"],
+    ["点击「P1」恢复现场", "click P1 to restore"],
+    ["点击让「P1」运行", "click to run P1"],
+    ["重新开始切换", "restart the switch"],
+  ];
+  const nextLabel = NEXT_LABELS[Math.max(0, Math.min(NEXT_LABELS.length - 1, s.step))];
   const procs = ["P0", "P1"];
   const p0Saved = s.step >= 1;
   const p1Restored = s.step >= 3;
@@ -246,10 +313,12 @@ function ContextSwitchRender({ scene, config, t }: any) {
           const on = s.who === p;
           const running = (p === "P0" && s.step === 0) || (p === "P1" && s.step === 4);
           const saved = (p === "P0" && p0Saved) || (p === "P1" && p1Restored);
+          const clickable = canNext && on;
           return (
-            <div key={p} style={{ flex: "1 1 200px", minWidth: 180, padding: "10px 14px", borderRadius: 12, background: on ? "#eef2ff" : "#f8fafc", border: `2px solid ${on ? "#6366f1" : "#e2e8f0"}` }}>
+            <div key={p} onClick={clickable ? (e: any) => { e.stopPropagation(); onNext(); } : undefined}
+              style={{ flex: "1 1 200px", minWidth: 180, padding: "10px 14px", borderRadius: 12, background: on ? "#eef2ff" : "#f8fafc", border: `2px solid ${on ? "#6366f1" : "#e2e8f0"}`, cursor: clickable ? "pointer" : "default" }}>
               <div style={{ fontWeight: 800, color: on ? "#4338ca" : "#1e293b", fontSize: 13 }}>
-                {p}{running ? (zh ? " · 占用 CPU" : " · on CPU") : ""}
+                {p}{running ? (zh ? " · 占用 CPU" : " · on CPU") : ""}{clickable ? (zh ? " · 点我切换" : " · click") : ""}
               </div>
               <div style={{ fontSize: 11, color: "#64748b", marginTop: 4 }}>{zh ? "上下文：PC · 寄存器 · PSW" : "Context: PC · regs · PSW"}</div>
               <div style={{ fontSize: 11, marginTop: 4, color: saved ? "#047857" : "#94a3b8", fontFamily: "ui-monospace, monospace" }}>
@@ -259,6 +328,14 @@ function ContextSwitchRender({ scene, config, t }: any) {
           );
         })}
       </div>
+      <StepPanel t={t} title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("阶段", "Phase")), `${s.step + 1}/${phases.length}`],
+          [t(T("占用 CPU", "On CPU")), s.who],
+          [t(T("T_context", "T_context")), `${switchMs.toFixed(4)} ms`],
+          [t(T("开销占比", "Overhead")), `${overheadPct.toFixed(2)}%`],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(T(nextLabel[0], nextLabel[1]))} />
       <div style={{ textAlign: "center", fontSize: 14 }}>
         <MathText text="$T_{context} = T_{save} + T_{dispatch} + T_{restore}$" />
       </div>

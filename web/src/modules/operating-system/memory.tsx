@@ -1,4 +1,4 @@
-import { T } from "../../i18n/lang";
+import { T, type Text } from "../../i18n/lang";
 import { MathText } from "../../lib/tex";
 import type { Frame } from "../../engine/types";
 import { Panel, Table, Note, Chips, NumField, TextField, Row, Steps, isZh, makeChapter, type SubDef } from "../common/chapter";
@@ -14,6 +14,27 @@ type SubMode = "address-space" | "paging" | "segmentation" | "tlb";
 
 const bin = (n: number, w: number) => (n >>> 0).toString(2).padStart(w, "0");
 const isPow2 = (n: number) => Number.isInteger(n) && n > 0 && (n & (n - 1)) === 0;
+
+// 用户驱动的「状态 / 数值」面板：展示当前步的关键取值，并提供推进按钮
+function StatusPanel({ t, rows, onNext, nextLabel, showNext }: {
+  t: (x: Text) => string;
+  rows: [string, string][];
+  onNext?: () => void;
+  nextLabel: string;
+  showNext: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", borderRadius: 10, background: "#0f172a", color: "#e2e8f0", fontSize: 12 }}>
+      <span style={{ fontWeight: 800, color: "#a5b4fc" }}>{t(T("状态 / 数值", "Status / Values"))}</span>
+      {rows.map(([k, v]) => (
+        <span key={k} style={{ fontFamily: "ui-monospace, monospace", whiteSpace: "nowrap" }}>{k} = <b style={{ color: "#fde047" }}>{v}</b></span>
+      ))}
+      {showNext && onNext && (
+        <button className="primary" style={{ marginLeft: "auto" }} onClick={(e) => { e.stopPropagation(); onNext(); }}>{nextLabel}</button>
+      )}
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------
 // address-space: MMU 运行时重定位（逐帧）
@@ -35,7 +56,7 @@ function AddressControls({ config, onChange, t }: any) {
 }
 type AddressScene = { logical: number; base: number; limit: number; physical: number; ok: boolean; step: number };
 
-function AddressRender({ scene, config, t }: any) {
+function AddressRender({ scene, config, t, step: frameStep, count, playing, onNext }: any) {
   const zh = isZh(t);
   const sc = (scene ?? {}) as Partial<AddressScene>;
   const la = sc.logical ?? Math.max(0, Math.floor(Number(config?.logical) || 0));
@@ -44,8 +65,9 @@ function AddressRender({ scene, config, t }: any) {
   const ok = sc.ok ?? la < limit;
   const pa = sc.physical ?? (ok ? base + la : 0);
   const step = sc.step ?? 3;
-  const box = (accent: string, bg: string, on: boolean, title: string, lines: string[]) => (
-    <div style={{ minWidth: 132, flex: "0 1 auto", padding: "12px 16px", borderRadius: 12, background: on ? bg : "#f8fafc", border: `1.5px solid ${on ? accent : "#e2e8f0"}`, textAlign: "center", opacity: on ? 1 : 0.5, transition: "background .2s, opacity .2s" }}>
+  const canNext = !!onNext && !playing && (typeof frameStep !== "number" || typeof count !== "number" || frameStep < count - 1);
+  const box = (accent: string, bg: string, on: boolean, title: string, lines: string[], onClick?: (e: any) => void) => (
+    <div onClick={onClick} style={{ minWidth: 132, flex: "0 1 auto", padding: "12px 16px", borderRadius: 12, background: on ? bg : "#f8fafc", border: `1.5px solid ${on ? accent : "#e2e8f0"}`, textAlign: "center", opacity: on ? 1 : 0.5, transition: "background .2s, opacity .2s", cursor: onClick ? "pointer" : "default" }}>
       <div style={{ fontWeight: 800, color: on ? accent : "#94a3b8" }}>{title}</div>
       {lines.map((l, i) => <div key={i} style={{ fontSize: i === 0 ? 12 : 11, color: i === 0 ? "#334155" : "#64748b", fontFamily: "ui-monospace, monospace", fontWeight: i === 0 ? 800 : 400 }}>{l}</div>)}
     </div>
@@ -66,7 +88,7 @@ function AddressRender({ scene, config, t }: any) {
   return (
     <Panel>
       <div style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
-        {box("#4f46e5", "#e0e7ff", step === 0, "CPU", [zh ? "逻辑地址" : "Logical addr", `LA = ${la}`])}
+        {box("#4f46e5", "#e0e7ff", step === 0, zh ? "CPU 访存" : "CPU access", [zh ? "逻辑地址" : "Logical addr", `LA = ${la}`], canNext ? (e: any) => { e.stopPropagation(); onNext(); } : undefined)}
         <span style={{ fontSize: 22, color: "#94a3b8" }}>→</span>
         {box("#d97706", "#fef3c7", step === 1, "MMU", [zh ? "重定位 + 保护" : "relocate + protect", `base = ${base}`, `limit = ${limit}`])}
         <span style={{ fontSize: 22, color: "#94a3b8" }}>→</span>
@@ -79,6 +101,16 @@ function AddressRender({ scene, config, t }: any) {
       <div style={{ textAlign: "center", fontSize: 15, fontWeight: 900, color: ok ? "#15803d" : "#b91c1c", fontFamily: "ui-monospace, monospace", opacity: step >= 2 ? 1 : 0.45, transition: "opacity .2s" }}>
         {ok ? `PA = base + LA = ${base} + ${la} = ${pa}` : (zh ? "越界陷阱：LA ≥ limit（内核处理，保护隔离）" : "Out-of-bounds trap: LA ≥ limit (kernel handles, isolation)")}
       </div>
+      <StatusPanel t={t}
+        rows={[
+          [zh ? "步骤" : "step", `${step + 1}/4`],
+          ["base", `${base}`],
+          ["limit", `${limit}`],
+          ["LA", `${la}`],
+          [zh ? "越界检查" : "check", `LA ${ok ? "<" : ">="} limit`],
+          [zh ? "物理地址" : "PA", ok ? `${pa}` : "-"],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(T("下一步", "Next step"))} />
       <div style={{ textAlign: "center", fontSize: 14 }}>
         <MathText text="$LA < limit \;\Rightarrow\; PA = base + LA$" />
       </div>
@@ -144,7 +176,7 @@ function PagingControls({ config, onChange, t }: any) {
 }
 type PagingScene = { logical: number; pageSize: number; p: number; d: number; frame: number; physical: number; step: number };
 
-function PagingRender({ scene, config, t }: any) {
+function PagingRender({ scene, config, t, step: frameStep, count, playing, onNext }: any) {
   const zh = isZh(t);
   const sc = (scene ?? {}) as Partial<PagingScene>;
   const addr = sc.logical ?? 0;
@@ -157,6 +189,7 @@ function PagingRender({ scene, config, t }: any) {
   const pfn = sc.frame ?? PAGE_TABLE[slot];
   const pa = sc.physical ?? pfn * pageSize + offset;
   const step = sc.step ?? 4;
+  const canNext = !!onNext && !playing && (typeof frameStep !== "number" || typeof count !== "number" || frameStep < count - 1);
   const pageBits = Math.max(1, 32 - offsetBits);
   const rect = (label: string, val: string, bitsText: string, bg: string, bd: string, fg: string, grow: number, on: boolean) => (
     <div style={{ flexGrow: grow, flexBasis: 0, background: on ? bg : "#f8fafc", borderRight: `1px solid ${bd}`, padding: "6px 4px", textAlign: "center", opacity: on ? 1 : 0.55, transition: "background .2s, opacity .2s" }}>
@@ -183,7 +216,11 @@ function PagingRender({ scene, config, t }: any) {
   return (
     <Panel>
       {!pow2 && <Note tone="warn">{zh ? "页大小建议取 2 的幂（如 1024）；当前按最近似的位数演示位切分。" : "Use a power-of-two page size (e.g. 1024); bit split uses the nearest width."}</Note>}
-      <div style={{ display: "flex", border: "1px solid #cbd5e1", borderRadius: 10, overflow: "hidden" }}>
+      <div style={{ textAlign: "center", fontSize: 12, fontWeight: 800, color: canNext ? "#4338ca" : "#64748b" }}>
+        {zh ? "逻辑地址（点击翻译）" : "Logical address (click to translate)"}
+      </div>
+      <div onClick={canNext ? (e: any) => { e.stopPropagation(); onNext(); } : undefined}
+        style={{ display: "flex", border: "1px solid #cbd5e1", borderRadius: 10, overflow: "hidden", cursor: canNext ? "pointer" : "default", outline: canNext ? "2px solid #a5b4fc" : "none", outlineOffset: 2 }}>
         {rect(zh ? "页号 p" : "page p", pow2 ? bin(pageNo, Math.min(pageBits, 16)) : `${pageNo}`, pow2 ? `${pageNo} (dec)` : "", "#e0e7ff", "#c7d2fe", "#4338ca", Math.max(1, Math.min(pageBits, 16)), step === 1)}
         {rect(zh ? "页内偏移 d" : "offset d", pow2 ? bin(offset, offsetBits) : `${offset}`, `${offset} (dec)`, "#fef3c7", "#fde68a", "#b45309", Math.max(1, offsetBits), step === 2)}
       </div>
@@ -206,6 +243,15 @@ function PagingRender({ scene, config, t }: any) {
         <span style={{ fontSize: 13, color: "#475569", opacity: step >= 4 ? 1 : 0.5, transition: "opacity .2s" }}>{zh ? "物理地址" : "PA"} = f·S + d = {pfn}×{pageSize} + {offset} = <b style={{ color: "#15803d" }}>{pa}</b></span>
         <span style={{ fontSize: 11, fontFamily: "ui-monospace, monospace", color: "#64748b" }}>0x{pa.toString(16).toUpperCase()}</span>
       </Row>
+      <StatusPanel t={t}
+        rows={[
+          [zh ? "步骤" : "step", `${step + 1}/5`],
+          [zh ? "页号 p" : "p", `${pageNo}`],
+          [zh ? "偏移 d" : "d", `${offset}`],
+          [zh ? "帧号 f" : "f", `${pfn}`],
+          [zh ? "物理地址" : "PA", `${pa}`],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(T("下一步", "Next step"))} />
       <div style={{ textAlign: "center", fontSize: 14 }}>
         <MathText text="$p = \lfloor LA / S \rfloor,\quad d = LA \bmod S,\quad PA = f \times S + d$" />
       </div>
@@ -268,7 +314,7 @@ function SegmentationControls({ config, onChange, t }: any) {
 }
 type SegScene = { seg: number; offset: number; base: number; limit: number; ok: boolean; physical: number; step: number };
 
-function SegmentationRender({ scene, config, t }: any) {
+function SegmentationRender({ scene, config, t, step: frameStep, count, playing, onNext }: any) {
   const zh = isZh(t);
   const sc = (scene ?? {}) as Partial<SegScene>;
   const s = sc.seg ?? Math.max(0, Math.min(SEG_TABLE.length - 1, Math.round(Number(config?.segNo) || 0)));
@@ -277,6 +323,7 @@ function SegmentationRender({ scene, config, t }: any) {
   const valid = sc.ok ?? d < seg.limit;
   const pa = sc.physical ?? (valid ? seg.base + d : 0);
   const step = sc.step ?? 4;
+  const canNext = !!onNext && !playing && (typeof frameStep !== "number" || typeof count !== "number" || frameStep < count - 1);
   const rows: React.ReactNode[][] = SEG_TABLE.map((g, i) => [
     `${i}${i === s ? (zh ? "（当前）" : " (now)") : ""}`,
     g.base,
@@ -302,6 +349,21 @@ function SegmentationRender({ scene, config, t }: any) {
     <Panel>
       <div style={{ fontSize: 12, fontWeight: 800, color: "#475569" }}>{zh ? "段表" : "Segment table"}</div>
       <Table head={zh ? ["段号 s", "base", "limit", "状态"] : ["Segment s", "base", "limit", "State"]} rows={rows} />
+      <div style={{ textAlign: "center", fontSize: 12, fontWeight: 800, color: canNext ? "#4338ca" : "#64748b" }}>{zh ? "物理内存分段（点击段推进）" : "Physical memory segments (click a segment)"}</div>
+      <div style={{ display: "flex", gap: 6, alignItems: "stretch" }}>
+        {SEG_TABLE.map((g, i) => {
+          const active = i === s;
+          return (
+            <div key={i}
+              onClick={canNext ? (e: any) => { e.stopPropagation(); onNext(); } : undefined}
+              style={{ flexGrow: g.limit, flexBasis: 0, minWidth: 52, padding: "8px 4px", borderRadius: 8, textAlign: "center", background: active ? "#c7d2fe" : "#f8fafc", border: `1.5px solid ${active ? "#4f46e5" : "#e2e8f0"}`, cursor: canNext ? "pointer" : "default" }}>
+              <div style={{ fontWeight: 800, color: active ? "#3730a3" : "#334155", fontSize: 12 }}>{zh ? `段 ${i}` : `S${i}`}</div>
+              <div style={{ fontSize: 10, color: "#64748b", fontFamily: "ui-monospace, monospace" }}>base {g.base}</div>
+              <div style={{ fontSize: 10, color: "#64748b", fontFamily: "ui-monospace, monospace" }}>limit {g.limit}</div>
+            </div>
+          );
+        })}
+      </div>
       <Row>
         <span style={{ fontSize: 13, color: "#475569" }}>{zh ? "逻辑地址" : "LA"} = s∥d = {s}∥{d}</span>
         <span style={{ fontSize: 13, color: "#475569", fontWeight: step === 3 ? 800 : 400 }}>{zh ? "检查" : "check"} d={d} {valid ? "<" : "≥"} limit[{s}]={seg.limit}</span>
@@ -310,6 +372,17 @@ function SegmentationRender({ scene, config, t }: any) {
       <div style={{ textAlign: "center", fontSize: 15, fontWeight: 900, color: valid ? "#15803d" : "#b91c1c", fontFamily: "ui-monospace, monospace", opacity: step >= 4 ? 1 : 0.45, transition: "opacity .2s" }}>
         {valid ? `PA = base[${s}] + d = ${seg.base} + ${d} = ${pa}` : (zh ? `越界异常：d ≥ limit[${s}]（保护中断）` : `out-of-bounds: d ≥ limit[${s}] (trap)`)}
       </div>
+      <StatusPanel t={t}
+        rows={[
+          [zh ? "步骤" : "step", `${step + 1}/5`],
+          [zh ? "段号 s" : "s", `${s}`],
+          [zh ? "偏移 d" : "d", `${d}`],
+          ["base", `${seg.base}`],
+          ["limit", `${seg.limit}`],
+          [zh ? "越界检查" : "check", `d ${valid ? "<" : ">="} limit`],
+          [zh ? "物理地址" : "PA", valid ? `${pa}` : "-"],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(T("下一步", "Next step"))} />
       <div style={{ textAlign: "center", fontSize: 14 }}>
         <MathText text="$d < limit[s] \;\Rightarrow\; PA = base[s] + d$" />
       </div>
@@ -373,7 +446,7 @@ function TlbControls({ config, onChange, t }: any) {
 }
 type TlbScene = { hit: boolean; step: number; eat: number };
 
-function TlbRender({ scene, config, t }: any) {
+function TlbRender({ scene, config, t, step: frameStep, count, playing, onNext }: any) {
   const zh = isZh(t);
   const sc = (scene ?? {}) as Partial<TlbScene>;
   const h = Math.max(0, Math.min(1, (Number(config?.hitPct) || 0) / 100));
@@ -384,6 +457,7 @@ function TlbRender({ scene, config, t }: any) {
   const eat = sc.eat ?? h * hitPath + (1 - h) * missPath;
   const step = sc.step ?? 4;
   const hitNow = sc.hit ?? false;
+  const canNext = !!onNext && !playing && (typeof frameStep !== "number" || typeof count !== "number" || frameStep < count - 1);
   const simplified = tTlb + (2 - h) * tMem;
   const noTlb = 2 * tMem;
   const path = (label: string, sub: string, val: number, bg: string, bd: string, fg: string, on: boolean) => (
@@ -399,6 +473,12 @@ function TlbRender({ scene, config, t }: any) {
   });
   return (
     <Panel>
+      <div style={{ textAlign: "center" }}>
+        <div onClick={canNext ? (e: any) => { e.stopPropagation(); onNext(); } : undefined}
+          style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 18px", borderRadius: 999, background: canNext ? "#4338ca" : "#e2e8f0", color: canNext ? "#fff" : "#64748b", fontWeight: 800, fontSize: 13, cursor: canNext ? "pointer" : "default" }}>
+          {zh ? "访问" : "Access"} · {zh ? "探测 TLB" : "probe TLB"}
+        </div>
+      </div>
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
         {path(zh ? `命中路径 (h=${(h * 100).toFixed(0)}%)` : `Hit path (h=${(h * 100).toFixed(0)}%)`, "t_tlb + t_mem", hitPath, "#dcfce7", "#16a34a", "#166534", step === 1)}
         {path(zh ? `未命中路径 (${((1 - h) * 100).toFixed(0)}%)` : `Miss path (${((1 - h) * 100).toFixed(0)}%)`, "t_tlb + 2·t_mem", missPath, "#fee2e2", "#ef4444", "#b91c1c", step >= 2)}
@@ -415,6 +495,15 @@ function TlbRender({ scene, config, t }: any) {
         <span style={{ fontSize: 13, color: "#475569" }}>{zh ? "无 TLB" : "no TLB"} 2·t_mem = <b style={{ color: "#b45309" }}>{noTlb.toFixed(1)} ns</b></span>
         <span style={{ fontSize: 11, color: hitNow ? "#166534" : "#b91c1c", fontWeight: 800 }}>{zh ? `当前：${hitNow ? "命中" : "未命中"}` : `now: ${hitNow ? "hit" : "miss"}`}</span>
       </Row>
+      <StatusPanel t={t}
+        rows={[
+          [zh ? "步骤" : "step", `${step + 1}/5`],
+          [zh ? "当前" : "now", hitNow ? (zh ? "命中" : "hit") : (zh ? "未命中" : "miss")],
+          [zh ? "命中路径" : "hit", `${hitPath.toFixed(1)} ns`],
+          [zh ? "未命中路径" : "miss", `${missPath.toFixed(1)} ns`],
+          ["EAT", `${eat.toFixed(2)} ns`],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(T("下一步", "Next step"))} />
       <Table head={zh ? ["h", "命中路径 (ns)", "未命中 (ns)", "EAT (ns)"] : ["h", "Hit (ns)", "Miss (ns)", "EAT (ns)"]} rows={rows} />
       <Note>
         {zh

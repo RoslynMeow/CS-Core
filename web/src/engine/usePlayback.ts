@@ -82,7 +82,8 @@ export function usePlayback(framesOr: FramesOrInfinite, opts: { interval?: numbe
   const stepBack = useCallback(() => { setPlaying(false); setIndex(i => Math.max(i - 1, 0)); }, []);
   const first = useCallback(() => { setPlaying(false); setIndex(0); }, []);
   const last = useCallback(() => { setPlaying(false); setIndex(framesRef.current.length - 1); }, []);
+  const goTo = useCallback((i: number) => { setPlaying(false); setIndex(Math.max(0, Math.min(framesRef.current.length - 1, i))); }, []);
 
-  return { frames, frame: frames[index], index, count: frames.length, infinite: isInfinite, playing, speed, setSpeed, play, pause, toggle, stepFwd, stepBack, first, last };
+  return { frames, frame: frames[index], index, count: frames.length, infinite: isInfinite, playing, speed, setSpeed, play, pause, toggle, stepFwd, stepBack, first, last, goTo };
 }
 export type Playback = ReturnType<typeof usePlayback>;

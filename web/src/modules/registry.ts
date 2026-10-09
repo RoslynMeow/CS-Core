@@ -113,12 +113,19 @@ const CHAPTERS: Chapter[] = [
 function wrapCard(module: ModuleDef, o: Opt, subject: SubjectKey): ModuleDef {
   const chapter = module as any;
   const force = (c: any) => ({ ...(c ?? {}), subMode: o.v });
+  const hasCode = !!(module as any).codeFor || !!(module as any).code;
+  // 画布点击推进：仅对「纯线性动画」章节默认开启；带自身画布交互的章节（图/树/数字电路等）不开启，避免误触
+  const ADVANCE_CHAPTERS = new Set([
+    "computer-overview", "instruction-set", "cpu-datapath", "pipeline",
+    "memory-hierarchy", "c-programming", "algorithm-analysis",
+  ]);
   return {
     id: `${module.id}/${o.v}`,
     title: T(o.zh, o.en),
     desc: module.desc,
     tags: module.tags,
     interactive: module.interactive,
+    advanceOnCanvas: (module as any).advanceOnCanvas ?? (hasCode && !module.interactive && ADVANCE_CHAPTERS.has(module.id)),
     persistExclude: [...(module.persistExclude ?? []), "subMode"],
     chapter: module.title,
     subject,

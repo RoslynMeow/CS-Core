@@ -21,6 +21,7 @@ function persistable(c: object, exclude: string[] = []): object {
   return out;
 }
 import { useLang } from "../i18n/LangContext";
+import { T } from "../i18n/lang";
 import type { ModuleDef } from "../engine/types";
 import { usePlayback } from "../engine/usePlayback";
 import { Pseudocode } from "./Pseudocode";
@@ -139,6 +140,27 @@ export function Stage({ mod }: { mod: ModuleDef }) {
     } else setToast(null);
   }, [pb.frame]);
 
+  // 步进驱动：把当前步/总数/推进回调透传给 Render 与 Side，模块可在画布内放「点击触发」的对象
+  const stepProps = {
+    step: pb.index,
+    count: pb.count,
+    playing: pb.playing,
+    onNext: pb.stepFwd,
+    onPrev: pb.stepBack,
+    onStep: pb.goTo,
+    toggle: pb.toggle,
+    reset: pb.first,
+  };
+  const canAdvance = !!mod.advanceOnCanvas && !interactive && pb.count > 1 && !mod.blockedReason?.(config as never);
+  const advanceClick = canAdvance
+    ? (e: React.MouseEvent) => {
+        if (pb.playing || pb.index >= pb.count - 1) return;
+        const el = e.target as HTMLElement;
+        if (el.closest("button,a,input,select,textarea,[data-no-advance]")) return;
+        pb.stepFwd();
+      }
+    : undefined;
+
   return (
     <div className={`stage${bareLayout ? " stage--demo" : ""}`} style={{ position: "relative" }}>
       {toast && (
@@ -178,6 +200,7 @@ export function Stage({ mod }: { mod: ModuleDef }) {
                 onChange={handleChange as never}
                 inspected={inspected as never}
                 onInspect={(id) => setInspected(id ?? null)}
+                  {...stepProps}
               />
             )}
           </div>
@@ -190,7 +213,11 @@ export function Stage({ mod }: { mod: ModuleDef }) {
               <MathText text={t(pb.frame.caption)} />
             </div>
           )}
-          <div className="canvas">
+          <div
+            className="canvas"
+            onClick={advanceClick}
+            style={canAdvance ? { position: "relative", cursor: pb.index < pb.count - 1 ? "pointer" : "default" } : undefined}
+          >
             {pb.frame && (
               <mod.Render
                 scene={pb.frame.scene}
@@ -199,7 +226,29 @@ export function Stage({ mod }: { mod: ModuleDef }) {
                 onChange={handleChange as never}
                 inspected={inspected as never}
                 onInspect={(id) => setInspected(id ?? null)}
+                {...stepProps}
               />
+            )}
+            {canAdvance && !pb.playing && pb.index < pb.count - 1 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); pb.stepFwd(); }}
+                style={{
+                  position: "absolute",
+                  right: 10,
+                  bottom: 10,
+                  background: "#4338ca",
+                  color: "#fff",
+                  border: "none",
+                  padding: "6px 14px",
+                  borderRadius: 999,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                  boxShadow: "0 4px 12px rgba(67,56,202,.35)",
+                }}
+              >
+                {t(T("点击继续", "click to continue"))} →
+              </button>
             )}
           </div>
         </div>
@@ -219,6 +268,10 @@ export function Stage({ mod }: { mod: ModuleDef }) {
               onChange={handleChange as never}
               inspected={inspected as never}
               onInspect={(id) => setInspected(id ?? null)}
+              step={pb.index}
+              count={pb.count}
+              onNext={pb.stepFwd}
+              onStep={pb.goTo}
             />
           )}
         </div>

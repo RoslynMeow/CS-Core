@@ -11,6 +11,32 @@ import { Panel, Table, Note, isZh, makeChapter, type SubDef } from "../common/ch
 
 type SubMode = "crc" | "multiple-access" | "arp" | "vlan";
 
+type Kv = [string, React.ReactNode];
+
+// 用户驱动触发器：点击「发送」等推进到下一帧（onNext）
+function NextButton({ onNext, zh, zhLabel, enLabel, disabled, hint }: { onNext?: () => void; zh: boolean; zhLabel: string; enLabel: string; disabled?: boolean; hint?: string }) {
+  const off = !!disabled || typeof onNext !== "function";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "8px 12px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
+      <button disabled={off} onClick={(e) => { e.stopPropagation(); if (!off) onNext?.(); }} style={{ padding: "7px 18px", borderRadius: 999, border: "1px solid #c7d2fe", background: off ? "#f1f5f9" : "#4338ca", color: off ? "#94a3b8" : "#fff", fontWeight: 800, fontSize: 13, cursor: off ? "default" : "pointer", fontFamily: "inherit" }}>
+        {zh ? zhLabel : enLabel}
+      </button>
+      {!off && hint && <span style={{ fontSize: 12, color: "#4338ca" }}>{hint}</span>}
+    </div>
+  );
+}
+
+// 内联「状态 / 数值」面板：每步从 scene 派生
+function ValuePanel({ zh, rows }: { zh: boolean; rows: Kv[] }) {
+  if (!rows.length) return null;
+  return (
+    <div style={{ display: "grid", gap: 6, padding: "10px 14px", borderRadius: 10, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+      <div style={{ fontWeight: 800, color: "#1e293b", fontSize: 13 }}>{zh ? "状态 / 数值" : "State / Values"}</div>
+      <Table head={zh ? ["项", "值"] : ["Item", "Value"]} rows={rows as React.ReactNode[][]} />
+    </div>
+  );
+}
+
 function xorStr(a: string, b: string): string {
   let out = "";
   for (let i = 0; i < a.length; i++) out += a[i] === b[i] ? "0" : "1";
@@ -36,19 +62,32 @@ function crcDivide(data: string, gen: string) {
 
 type CrcScene = { phase: "init" | "step" | "done"; data: string; gen: string; shifted: string; steps: { before: string; divisor: string; after: string; pos: number }[]; visible: number; remainder: string; code: string; r: number; bad?: boolean };
 
-function CrcRender({ scene, t }: any) {
+function CrcRender({ scene, t, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as CrcScene;
   if (s.bad || !s.data) {
     return <Panel><Note tone="warn">{zh ? "请输入合法数据位串与生成多项式（首位为 1）。" : "Enter valid data bits and a generator (leading 1)."}</Note></Panel> as never;
   }
   const shown = s.steps.slice(0, s.visible);
+  const total = s.steps?.length ?? 0;
+  const done = s.phase === "done";
+  const rows: Kv[] = [
+    [zh ? "数据 D" : "Data D", s.data],
+    [zh ? "生成多项式 G" : "Generator G", s.gen],
+    [zh ? "左移位数 r" : "Shift r", s.r],
+    [zh ? "已完成异或步" : "XOR steps done", `${s.visible ?? 0} / ${total}`],
+    [zh ? "当前余数" : "Current remainder", done ? s.remainder : (zh ? "长除进行中" : "dividing")],
+    [zh ? "发送码字" : "Codeword", done ? s.code : "—"],
+  ];
   return (
     <Panel>
       <div style={{ fontFamily: "ui-monospace, monospace", fontSize: 14, textAlign: "center", color: "#334155", lineHeight: 1.9 }}>
         <div>{zh ? "数据 D" : "Data D"} = <b>{s.data}</b>{zh ? `，左移 r=${s.r} 位` : `, shift left r=${s.r}`} → <b>{s.shifted}</b></div>
         <div>{zh ? "生成多项式 G" : "Generator G"} = <b>{s.gen}</b></div>
       </div>
+      <NextButton zh={zh} onNext={onNext} disabled={done} hint={zh ? "点击发送，逐步执行模 2 长除" : "click to send, running the mod-2 division step by step"}
+        zhLabel={done ? "已完成" : s.phase === "init" ? "发送（开始长除）" : "发送（下一步异或）"}
+        enLabel={done ? "done" : s.phase === "init" ? "send (start)" : "send (next XOR)"} />
       <div style={{ overflowX: "auto", fontFamily: "ui-monospace, monospace", fontSize: 12, background: "#0f172a", color: "#e2e8f0", padding: 12, borderRadius: 10, lineHeight: 1.7 }}>
         {shown.length === 0 && <div style={{ color: "#94a3b8" }}>{zh ? "（尚未开始异或）" : "(no XOR yet)"}</div>}
         {shown.map((st, i) => {
@@ -69,6 +108,7 @@ function CrcRender({ scene, t }: any) {
         </div>
       )}
       <Note>{zh ? `发送 数据+余数 = ${s.code}；接收方再除以 G，余数为 0 则认为无差错。` : `Send data+remainder = ${s.code}; receiver divides by G, zero remainder ⇒ no error.`}</Note>
+      <ValuePanel zh={zh} rows={rows} />
     </Panel>
   );
 }
@@ -131,7 +171,7 @@ function csmaStation(label: string, on: boolean) {
   );
 }
 
-function CsmaRender({ scene, t }: any) {
+function CsmaRender({ scene, t, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? { phase: "idle", m: 0, K: 0, slots: 1 }) as CsmaScene;
   const ph = CSMA_PHASE[s.phase] ?? CSMA_PHASE.idle;
@@ -139,9 +179,18 @@ function CsmaRender({ scene, t }: any) {
   const bOn = s.phase === "collision";
   const signal = s.phase === "send" ? "#2563eb" : s.phase === "collision" ? "#dc2626" : "#16a34a";
   const slots = Array.from({ length: Math.max(1, 2 ** s.m) }, (_, i) => i);
+  const done = s.phase === "success";
+  const rows: Kv[] = [
+    [zh ? "阶段" : "Phase", zh ? ph.zh : ph.en],
+    [zh ? "冲突次数 m" : "Collisions m", s.m],
+    [zh ? "退避窗口" : "Backoff window", `{0,...,${Math.max(1, 2 ** s.m) - 1}}`],
+    [zh ? "已选时隙 K" : "Picked slot K", s.K],
+  ];
   return (
     <Panel>
       <div style={{ textAlign: "center", padding: "8px 14px", borderRadius: 10, background: ph.bg, color: ph.fg, fontWeight: 800, fontSize: 14 }}>{zh ? ph.zh : ph.en}</div>
+      <NextButton zh={zh} onNext={onNext} disabled={done} hint={zh ? "点击让 A 尝试发送，逐步演示 CSMA/CD" : "click to let A attempt transmission, running CSMA/CD step by step"}
+        zhLabel={done ? "发送成功" : "尝试发送"} enLabel={done ? "sent" : "attempt to send"} />
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         {csmaStation("A", aOn)}
         <div style={{ position: "relative", flex: 1, height: 56, borderRadius: 8, background: "#f1f5f9", border: "1px solid #e2e8f0", overflow: "hidden" }}>
@@ -170,6 +219,7 @@ function CsmaRender({ scene, t }: any) {
         </div>
       )}
       <Note>{zh ? "CSMA/CD：先听后发、边发边听、冲突即停、二进制指数退避。第 $m$ 次冲突从 $\\{0,\\dots,2^m-1\\}$ 取 $K$。" : "CSMA/CD: listen before talk, listen while talking, abort on collision, binary exponential backoff. After the $m$-th collision pick $K$ from $\\{0,\\dots,2^m-1\\}$."}</Note>
+      <ValuePanel zh={zh} rows={rows} />
     </Panel>
   );
 }

@@ -12,6 +12,27 @@ import { Panel, Table, Note, TextField, Row, isZh, makeChapter, type SubDef } fr
 
 type SubMode = "access-control" | "permissions";
 
+// 用户驱动「状态 / 数值」面板：展示当前步取值，并提供推进按钮
+function StepPanel({ title, rows, onNext, nextLabel, showNext }: {
+  title: string;
+  rows: [string, string][];
+  onNext?: () => void;
+  nextLabel: string;
+  showNext: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", borderRadius: 10, background: "#0f172a", color: "#e2e8f0", fontSize: 12 }}>
+      <span style={{ fontWeight: 800, color: "#a5b4fc" }}>{title}</span>
+      {rows.map(([k, v]) => (
+        <span key={k} style={{ fontFamily: "ui-monospace, monospace", whiteSpace: "nowrap" }}>{k} = <b style={{ color: "#fde047" }}>{v}</b></span>
+      ))}
+      {showNext && onNext && (
+        <button className="primary" style={{ marginLeft: "auto" }} onClick={(e) => { e.stopPropagation(); onNext(); }}>{nextLabel}</button>
+      )}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------
 // access-control (逐帧动画：主体请求 → 查访问矩阵 → ACL/能力视角 → 判定)
 // ---------------------------------------------------------------------
@@ -59,9 +80,11 @@ function acHighlight(on: boolean) {
     : undefined;
 }
 
-function AccessControlRender({ scene, t }: any) {
+function AccessControlRender({ scene, t, onNext, step: frameStep, count, playing }: any) {
   const zh = isZh(t);
   const s = (scene ?? { subject: "B", object: "F1", op: "write", allowed: false, step: 3 }) as AcScene;
+  const canNext = !!onNext && !playing && (typeof frameStep !== "number" || typeof count !== "number" || frameStep < count - 1);
+  const advance = (e: React.MouseEvent) => { e.stopPropagation(); if (canNext) onNext(); };
   const subLabel = acName(s.subject, zh);
   const objLabel = acName(s.object, zh);
   const opLabel = (zh ? AC_OP[s.op]?.zh : AC_OP[s.op]?.en) ?? s.op;
@@ -74,8 +97,12 @@ function AccessControlRender({ scene, t }: any) {
   const matrixRows: React.ReactNode[][] = AC_SUBJECTS.map((sub) => {
     const rowHi = consulted && sub.id === s.subject;
     return [
-      <span style={acHighlight(rowHi)}>{zh ? sub.zh : sub.en}</span>,
-      ...AC_OBJECTS.map((obj) => <span style={acHighlight(rowHi && obj.id === s.object)}>{acRights(sub.id, obj.id, zh)}</span>),
+      <span onClick={canNext ? advance : undefined} style={{ ...(acHighlight(rowHi) ?? {}), cursor: canNext ? "pointer" : "default" }}>{zh ? sub.zh : sub.en}</span>,
+      ...AC_OBJECTS.map((obj) => {
+        const on = rowHi && obj.id === s.object;
+        const clickable = canNext && on;
+        return <span onClick={clickable ? advance : undefined} style={clickable ? { ...(acHighlight(true) ?? {}), cursor: "pointer" } : acHighlight(on)}>{acRights(sub.id, obj.id, zh)}</span>;
+      }),
     ];
   });
 
@@ -110,6 +137,16 @@ function AccessControlRender({ scene, t }: any) {
           <b>{subLabel}</b> → <b>{opLabel}</b> → <b>{objLabel}</b>
         </span>
       </Row>
+      <StepPanel
+        title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("主体", "Subject")), subLabel],
+          [t(T("客体", "Object")), objLabel],
+          [t(T("操作", "Op")), opLabel],
+          [t(T("阶段", "Stage")), `${stage + 1}/4`],
+          [t(T("判定", "Verdict")), verdict ? (s.allowed ? (zh ? "允许" : "allow") : "EACCES") : "—"],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(T("下一步", "Next step"))} />
       <Table head={matrixHead} rows={matrixRows} />
       {showViews && (
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -267,11 +304,13 @@ function PermissionsControls({ config, onChange, t }: any) {
   );
 }
 
-function PermissionsRender({ scene, t }: any) {
+function PermissionsRender({ scene, t, onNext, step: frameStep, count, playing }: any) {
   const zh = isZh(t);
   const s = (scene ?? { mode: "754" }) as PermScene;
   const raw = String(s.mode ?? "");
   const valid = /^[0-7]{3,4}$/.test(raw);
+  const canNext = !!onNext && !playing && (typeof frameStep !== "number" || typeof count !== "number" || frameStep < count - 1);
+  const advance = (e: React.MouseEvent) => { e.stopPropagation(); if (canNext) onNext(); };
 
   if (s.bad || !valid) {
     return (
@@ -301,8 +340,8 @@ function PermissionsRender({ scene, t }: any) {
       ? { background: "#eef2ff", color: "#4338ca", fontWeight: 700, borderRadius: 6, padding: "1px 6px", display: "inline-block" }
       : undefined;
     return [
-      <span style={st}>{classes[i]}</span>,
-      <span style={st}>{String(d)}</span>,
+      <span onClick={canNext ? advance : undefined} style={{ ...(st ?? {}), cursor: canNext ? "pointer" : "default" }}>{classes[i]}</span>,
+      <span onClick={canNext ? advance : undefined} style={{ ...(st ?? {}), cursor: canNext ? "pointer" : "default" }}>{String(d)}</span>,
       <span style={st}>{parseDigit(d)}</span>,
       <span style={st}>{opsOf(d, zh)}</span>,
     ];
@@ -356,6 +395,16 @@ function PermissionsRender({ scene, t }: any) {
             : `Special digit ${special}: ${specialFlags.length ? specialFlags.join(" / ") : "none"}. setuid runs the program as the owner; sticky lets only owners delete their files in a directory.`}
         </Note>
       )}
+      <StepPanel
+        title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("权限", "Mode")), raw],
+          [t(T("类别", "Class")), classes[clsIndex]],
+          [t(T("三位", "Bits")), s.bits],
+          [t(T("所需位", "Bit")), String(op.bit)],
+          [t(T("判定", "Verdict")), step >= 4 ? (s.allowed ? (zh ? "允许" : "allow") : "EACCES") : "—"],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(T("检查下一项", "Check next"))} />
       <div style={{ fontSize: 12, fontWeight: 800, color: "#4338ca", padding: "2px 4px" }}>
         {zh ? `访问判定：${classes[clsIndex]} 请求 ${op.zh} 文件` : `Access check: ${classes[clsIndex]} requests ${op.en}`}
       </div>

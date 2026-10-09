@@ -41,6 +41,56 @@ const PRIO_PROCS: Proc[] = [
 
 const PCOLOR: Record<string, string> = { P1: "#6366f1", P2: "#0ea5e9", P3: "#f59e0b", P4: "#10b981" };
 
+// 用户驱动的触发器：点击画布对象推进到下一帧（onNext）；末帧点击可重播（reset）
+function advanceHandler(onNext?: () => void, onReset?: () => void, playing?: boolean, atEnd?: boolean) {
+  return (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (playing) return;
+    if (atEnd) onReset?.();
+    else onNext?.();
+  };
+}
+
+// 触发提示：告诉用户点哪个对象推进
+function TriggerHint({ text, ready }: { text: string; ready: boolean }) {
+  return <div style={{ textAlign: "center", fontSize: 11, fontWeight: 700, color: ready ? "#4338ca" : "#059669" }}>{text}</div>;
+}
+
+// 状态/数值面板：逐帧展示 scene 中的当前取值
+function StatPanel({ title, rows }: { title: string; rows: [string, string][] }) {
+  return (
+    <div style={{ padding: "8px 12px", borderRadius: 10, background: "#0f172a", border: "1px solid #1e293b", fontFamily: "ui-monospace, monospace", fontSize: 12, display: "grid", gap: 4 }}>
+      <div style={{ fontWeight: 800, color: "#93c5fd" }}>{title}</div>
+      {rows.map(([k, v], i) => (
+        <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+          <span style={{ color: "#94a3b8" }}>{k}</span>
+          <span style={{ color: "#f1f5f9", fontWeight: 700 }}>{v}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// 由甘特图推断已完成进程，计算当前平均周转/等待（随步进更新）
+function ganttStats(procs: Proc[], gantt: Slice[]) {
+  const fin: Record<string, number> = {};
+  const run: Record<string, number> = {};
+  for (const s of gantt) {
+    fin[s.id] = Math.max(fin[s.id] ?? 0, s.end);
+    run[s.id] = (run[s.id] ?? 0) + (s.end - s.start);
+  }
+  let st = 0, sw = 0, cnt = 0;
+  for (const p of procs) {
+    if ((run[p.id] ?? 0) >= p.burst) {
+      const f = fin[p.id];
+      st += f - p.arrival;
+      sw += f - p.arrival - p.burst;
+      cnt += 1;
+    }
+  }
+  return { turn: cnt ? st / cnt : 0, wait: cnt ? sw / cnt : 0, cnt };
+}
+
 function merge(slices: Slice[]): Slice[] {
   const out: Slice[] = [];
   for (const s of slices) {
@@ -446,7 +496,7 @@ function metricsGenerate(_config: any): Frame<MetricsScene>[] {
   return frames;
 }
 
-function MetricsRender({ scene, t }: any) {
+function MetricsRender({ scene, t, onNext, reset, playing, step: pStep, count }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as Partial<MetricsScene>;
   const n = METRIC_PROCS.length;
@@ -455,6 +505,10 @@ function MetricsRender({ scene, t }: any) {
   const waiting = s.waiting ?? new Array(n).fill(null);
   const proc = s.proc ?? -1;
   const step = s.step ?? 0;
+  const total = count ?? 1;
+  const atEnd = typeof pStep === "number" && pStep >= total - 1;
+  const canClick = !!onNext && !playing && total > 1;
+  const advance = advanceHandler(onNext, reset, playing, atEnd);
   const slices: Slice[] = METRIC_PROCS.map((p, i) => ({
     id: p.id, start: (completion[i] ?? 0) - p.burst, end: completion[i] ?? 0,
   }));
@@ -476,6 +530,26 @@ function MetricsRender({ scene, t }: any) {
   return (
     <Panel>
       <Gantt slices={slices} end={end} />
+      <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+        {METRIC_PROCS.map((p, i) => (
+          <div key={p.id} onClick={canClick ? advance : undefined}
+            title={canClick ? t(T("点击该进程，逐步计算周转/等待", "click this job to compute turnaround/wait step by step")) : undefined}
+            style={{ padding: "6px 14px", borderRadius: 10, background: i === proc ? "#eef2ff" : "#f8fafc", border: `2px solid ${i === proc ? "#6366f1" : "#e2e8f0"}`, fontFamily: "ui-monospace, monospace", fontWeight: 800, color: "#334155", cursor: canClick ? "pointer" : "default" }}>
+            {p.id}
+          </div>
+        ))}
+      </div>
+      {canClick && (
+        <TriggerHint ready={!atEnd} text={atEnd
+          ? t(T("已完成，点击进程可重播", "Done; click a job to replay"))
+          : t(T("点击任一进程，逐步计算其周转/等待并求平均", "click any job to compute its turnaround/wait, then average"))} />
+      )}
+      <StatPanel title={t(T("状态 / 数值", "State / values"))} rows={[
+        [t(T("步骤", "Step")), `${(s.step ?? 0) + 1}/${total}`],
+        [t(T("当前进程", "Current job")), proc >= 0 ? METRIC_PROCS[proc].id : "—"],
+        [t(T("平均周转", "Avg turn")), av ? av.turn.toFixed(2) : "—"],
+        [t(T("平均等待", "Avg wait")), av ? av.wait.toFixed(2) : "—"],
+      ]} />
       <Table
         head={zh ? ["进程", "到达", "运行", "完成", "周转", "等待"] : ["Proc", "Arr", "Burst", "Finish", "Turn", "Wait"]}
         rows={rows}
@@ -515,15 +589,20 @@ function FcfsSJFControls({ config, onChange, t }: any) {
   );
 }
 
-function FcfsSJFRender({ scene, config, t }: any) {
+function FcfsSJFRender({ scene, config, t, onNext, reset, playing, step, count }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as Partial<FsScene>;
   const algo = (s.algo ?? config?.algo ?? "fcfs") as "fcfs" | "sjf" | "srtf";
+  const total = count ?? 1;
+  const atEnd = typeof step === "number" && step >= total - 1;
+  const canClick = !!onNext && !playing && total > 1;
+  const advance = advanceHandler(onNext, reset, playing, atEnd);
   const res = algo === "srtf" ? simSRTF(PROCS) : simNonPreemptive(algo, PROCS);
   const aF = simNonPreemptive("fcfs", PROCS);
   const aS = simNonPreemptive("sjf", PROCS);
   const aP = simSRTF(PROCS);
   const doneSet = new Set<number>(s.done ?? []);
+  const gStat = ganttStats(PROCS, s.gantt ?? res.slices);
   const per: React.ReactNode[][] = PROCS.map((p, i) => {
     const f = res.finish[p.id];
     if (!doneSet.has(i)) return [p.id, p.arrival, p.burst, "—", "—", "—"];
@@ -545,11 +624,31 @@ function FcfsSJFRender({ scene, config, t }: any) {
   return (
     <Panel>
       <Legend t={t} />
-      <div style={{ display: "flex", gap: 18, justifyContent: "center", flexWrap: "wrap", fontSize: 13, fontFamily: "ui-monospace, monospace", color: "#334155" }}>
+      <div style={{ display: "flex", gap: 18, justifyContent: "center", alignItems: "center", flexWrap: "wrap", fontSize: 13, fontFamily: "ui-monospace, monospace", color: "#334155" }}>
         <span>{zh ? "当前时间" : "Time"} <b>t = {s.time ?? 0}</b></span>
         <span>{zh ? "运行" : "Running"} = <b style={{ color: s.running ? PCOLOR[s.running] : "#94a3b8" }}>{s.running ?? (zh ? "空闲" : "idle")}</b></span>
+        {canClick && (
+          <span onClick={advance} title={t(T("点击时钟，前进一个时间单位", "click the clock to advance one time unit"))}
+            style={{ padding: "3px 12px", borderRadius: 999, background: "#4338ca", color: "#fff", fontWeight: 800, cursor: "pointer" }}>
+            {zh ? "时钟 +1" : "clock +1"}
+          </span>
+        )}
       </div>
-      <Gantt slices={s.gantt ?? res.slices} end={res.end} />
+      <div onClick={canClick ? advance : undefined} title={canClick ? t(T("点击甘特图，前进一个时间单位", "click the Gantt to advance one time unit")) : undefined} style={{ cursor: canClick ? "pointer" : "default" }}>
+        <Gantt slices={s.gantt ?? res.slices} end={res.end} />
+      </div>
+      {canClick && (
+        <TriggerHint ready={!atEnd} text={atEnd
+          ? t(T("已完成，点击可重播", "Done; click to replay"))
+          : t(T("点击「时钟 +1」或甘特图，逐单位推进调度", "click the clock or the Gantt to advance the schedule unit by unit"))} />
+      )}
+      <StatPanel title={t(T("状态 / 数值", "State / values"))} rows={[
+        [t(T("当前时间", "Time")), `t = ${s.time ?? 0}`],
+        [t(T("运行", "Running")), s.running ?? t(T("空闲", "idle"))],
+        [t(T("已完成", "Done")), `${doneSet.size}/${PROCS.length}`],
+        [t(T("平均周转", "Avg turn")), gStat.turn.toFixed(2)],
+        [t(T("平均等待", "Avg wait")), gStat.wait.toFixed(2)],
+      ]} />
       <Table head={zh ? ["进程", "到达", "运行", "完成", "周转", "等待"] : ["Proc", "Arr", "Burst", "Finish", "Turn", "Wait"]} rows={per} />
       <div style={{ display: "flex", gap: 24, justifyContent: "center", flexWrap: "wrap", fontSize: 14 }}>
         <span>{zh ? "平均周转" : "Avg turnaround"} = <b style={{ color: "#4338ca" }}>{res.avgTurn.toFixed(2)}</b></span>
@@ -573,11 +672,16 @@ function RrPriorityControls({ config, onChange, t }: any) {
   );
 }
 
-function RrPriorityRender({ scene, config, t }: any) {
+function RrPriorityRender({ scene, config, t, onNext, reset, playing, step, count }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as Partial<RrScene>;
   const q = Math.max(1, Math.min(8, Math.round(config?.q ?? 2)));
   const res = simRR(PROCS, q);
+  const total = count ?? 1;
+  const atEnd = typeof step === "number" && step >= total - 1;
+  const canClick = !!onNext && !playing && total > 1;
+  const advance = advanceHandler(onNext, reset, playing, atEnd);
+  const gStat = ganttStats(PROCS, s.gantt ?? res.slices);
   const per: React.ReactNode[][] = PROCS.map((p) => {
     const f = res.finish[p.id];
     return [p.id, p.arrival, p.burst, f, f - p.arrival, f - p.arrival - p.burst];
@@ -613,6 +717,27 @@ function RrPriorityRender({ scene, config, t }: any) {
     <Panel>
       <Legend t={t} />
       {queueView}
+      {canClick && (
+        <div style={{ display: "flex", justifyContent: "center" }}>
+          <div onClick={advance} title={t(T("点击运行一个时间片", "click to run one time slice"))}
+            style={{ padding: "7px 18px", borderRadius: 999, background: "#4338ca", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>
+            {zh ? "运行一个时间片" : "run one time slice"}
+          </div>
+        </div>
+      )}
+      {canClick && (
+        <TriggerHint ready={!atEnd} text={atEnd
+          ? t(T("已完成，点击可重播", "Done; click to replay"))
+          : t(T("点击「运行一个时间片」，逐片演示 RR 轮转", "click to run one time slice and step through RR"))} />
+      )}
+      <StatPanel title={t(T("状态 / 数值", "State / values"))} rows={[
+        [t(T("当前时间", "Time")), `t = ${s.time ?? 0}`],
+        [t(T("CPU", "CPU")), s.running ?? t(T("空闲", "idle"))],
+        [t(T("就绪队列", "Ready queue")), (s.queue ?? []).join(" ") || t(T("空", "empty"))],
+        [t(T("时间片", "Quantum")), `q = ${q}`],
+        [t(T("平均周转", "Avg turn")), gStat.turn.toFixed(2)],
+        [t(T("平均等待", "Avg wait")), gStat.wait.toFixed(2)],
+      ]} />
       <Gantt slices={s.gantt ?? res.slices} end={res.end} />
       <Table head={zh ? ["进程", "到达", "运行", "完成", "周转", "等待"] : ["Proc", "Arr", "Burst", "Finish", "Turn", "Wait"]} rows={per} />
       <div style={{ display: "flex", gap: 24, justifyContent: "center", flexWrap: "wrap", fontSize: 14 }}>
@@ -646,10 +771,14 @@ function RrPriorityRender({ scene, config, t }: any) {
 // ---------------------------------------------------------------------
 // mlfq: 多级反馈队列
 // ---------------------------------------------------------------------
-function MlfqRender({ scene, t }: any) {
+function MlfqRender({ scene, t, onNext, reset, playing, step, count }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as Partial<MlfqScene>;
   const mlQueues = s.queues ?? [["A", "B"], [], []];
+  const total = count ?? 1;
+  const atEnd = typeof step === "number" && step >= total - 1;
+  const canClick = !!onNext && !playing && total > 1;
+  const advance = advanceHandler(onNext, reset, playing, atEnd);
   const rules: [string, string][] = zh
     ? [
       ["多队列", "多个优先级队列 Q0…Qn，Q0 最高；总是先调度最高优先级非空队列"],
@@ -694,11 +823,24 @@ function MlfqRender({ scene, t }: any) {
             {(row ?? []).length === 0
               ? <span style={{ color: "#94a3b8", fontSize: 12 }}>{zh ? "（空）" : "(empty)"}</span>
               : (row ?? []).map((id, k) => (
-                <span key={`${id}-${k}`} style={{ padding: "3px 12px", borderRadius: 8, background: procColor[id] ?? "#64748b", color: "#fff", fontWeight: 800, fontSize: 13 }}>{id}</span>
+                <span key={`${id}-${k}`} onClick={canClick ? advance : undefined}
+                  title={canClick ? t(T("点击该进程，推进一步（降级/提升/完成）", "click this job to advance (demote/boost/finish)")) : undefined}
+                  style={{ padding: "3px 12px", borderRadius: 8, background: procColor[id] ?? "#64748b", color: "#fff", fontWeight: 800, fontSize: 13, cursor: canClick ? "pointer" : "default" }}>{id}</span>
               ))}
           </div>
         ))}
       </div>
+      {canClick && (
+        <TriggerHint ready={!atEnd} text={atEnd
+          ? t(T("已完成，点击进程可重播", "Done; click a job to replay"))
+          : t(T("点击任一队列中的进程，逐步演示降级 / 提升 / 完成", "click any job in a queue to step through demotion / boost / finish"))} />
+      )}
+      <StatPanel title={t(T("状态 / 数值", "State / values"))} rows={[
+        [t(T("步骤", "Step")), `${(s.step ?? 0) + 1}/${total}`],
+        ["Q0", (mlQueues[0] ?? []).join(" ") || "—"],
+        ["Q1", (mlQueues[1] ?? []).join(" ") || "—"],
+        ["Q2", (mlQueues[2] ?? []).join(" ") || "—"],
+      ]} />
       <div style={{ display: "grid", gap: 6 }}>
         {queues.map((r, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 14px", borderRadius: 10, borderLeft: `6px solid ${queueColors[i]}`, background: "#f8fafc", border: "1px solid #e2e8f0" }}>

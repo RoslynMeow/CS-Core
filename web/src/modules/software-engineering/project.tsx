@@ -1,4 +1,4 @@
-import { T } from "../../i18n/lang";
+import { T, type Text } from "../../i18n/lang";
 import { MathText } from "../../lib/tex";
 import type { Frame } from "../../engine/types";
 import { Panel, Table, Note, NumField, Row, Steps, isZh, makeChapter, type SubDef } from "../common/chapter";
@@ -51,7 +51,27 @@ const ESTIMATION_CODE = [
   T("输出 $E$（人月）、$D$（月）、团队规模", "output $E$ (PM), $D$ (mo), team size"),
 ];
 
-function EstimationRender({ scene, t }: any) {
+// 用户驱动的「状态 / 数值」面板：展示当前步的关键取值，并提供推进按钮
+function StatusPanel({ t, rows, onAdvance, label }: {
+  t: (x: Text) => string;
+  rows: [string, string][];
+  onAdvance?: () => void;
+  label: string;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", borderRadius: 10, background: "#0f172a", color: "#e2e8f0", fontSize: 12 }}>
+      <span style={{ fontWeight: 800, color: "#a5b4fc" }}>{t(T("状态 / 数值", "Status / Values"))}</span>
+      {rows.map(([k, v]) => (
+        <span key={k} style={{ fontFamily: "ui-monospace, monospace", whiteSpace: "nowrap" }}>{k} = <b style={{ color: "#fde047" }}>{v}</b></span>
+      ))}
+      {onAdvance && (
+        <button className="primary" style={{ marginLeft: "auto" }} onClick={(e) => { e.stopPropagation(); onAdvance(); }}>{label}</button>
+      )}
+    </div>
+  );
+}
+
+function EstimationRender({ scene, t, onNext, reset, playing, step: frameStep, count }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as Partial<EstimationScene>;
   const kloc = s.kloc ?? 33;
@@ -63,6 +83,13 @@ function EstimationRender({ scene, t }: any) {
   const showE = step >= 1;
   const showD = step >= 2;
   const showT = step >= 3;
+
+  const total = count ?? 1;
+  const atEnd = typeof frameStep === "number" && frameStep >= total - 1;
+  const canClick = !playing && total > 1;
+  const doAdvance = () => { if (playing) return; if (atEnd) reset?.(); else onNext?.(); };
+  const onClick = canClick ? (e: any) => { e.stopPropagation(); doAdvance(); } : undefined;
+  const trigger = atEnd ? T("重新开始", "Restart") : T("计算下一步", "Next quantity");
 
   const rows: React.ReactNode[][] = [
     [zh ? "规模 KLOC" : "Size KLOC", `${f(kloc, 0)} KLOC（${f(kloc * 1000, 0)} LOC）`, zh ? "输入" : "input"],
@@ -78,8 +105,17 @@ function EstimationRender({ scene, t }: any) {
         <MathText text={"$E = 2.4 \\times (KLOC)^{1.05}$"} />
         <MathText text={"$D = 2.5 \\times E^{0.38}$"} />
         <MathText text={"$Team = E / D$"} />
+        <div onClick={onClick} style={{ marginLeft: "auto", padding: "6px 16px", borderRadius: 999, background: canClick ? "#4338ca" : "#e2e8f0", color: canClick ? "#fff" : "#64748b", fontWeight: 800, fontSize: 12, cursor: canClick ? "pointer" : "default", transition: "background .2s" }}>{t(trigger)}</div>
       </Row>
       <Table head={zh ? ["项目", "值", "公式"] : ["Item", "Value", "Formula"]} rows={rows} />
+      <StatusPanel t={t}
+        rows={[
+          [t(T("规模 KLOC", "KLOC")), `${f(kloc, 0)}`],
+          [t(T("工作量 E", "Effort E")), showE ? f(E) : "?"],
+          [t(T("工期 D", "Schedule D")), showD ? f(D) : "?"],
+          [t(T("团队", "Team")), showT ? f(team) : "?"],
+        ]}
+        onAdvance={canClick ? doAdvance : undefined} label={t(trigger)} />
       <Note>
         {zh
           ? "工作量随规模超线性增长（指数 $1.05>1$）：规模翻倍，人月增长超过一倍，所以「加人」并不能线性缩短工期。"
@@ -232,7 +268,7 @@ const SCHEDULING_CODE = [
   T("关键路径 $=\\{TF=0\\}$", "critical path $=\\{TF=0\\}$"),
 ];
 
-function SchedulingRender({ scene, t }: any) {
+function SchedulingRender({ scene, t, onNext, reset, playing, step: frameStep, count }: any) {
   const zh = isZh(t);
   const full = cpm(ACTS);
   const s = (scene ?? {}) as Partial<CpmScene>;
@@ -248,6 +284,16 @@ function SchedulingRender({ scene, t }: any) {
   const showF = phase >= 3;
   const showC = phase >= 4;
   const cell = (v: number | undefined) => (v === undefined ? "?" : v);
+
+  const frameTotal = count ?? 1;
+  const atEnd = typeof frameStep === "number" && frameStep >= frameTotal - 1;
+  const canClick = !playing && frameTotal > 1;
+  const doAdvance = () => { if (playing) return; if (atEnd) reset?.(); else onNext?.(); };
+  const onClick = canClick ? (e: any) => { e.stopPropagation(); doAdvance(); } : undefined;
+  const phaseLabel = atEnd ? T("关键路径", "Critical path")
+    : phase === 1 ? T("前向", "Forward")
+      : phase === 2 ? T("反向", "Backward")
+        : T("浮动", "Float");
 
   const rows: React.ReactNode[][] = ACTS.map((a) => {
     const isCur = a.id === act;
@@ -271,7 +317,11 @@ function SchedulingRender({ scene, t }: any) {
           : "Critical Path Method: build an activity network, forward pass gives ES/EF, backward pass gives LS/LF; total float TF = LS − ES = LF − EF. Activities with TF = 0 form the critical path."}
       </Note>
 
-      <div style={{ display: "grid", gap: 6 }}>
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <div onClick={onClick} style={{ padding: "6px 18px", borderRadius: 999, background: canClick ? "#4338ca" : "#e2e8f0", color: canClick ? "#fff" : "#64748b", fontWeight: 800, fontSize: 12, cursor: canClick ? "pointer" : "default", transition: "background .2s" }}>{t(phaseLabel)}</div>
+      </div>
+
+      <div onClick={onClick} style={{ display: "grid", gap: 6, cursor: canClick ? "pointer" : "default", borderRadius: 10, outline: canClick ? "2px dashed #c7d2fe" : "none", outlineOffset: 4, padding: 4 }}>
         {ACTS.map((a) => {
           const isCur = a.id === act;
           const critical = showC && fl[a.id] === 0;
@@ -301,6 +351,18 @@ function SchedulingRender({ scene, t }: any) {
       <Table
         head={zh ? ["活动", "工期", "前置", "ES", "EF", "LS", "LF", "浮动 TF"] : ["Act", "Dur", "Preds", "ES", "EF", "LS", "LF", "Float"]}
         rows={rows} />
+      <StatusPanel t={t}
+        rows={[
+          [t(T("阶段", "Phase")), t(phaseLabel)],
+          [t(T("活动", "Act")), act ?? "-"],
+          [t(T("ES", "ES")), act && es[act] !== undefined ? `${es[act]}` : "-"],
+          [t(T("EF", "EF")), act && ef[act] !== undefined ? `${ef[act]}` : "-"],
+          [t(T("LS", "LS")), showL && act && ls[act] !== undefined ? `${ls[act]}` : "?"],
+          [t(T("LF", "LF")), showL && act && lf[act] !== undefined ? `${lf[act]}` : "?"],
+          [t(T("浮动 TF", "Float")), showF && act && fl[act] !== undefined ? `${fl[act]}` : (showF ? "-" : "?")],
+          [t(T("关键路径", "Critical")), showC ? s.critical?.join(zh ? "、" : ",") ?? "-" : "?"],
+        ]}
+        onAdvance={canClick ? doAdvance : undefined} label={t(phaseLabel)} />
       {showC && (
         <Note tone="warn">
           <MathText text={zh ? "关键路径：$A \\to B \\to D \\to F$，总工期 $= 3+4+5+2 = 14$。C、E 各有 6 个时间单位浮动，可推迟而不影响总工期。" : "Critical path: $A \\to B \\to D \\to F$, total duration $= 3+4+5+2 = 14$. C and E each have 6 units of float."} />

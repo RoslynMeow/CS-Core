@@ -3,6 +3,32 @@ import { MathText } from "../../lib/tex";
 import type { Frame } from "../../engine/types";
 import { Panel, Table, Note, Chips, NumField, isZh, makeChapter, type SubDef } from "./shared";
 
+type Kv = [string, React.ReactNode];
+
+// 用户驱动触发器：点击推进到下一帧（onNext）
+function NextButton({ onClick, zh, zhLabel, enLabel, disabled, hint }: { onClick?: () => void; zh: boolean; zhLabel: string; enLabel: string; disabled?: boolean; hint?: string }) {
+  const off = !!disabled || typeof onClick !== "function";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "8px 12px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
+      <button disabled={off} onClick={(e) => { e.stopPropagation(); if (!off) onClick?.(); }} style={{ padding: "7px 18px", borderRadius: 999, border: "1px solid #c7d2fe", background: off ? "#f1f5f9" : "#4338ca", color: off ? "#94a3b8" : "#fff", fontWeight: 800, fontSize: 13, cursor: off ? "default" : "pointer", fontFamily: "inherit" }}>
+        {zh ? zhLabel : enLabel}
+      </button>
+      {!off && hint && <span style={{ fontSize: 12, color: "#4338ca" }}>{hint}</span>}
+    </div>
+  );
+}
+
+// 内联「状态 / 数值」面板：每步从 scene 派生
+function ValuePanel({ zh, rows }: { zh: boolean; rows: Kv[] }) {
+  if (!rows.length) return null;
+  return (
+    <div style={{ display: "grid", gap: 6, padding: "10px 14px", borderRadius: 10, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+      <div style={{ fontWeight: 800, color: "#1e293b", fontSize: 13 }}>{zh ? "状态 / 数值" : "State / Values"}</div>
+      <Table head={zh ? ["项", "值"] : ["Item", "Value"]} rows={rows as React.ReactNode[][]} />
+    </div>
+  );
+}
+
 // =====================================================================
 // 计算机网络 · 第4章 运输层
 //   对应 tex/ComputerNetwork/chapters/transport_layer.tex
@@ -24,7 +50,7 @@ const MUX_SOCKETS: MuxSocket[] = [
 const MUX_UDP_SEG: MuxSeg = { srcIP: "10.0.0.5", srcPort: 5000, dstIP: "192.168.1.10", dstPort: 53 };
 const MUX_TCP_SEG: MuxSeg = { srcIP: "10.0.0.5", srcPort: 5000, dstIP: "192.168.1.10", dstPort: 443 };
 
-function MuxRender({ scene, t }: any) {
+function MuxRender({ scene, t, step, count, playing, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as Partial<MuxScene>;
   const proto = s.proto ?? "UDP";
@@ -33,15 +59,22 @@ function MuxRender({ scene, t }: any) {
   const delivered = s.delivered ?? -1;
   const read = s.read ?? false;
   const useSrc = proto === "TCP";
+  const atEnd = typeof count === "number" && typeof step === "number" && step >= count - 1;
+  const canAdvance = !!onNext && !playing && !atEnd;
+  const advance = (e: any) => { e.stopPropagation(); if (canAdvance) onNext(); };
   const cell = (label: string, value: string, on: boolean) => (
-    <div style={{ padding: "8px 10px", borderRadius: 8, background: on ? "#eef2ff" : "#f8fafc", border: `1px solid ${on ? "#4338ca" : "#e2e8f0"}`, fontFamily: "ui-monospace, monospace", fontSize: 12, textAlign: "center" }}>
+    <div onClick={advance} data-no-advance="" style={{ cursor: canAdvance ? "pointer" : "default", padding: "8px 10px", borderRadius: 8, background: on ? "#eef2ff" : "#f8fafc", border: `1px solid ${on ? "#4338ca" : "#e2e8f0"}`, fontFamily: "ui-monospace, monospace", fontSize: 12, textAlign: "center" }}>
       <div style={{ fontSize: 10, color: on ? "#4338ca" : "#94a3b8", fontWeight: 800 }}>{label}</div>
       <div style={{ color: "#334155" }}>{value}</div>
     </div>
   );
+  const cur = delivered >= 0 ? sockets[delivered] : sockets.find((sk) => read && sk.proto === proto && sk.port === seg.dstPort);
   return (
     <Panel>
-      <div style={{ textAlign: "center", fontSize: 12, color: "#64748b" }}>{zh ? `到达的报文段（${proto}）` : `Arriving segment (${proto})`}</div>
+      <div style={{ textAlign: "center", fontSize: 12, color: "#64748b" }}>
+        {zh ? `到达的报文段（${proto}）` : `Arriving segment (${proto})`}
+        {canAdvance && <span style={{ color: "#4338ca", fontWeight: 800 }}>{zh ? " · 点击 socket 交付" : " · click a socket to deliver"}</span>}
+      </div>
       <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
         {cell(zh ? "源 IP" : "src IP", seg.srcIP, read && useSrc)}
         {cell(zh ? "源端口" : "src port", `${seg.srcPort}`, read && useSrc)}
@@ -58,16 +91,22 @@ function MuxRender({ scene, t }: any) {
           const on = i === delivered;
           const cand = read && delivered < 0 && sk.proto === proto && sk.port === seg.dstPort;
           return (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderRadius: 10, background: on ? "#dcfce7" : cand ? "#eef2ff" : "#f8fafc", border: `2px ${cand ? "dashed" : "solid"} ${on ? "#16a34a" : cand ? "#4338ca" : "#e2e8f0"}` }}>
+            <div key={i} onClick={advance} data-no-advance="" style={{ cursor: canAdvance ? "pointer" : "default", display: "flex", alignItems: "center", gap: 10, padding: "9px 14px", borderRadius: 10, background: on ? "#dcfce7" : cand ? "#eef2ff" : "#f8fafc", border: `2px ${cand ? "dashed" : "solid"} ${on ? "#16a34a" : cand ? "#4338ca" : "#e2e8f0"}` }}>
               <span style={{ fontSize: 12, fontWeight: 800, color: "#1e293b", width: 54 }}>{sk.proto}</span>
               <span style={{ fontFamily: "ui-monospace, monospace", fontSize: 12, color: "#334155" }}>{zh ? "端口" : "port"} {sk.port}</span>
               <span style={{ fontSize: 12, color: "#64748b" }}>{sk.app}</span>
-              {on && <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: "#166534" }}>{zh ? "◀ 交付到此 socket" : "◀ deliver here"}</span>}
-              {cand && <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: "#4338ca" }}>{zh ? "匹配中…" : "matching…"}</span>}
+              {on && <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: "#166534" }}>{zh ? "已交付到此 socket" : "delivered here"}</span>}
+              {cand && <span style={{ marginLeft: "auto", fontSize: 12, fontWeight: 800, color: "#4338ca" }}>{zh ? "匹配中，点击交付" : "matching, click to deliver"}</span>}
             </div>
           );
         })}
       </div>
+      <ValuePanel zh={zh} rows={[
+        [zh ? "协议" : "Protocol", proto],
+        [zh ? "分用元组" : "Demux tuple", proto === "UDP" ? `(${seg.dstIP}, ${seg.dstPort})` : `(${seg.srcIP}:${seg.srcPort}) -> (${seg.dstIP}:${seg.dstPort})`],
+        [zh ? "已读取字段" : "Fields read", read ? (zh ? "是" : "yes") : (zh ? "否" : "no")],
+        [zh ? "匹配 / 交付 socket" : "Matched socket", cur ? `${cur.app} : ${cur.port}` : (zh ? "尚未匹配" : "not matched")],
+      ]} />
       <Table
         head={zh ? ["协议", "分用元组 (demux tuple)", "要点"] : ["Protocol", "Demux tuple", "Notes"]}
         rows={
@@ -119,26 +158,32 @@ const UDP_FIELDS: UdpField[] = [
   { zh: "源端口", en: "Source Port", size: 2, value: "0xC001 = 49153", descZh: "发送方进程的 16 位端口，接收端回送应答时使用。", descEn: "Sender's 16-bit port, used when replying.", color: "#dbeafe" },
   { zh: "目的端口", en: "Dest Port", size: 2, value: "0x0035 = 53 (DNS)", descZh: "接收方进程的 16 位端口，是分用的依据。", descEn: "Receiver's 16-bit port, the demux key.", color: "#dcfce7" },
   { zh: "长度", en: "Length", size: 2, value: "0x0021 = 33", descZh: "UDP 首部 + 数据的总字节数，最小值 8。", descEn: "Header + data bytes, minimum 8.", color: "#fef3c7" },
-  { zh: "检验和", en: "Checksum", size: 2, value: "0x1B2A", descZh: "覆盖首部、数据与伪首部的差错检测；出错则丢弃。", descEn: "Error check over header, data and pseudo-header; bad ⇒ drop.", color: "#fce7f3" },
+  { zh: "检验和", en: "Checksum", size: 2, value: "0x1B2A", descZh: "覆盖首部、数据与伪首部的差错检测；出错则丢弃。", descEn: "Error check over header, data and pseudo-header; bad -> drop.", color: "#fce7f3" },
 ];
 
-function UdpRender({ scene, t }: any) {
+function UdpRender({ scene, t, step, count, playing, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as Partial<UdpScene>;
   const fields = s.fields ?? UDP_FIELDS;
   const active = s.active ?? 0;
   const cur = fields[active];
+  const atEnd = typeof count === "number" && typeof step === "number" && step >= count - 1;
+  const canAdvance = !!onNext && !playing && !atEnd;
+  const advance = (e: any) => { e.stopPropagation(); if (canAdvance) onNext(); };
   return (
     <Panel>
-      <div style={{ textAlign: "center", fontSize: 12, color: "#64748b" }}>{zh ? "UDP 首部（8 字节，逐字段解析）" : "UDP header (8 bytes, field by field)"}</div>
+      <div style={{ textAlign: "center", fontSize: 12, color: "#64748b" }}>
+        {zh ? "UDP 首部（8 字节，逐字段解析）" : "UDP header (8 bytes, field by field)"}
+        {canAdvance && <span style={{ color: "#4338ca", fontWeight: 800 }}>{zh ? " · 点击字段查看下一项" : " · click a field to inspect"}</span>}
+      </div>
       <div style={{ display: "flex", width: "100%", border: "1px solid #cbd5e1", borderRadius: 8, overflow: "hidden", minHeight: 64 }}>
         {fields.map((f, i) => {
           const on = i === active;
           return (
-            <div key={i} style={{ flexGrow: f.size, flexBasis: 0, padding: "10px 4px", background: on ? f.color : "#f8fafc", borderRight: "1px solid #e2e8f0", textAlign: "center", outline: on ? "2px solid #4338ca" : "none", outlineOffset: -2, transition: "background .2s" }}>
+            <div key={i} onClick={advance} data-no-advance="" style={{ cursor: canAdvance ? "pointer" : "default", flexGrow: f.size, flexBasis: 0, padding: "10px 4px", background: on ? f.color : "#f8fafc", borderRight: "1px solid #e2e8f0", textAlign: "center", outline: on ? "2px solid #4338ca" : "none", outlineOffset: -2, transition: "background .2s" }}>
               <div style={{ fontSize: 12, fontWeight: 800, color: on ? "#1e293b" : "#475569" }}>{zh ? f.zh : f.en}</div>
               <div style={{ fontSize: 10, color: "#94a3b8", fontFamily: "ui-monospace, monospace" }}>{f.size * 8} bit</div>
-              <div style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "#64748b", marginTop: 2 }}>{i * 16}–{i * 16 + 15}</div>
+              <div style={{ fontFamily: "ui-monospace, monospace", fontSize: 10, color: "#64748b", marginTop: 2 }}>{i * 16}-{i * 16 + 15}</div>
             </div>
           );
         })}
@@ -154,6 +199,12 @@ function UdpRender({ scene, t }: any) {
           <div style={{ fontSize: 13, color: "#334155", lineHeight: 1.7 }}>{zh ? cur.descZh : cur.descEn}</div>
         </div>
       )}
+      <ValuePanel zh={zh} rows={[
+        [zh ? "当前字段" : "Current field", cur ? (zh ? cur.zh : cur.en) : "-"],
+        [zh ? "取值" : "Value", cur ? cur.value : "-"],
+        [zh ? "位偏移" : "Bit offset", cur ? `${active * 16}-${active * 16 + 15}` : "-"],
+        [zh ? "进度" : "Progress", typeof step === "number" && typeof count === "number" ? `${step + 1} / ${count}` : "-"],
+      ]} />
       <Chips
         items={
           zh
@@ -208,8 +259,11 @@ type RdtScene = {
   action: "send" | "ack" | "loss" | "timeout" | "retransmit" | "done";
   window: number;
 };
-function RdtRender({ scene, config, t }: any) {
+function RdtRender({ scene, config, t, step, count, playing, onNext }: any) {
   const zh = isZh(t);
+  const atEnd = typeof count === "number" && typeof step === "number" && step >= count - 1;
+  const canAdvance = !!onNext && !playing && !atEnd;
+  const advance = (e: any) => { e.stopPropagation(); if (canAdvance) onNext(); };
   const s = (scene ?? {}) as Partial<RdtScene>;
   const N = Math.max(1, Math.min(8, Math.round(s.window ?? config?.win ?? 4)));
   const base = Math.max(0, Math.round(s.base ?? 0));
@@ -241,6 +295,11 @@ function RdtRender({ scene, config, t }: any) {
   };
   return (
     <Panel>
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <div onClick={advance} data-no-advance="" style={{ cursor: canAdvance ? "pointer" : "default", padding: "8px 18px", borderRadius: 12, background: canAdvance ? "#4338ca" : "#e2e8f0", color: canAdvance ? "#fff" : "#64748b", fontWeight: 800, fontSize: 13, boxShadow: canAdvance ? "0 4px 12px rgba(67,56,202,.35)" : "none" }}>
+          {zh ? "发送方：点击发送 / 触发超时重传" : "Sender: click to send / trigger timeout & retransmit"}
+        </div>
+      </div>
       <div style={{ textAlign: "center", fontSize: 14 }}>
         <MathText text={`$U_{\\text{pipe}}=\\dfrac{N\\cdot L/R}{RTT+L/R}=${(uPipe * 100).toFixed(1)}\\%$`} />
       </div>
@@ -272,6 +331,16 @@ function RdtRender({ scene, config, t }: any) {
         <span>{zh ? "丢失" : "lost"} <span style={{ display: "inline-block", width: 10, height: 10, background: "#fee2e2", border: "1px solid #dc2626", borderRadius: 3, verticalAlign: "middle" }} /></span>
         <span>{zh ? "未发送" : "unsent"} <span style={{ display: "inline-block", width: 10, height: 10, background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 3, verticalAlign: "middle" }} /></span>
       </div>
+      <ValuePanel zh={zh} rows={[
+        [zh ? "窗口 base" : "window base", `${base}`],
+        [zh ? "nextSeq" : "nextSeq", `${nextSeq}`],
+        [zh ? "窗口 N" : "window N", `${N}`],
+        [zh ? "在途分组" : "in-flight", `${Math.max(0, nextSeq - base)}`],
+        [zh ? "已确认" : "acked", `${acked.size}`],
+        [zh ? "丢失分组" : "lost", lostAt !== null ? `${lostAt}` : "-"],
+        [zh ? "动作" : "action", zh ? az : ae],
+        [zh ? "管道利用率" : "utilization", `${(uPipe * 100).toFixed(1)}%`],
+      ]} />
     </Panel>
   );
 }
@@ -283,7 +352,7 @@ function rdtGenerate(config: any): Frame<RdtScene>[] {
   const ackedPart = range(0, mid);
   return [
     { line: 0, caption: T(`窗口 $[0,${N})$ 内连续发送 ${N} 个分组`, `Send ${N} segments in window $[0,${N})$`), scene: { ...base } },
-    { line: 1, caption: T(`收到累积 ACK，base 前移到 ${mid}`, `Cumulative ACK → base advances to ${mid}`), scene: { ...base, base: mid, acked: ackedPart, action: "ack" } },
+    { line: 1, caption: T(`收到累积 ACK，base 前移到 ${mid}`, `Cumulative ACK: base advances to ${mid}`), scene: { ...base, base: mid, acked: ackedPart, action: "ack" } },
     { line: 2, caption: T(`分组 ${mid} 在链路中丢失`, `Segment ${mid} is lost`), scene: { ...base, base: mid, acked: ackedPart, lostAt: mid, action: "loss" } },
     { line: 3, caption: T(`分组 ${mid} 的定时器超时`, `Timer for segment ${mid} times out`), scene: { ...base, base: mid, acked: ackedPart, lostAt: mid, action: "timeout" } },
     { line: 4, caption: T(`重传分组 ${mid}`, `Retransmit segment ${mid}`), scene: { ...base, base: mid, acked: ackedPart, lostAt: mid, action: "retransmit" } },
@@ -292,7 +361,7 @@ function rdtGenerate(config: any): Frame<RdtScene>[] {
 }
 const RDT_CODE = [
   T("窗口内连续发送未确认分组", "send all unacked segments in window"),
-  T("收到 ACK → $base$ 前移", "ACK arrives → $base$ advances"),
+  T("收到 ACK：$base$ 前移", "ACK arrives: $base$ advances"),
   T("分组 $i$ 丢失", "segment $i$ is lost"),
   T("$base$ 定时器超时", "$base$ timer times out"),
   T("重传未确认分组", "retransmit unacked segments"),
@@ -309,23 +378,31 @@ function MsgRow({ msg, show, active }: any) {
     <div style={{ position: "relative", height: 38, opacity: show ? 1 : 0.18, background: active ? "#f5f3ff" : "transparent", borderRadius: 8 }}>
       <div style={{ position: "absolute", top: 22, left: m.dir > 0 ? "2%" : "6%", right: m.dir > 0 ? "6%" : "2%", borderTop: `2px ${active ? "solid" : "dashed"} ${m.color}` }} />
       <span style={{ position: "absolute", top: 2, left: "50%", transform: "translateX(-50%)", fontSize: 11, fontFamily: "ui-monospace, monospace", color: "#334155", background: "#fff", padding: "0 6px", whiteSpace: "nowrap", fontWeight: active ? 800 : 400 }}>{m.label}</span>
-      <span style={{ position: "absolute", top: 15, fontSize: 12, color: m.color, ...(m.dir > 0 ? { right: "1%" } : { left: "1%" }) }}>{m.dir > 0 ? "▶" : "◀"}</span>
+      <span style={{ position: "absolute", top: 15, fontSize: 12, color: m.color, ...(m.dir > 0 ? { right: "1%" } : { left: "1%" }) }}>{m.dir > 0 ? ">" : "<"}</span>
     </div>
   );
 }
-function TcpConnRender({ scene, t }: any) {
+function TcpConnRender({ scene, t, step: pStep, count, playing, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as Partial<TcpConnScene>;
   const msgs = s.msgs ?? [];
   const step = s.step ?? 0;
+  const atEnd = typeof count === "number" && typeof pStep === "number" && pStep >= count - 1;
+  const canAdvance = !!onNext && !playing && !atEnd;
+  const advance = (e: any) => { e.stopPropagation(); if (canAdvance) onNext(); };
   const rowsFor = (phase: "hs" | "td") => msgs.map((m, i) => ({ m, i })).filter(({ m }) => m.phase === phase).map(({ m, i }) => (
     <MsgRow key={i} msg={m} show={i <= step} active={i === step} />
   ));
+  const curMsg = msgs[Math.min(step, msgs.length - 1)];
+  const seqVal = curMsg ? (curMsg.label.match(/seq=([^,\s]+)/)?.[1] ?? "-") : "-";
+  const ackVal = curMsg ? (curMsg.label.match(/ack=([^,\s]+)/)?.[1] ?? "-") : "-";
+  const dirText = curMsg ? (curMsg.dir > 0 ? (zh ? "客户机 -> 服务器" : "client -> server") : (zh ? "服务器 -> 客户机" : "server -> client")) : "-";
+  const headStyle = (active: boolean) => ({ padding: "6px 12px", borderRadius: 10, fontSize: 12, fontWeight: 800, color: active ? "#fff" : "#1e293b", background: active ? "#4338ca" : "#f1f5f9", cursor: canAdvance ? "pointer" : "default" });
   return (
     <Panel>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, fontWeight: 800, color: "#1e293b" }}>
-        <span>{zh ? "客户机" : "Client"}</span>
-        <span>{zh ? "服务器" : "Server"}</span>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, fontWeight: 800, color: "#1e293b" }}>
+        <div onClick={advance} data-no-advance="" style={headStyle(!!curMsg && curMsg.dir > 0)}>{zh ? "客户机（点击发送报文）" : "Client (click to send)"}</div>
+        <div onClick={advance} data-no-advance="" style={headStyle(!!curMsg && curMsg.dir < 0)}>{zh ? "服务器" : "Server"}</div>
       </div>
       <div style={{ fontSize: 12, fontWeight: 800, color: "#4338ca" }}>{zh ? "三次握手" : "Three-way handshake"}</div>
       <div>{rowsFor("hs")}</div>
@@ -336,6 +413,14 @@ function TcpConnRender({ scene, t }: any) {
           {zh ? "TIME_WAIT（等待 2×MSL）" : "TIME_WAIT (wait 2×MSL)"}
         </span>
       </div>
+      <ValuePanel zh={zh} rows={[
+        [zh ? "步骤" : "Step", `${step + 1} / ${typeof count === "number" ? count : msgs.length + 1}`],
+        [zh ? "当前报文" : "Current segment", curMsg ? curMsg.label : "TIME_WAIT (2×MSL)"],
+        [zh ? "方向" : "Direction", step >= 7 ? "-" : dirText],
+        [zh ? "序号 seq" : "seq", seqVal],
+        [zh ? "确认号 ack" : "ack", ackVal],
+        [zh ? "阶段" : "Phase", step >= 7 ? (zh ? "连接已关闭" : "closed") : curMsg?.phase === "hs" ? (zh ? "三次握手" : "handshake") : (zh ? "四次挥手" : "teardown")],
+      ]} />
       <Note tone={step >= 7 ? "warn" : "info"}>
         {zh
           ? "三次握手让双方确认「自己会发、对方会收」并交换初始序号；四次挥手因 TCP 全双工，两个方向需各自关闭；主动关闭方最后进入 TIME_WAIT。"
@@ -430,13 +515,15 @@ function ccGenerate(config: any): Frame<CcScene>[] {
 const CC_CODE = [
   T("$cwnd \\gets 1$，进入慢启动", "$cwnd \\gets 1$, slow start"),
   T("每 RTT $cwnd \\gets 2\\,cwnd$", "per RTT $cwnd \\gets 2\\,cwnd$"),
-  T("$cwnd \\ge ssthresh$ → 拥塞避免", "$cwnd \\ge ssthresh$ → congestion avoidance"),
+  T("$cwnd \\ge ssthresh$：转拥塞避免", "$cwnd \\ge ssthresh$: enter congestion avoidance"),
   T("每 RTT $cwnd \\gets cwnd + 1$", "per RTT $cwnd \\gets cwnd + 1$"),
   T("丢包：$ssthresh \\gets cwnd/2$", "loss: $ssthresh \\gets cwnd/2$"),
   T("$cwnd \\gets 1$，回到慢启动", "$cwnd \\gets 1$, back to slow start"),
 ];
-function CcRender({ scene, config, t }: any) {
+function CcRender({ scene, config, t, step, count, playing, onNext }: any) {
   const zh = isZh(t);
+  const atEnd = typeof count === "number" && typeof step === "number" && step >= count - 1;
+  const canAdvance = !!onNext && !playing && !atEnd;
   const conf = config ?? {};
   const lossRound = Math.max(1, Math.min(CC_ROUNDS, Math.round(conf.lossRound ?? 13)));
   const { pts, lossCwnd } = simulateCC(conf.ssthresh ?? 16, lossRound);
@@ -458,6 +545,8 @@ function CcRender({ scene, config, t }: any) {
   const phaseText = phase === "loss" ? (zh ? "丢包" : "loss") : phase === "ss" ? (zh ? "慢启动" : "slow start") : (zh ? "拥塞避免" : "cong. avoid");
   return (
     <Panel>
+      <NextButton onClick={onNext} zh={zh} disabled={atEnd} hint={zh ? "点击推进一个拥塞窗口轮次（RTT）" : "click to advance one congestion round (RTT)"}
+        zhLabel={atEnd ? (zh ? "已到末轮" : "last round") : (zh ? "继续下一轮" : "next round")} enLabel={atEnd ? "last round" : "next round"} />
       <div style={{ textAlign: "center", fontSize: 14 }}>
         <MathText text={`$\\text{round}=${round},\\quad cwnd=${cwnd},\\quad ssthresh=${ssth}$`} />
       </div>
@@ -489,19 +578,27 @@ function CcRender({ scene, config, t }: any) {
               <text x={x(cur.r)} y={y(cur.cwnd) - 10} textAnchor="middle" fontSize={10} fontWeight={800} fill="#4f46e5">{cur.cwnd}</text>
             </g>
           )}
-          <text x={W - padR} y={H - padB + 18} textAnchor="end" fontSize={10} fill="#64748b">{zh ? "时间 / RTT →" : "time / RTT →"}</text>
+          <text x={W - padR} y={H - padB + 18} textAnchor="end" fontSize={10} fill="#64748b">{zh ? "时间 / RTT" : "time / RTT"}</text>
           <text x={padL + 24} y={padT + 10} fontSize={10} fill="#4f46e5">cwnd</text>
           <text x={padL + 70} y={padT + 10} fontSize={10} fill="#f59e0b">ssthresh</text>
         </svg>
       </div>
-      <Table head={zh ? ["轮次", "cwnd", "阶段", "事件"] : ["Round", "cwnd", "Phase", "Event"]} rows={shown.map((p) => [`${p.r}`, `${p.cwnd}`, p.loss ? (zh ? "丢包" : "loss") : p.phase === "ss" ? (zh ? "慢启动" : "slow start") : (zh ? "拥塞避免" : "cong. avoid"), p.loss ? (zh ? "ssthresh 减半，cwnd→1" : "ssthresh halved, cwnd→1") : ""])} />
+      <Table head={zh ? ["轮次", "cwnd", "阶段", "事件"] : ["Round", "cwnd", "Phase", "Event"]} rows={shown.map((p) => [`${p.r}`, `${p.cwnd}`, p.loss ? (zh ? "丢包" : "loss") : p.phase === "ss" ? (zh ? "慢启动" : "slow start") : (zh ? "拥塞避免" : "cong. avoid"), p.loss ? (zh ? "ssthresh 减半，cwnd 置 1" : "ssthresh halved, cwnd resets") : ""])} />
+      <ValuePanel zh={zh} rows={[
+        [zh ? "当前轮次" : "Round", `${round} / ${CC_ROUNDS}`],
+        [zh ? "拥塞窗口 cwnd" : "cwnd", `${cwnd} MSS`],
+        [zh ? "门限 ssthresh" : "ssthresh", `${ssth} MSS`],
+        [zh ? "阶段" : "Phase", phaseText],
+        [zh ? "本步事件" : "Event", cur?.loss ? (zh ? "丢包：ssthresh 减半，cwnd 置 1" : "loss: ssthresh halved, cwnd reset") : phase === "ss" ? (zh ? "每 RTT cwnd 翻倍" : "cwnd doubles per RTT") : (zh ? "每 RTT cwnd +1" : "cwnd +1 per RTT")],
+        [zh ? "吞吐量近似" : "Throughput", `${(0.75 * (lossCwnd || maxV)).toFixed(1)} MSS/RTT`],
+      ]} />
       <div style={{ textAlign: "center", fontSize: 14 }}>
         <MathText text={`$\\text{Throughput} \\approx \\dfrac{0.75\\,W}{RTT}\\quad (W=${lossCwnd || maxV})$`} />
       </div>
       <Note tone="warn">
         {zh
-          ? `慢启动指数翻倍 → 到达 ssthresh 后转拥塞避免线性 +1 → 第 ${lossRound} 轮丢包，ssthresh 减半、cwnd 回落。并发窗口取 min(rwnd, cwnd)。`
-          : `Slow start doubles per RTT → after reaching ssthresh switch to linear +1 congestion avoidance → loss at round ${lossRound} halves ssthresh and resets cwnd. The real window is min(rwnd, cwnd).`}
+          ? `慢启动指数翻倍，到达 ssthresh 后转拥塞避免线性 +1；第 ${lossRound} 轮丢包，ssthresh 减半、cwnd 回落。并发窗口取 min(rwnd, cwnd)。`
+          : `Slow start doubles per RTT, then after reaching ssthresh switches to linear +1 congestion avoidance; loss at round ${lossRound} halves ssthresh and resets cwnd. The real window is min(rwnd, cwnd).`}
       </Note>
     </Panel>
   );

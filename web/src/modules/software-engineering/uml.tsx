@@ -1,6 +1,28 @@
-import { T } from "../../i18n/lang";
+import { T, type Text } from "../../i18n/lang";
 import type { Frame } from "../../engine/types";
 import { Panel, Table, Note, Chips, isZh, makeChapter, type SubDef } from "../common/chapter";
+
+// 用户驱动的「状态 / 数值」面板：展示当前步的关键取值，并提供推进按钮
+function StepPanel({ t, title, rows, onNext, nextLabel, showNext }: {
+  t: (x: Text) => string;
+  title: string;
+  rows: [string, string][];
+  onNext?: () => void;
+  nextLabel: string;
+  showNext: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", borderRadius: 10, background: "#0f172a", color: "#e2e8f0", fontSize: 12 }}>
+      <span style={{ fontWeight: 800, color: "#a5b4fc" }}>{title}</span>
+      {rows.map(([k, v]) => (
+        <span key={k} style={{ fontFamily: "ui-monospace, monospace", whiteSpace: "nowrap" }}>{k} = <b style={{ color: "#fde047" }}>{v}</b></span>
+      ))}
+      {showNext && onNext && (
+        <button className="primary" style={{ marginLeft: "auto" }} onClick={(e) => { e.stopPropagation(); onNext(); }}>{nextLabel}</button>
+      )}
+    </div>
+  );
+}
 
 // =====================================================================
 // 软件工程 · 面向对象与 UML
@@ -119,12 +141,21 @@ function MultLabel({ p, dir, text, color }: { p: Pt; dir: Pt; text: string; colo
   return <text x={q.x} y={q.y} fontSize={12} fontFamily="ui-monospace, monospace" fill={color} textAnchor="middle">{text}</text>;
 }
 
-function ClassRender({ scene, t }: any) {
+function ClassRender({ scene, t, playing, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? { step: 0, classes: 0, relations: [] }) as ClassScene;
   const shown = new Set(s.relations);
   const cur: RelKind | null = s.relations.length ? s.relations[s.relations.length - 1] : null;
   const meta = cur ? REL_META[cur] : null;
+  const classPhase = s.relations.length === 0 && s.classes < UML_ORDER.length;
+  const nextClass = classPhase ? UML_ORDER[s.classes] : null;
+  const nextRelIndex = !classPhase && s.relations.length < UML_REL_ORDER.length ? s.relations.length : -1;
+  const nextRel = nextRelIndex >= 0 ? UML_RELS.find((x) => x.kind === UML_REL_ORDER[nextRelIndex]) ?? null : null;
+  const nextMeta = nextRel ? REL_META[nextRel.kind] : null;
+  const done = s.relations.length >= UML_REL_ORDER.length;
+  const canNext = !!onNext && !playing && !done;
+  const advance = (e: any) => { e.stopPropagation(); onNext?.(); };
+  const lastClass = UML_ORDER[Math.max(0, s.classes - 1)];
   return (
     <Panel>
       <div style={{ textAlign: "center", padding: "8px 14px", borderRadius: 10, background: meta ? meta.bg : "#eef2ff", color: meta ? meta.fg : "#4338ca", fontWeight: 800, fontSize: 14 }}>
@@ -154,18 +185,55 @@ function ClassRender({ scene, t }: any) {
                 </g>
               );
             })}
+            {nextRel && (() => {
+              const c1 = centerOf(nextRel.from), c2 = centerOf(nextRel.to);
+              const p1 = borderOf(c1, c2), p2 = borderOf(c2, c1);
+              return (
+                <g onClick={canNext ? advance : undefined} style={{ cursor: canNext ? "pointer" : "default" }}>
+                  <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="transparent" strokeWidth={16} />
+                  <line x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke="#6366f1" strokeWidth={2} strokeDasharray="6 4" />
+                  <text x={(p1.x + p2.x) / 2} y={(p1.y + p2.y) / 2 - 6} fontSize={11} fontFamily="ui-monospace, monospace" fill="#4338ca" textAnchor="middle">
+                    {zh ? "点击画出" : "click to draw"}
+                  </text>
+                </g>
+              );
+            })()}
           </svg>
           {UML_ORDER.slice(0, s.classes).map((name) => {
             const c = UML_CLASSES[name];
             const p = UML_POS[name];
+            const clickable = canNext && !classPhase;
             return (
-              <div key={name} style={{ position: "absolute", left: p.x, top: p.y, width: BOX_W }}>
+              <div key={name} onClick={clickable ? advance : undefined}
+                title={clickable ? t(T("点击画出下一条关系", "click to draw the next relation")) : undefined}
+                style={{ position: "absolute", left: p.x, top: p.y, width: BOX_W, cursor: clickable ? "pointer" : "default" }}>
                 <ClassBox name={c.name} attrs={c.attrs} methods={c.methods} tone={c.tone} />
               </div>
             );
           })}
+          {nextClass && (
+            <div onClick={canNext ? advance : undefined}
+              title={t(T("点击添加下一个类", "click to add the next class"))}
+              style={{ position: "absolute", left: UML_POS[nextClass].x, top: UML_POS[nextClass].y, width: BOX_W, cursor: canNext ? "pointer" : "default" }}>
+              <div style={{ height: BOX_H, border: "2px dashed #6366f1", borderRadius: 10, background: "#f5f3ff", display: "grid", placeItems: "center", gap: 4, padding: 8, textAlign: "center", color: "#4338ca", fontSize: 12, fontFamily: "ui-monospace, monospace", fontWeight: 800 }}>
+                <div>{zh ? "点击添加类" : "click to add class"}</div>
+                <div>{nextClass}</div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
+      <StepPanel t={t} title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("阶段", "Phase")), classPhase ? t(T("建立类", "Define classes")) : t(T("画关系", "Draw relations"))],
+          [t(T("已建类", "Classes")), `${s.classes}/${UML_ORDER.length}`],
+          [t(T("已画关系", "Relations")), `${s.relations.length}/${UML_REL_ORDER.length}`],
+          [t(T("当前", "Current")), classPhase ? lastClass : (meta ? (zh ? meta.zh : meta.en) : "-")],
+        ]}
+        onNext={onNext} showNext={canNext}
+        nextLabel={classPhase && nextClass
+          ? t(T(`添加类 ${nextClass}`, `Add class ${nextClass}`))
+          : nextMeta ? t(T(`画出${nextMeta.zh}`, `Draw ${nextMeta.en}`)) : t(T("完成", "Done"))} />
       <Table head={zh ? ["关系", "符号", "说明"] : ["Relation", "Notation", "Meaning"]}
         rows={zh
           ? [
@@ -196,7 +264,7 @@ function ClassRender({ scene, t }: any) {
 type SeqMsg = { from: number; to: number; label: string; ret: boolean };
 type SeqScene = { step: number; msgs: SeqMsg[] };
 
-function SequenceRender({ scene, t }: any) {
+function SequenceRender({ scene, t, playing, onNext }: any) {
   const zh = isZh(t);
   const parts = zh ? ["用户", "控制器", "数据库"] : ["User", "Controller", "Database"];
   const s = (scene ?? { step: 0, msgs: [] }) as SeqScene;
@@ -208,6 +276,11 @@ function SequenceRender({ scene, t }: any) {
   };
   const col = (i: number) => `${(i + 0.5) * (100 / parts.length)}%`;
   const shown = s.msgs.slice(0, s.step + 1);
+  const curMsg = shown.length ? shown[shown.length - 1] : null;
+  const nextMsg = s.msgs[s.step + 1];
+  const canNext = !!onNext && !playing && !!nextMsg;
+  const advance = (e: any) => { e.stopPropagation(); onNext?.(); };
+  const msgLabel = (m: SeqMsg) => (labelText[m.label] ?? [m.label, m.label])[zh ? 0 : 1];
   const kinds: React.ReactNode[][] = zh
     ? [
       ["生命线 Lifeline", "对象下方虚线", "对象在时间轴上的存在"],
@@ -257,7 +330,26 @@ function SequenceRender({ scene, t }: any) {
             </div>
           );
         })}
+        {parts.map((_, i) => {
+          const isTrigger = !!nextMsg && (nextMsg.from === i || nextMsg.to === i);
+          return (
+            <div key={`ln-${i}`} onClick={canNext ? advance : undefined}
+              title={canNext ? t(T("点击生命线发送下一条消息", "click a lifeline to send the next message")) : undefined}
+              style={{ position: "absolute", top: 0, bottom: 0, left: col(i), width: `${100 / parts.length}%`, transform: "translateX(-50%)", zIndex: 5, cursor: canNext ? "pointer" : "default", background: canNext && isTrigger ? "rgba(99,102,241,0.07)" : "transparent" }} />
+          );
+        })}
       </div>
+      <StepPanel t={t} title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("消息", "Message")), `${Math.min(s.step + 1, s.msgs.length)}/${s.msgs.length}`],
+          [t(T("当前", "Current")), curMsg ? msgLabel(curMsg) : "-"],
+          [t(T("类型", "Kind")), curMsg ? (curMsg.ret ? t(T("返回", "Return")) : t(T("同步", "Sync"))) : "-"],
+          [t(T("方向", "From / To")), curMsg ? `${parts[curMsg.from]} / ${parts[curMsg.to]}` : "-"],
+        ]}
+        onNext={onNext} showNext={canNext}
+        nextLabel={nextMsg
+          ? t(T(`发送 ${parts[nextMsg.from]} 到 ${parts[nextMsg.to]}`, `send ${parts[nextMsg.from]} to ${parts[nextMsg.to]}`))
+          : t(T("完成", "Done"))} />
       <Table head={zh ? ["要素", "图形", "说明"] : ["Element", "Notation", "Meaning"]} rows={kinds} />
       <Note>{zh ? "同步消息的发送者在收到返回前被阻塞，通常配套返回消息；异步消息发送后立即继续，常用于事件通知。" : "A synchronous sender blocks until it receives the return; an asynchronous sender continues immediately, common for event notifications."}</Note>
     </Panel>
@@ -293,9 +385,10 @@ function StateBox({ label, tone }: { label: string; tone: string }) {
   return <span style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid #cbd5e1", background: tone, fontSize: 12, fontWeight: 700, color: "#1e293b" }}>{label}</span>;
 }
 
-function Trans({ label }: { label: string }) {
+function Trans({ label, onClick, clickable = false }: { label: string; onClick?: (e: any) => void; clickable?: boolean }) {
   return (
-    <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", fontSize: 10, color: "#64748b" }}>
+    <span onClick={onClick} title={clickable ? label : undefined}
+      style={{ display: "inline-flex", flexDirection: "column", alignItems: "center", fontSize: 10, color: "#64748b", cursor: clickable ? "pointer" : "default", padding: clickable ? "2px 4px" : 0, borderRadius: 6, background: clickable ? "#eef2ff" : undefined }}>
       <span>{label}</span>
       <span style={{ color: "#334155", fontSize: 14, lineHeight: 1 }}>→</span>
     </span>
@@ -316,11 +409,22 @@ function FlowDiamond({ label }: { label: string }) {
 }
 
 type StateKey = "created" | "paid" | "shipped" | "done";
-type StateScene = { state: StateKey; event: string; prev: StateKey };
+type StateScene = { step: number; state: StateKey; event: string; prev: StateKey };
 
-function StateRender({ scene, t }: any) {
+const STATE_SEQ: StateScene[] = [
+  { step: 0, state: "created", event: "", prev: "created" },
+  { step: 1, state: "created", event: "payFail", prev: "created" },
+  { step: 2, state: "paid", event: "payOk", prev: "created" },
+  { step: 3, state: "shipped", event: "ship", prev: "paid" },
+  { step: 4, state: "done", event: "confirm", prev: "shipped" },
+];
+
+function StateRender({ scene, t, playing, onNext }: any) {
   const zh = isZh(t);
-  const s = (scene ?? { state: "created", event: "", prev: "created" }) as StateScene;
+  const s = (scene ?? STATE_SEQ[0]) as StateScene;
+  const nextScene = STATE_SEQ[s.step + 1];
+  const canNext = !!onNext && !playing && !!nextScene;
+  const advance = (e: any) => { e.stopPropagation(); onNext?.(); };
   const labels: Record<StateKey, string> = {
     created: zh ? "新建" : "Created",
     paid: zh ? "已支付" : "Paid",
@@ -383,13 +487,22 @@ function StateRender({ scene, t }: any) {
       <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 6, justifyContent: "center", padding: 10, borderRadius: 12, background: "#fbfdff", border: "1px dashed #cbd5e1" }}>
         {order.map((k, i) => (
           <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-            {i > 0 && <Trans label={transName[`${order[i - 1]}>${k}`]} />}
-            <span style={{ display: "inline-flex", padding: 2, borderRadius: 12, boxShadow: k === s.state ? "0 0 0 2px #22c55e" : "none" }}>
+            {i > 0 && <Trans label={transName[`${order[i - 1]}>${k}`]} clickable={canNext} onClick={canNext ? advance : undefined} />}
+            <span onClick={canNext ? advance : undefined}
+              title={canNext ? t(T("点击触发下一个事件", "click to fire the next event")) : undefined}
+              style={{ display: "inline-flex", padding: 2, borderRadius: 12, boxShadow: k === s.state ? "0 0 0 2px #22c55e" : "none", cursor: canNext ? "pointer" : "default" }}>
               <StateBox label={labels[k]} tone={k === s.state ? "#dcfce7" : "#f1f5f9"} />
             </span>
           </span>
         ))}
       </div>
+      {nextScene && (
+        <div onClick={advance} title={t(T("点击触发下一个事件", "click to fire the next event"))}
+          style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "center", padding: "8px 12px", borderRadius: 10, background: "#eef2ff", border: "2px dashed #6366f1", fontSize: 13, fontWeight: 800, color: "#3730a3", cursor: "pointer" }}>
+          <span>{t(T("点击触发事件", "click to fire event"))}:</span>
+          <span>{eventText[nextScene.event] ?? nextScene.event}</span>
+        </div>
+      )}
       <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", fontSize: 13, color: "#334155" }}>
         <span>{zh ? "事件" : "Event"}: <b>{eventText[s.event] ?? s.event}</b></span>
         <span style={{ color: "#cbd5e1" }}>|</span>
@@ -397,6 +510,16 @@ function StateRender({ scene, t }: any) {
         <span style={{ color: "#cbd5e1" }}>|</span>
         <span>{zh ? "当前状态" : "State"}: <b>{labels[s.state]}</b></span>
       </div>
+      <StepPanel t={t} title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("步骤", "Step")), `${s.step + 1}/${STATE_SEQ.length}`],
+          [t(T("前一状态", "Prev")), labels[s.prev]],
+          [t(T("当前状态", "State")), labels[s.state]],
+          [t(T("事件", "Event")), eventText[s.event] ?? s.event],
+          [t(T("触发事件", "Trigger")), nextScene ? (eventText[nextScene.event] ?? nextScene.event) : t(T("完成", "Done"))],
+        ]}
+        onNext={onNext} showNext={canNext}
+        nextLabel={nextScene ? t(T("触发事件", "Fire event")) : t(T("完成", "Done"))} />
       {s.event === "payFail"
         ? <Note tone="warn">{zh ? "守卫 [金额>0] 为假，转移不发生，对象保持「新建」。守卫把条件转移显式化。" : "Guard [amount>0] is false, so the transition does not fire; the object stays in Created. Guards make conditional transitions explicit."}</Note>
         : <Note>{zh ? "转移语法：事件[守卫]/动作，例如 支付[金额>0]/扣款。" : "Transition syntax: event[guard]/action, e.g. pay[amount>0]/charge."}</Note>}
@@ -430,13 +553,7 @@ const STATE_CODE = [
 ];
 
 function stateGenerate(_config: any): Frame<StateScene>[] {
-  const seq: StateScene[] = [
-    { state: "created", event: "", prev: "created" },
-    { state: "created", event: "payFail", prev: "created" },
-    { state: "paid", event: "payOk", prev: "created" },
-    { state: "shipped", event: "ship", prev: "paid" },
-    { state: "done", event: "confirm", prev: "shipped" },
-  ];
+  const seq = STATE_SEQ;
   const caps: [string, string][] = [
     ["初始状态：新建", "Initial state: Created"],
     ["事件 支付[$金额 \\le 0$]：守卫为假，不发生转移", "Event pay[$amount \\le 0$]: guard false, no transition"],

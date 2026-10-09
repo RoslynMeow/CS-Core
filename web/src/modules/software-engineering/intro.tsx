@@ -1,4 +1,4 @@
-import { T } from "../../i18n/lang";
+import { T, type Text } from "../../i18n/lang";
 import { MathText } from "../../lib/tex";
 import type { Frame } from "../../engine/types";
 import { Panel, Note, NumField, isZh, makeChapter, type SubDef } from "../common/chapter";
@@ -13,7 +13,29 @@ type SubMode = "lifecycle";
 
 type LifecycleScene = { phase: number; cost: number };
 
-function LifecycleRender({ scene, config, t }: any) {
+// 用户驱动的「状态 / 数值」面板：展示当前步的关键取值，并提供推进按钮
+function StepPanel({ t, title, rows, onNext, nextLabel, showNext }: {
+  t: (x: Text) => string;
+  title: string;
+  rows: [string, string][];
+  onNext?: () => void;
+  nextLabel: string;
+  showNext: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", borderRadius: 10, background: "#0f172a", color: "#e2e8f0", fontSize: 12 }}>
+      <span style={{ fontWeight: 800, color: "#a5b4fc" }}>{title}</span>
+      {rows.map(([k, v]) => (
+        <span key={k} style={{ fontFamily: "ui-monospace, monospace", whiteSpace: "nowrap" }}>{k} = <b style={{ color: "#fde047" }}>{v}</b></span>
+      ))}
+      {showNext && onNext && (
+        <button className="primary" style={{ marginLeft: "auto" }} onClick={(e) => { e.stopPropagation(); onNext(); }}>{nextLabel}</button>
+      )}
+    </div>
+  );
+}
+
+function LifecycleRender({ scene, config, t, onNext, step: frameStep, count }: any) {
   const zh = isZh(t);
   const s = (scene ?? { phase: 0, cost: 1 }) as LifecycleScene;
   const stages: [string, string][] = zh
@@ -23,22 +45,34 @@ function LifecycleRender({ scene, config, t }: any) {
   const costs = stages.map(([label], i) => ({ i, label, c: Math.pow(k / 2, i) }));
   const max = Math.max(...costs.map((c) => c.c));
   const desc = stages[s.phase]?.[1] ?? "";
+  const canNext = !!onNext && s.phase < stages.length - 1 && (typeof frameStep !== "number" || typeof count !== "number" || frameStep < count - 1);
   return (
     <Panel>
       <div style={{ display: "grid", gap: 6 }}>
         {costs.map((c) => {
           const cur = c.i === s.phase;
+          const clickable = cur && canNext;
           return (
-            <div key={c.i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", borderRadius: 10, background: cur ? "#eef2ff" : "#f8fafc", border: `1px solid ${cur ? "#c7d2fe" : "#e2e8f0"}`, opacity: c.i <= s.phase ? 1 : 0.5 }}>
+            <div key={c.i}
+              onClick={clickable ? (e: any) => { e.stopPropagation(); onNext?.(); } : undefined}
+              style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 12px", borderRadius: 10, background: cur ? "#eef2ff" : "#f8fafc", border: `1px solid ${cur ? "#c7d2fe" : "#e2e8f0"}`, opacity: c.i <= s.phase ? 1 : 0.5, cursor: clickable ? "pointer" : "default" }}>
               <span style={{ width: 88, fontSize: 13, fontWeight: 800, color: cur ? "#4338ca" : "#3730a3" }}>{c.label}</span>
               <div style={{ flex: 1, height: 16, background: "#f1f5f9", borderRadius: 8, overflow: "hidden" }}>
                 <div style={{ width: `${(c.c / max) * 100}%`, height: "100%", background: cur ? "#6366f1" : "#a5b4fc" }} />
               </div>
-              <span style={{ width: 52, fontSize: 12, color: "#475569", textAlign: "right" }}>{c.c.toFixed(1)}×</span>
+              <span style={{ width: 52, fontSize: 12, color: "#475569", textAlign: "right" }}>{c.c.toFixed(1)}x</span>
             </div>
           );
         })}
       </div>
+      <StepPanel t={t} title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("当前阶段", "Phase")), `${s.phase + 1}/${stages.length}`],
+          [t(T("名称", "Name")), costs[s.phase]?.label ?? "-"],
+          [t(T("修复代价", "Fix cost")), `${s.cost.toFixed(1)}x`],
+          [t(T("增长率 k", "Growth k")), `${k}`],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(T("下一阶段", "Next phase"))} />
       <div style={{ textAlign: "center", fontSize: 14 }}>
         <MathText text={`$C_{fix} \\approx ${s.cost.toFixed(1)}\\times,\\quad C \\propto e^{k\\cdot stage}$`} />
       </div>

@@ -1,4 +1,4 @@
-import { T } from "../../i18n/lang";
+import { T, type Text } from "../../i18n/lang";
 import { MathText } from "../../lib/tex";
 import type { Frame } from "../../engine/types";
 import { Panel, Table, Note, Chips, NumField, TextField, Row, Steps, isZh, makeChapter, type SubDef } from "../common/chapter";
@@ -12,14 +12,14 @@ import { Panel, Table, Note, Chips, NumField, TextField, Row, Steps, isZh, makeC
 type SubMode = "dfd" | "data-dictionary";
 
 // DFD 元素方框：外部实体(矩形) / 加工(圆角) / 数据存储(方角) —— 纯 HTML + inline style
-function Box({ label, kind, active }: { label: string; kind: "entity" | "proc" | "store"; active?: boolean }) {
+function Box({ label, kind, active, onClick }: { label: string; kind: "entity" | "proc" | "store"; active?: boolean; onClick?: (e: any) => void }) {
   const skin = {
     entity: { background: "#dbeafe", border: "1.5px solid #93c5fd", color: "#1d4ed8", borderRadius: 4 },
     proc: { background: "#ffedd5", border: "1.5px solid #fdba74", color: "#c2410c", borderRadius: 16 },
     store: { background: "#dcfce7", border: "1.5px solid #86efac", color: "#15803d", borderRadius: 3 },
   }[kind];
   return (
-    <div style={{ ...skin, padding: "9px 13px", fontSize: 12.5, fontWeight: 700, textAlign: "center", whiteSpace: "pre-line", minWidth: 78, transition: "all .18s ease", opacity: active ? 1 : 0.55, boxShadow: active ? "0 0 0 3px rgba(99,102,241,0.4)" : "none", transform: active ? "scale(1.06)" : "none" }}>
+    <div onClick={onClick} style={{ ...skin, padding: "9px 13px", fontSize: 12.5, fontWeight: 700, textAlign: "center", whiteSpace: "pre-line", minWidth: 78, transition: "all .18s ease", opacity: active ? 1 : 0.55, boxShadow: active ? "0 0 0 3px rgba(99,102,241,0.4)" : "none", transform: active ? "scale(1.06)" : "none", cursor: onClick ? "pointer" : "default" }}>
       {label}
     </div>
   );
@@ -42,9 +42,31 @@ function Flow({ label, active }: { label?: string; active?: boolean }) {
 // ---------------------------------------------------------------------
 // dfd
 // ---------------------------------------------------------------------
+// 用户驱动的「状态 / 数值」面板：展示当前步的关键取值，并提供推进按钮
+function StepPanel({ t, title, rows, onNext, nextLabel, showNext }: {
+  t: (x: Text) => string;
+  title: string;
+  rows: [string, string][];
+  onNext?: () => void;
+  nextLabel: string;
+  showNext: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", borderRadius: 10, background: "#0f172a", color: "#e2e8f0", fontSize: 12 }}>
+      <span style={{ fontWeight: 800, color: "#a5b4fc" }}>{title}</span>
+      {rows.map(([k, v]) => (
+        <span key={k} style={{ fontFamily: "ui-monospace, monospace", whiteSpace: "nowrap" }}>{k} = <b style={{ color: "#fde047" }}>{v}</b></span>
+      ))}
+      {showNext && onNext && (
+        <button className="primary" style={{ marginLeft: "auto" }} onClick={(e) => { e.stopPropagation(); onNext(); }}>{nextLabel}</button>
+      )}
+    </div>
+  );
+}
+
 type DfdScene = { step: number; activeNode: number; activeEdge: number };
 
-function DfdRender({ scene, t }: any) {
+function DfdRender({ scene, t, onNext, step: frameStep, count }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as Partial<DfdScene>;
   const step = s.step ?? 0;
@@ -96,6 +118,8 @@ function DfdRender({ scene, t }: any) {
       "Process 2 outputs the shipment to external entity \"Warehouse\" (sink)",
     ];
   const cur = Math.max(0, Math.min(steps.length - 1, step));
+  const canNext = !!onNext && (typeof frameStep !== "number" || typeof count !== "number" || frameStep < count - 1);
+  const advance = canNext ? (e: any) => { e.stopPropagation(); onNext?.(); } : undefined;
   return (
     <Panel>
       <Table head={zh ? ["元素", "符号", "说明"] : ["Element", "Symbol", "Meaning"]} rows={rows} />
@@ -103,7 +127,7 @@ function DfdRender({ scene, t }: any) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "wrap", gap: 4, padding: "6px 0" }}>
         {nodes.map((n, i) => (
           <div key={i} style={{ display: "flex", alignItems: "center" }}>
-            <Box label={n.label} kind={n.kind} active={activeNode === i} />
+            <Box label={n.label} kind={n.kind} active={activeNode === i} onClick={activeNode === i ? advance : undefined} />
             {i < nodes.length - 1 && <Flow label={flows[i]} active={activeEdge === i} />}
           </div>
         ))}
@@ -111,6 +135,13 @@ function DfdRender({ scene, t }: any) {
       <div style={{ padding: "10px 14px", borderRadius: 10, background: "#eef2ff", border: "1px solid #c7d2fe", fontSize: 13, color: "#3730a3", lineHeight: 1.8, fontWeight: 600 }}>
         {steps[cur]}
       </div>
+      <StepPanel t={t} title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("步骤", "Step")), `${cur + 1}/${steps.length}`],
+          [t(T("当前节点", "Node")), activeNode >= 0 && nodes[activeNode] ? nodes[activeNode].label : "-"],
+          [t(T("当前数据流", "Edge")), activeEdge >= 0 && flows[activeEdge] ? flows[activeEdge] : "-"],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(T("下一步", "Next step"))} />
       <Note tone="warn">
         {zh
           ? <>平衡原则：父图中某加工在边界上的输入 / 输出数据流，必须与子图边界的数据流一一对应——分解时数据不凭空产生，也不凭空消失。加工编号形如 <MathText text={"$1 \\to 1.1, 1.2$"} />。</>

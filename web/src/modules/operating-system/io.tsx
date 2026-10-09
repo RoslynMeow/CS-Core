@@ -11,6 +11,27 @@ import { Panel, Table, Note, NumField, TextField, Row, isZh, makeChapter, type S
 
 type SubMode = "dma" | "disk-scheduling";
 
+// 用户驱动「状态 / 数值」面板：展示当前步取值，并提供推进按钮
+function StepPanel({ title, rows, onNext, nextLabel, showNext }: {
+  title: string;
+  rows: [string, string][];
+  onNext?: () => void;
+  nextLabel: string;
+  showNext: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", borderRadius: 10, background: "#0f172a", color: "#e2e8f0", fontSize: 12 }}>
+      <span style={{ fontWeight: 800, color: "#a5b4fc" }}>{title}</span>
+      {rows.map(([k, v]) => (
+        <span key={k} style={{ fontFamily: "ui-monospace, monospace", whiteSpace: "nowrap" }}>{k} = <b style={{ color: "#fde047" }}>{v}</b></span>
+      ))}
+      {showNext && onNext && (
+        <button className="primary" style={{ marginLeft: "auto" }} onClick={(e) => { e.stopPropagation(); onNext(); }}>{nextLabel}</button>
+      )}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------
 // dma：轮询 / 中断 / DMA 逐帧对比
 // ---------------------------------------------------------------------
@@ -56,9 +77,11 @@ function dmaGenerate(_config: any): Frame<DmaScene>[] {
   return frames;
 }
 
-function DmaRender({ scene, t }: any) {
+function DmaRender({ scene, t, onNext, step: frameStep, count, playing }: any) {
   const zh = isZh(t);
   const s = (scene ?? { mode: "poll", step: 0, cpuBusy: true, done: false }) as DmaScene;
+  const canNext = !!onNext && !playing && (typeof frameStep !== "number" || typeof count !== "number" || frameStep < count - 1);
+  const advance = (e: React.MouseEvent) => { e.stopPropagation(); if (canNext) onNext(); };
   const meta: Record<DmaMode, { name: string; color: string; mover: string; cpu: string; use: string }> = {
     poll: { name: zh ? "轮询" : "Polling", color: "#ef4444", mover: zh ? "CPU 逐字搬运" : "CPU per word", cpu: "≈100%", use: zh ? "简单、低速设备" : "simple, slow devices" },
     irq: { name: zh ? "中断" : "Interrupt", color: "#f59e0b", mover: zh ? "CPU 在 ISR 中逐字搬运" : "CPU per word in ISR", cpu: zh ? "每字 1 次中断" : "1 IRQ/word", use: zh ? "中低速、事件随机" : "medium speed, random" },
@@ -83,7 +106,7 @@ function DmaRender({ scene, t }: any) {
         })}
       </div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, flexWrap: "wrap", fontFamily: "ui-monospace, monospace", fontSize: 12 }}>
-        <div style={{ padding: "10px 14px", borderRadius: 10, background: "#eef2ff", border: "1px solid #c7d2fe", fontWeight: 800, color: "#3730a3" }}>{zh ? "设备" : "Device"}</div>
+        <div onClick={canNext ? advance : undefined} style={{ padding: "10px 14px", borderRadius: 10, background: "#eef2ff", border: "1px solid #c7d2fe", fontWeight: 800, color: "#3730a3", cursor: canNext ? "pointer" : "default" }}>{zh ? "设备" : "Device"}</div>
         <div style={{ color: m.color, fontWeight: 800 }}>
           {s.mode === "dma" ? (zh ? "→ DMA → 内存" : "→ DMA → Memory") : (zh ? "→ 经 CPU → 内存" : "→ via CPU → Memory")}
         </div>
@@ -108,6 +131,15 @@ function DmaRender({ scene, t }: any) {
         </span>
         {s.done && <span style={{ color: "#15803d", fontWeight: 800 }}>{zh ? "✓ 完成" : "✓ done"}</span>}
       </div>
+      <StepPanel
+        title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("方式", "Mode")), m.name],
+          [t(T("已搬运", "Moved")), `${moved}/${DMA_N}`],
+          [t(T("CPU", "CPU")), s.cpuBusy ? (zh ? "忙" : "busy") : (zh ? "空闲" : "idle")],
+          [t(T("完成", "Done")), s.done ? (zh ? "是" : "yes") : (zh ? "否" : "no")],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(T("启动 / 继续传输", "Start / continue transfer"))} />
       <Table
         head={zh ? ["方式", "数据搬运者", "CPU 占用", "适用场景"] : ["Mode", "Data mover", "CPU cost", "Use case"]}
         rows={rows}
@@ -274,9 +306,11 @@ function diskGenerate(config: any): Frame<DiskScene>[] {
   return frames;
 }
 
-function DiskRender({ scene, config, t }: any) {
+function DiskRender({ scene, config, t, onNext, step: frameStep, count, playing }: any) {
   const zh = isZh(t);
   const s = (scene ?? null) as DiskScene | null;
+  const canNext = !!onNext && !playing && (typeof frameStep !== "number" || typeof count !== "number" || frameStep < count - 1);
+  const advance = (e: React.MouseEvent) => { e.stopPropagation(); if (canNext) onNext(); };
   const req = parseReq(String(config?.requests ?? ""));
   const head = Number(config?.head) || 0;
   const algo = s?.algo ?? (DISK_ALGO_FN[String(config?.algo)] ? String(config?.algo) : "FCFS");
@@ -329,12 +363,22 @@ function DiskRender({ scene, config, t }: any) {
             : order.map((r, k) => {
               const served = k <= idx;
               const cur = k === idx;
+              const clickable = canNext && k === idx + 1;
               return (
-                <span key={k} style={{ padding: "2px 9px", borderRadius: 999, fontSize: 12, fontFamily: "ui-monospace, monospace", fontWeight: 700, background: cur ? "#4338ca" : served ? "#eef2ff" : "#f8fafc", color: cur ? "#fff" : served ? "#4338ca" : "#94a3b8", border: `1px solid ${cur ? "#4338ca" : "#e2e8f0"}` }}>{r}</span>
+                <span key={k} onClick={clickable ? advance : undefined} style={{ padding: "2px 9px", borderRadius: 999, fontSize: 12, fontFamily: "ui-monospace, monospace", fontWeight: 700, background: cur ? "#4338ca" : served ? "#eef2ff" : "#f8fafc", color: cur ? "#fff" : served ? "#4338ca" : "#94a3b8", border: `1px solid ${cur || clickable ? "#4338ca" : "#e2e8f0"}`, cursor: clickable ? "pointer" : "default" }}>{r}</span>
               );
             })}
         </div>
       </div>
+      <StepPanel
+        title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("算法", "Algo")), algo],
+          [t(T("磁头", "Head")), String(pos)],
+          [t(T("累计寻道", "Seek")), String(total)],
+          [t(T("已服务", "Served")), `${Math.max(idx + 1, 0)}/${order.length}`],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(T("服务下一请求", "Serve next request"))} />
       <div style={{ textAlign: "center", fontSize: 14 }}>
         <MathText text="$T_{access} = T_{seek} + T_{rotation} + T_{transfer}$" />
       </div>

@@ -11,6 +11,28 @@ import { Panel, Table, Note, NumField, TextField, Row, Steps, isZh, makeChapter,
 
 type SubMode = "elicitation" | "usecase";
 
+// 用户驱动的「状态 / 数值」面板：展示当前步的关键取值，并提供推进按钮
+function StepPanel({ t, title, rows, onNext, nextLabel, showNext }: {
+  t: (x: Text) => string;
+  title: string;
+  rows: [string, string][];
+  onNext?: () => void;
+  nextLabel: string;
+  showNext: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", borderRadius: 10, background: "#0f172a", color: "#e2e8f0", fontSize: 12 }}>
+      <span style={{ fontWeight: 800, color: "#a5b4fc" }}>{title}</span>
+      {rows.map(([k, v]) => (
+        <span key={k} style={{ fontFamily: "ui-monospace, monospace", whiteSpace: "nowrap" }}>{k} = <b style={{ color: "#fde047" }}>{v}</b></span>
+      ))}
+      {showNext && onNext && (
+        <button className="primary" style={{ marginLeft: "auto" }} onClick={(e) => { e.stopPropagation(); onNext(); }}>{nextLabel}</button>
+      )}
+    </div>
+  );
+}
+
 function ElicitationRender({ config, t }: any) {
   const zh = isZh(t);
   const rows: React.ReactNode[][] = zh
@@ -78,7 +100,7 @@ const USECASE_POST = T("订单已创建、库存已扣减、返回订单号", "O
 
 type UseCaseScene = { step: number; actor: Text; flow: Text[]; extended: boolean };
 
-function UseCaseRender({ scene, config, t }: any) {
+function UseCaseRender({ scene, config, t, onNext, step: frameStep, count }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as Partial<UseCaseScene>;
   const flow = Array.isArray(s.flow) ? s.flow : [];
@@ -90,14 +112,20 @@ function UseCaseRender({ scene, config, t }: any) {
   const done = step > n + 1;
   const actor = s.actor ? t(s.actor) : "";
   const name = String(config?.name ?? "");
+  const canNext = !!onNext && (typeof frameStep !== "number" || typeof count !== "number" || frameStep < count - 1);
+  const advance = canNext ? (e: any) => { e.stopPropagation(); onNext?.(); } : undefined;
+  const mainIdx = Math.max(0, Math.min(n, step));
+  const frameNo = (typeof frameStep === "number" ? frameStep : 0) + 1;
+  const frameTotal = typeof count === "number" ? count : n + 4;
+  const extendText = !showExtend ? t(T("未触发", "not reached")) : (s.extended ? t(T("执行", "run")) : t(T("跳过", "skip")));
   return (
     <Panel>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, flexWrap: "wrap" }}>
-        <div style={{ padding: "8px 14px", borderRadius: 999, fontWeight: 800, fontSize: 13, background: step === 0 ? "#eef2ff" : "#f8fafc", border: `1px solid ${step === 0 ? "#c7d2fe" : "#e2e8f0"}`, color: step === 0 ? "#4338ca" : "#475569" }}>
+        <div onClick={advance} style={{ padding: "8px 14px", borderRadius: 999, fontWeight: 800, fontSize: 13, background: step === 0 ? "#eef2ff" : "#f8fafc", border: `1px solid ${step === 0 ? "#c7d2fe" : "#e2e8f0"}`, color: step === 0 ? "#4338ca" : "#475569", cursor: canNext ? "pointer" : "default" }}>
           {zh ? "参与者" : "Actor"} · {actor}
         </div>
         <span style={{ color: "#94a3b8", fontSize: 18 }}>→</span>
-        <div style={{ padding: "8px 14px", borderRadius: 999, fontWeight: 800, fontSize: 13, background: step > 0 && !done ? "#eef2ff" : "#f8fafc", border: `1px solid ${step > 0 && !done ? "#c7d2fe" : "#e2e8f0"}`, color: "#3730a3" }}>
+        <div onClick={advance} style={{ padding: "8px 14px", borderRadius: 999, fontWeight: 800, fontSize: 13, background: step > 0 && !done ? "#eef2ff" : "#f8fafc", border: `1px solid ${step > 0 && !done ? "#c7d2fe" : "#e2e8f0"}`, color: "#3730a3", cursor: canNext ? "pointer" : "default" }}>
           {zh ? "用例" : "Use case"} · {name}
         </div>
       </div>
@@ -113,6 +141,14 @@ function UseCaseRender({ scene, config, t }: any) {
           );
         })}
       </div>
+      <StepPanel t={t} title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("帧", "Frame")), `${frameNo}/${frameTotal}`],
+          [t(T("主流程", "Main flow")), `${mainIdx}/${n}`],
+          [t(T("扩展", "Extend")), extendText],
+          [t(T("参与者", "Actor")), actor || "-"],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(T("下一步", "Next step"))} />
       {showExtend && (
         <div style={{ display: "flex", gap: 12, padding: "9px 14px", borderRadius: 10, background: s.extended ? "#ecfdf5" : "#f8fafc", border: `1px solid ${s.extended ? "#a7f3d0" : "#e2e8f0"}` }}>
           <span style={{ fontWeight: 800, color: s.extended ? "#047857" : "#94a3b8", width: 96, flexShrink: 0 }}>{"<<extend>>"}</span>

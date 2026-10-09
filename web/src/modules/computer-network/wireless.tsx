@@ -11,6 +11,32 @@ import { Panel, Table, Note, Chips, NumField, isZh, makeChapter, type SubDef } f
 
 type SubMode = "wireless-link" | "wifi" | "mobility";
 
+type Kv = [string, React.ReactNode];
+
+// 用户驱动触发器：点击推进到下一帧（onNext）
+function NextButton({ onNext, zh, zhLabel, enLabel, disabled, hint }: { onNext?: () => void; zh: boolean; zhLabel: string; enLabel: string; disabled?: boolean; hint?: string }) {
+  const off = !!disabled || typeof onNext !== "function";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "8px 12px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
+      <button disabled={off} onClick={(e) => { e.stopPropagation(); if (!off) onNext?.(); }} style={{ padding: "7px 18px", borderRadius: 999, border: "1px solid #c7d2fe", background: off ? "#f1f5f9" : "#4338ca", color: off ? "#94a3b8" : "#fff", fontWeight: 800, fontSize: 13, cursor: off ? "default" : "pointer", fontFamily: "inherit" }}>
+        {zh ? zhLabel : enLabel}
+      </button>
+      {!off && hint && <span style={{ fontSize: 12, color: "#4338ca" }}>{hint}</span>}
+    </div>
+  );
+}
+
+// 内联「状态 / 数值」面板：每步从 scene 派生
+function ValuePanel({ zh, rows }: { zh: boolean; rows: Kv[] }) {
+  if (!rows.length) return null;
+  return (
+    <div style={{ display: "grid", gap: 6, padding: "10px 14px", borderRadius: 10, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+      <div style={{ fontWeight: 800, color: "#1e293b", fontSize: 13 }}>{zh ? "状态 / 数值" : "State / Values"}</div>
+      <Table head={zh ? ["项", "值"] : ["Item", "Value"]} rows={rows as React.ReactNode[][]} />
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------
 // 1) 无线链路：隐藏终端（逐帧动画）
 //    A 发往 B；C 在 A 覆盖之外也想发；A、C 互不可达 → 在 B 处碰撞
@@ -36,15 +62,23 @@ function wirelessLinkGenerate(_config: any): Frame<WirelessLinkScene>[] {
   ];
 }
 
-function WirelessLinkRender({ scene, t }: any) {
+function WirelessLinkRender({ scene, t, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? { step: 0, tx: [], collision: false }) as Partial<WirelessLinkScene>;
   const tx = Array.isArray(s.tx) ? s.tx : [];
   const aOn = tx.includes("A");
   const cOn = tx.includes("C");
   const collision = !!s.collision;
+  const done = (s.step ?? 0) >= 5;
+  const rows: Kv[] = [
+    [zh ? "步骤" : "Step", `${(s.step ?? 0) + 1} / 6`],
+    [zh ? "正在发送" : "Transmitting", tx.length ? tx.join(", ") : "—"],
+    [zh ? "是否碰撞" : "Collision", collision ? (zh ? "是" : "yes") : (zh ? "否" : "no")],
+  ];
   return (
     <Panel>
+      <NextButton zh={zh} onNext={onNext} disabled={done} hint={zh ? "点击让 A / C 竞争信道，逐步演示隐藏终端" : "click to let A / C contend, showing hidden terminals"}
+        zhLabel={done ? "已退避重传" : "发送"} enLabel={done ? "backed off" : "send"} />
       <div style={{ display: "flex", justifyContent: "center" }}>
         <svg viewBox="0 0 560 230" width="100%" style={{ maxWidth: 620, background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12 }}>
           <circle cx="90" cy="115" r="120" fill="#dbeafe" fillOpacity="0.45" stroke="#93c5fd" strokeDasharray="4 3" />
@@ -81,6 +115,7 @@ function WirelessLinkRender({ scene, t }: any) {
           ? "隐藏终端使 CSMA 的「先听后发」失效；Wi-Fi 用 ACK 确认与可选 RTS/CTS 预约来缓解。"
           : "Hidden terminals defeat listen-before-talk; Wi-Fi adds ACK confirmation and optional RTS/CTS reservation."}
       </Note>
+      <ValuePanel zh={zh} rows={rows} />
     </Panel>
   );
 }
@@ -142,7 +177,7 @@ const WIFI_CODE = [
   T("等待 ACK；超时 → 退避重传", "wait ACK; timeout → backoff & retry"),
 ];
 
-function WifiRender({ scene, config, t }: any) {
+function WifiRender({ scene, config, t, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as Partial<WifiScene>;
   const state = s.state ?? "idle";
@@ -172,6 +207,8 @@ function WifiRender({ scene, config, t }: any) {
   ];
   return (
     <Panel>
+      <NextButton zh={zh} onNext={onNext} disabled={state === "done"} hint={zh ? "点击推进 CSMA/CA：监听、DIFS、退避、发送、ACK" : "click to advance CSMA/CA: sense, DIFS, backoff, DATA, ACK"}
+        zhLabel={state === "done" ? "发送成功" : "监听 / 发送"} enLabel={state === "done" ? "sent" : "sense / send"} />
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 4, flexWrap: "wrap" }}>
         {order.map((k, i) => {
           const done = i < cur;
@@ -190,6 +227,11 @@ function WifiRender({ scene, config, t }: any) {
         })}
         {state === "done" && <span style={{ marginLeft: 6, fontSize: 18 }}>✅</span>}
       </div>
+      <ValuePanel zh={zh} rows={[
+        [zh ? "当前状态" : "Current state", labels[state] ?? state],
+        [zh ? "退避时隙 K" : "Backoff slots K", backoff],
+        [zh ? "RTS/CTS" : "RTS/CTS", rts ? (zh ? "开启" : "on") : (zh ? "关闭" : "off")],
+      ]} />
       {rts && (
         <Note>
           {zh
@@ -239,12 +281,23 @@ const MOBILITY_CODE = [
   T("切换：更新注册，重定向隧道", "handover: update registration, re-point tunnel"),
 ];
 
-function MobilityRender({ scene, t }: any) {
+function MobilityRender({ scene, t, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? { step: 0, location: "home" }) as Partial<MobilityScene>;
   const loc = s.location ?? "home";
   const step = s.step ?? 0;
   const tunnelOn = loc === "tunnel" || loc === "handover";
+  const locLabel = loc === "home"
+    ? (zh ? "归属网络" : "Home network")
+    : loc === "handover"
+      ? (zh ? "拜访网络 B" : "Visited B")
+      : (zh ? "拜访网络 A" : "Visited A");
+  const rows: Kv[] = [
+    [zh ? "步骤" : "Step", `${step + 1} / 5`],
+    [zh ? "当前网络" : "Location", locLabel],
+    [zh ? "注册状态" : "Registration", step >= 2 ? (zh ? "已向 HA 注册 CoA" : "CoA registered with HA") : (zh ? "未注册" : "not registered")],
+    [zh ? "隧道" : "Tunnel", tunnelOn ? (zh ? "已建立" : "established") : (zh ? "无" : "none")],
+  ];
   const mn = loc === "home" ? { x: 150, y: 170 } : loc === "handover" ? { x: 405, y: 170 } : { x: 352, y: 170 };
   const status: string[] = zh
     ? [
@@ -261,7 +314,7 @@ function MobilityRender({ scene, t }: any) {
       "HA tunnels to the FA, which decapsulates to MN",
       "Handover: MN moves to visited B; HA re-points the tunnel",
     ];
-  const rows: React.ReactNode[][] = zh
+  const conceptRows: React.ReactNode[][] = zh
     ? [
       ["无线 Wireless", "链路介质：用无线电而非线缆传输"],
       ["移动 Mobile", "网络位置：节点改变接入点/子网"],
@@ -274,6 +327,8 @@ function MobilityRender({ scene, t }: any) {
     ];
   return (
     <Panel>
+      <NextButton zh={zh} onNext={onNext} disabled={step >= 4} hint={zh ? "点击推进移动性管理：移动、注册、隧道转发、切换" : "click to advance mobility: move, register, tunnel, handover"}
+        zhLabel={step >= 4 ? "切换完成" : "下一步"} enLabel={step >= 4 ? "handover done" : "next step"} />
       <Chips items={zh
         ? [
           ["归属代理 HA", "移动节点归属网上的锚点"],
@@ -325,7 +380,8 @@ function MobilityRender({ scene, t }: any) {
         </svg>
       </div>
       <Note>{status[step] ?? status[0]}</Note>
-      <Table head={zh ? ["概念", "含义"] : ["Concept", "Meaning"]} rows={rows} />
+      <ValuePanel zh={zh} rows={rows} />
+      <Table head={zh ? ["概念", "含义"] : ["Concept", "Meaning"]} rows={conceptRows} />
       <Note tone="warn">
         {zh
           ? "关键区分：无线 ≠ 移动。无线强调链路介质（无线电），移动强调节点改变了接入点；切换时通过归属/外地代理与隧道维持可达性。"

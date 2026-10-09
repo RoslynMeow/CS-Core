@@ -1,4 +1,4 @@
-import { T } from "../../i18n/lang";
+import { T, type Text } from "../../i18n/lang";
 import { MathText } from "../../lib/tex";
 import type { Frame } from "../../engine/types";
 import { Panel, Note, NumField, isZh, makeChapter, type SubDef } from "./shared";
@@ -10,6 +10,28 @@ import { Panel, Note, NumField, isZh, makeChapter, type SubDef } from "./shared"
 // =====================================================================
 
 type SubMode = "switching" | "performance";
+
+// 用户驱动的「状态 / 数值」面板：展示当前步的关键取值，并提供推进按钮
+function StepPanel({ t, title, rows, onNext, nextLabel, showNext }: {
+  t: (x: Text) => string;
+  title: string;
+  rows: [string, string][];
+  onNext?: () => void;
+  nextLabel: string;
+  showNext: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", borderRadius: 10, background: "#0f172a", color: "#e2e8f0", fontSize: 12 }}>
+      <span style={{ fontWeight: 800, color: "#a5b4fc" }}>{title}</span>
+      {rows.map(([k, v]) => (
+        <span key={k} style={{ fontFamily: "ui-monospace, monospace", whiteSpace: "nowrap" }}>{k} = <b style={{ color: "#fde047" }}>{v}</b></span>
+      ))}
+      {showNext && onNext && (
+        <button className="primary" style={{ marginLeft: "auto" }} onClick={(e) => { e.stopPropagation(); onNext(); }}>{nextLabel}</button>
+      )}
+    </div>
+  );
+}
 
 const SW_DEFAULT = { sizeMb: 1, rateMbps: 10, hops: 3, users: 20, circuitUsers: 10 };
 function SwitchingControls({ config, onChange, t }: any) {
@@ -54,7 +76,7 @@ const SW_CODE = [
   T("$(N)\\,t_{trans} + d_{prop}$", "$(N)\\,t_{trans} + d_{prop}$"),
 ];
 
-function SwitchingRender({ scene, config, t }: any) {
+function SwitchingRender({ scene, config, t, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as Partial<SwitchScene>;
   const hops = s.hops ?? Math.max(1, Math.round(Number(config?.hops) || 3));
@@ -64,6 +86,9 @@ function SwitchingRender({ scene, config, t }: any) {
   const dtrans = lenBits / (rateMbps * 1e6) * 1000;
   const nodes = Array.from({ length: hops + 2 }, (_, i) => i);
   const phase = s.phase;
+  const canNext = !!onNext && pos < hops + 1;
+  const phaseZh = phase === "send" ? "发送" : phase === "queue" ? "缓存排队" : phase === "forward" ? "存储转发" : "到达";
+  const phaseEn = phase === "send" ? "send" : phase === "queue" ? "buffer/queue" : phase === "forward" ? "store-and-forward" : "arrive";
   return (
     <Panel>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", overflowX: "auto", padding: "16px 6px" }}>
@@ -72,12 +97,14 @@ function SwitchingRender({ scene, config, t }: any) {
           const passed = i <= pos;
           const label = i === 0 ? (zh ? "源主机" : "Source") : i === hops + 1 ? (zh ? "目的主机" : "Dest") : zh ? `交换机 ${i}` : `SW ${i}`;
           const icon = i === 0 || i === hops + 1 ? "🖥️" : "🔀";
+          const clickable = cur && canNext;
           return (
             <div key={i} style={{ display: "flex", alignItems: "center" }}>
               {i > 0 && <div style={{ width: 40, height: 3, background: i <= pos ? "#6366f1" : "#cbd5e1" }} />}
               <div style={{ display: "grid", justifyItems: "center", gap: 4, minWidth: 72 }}>
                 <div style={{ height: 20, fontSize: 16 }}>{cur ? "📦" : ""}</div>
-                <div style={{ padding: "8px 10px", borderRadius: 10, background: cur ? "#eef2ff" : passed ? "#f1f5f9" : "#fff", border: `2px solid ${cur ? "#6366f1" : passed ? "#c7d2fe" : "#e2e8f0"}`, fontSize: 11, fontWeight: 700, color: "#334155", textAlign: "center", whiteSpace: "nowrap" }}>
+                <div onClick={clickable ? (e: any) => { e.stopPropagation(); onNext(); } : undefined}
+                  style={{ padding: "8px 10px", borderRadius: 10, background: cur ? "#eef2ff" : passed ? "#f1f5f9" : "#fff", border: `2px solid ${cur ? "#6366f1" : passed ? "#c7d2fe" : "#e2e8f0"}`, fontSize: 11, fontWeight: 700, color: "#334155", textAlign: "center", whiteSpace: "nowrap", cursor: clickable ? "pointer" : "default" }}>
                   <div>{icon}</div>
                   <div>{label}</div>
                 </div>
@@ -86,6 +113,17 @@ function SwitchingRender({ scene, config, t }: any) {
           );
         })}
       </div>
+      <StepPanel t={t} title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("节点", "Node")), `${pos}/${hops + 1}`],
+          [t(T("阶段", "Phase")), zh ? phaseZh : phaseEn],
+          [t(T("包长 L", "L")), `${lenBits} bit`],
+          [t(T("速率 R", "R")), `${rateMbps} Mbps`],
+          [t(T("每跳 ttrans", "ttrans")), `${dtrans.toFixed(3)} ms`],
+          [t(T("累计", "Cumulative")), `${(hops * dtrans).toFixed(3)} ms`],
+        ]}
+        onNext={onNext} showNext={canNext}
+        nextLabel={t(pos === 0 ? T("发送分组", "Send packet") : T("转发到下一跳", "Forward to next hop"))} />
       <Note tone={phase === "queue" ? "warn" : "info"}>
         {zh
           ? `包位于第 ${pos} / ${hops + 1} 个节点（${pos === 0 ? "源" : pos === hops + 1 ? "目的" : "交换机"}）。存储转发每跳 $t_{trans}=L/R=${dtrans.toFixed(3)}$ ms，共约 $${(hops * dtrans).toFixed(3)}$ ms 传输时延（不含传播/排队）。`
@@ -175,10 +213,16 @@ function PerfRow({ show, label, formula, value, color }: { show: boolean; label:
   );
 }
 
-function PerfRender({ scene, config, t }: any) {
+function PerfRender({ scene, config, t, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? perfScene(config ?? PERF_DEFAULT, 5)) as PerfScene;
   const v = s.visible ?? 0;
+  const canNext = !!onNext && v < 5;
+  const nextLabel = v === 0 ? T("计算传输时延", "Transmission delay")
+    : v === 1 ? T("计算传播时延", "Propagation delay")
+    : v === 2 ? T("计算单跳时延", "Nodal delay")
+    : v === 3 ? T("计算端到端时延", "End-to-end delay")
+    : T("计算时延带宽积", "Delay x bandwidth");
   const given: [string, string][] = [
     [zh ? "分组 L" : "L", `${s.len} bit`],
     [zh ? "速率 R" : "R", `${s.rateMbps} Mbps`],
@@ -194,6 +238,15 @@ function PerfRender({ scene, config, t }: any) {
           </span>
         ))}
       </div>
+      <StepPanel t={t} title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("进度", "Step")), `${v}/5`],
+          [t(T("传输 dtrans", "dtrans")), `${s.dtrans.toFixed(3)} ms`],
+          [t(T("传播 dprop", "dprop")), `${s.dprop.toFixed(3)} ms`],
+          [t(T("端到端", "e2e")), `${s.e2e.toFixed(3)} ms`],
+          [t(T("时延带宽积", "DBP")), `${s.bdp.toFixed(0)} bit`],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(nextLabel)} />
       <div style={{ display: "grid", gap: 6 }}>
         <PerfRow show={v >= 1} label={zh ? "传输时延" : "Transmission"} formula={`$d_{trans}=\\dfrac{L}{R}=\\dfrac{${s.len}}{${s.R}}=${s.dtrans.toFixed(3)}\\ \\text{ms}$`} value={`${s.dtrans.toFixed(3)} ms`} color="#dbeafe" />
         <PerfRow show={v >= 2} label={zh ? "传播时延" : "Propagation"} formula={`$d_{prop}=\\dfrac{d}{s}=\\dfrac{${s.distKm}\\times10^{3}}{2.5\\times10^{8}}=${s.dprop.toFixed(3)}\\ \\text{ms}$`} value={`${s.dprop.toFixed(3)} ms`} color="#fce7f3" />

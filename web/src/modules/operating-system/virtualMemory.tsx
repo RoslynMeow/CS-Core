@@ -1,4 +1,4 @@
-import { T } from "../../i18n/lang";
+import { T, type Text } from "../../i18n/lang";
 import { MathText } from "../../lib/tex";
 import type { Frame } from "../../engine/types";
 import { Panel, Table, Note, NumField, TextField, Row, isZh, makeChapter, type SubDef } from "../common/chapter";
@@ -10,6 +10,27 @@ import { Panel, Table, Note, NumField, TextField, Row, isZh, makeChapter, type S
 // =====================================================================
 
 type SubMode = "demand-paging" | "page-replacement";
+
+// 用户驱动的「状态 / 数值」面板：展示当前步的关键取值，并提供推进按钮
+function StatusPanel({ t, rows, onNext, nextLabel, showNext }: {
+  t: (x: Text) => string;
+  rows: [string, string][];
+  onNext?: () => void;
+  nextLabel: string;
+  showNext: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", borderRadius: 10, background: "#0f172a", color: "#e2e8f0", fontSize: 12 }}>
+      <span style={{ fontWeight: 800, color: "#a5b4fc" }}>{t(T("状态 / 数值", "Status / Values"))}</span>
+      {rows.map(([k, v]) => (
+        <span key={k} style={{ fontFamily: "ui-monospace, monospace", whiteSpace: "nowrap" }}>{k} = <b style={{ color: "#fde047" }}>{v}</b></span>
+      ))}
+      {showNext && onNext && (
+        <button className="primary" style={{ marginLeft: "auto" }} onClick={(e) => { e.stopPropagation(); onNext(); }}>{nextLabel}</button>
+      )}
+    </div>
+  );
+}
 
 // ------------------------------ 按需分页 ------------------------------
 
@@ -57,9 +78,10 @@ function demandPagingGenerate(_config: any): Frame<DpScene>[] {
   ];
 }
 
-function DemandPagingRender({ scene, t }: any) {
+function DemandPagingRender({ scene, t, step: frameStep, count, playing, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? { step: 0, victim: null, pageTable: [] }) as DpScene;
+  const canNext = !!onNext && !playing && (typeof frameStep !== "number" || typeof count !== "number" || frameStep < count - 1);
   const stepDefs: [string, string][] = zh
     ? [
       ["① CPU 引用页", "指令访问逻辑地址，交给 MMU 翻译。"],
@@ -93,6 +115,12 @@ function DemandPagingRender({ scene, t }: any) {
   });
   return (
     <Panel>
+      <div style={{ textAlign: "center" }}>
+        <div onClick={canNext ? (e: any) => { e.stopPropagation(); onNext(); } : undefined}
+          style={{ display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 18px", borderRadius: 999, background: canNext ? "#4338ca" : "#e2e8f0", color: canNext ? "#fff" : "#64748b", fontWeight: 800, fontSize: 13, cursor: canNext ? "pointer" : "default" }}>
+          {zh ? "CPU 引用页" : "CPU references page"} p = {DP_REF}
+        </div>
+      </div>
       <div style={{ textAlign: "center", fontSize: 14 }}>
         <MathText text={zh ? "$\\text{页号 } p \\;\\|\\; \\text{偏移 } d \\;\\to\\; \\text{帧号 } f \\;\\|\\; d$" : "$p \\;\\|\\; d \\;\\to\\; f \\;\\|\\; d$"} />
       </div>
@@ -134,6 +162,14 @@ function DemandPagingRender({ scene, t }: any) {
           <Table head={zh ? ["页号", "帧号", "有效位", "脏位"] : ["vpn", "frame", "valid", "dirty"]} rows={ptRows} />
         </div>
       </div>
+      <StatusPanel t={t}
+        rows={[
+          [zh ? "步骤" : "step", `${s.step + 1}/7`],
+          [zh ? "引用页" : "page", `${DP_REF}`],
+          [zh ? "牺牲页" : "victim", s.victim === null ? "-" : `${s.victim}`],
+          [zh ? "驻留页" : "resident", `${s.pageTable.filter((p) => p.valid).length}/${s.pageTable.length}`],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(T("下一步", "Next step"))} />
       <div style={{ textAlign: "center", fontSize: 15 }}>
         <MathText text="$EAT = (1-p)\\,t_{mem} + p\\,t_{fault}$" />
       </div>
@@ -274,13 +310,14 @@ function ReplacementControls({ config, onChange, t }: any) {
   );
 }
 
-function ReplacementRender({ scene, t }: any) {
+function ReplacementRender({ scene, t, step: frameStep, count, playing, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as PrScene;
   const ref = Array.isArray(s.ref) ? s.ref : [];
   const slots = Array.isArray(s.frames) ? s.frames : [];
   const F = Math.max(1, slots.length);
   const algo = s.algo ?? "FIFO";
+  const canNext = !!onNext && !playing && (typeof frameStep !== "number" || typeof count !== "number" || frameStep < count - 1);
   const results: { name: string; res: SimResult; tone: string }[] = [
     { name: "FIFO", res: fifo(ref, F), tone: "#7c3aed" },
     { name: "LRU", res: lru(ref, F), tone: "#2563eb" },
@@ -296,6 +333,8 @@ function ReplacementRender({ scene, t }: any) {
   ]);
   const cur = results.find((r) => r.name === algo);
   const curRes: SimResult = { faults: s.faults ?? 0, steps: cur ? cur.res.steps.slice(0, s.i + 1) : [] };
+  const lastStep = curRes.steps[curRes.steps.length - 1];
+  const victim = lastStep ? lastStep.evicted : null;
   return (
     <Panel>
       <Row>
@@ -317,7 +356,8 @@ function ReplacementRender({ scene, t }: any) {
             );
           })}
       </div>
-      <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+      <div onClick={canNext ? (e: any) => { e.stopPropagation(); onNext(); } : undefined}
+        style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", cursor: canNext ? "pointer" : "default", outline: canNext ? "2px solid #a5b4fc" : "none", outlineOffset: 4, borderRadius: 10 }}>
         {slots.map((v, f) => (
           <div key={f} style={{ minWidth: 60, padding: "8px 10px", borderRadius: 10, textAlign: "center", background: "#f8fafc", border: "2px solid #e2e8f0", fontFamily: "ui-monospace, monospace" }}>
             <div style={{ fontSize: 11, color: "#64748b" }}>F{f + 1}</div>
@@ -325,6 +365,16 @@ function ReplacementRender({ scene, t }: any) {
           </div>
         ))}
       </div>
+      <StatusPanel t={t}
+        rows={[
+          [zh ? "算法" : "algo", algo],
+          [zh ? "进度" : "step", `${ref.length ? s.i + 1 : 0}/${ref.length}`],
+          [zh ? "当前页" : "page", ref.length ? `${ref[s.i]}` : "-"],
+          [zh ? "结果" : "result", s.fault ? (zh ? "缺页" : "fault") : (zh ? "命中" : "hit")],
+          [zh ? "缺页累计" : "faults", `${s.faults}`],
+          [zh ? "牺牲页" : "victim", victim === null || victim === undefined ? "-" : `${victim}`],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(T("访问下一页", "Next reference"))} />
       <div style={{ textAlign: "center", fontSize: 14 }}>
         <MathText text={zh ? "$p = \\frac{F}{N}$（缺页率 = 缺页次数 / 访问次数）" : "$p = \\frac{F}{N}$"} />
       </div>

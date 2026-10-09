@@ -21,26 +21,62 @@ function field(zh: string, en: string, size: number, value: string, descZh: stri
   return { zh, en, size, value, descZh, descEn, color };
 }
 
-function BarsRender({ scene, t }: any) {
+// 用户驱动的「状态 / 数值」面板：展示当前步的关键取值，并提供推进按钮
+function StepPanel({ t, title, rows, onNext, nextLabel, showNext }: {
+  t: (x: Text) => string;
+  title: string;
+  rows: [string, string][];
+  onNext?: () => void;
+  nextLabel: string;
+  showNext: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", borderRadius: 10, background: "#0f172a", color: "#e2e8f0", fontSize: 12 }}>
+      <span style={{ fontWeight: 800, color: "#a5b4fc" }}>{title}</span>
+      {rows.map(([k, v]) => (
+        <span key={k} style={{ fontFamily: "ui-monospace, monospace", whiteSpace: "nowrap" }}>{k} = <b style={{ color: "#fde047" }}>{v}</b></span>
+      ))}
+      {showNext && onNext && (
+        <button className="primary" style={{ marginLeft: "auto" }} onClick={(e) => { e.stopPropagation(); onNext(); }}>{nextLabel}</button>
+      )}
+    </div>
+  );
+}
+
+function BarsRender({ scene, t, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as HeaderScene;
   const fields = s.fields ?? [];
   const total = fields.reduce((n, f) => n + f.size, 0) || 1;
-  const cur = fields[s.active];
+  const ai = s.active ?? 0;
+  const cur = fields[ai];
+  const cum = fields.slice(0, ai + 1).reduce((n, f) => n + f.size, 0);
+  const canNext = !!onNext && ai < fields.length - 1;
   return (
     <Panel>
       <div style={{ textAlign: "center", fontSize: 13, color: "#64748b" }}>{t(s.title)}</div>
       <div style={{ display: "flex", width: "100%", border: "1px solid #cbd5e1", borderRadius: 8, overflow: "hidden", minHeight: 56 }}>
         {fields.map((f, i) => {
-          const active = i === s.active;
+          const active = i === ai;
+          const clickable = active && canNext;
           return (
-            <div key={i} style={{ flexGrow: f.size, flexBasis: 0, minWidth: f.size > 2 ? 48 : 34, padding: "6px 4px", background: active ? f.color : "#f8fafc", borderRight: "1px solid #e2e8f0", textAlign: "center", outline: active ? "2px solid #4338ca" : "none", outlineOffset: -2, transition: "background .2s" }}>
+            <div key={i}
+              onClick={clickable ? (e: any) => { e.stopPropagation(); onNext(); } : undefined}
+              style={{ flexGrow: f.size, flexBasis: 0, minWidth: f.size > 2 ? 48 : 34, padding: "6px 4px", background: active ? f.color : "#f8fafc", borderRight: "1px solid #e2e8f0", textAlign: "center", outline: active ? "2px solid #4338ca" : "none", outlineOffset: -2, transition: "background .2s", cursor: clickable ? "pointer" : "default" }}>
               <div style={{ fontSize: 11, fontWeight: 800, color: active ? "#1e293b" : "#475569", lineHeight: 1.15 }}>{zh ? f.zh : f.en}</div>
               <div style={{ fontSize: 10, color: "#94a3b8", fontFamily: "ui-monospace, monospace" }}>{f.size} B</div>
             </div>
           );
         })}
       </div>
+      <StepPanel t={t} title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("字段", "Field")), `${ai + 1}/${fields.length}`],
+          [t(T("当前", "Current")), cur ? (zh ? cur.zh : cur.en) : "-"],
+          [t(T("本字段", "Size")), `${cur?.size ?? 0} B`],
+          [t(T("已解析", "Parsed")), `${cum}/${total} B`],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(T("下一个字段", "Next field"))} />
       {cur && (
         <div style={{ padding: "10px 14px", borderRadius: 10, background: "#eef2ff", border: "1px solid #c7d2fe", display: "grid", gap: 4 }}>
           <div style={{ fontWeight: 800, color: "#3730a3", fontSize: 13 }}>
@@ -67,22 +103,36 @@ const STACK_LAYERS: Layer[] = [
   { zh: "物理层：比特流", en: "Physical: bit stream", note: "0101… 上介质传输", color: "#ede9fe" },
 ];
 
-function StackRender({ scene, t }: any) {
+function StackRender({ scene, t, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? { visible: 1, layers: STACK_LAYERS }) as StackScene;
+  const layers = s.layers ?? STACK_LAYERS;
+  const visible = s.visible ?? 1;
+  const canNext = !!onNext && visible < layers.length;
+  const cur = layers[Math.max(0, Math.min(visible, layers.length) - 1)];
   return (
     <Panel>
       <div style={{ display: "grid", gap: 6 }}>
-        {(s.layers ?? STACK_LAYERS).map((l, i) => {
-          const on = i < s.visible;
+        {layers.map((l, i) => {
+          const on = i < visible;
+          const clickable = i === visible - 1 && canNext;
           return (
-            <div key={i} style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 14px", borderRadius: 10, background: on ? l.color : "#f8fafc", border: `1px solid ${i === s.visible - 1 ? "#4338ca" : "#e2e8f0"}`, opacity: on ? 1 : 0.4, marginLeft: i * 18 }}>
+            <div key={i}
+              onClick={clickable ? (e: any) => { e.stopPropagation(); onNext(); } : undefined}
+              style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 14px", borderRadius: 10, background: on ? l.color : "#f8fafc", border: `1px solid ${i === visible - 1 ? "#4338ca" : "#e2e8f0"}`, opacity: on ? 1 : 0.4, marginLeft: i * 18, cursor: clickable ? "pointer" : "default" }}>
               <span style={{ fontWeight: 800, fontSize: 13, color: "#1e293b" }}>{zh ? l.zh : l.en}</span>
               <span style={{ fontSize: 12, color: "#64748b", fontFamily: "ui-monospace, monospace" }}>{l.note}</span>
             </div>
           );
         })}
       </div>
+      <StepPanel t={t} title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("当前层", "Layer")), `${visible}/${layers.length}`],
+          [t(T("名称", "Name")), cur ? (zh ? cur.zh : cur.en) : "-"],
+          [t(T("动作", "Action")), zh ? "逐层加/剥首部" : "add/strip headers"],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(T("下一层", "Next layer"))} />
       <Note>{zh ? "发送方逐层加首部（封装）；接收方逐层剥去首部（解封装），每层只看自己那一层。" : "Sender adds headers layer by layer (encapsulation); receiver strips them (decapsulation), each layer reading only its own."}</Note>
     </Panel>
   );
@@ -176,14 +226,17 @@ const HEX_FIELDS: HexField[] = [
   hf("载荷", "Payload", ["47", "45", "54", "20", "2F", "20", "48", "54", "54", "50"], "#fce7f3", "“GET / HTTP” 的 ASCII 码。", "ASCII of \"GET / HTTP\"."),
 ];
 
-function HexRender({ scene, t }: any) {
+function HexRender({ scene, t, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? { fields: HEX_FIELDS, active: 0 }) as HexScene;
   const fields = s.fields ?? HEX_FIELDS;
+  const ai = s.active ?? 0;
   // 打平为字节序列，记录每字节归属字段
   const flat: { b: string; f: number }[] = [];
   fields.forEach((f, fi) => f.bytes.forEach((b) => flat.push({ b, f: fi })));
-  const cur = fields[s.active];
+  const cur = fields[ai];
+  const offset = fields.slice(0, ai).reduce((n, f) => n + f.bytes.length, 0);
+  const canNext = !!onNext && ai < fields.length - 1;
   const rows: { off: number; items: { b: string; f: number }[] }[] = [];
   for (let i = 0; i < flat.length; i += 16) rows.push({ off: i, items: flat.slice(i, i + 16) });
   return (
@@ -195,15 +248,23 @@ function HexRender({ scene, t }: any) {
             <span style={{ color: "#64748b" }}>{r.off.toString(16).padStart(4, "0")}</span>
             <span style={{ display: "flex", gap: 3 }}>
               {r.items.map((it, k) => {
-                const active = it.f === s.active;
+                const active = it.f === ai;
                 return (
-                  <span key={k} style={{ padding: "0 3px", borderRadius: 3, background: active ? "#fde047" : fields[it.f]?.color, color: "#0f172a", fontWeight: active ? 900 : 600, outline: active ? "1px solid #fff" : "none" }}>{it.b}</span>
+                  <span key={k} onClick={active && canNext ? (e: any) => { e.stopPropagation(); onNext(); } : undefined} style={{ padding: "0 3px", borderRadius: 3, background: active ? "#fde047" : fields[it.f]?.color, color: "#0f172a", fontWeight: active ? 900 : 600, outline: active ? "1px solid #fff" : "none", cursor: active && canNext ? "pointer" : "default" }}>{it.b}</span>
                 );
               })}
             </span>
           </div>
         ))}
       </div>
+      <StepPanel t={t} title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("字段", "Field")), `${ai + 1}/${fields.length}`],
+          [t(T("当前", "Current")), cur ? (zh ? cur.zh : cur.en) : "-"],
+          [t(T("偏移", "Offset")), `0x${offset.toString(16)}`],
+          [t(T("本字段", "Size")), `${cur?.bytes.length ?? 0} B`],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(T("下一个字段", "Next field"))} />
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
         {fields.map((f, i) => (
           <span key={i} style={{ fontSize: 11, padding: "2px 8px", borderRadius: 999, background: i === s.active ? "#4338ca" : f.color, color: i === s.active ? "#fff" : "#334155" }}>{zh ? f.zh : f.en}</span>

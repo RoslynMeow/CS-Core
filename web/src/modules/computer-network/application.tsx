@@ -41,6 +41,36 @@ function MsgLine({ label, body, tint }: { label: string; body: string; tint: str
   );
 }
 
+// 状态/数值面板：逐帧展示 scene 中的当前值
+function StatPanel({ title, rows }: { title: string; rows: [string, string][] }) {
+  return (
+    <div style={{ padding: "8px 12px", borderRadius: 10, background: "#0f172a", border: "1px solid #1e293b", fontFamily: "ui-monospace, monospace", fontSize: 12, display: "grid", gap: 4 }}>
+      <div style={{ fontWeight: 800, color: "#93c5fd" }}>{title}</div>
+      {rows.map(([k, v], i) => (
+        <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+          <span style={{ color: "#94a3b8" }}>{k}</span>
+          <span style={{ color: "#f1f5f9", fontWeight: 700 }}>{v}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// 画布内对象点击推进：驱动 onNext（非 <button> 必须 stopPropagation，避免与画布点击重复推进）
+function advanceHandler(onNext?: () => void, onReset?: () => void, playing?: boolean, atEnd?: boolean) {
+  return (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (playing) return;
+    if (atEnd) onReset?.();
+    else onNext?.();
+  };
+}
+
+// 触发提示：告诉用户点哪个对象推进
+function TriggerHint({ text, ready }: { text: string; ready: boolean }) {
+  return <div style={{ textAlign: "center", fontSize: 11, fontWeight: 700, color: ready ? "#4338ca" : "#059669" }}>{text}</div>;
+}
+
 // ---------------------------------------------------------------------
 // arch — 应用体系结构：C/S 上传瓶颈 vs P2P 对等分发（逐帧动画）
 //   C/S 只有服务器上传 → D=NF/u_s 随 N 线性增长；
@@ -97,7 +127,7 @@ const ARCH_CODE = [
   T("对等点越多 → 分发时延越短", "more peers → shorter distribution time"),
 ];
 
-function ArchRender({ scene, t }: any) {
+function ArchRender({ scene, t, onNext, reset, playing, step, count }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as Partial<ArchScene>;
   const mode: ArchMode = s.mode === "cs" ? "cs" : "p2p";
@@ -108,6 +138,10 @@ function ArchRender({ scene, t }: any) {
   const p2pT = archP2pTime(peers);
   const scale = Math.max(csT, p2pT, 1);
   const idx = Array.from({ length: peers }, (_, i) => i);
+  const total = count ?? 1;
+  const atEnd = typeof step === "number" && step >= total - 1;
+  const canClick = !playing && total > 1;
+  const join = advanceHandler(onNext, reset, playing, atEnd);
 
   const bar = (label: string, val: number, color: string, current: boolean) => (
     <div style={{ display: "grid", gridTemplateColumns: "110px 1fr 70px", alignItems: "center", gap: 8 }}>
@@ -128,6 +162,17 @@ function ArchRender({ scene, t }: any) {
         <span style={{ fontSize: 13, color: "#334155" }}>{zh ? `对等点 N = ${peers}` : `peers N = ${peers}`}</span>
         <span style={{ fontSize: 13, color: "#475569" }}>{zh ? `分发时延 D = ${time.toFixed(1)}` : `distribution D = ${time.toFixed(1)}`}</span>
       </div>
+      <StatPanel
+        title={t(T("状态 / 数值", "State / values"))}
+        rows={[
+          [t(T("模式", "Mode")), mode === "cs" ? t(T("客户机/服务器", "Client/Server")) : "P2P"],
+          [t(T("在线对等点", "Peers online")), String(peers)],
+          [t(T("聚合上传速率", "Aggregate upload")), (ARCH_US + peers * ARCH_U).toFixed(0)],
+          [t(T("当前分发时延", "Current distribution")), time.toFixed(1)],
+          [t(T("C/S 串行时延", "C/S serial time")), csT.toFixed(1)],
+          [t(T("P2P 并行时延", "P2P parallel time")), p2pT.toFixed(1)],
+        ]}
+      />
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, flexWrap: "wrap", padding: "8px 4px" }}>
         <div style={{ padding: "10px 14px", borderRadius: 12, background: "#eef2ff", border: "2px solid #6366f1", fontSize: 12, fontWeight: 800, color: "#3730a3", textAlign: "center" }}>
           {zh ? "服务器" : "server"}
@@ -136,7 +181,8 @@ function ArchRender({ scene, t }: any) {
         <span style={{ color: "#94a3b8" }}>↦</span>
         {idx.map((i) => (
           <div key={i} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <div style={{ padding: "8px 10px", borderRadius: 10, background: mode === "p2p" ? "#ecfdf5" : "#f8fafc", border: `1px solid ${mode === "p2p" ? "#6ee7b7" : "#e2e8f0"}`, fontSize: 11, fontWeight: 700, color: "#334155", textAlign: "center" }}>
+            <div onClick={canClick ? join : undefined} title={canClick ? t(T("点击让对等点加入 P2P", "click to let this peer join the P2P swarm")) : undefined}
+              style={{ padding: "8px 10px", borderRadius: 10, background: mode === "p2p" ? "#ecfdf5" : "#f8fafc", border: `1px solid ${mode === "p2p" ? "#6ee7b7" : "#e2e8f0"}`, fontSize: 11, fontWeight: 700, color: "#334155", textAlign: "center", cursor: canClick ? "pointer" : "default", outline: mode === "p2p" && i === peers - 1 ? "2px solid #10b981" : "none", outlineOffset: -2 }}>
               {zh ? `对等点 ${i + 1}` : `peer ${i + 1}`}
               <div style={{ fontSize: 9, fontWeight: 600, color: "#64748b" }}>{mode === "p2p" ? (zh ? "上传+下载" : "up+down") : (zh ? "仅下载" : "down only")}</div>
             </div>
@@ -144,6 +190,14 @@ function ArchRender({ scene, t }: any) {
           </div>
         ))}
       </div>
+      {canClick && (
+        <TriggerHint
+          ready={!atEnd}
+          text={atEnd
+            ? t(T("已完成，点击对等点可重播", "Done; click a peer to replay"))
+            : t(T("点击任一「对等点」加入 P2P 群，逐步增加上传者", "click any peer to join the P2P swarm"))}
+        />
+      )}
       <div style={{ display: "grid", gap: 6, padding: "6px 8px" }}>
         {bar(zh ? "C/S 串行" : "C/S serial", csT, "#f87171", mode === "cs")}
         {bar(zh ? "P2P 并行" : "P2P parallel", p2pT, "#34d399", mode === "p2p")}
@@ -223,7 +277,7 @@ const HTTP_CODE = [
   T("每个对象再付 $RTT + L/R$", "each object costs $RTT + L/R$"),
 ];
 
-function HttpRender({ scene, config, t }: any) {
+function HttpRender({ scene, config, t, onNext, reset, playing, step: frameStep, count }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as Partial<HttpScene>;
   const n = s.n ?? (Number(config?.n) || 1);
@@ -236,6 +290,12 @@ function HttpRender({ scene, config, t }: any) {
   const step = s.step ?? 0;
   const objectsFetched = s.objectsFetched ?? 0;
   const elapsed = s.elapsedMs ?? 0;
+  const frameCount = count ?? 1;
+  const atEnd = typeof frameStep === "number" && frameStep >= frameCount - 1;
+  const canClick = !playing && frameCount > 1;
+  const send = advanceHandler(onNext, reset, playing, atEnd);
+  const clientHot = s.phase !== "process";
+  const serverHot = s.phase === "process";
 
   const phases: [string, string][] = zh
     ? [
@@ -286,6 +346,18 @@ function HttpRender({ scene, config, t }: any) {
 
   return (
     <Panel>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
+        <div onClick={canClick ? send : undefined} title={canClick ? t(T("点击客户机发送请求", "click the client to send the request")) : undefined}
+          style={{ padding: "8px 14px", borderRadius: 12, background: clientHot ? "#eef2ff" : "#f8fafc", border: `2px solid ${clientHot ? "#6366f1" : "#e2e8f0"}`, fontSize: 12, fontWeight: 800, color: "#3730a3", textAlign: "center", cursor: canClick ? "pointer" : "default" }}>
+          {t(T("客户机", "client"))}
+          <div style={{ fontSize: 10, fontWeight: 600, color: "#64748b" }}>{t(T("点击发送请求", "click to send request"))}</div>
+        </div>
+        <div style={{ width: 72, height: 2, background: "#cbd5e1" }} />
+        <div style={{ padding: "8px 14px", borderRadius: 12, background: serverHot ? "#ecfdf5" : "#f8fafc", border: `2px solid ${serverHot ? "#059669" : "#e2e8f0"}`, fontSize: 12, fontWeight: 800, color: "#047857", textAlign: "center" }}>
+          {t(T("服务器", "server"))}
+          <div style={{ fontSize: 10, fontWeight: 600, color: "#64748b" }}>{t(T("处理并响应", "process & respond"))}</div>
+        </div>
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
         {phases.map(([a, b], i) => {
           const cur = i === step;
@@ -298,6 +370,24 @@ function HttpRender({ scene, config, t }: any) {
           );
         })}
       </div>
+      <StatPanel
+        title={t(T("状态 / 数值", "State / values"))}
+        rows={[
+          [t(T("当前阶段", "Phase")), phases[Math.min(step, phases.length - 1)]?.[0] ?? "-"],
+          [t(T("已取回对象", "Objects fetched")), `${objectsFetched}/${n}`],
+          [t(T("累计时延", "Elapsed")), `${elapsed.toFixed(1)} ms`],
+          [t(T("总时延", "Total")), `${total.toFixed(1)} ms`],
+          [t(T("RTT", "RTT")), `${rtt} ms`],
+        ]}
+      />
+      {canClick && (
+        <TriggerHint
+          ready={!atEnd}
+          text={atEnd
+            ? t(T("已完成，点击客户机可重播", "Done; click the client to replay"))
+            : t(T("点击「客户机」发送 HTTP 请求", "click the client to send the HTTP request"))}
+        />
+      )}
       {s.phase === "fetch" && (
         <Note>
           {zh
@@ -384,11 +474,15 @@ const DNS_CODE = [
   T("本地 DNS 缓存（TTL）后回主机", "local DNS caches (TTL) then replies"),
 ];
 
-function DnsRender({ scene, t }: any) {
+function DnsRender({ scene, t, onNext, reset, playing, step, count }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as Partial<DnsScene>;
   const mode: DnsMode = s.mode === "iterative" ? "iterative" : "recursive";
   const path = s.path ?? ["host", "local"];
+  const frameCount = count ?? 1;
+  const atEnd = typeof step === "number" && step >= frameCount - 1;
+  const canClick = !playing && frameCount > 1;
+  const resolve = advanceHandler(onNext, reset, playing, atEnd);
   const labels: Record<string, string> = zh
     ? { host: "主机", local: "本地 DNS", root: "根服务器", tld: "TLD 服务器", auth: "权威服务器" }
     : { host: "host", local: "local DNS", root: "root", tld: "TLD", auth: "authoritative" };
@@ -442,13 +536,31 @@ function DnsRender({ scene, t }: any) {
           return (
             <div key={id} style={{ display: "flex", alignItems: "center" }}>
               {i > 0 && <div style={{ width: 26, height: 3, background: active ? "#6366f1" : "#cbd5e1" }} />}
-              <div style={{ padding: "7px 10px", borderRadius: 10, background: cur ? "#eef2ff" : active ? "#f1f5f9" : "#fff", border: `2px solid ${cur ? "#6366f1" : active ? "#c7d2fe" : "#e2e8f0"}`, fontSize: 11, fontWeight: 700, color: "#334155", whiteSpace: "nowrap" }}>
+              <div onClick={canClick && id === "local" ? resolve : undefined} title={canClick && id === "local" ? t(T("点击本地 DNS 开始解析", "click the local DNS to start resolution")) : undefined}
+                style={{ padding: "7px 10px", borderRadius: 10, background: cur ? "#eef2ff" : active ? "#f1f5f9" : "#fff", border: `2px solid ${cur ? "#6366f1" : active ? "#c7d2fe" : "#e2e8f0"}`, fontSize: 11, fontWeight: 700, color: "#334155", whiteSpace: "nowrap", cursor: canClick && id === "local" ? "pointer" : "default", outline: canClick && id === "local" ? "2px dashed #4338ca" : "none", outlineOffset: 2 }}>
                 {labels[id]}
               </div>
             </div>
           );
         })}
       </div>
+      <StatPanel
+        title={t(T("状态 / 数值", "State / values"))}
+        rows={[
+          [t(T("查询方式", "Mode")), mode === "recursive" ? t(T("递归", "Recursive")) : t(T("迭代", "Iterative"))],
+          [t(T("当前步", "Step")), `${step ?? s.step ?? 0} / ${Math.max(0, frameCount - 1)}`],
+          [t(T("当前跳", "Current hop")), labels[path[path.length - 1]] ?? "-"],
+          [t(T("路径", "Path")), path.map((p) => labels[p] ?? p).join(" / ")],
+        ]}
+      />
+      {canClick && (
+        <TriggerHint
+          ready={!atEnd}
+          text={atEnd
+            ? t(T("已完成，点击本地 DNS 可重播", "Done; click the local DNS to replay"))
+            : t(T("点击「本地 DNS」开始解析", "click the local DNS to start resolution"))}
+        />
+      )}
       <Note tone={mode === "recursive" ? "info" : "warn"}>
         {zh
           ? `${mode === "recursive" ? "递归查询" : "迭代查询"}：当前走位 ${path.map((p) => labels[p] ?? p).join(" → ")}。`
@@ -533,10 +645,26 @@ function FlowHL({ title, items, accent, active }: { title: string; items: [strin
   );
 }
 
-function SocketRender({ scene, t }: any) {
+function SocketRender({ scene, t, onNext, reset, playing, step, count }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as Partial<SockScene>;
   const curCall = s.call ?? "";
+  const frameCount = count ?? 1;
+  const atEnd = typeof step === "number" && step >= frameCount - 1;
+  const canClick = !playing && frameCount > 1;
+  const accept = advanceHandler(onNext, reset, playing, atEnd);
+  const curIdx = step ?? s.step ?? 0;
+  const sockState = curIdx <= 1
+    ? t(T("CLOSED（刚创建）", "CLOSED (just created)"))
+    : curIdx === 2
+      ? t(T("LISTEN（监听中）", "LISTEN"))
+      : curIdx === 3
+        ? t(T("CLOSED（刚创建）", "CLOSED (just created)"))
+        : curIdx === 4
+          ? t(T("SYN_SENT（握手中）", "SYN_SENT"))
+          : curIdx <= 9
+            ? t(T("ESTABLISHED（已连接）", "ESTABLISHED"))
+            : t(T("CLOSED（已关闭）", "CLOSED (closed)"));
   const srv: [string, string][] = zh
     ? [["socket()", "socket() 创建套接字"], ["bind()", "bind() 绑定 IP:端口"], ["listen()", "listen() 进入监听"], ["accept()", "accept() 等待并接受连接"], ["recv()/send()", "recv() / send() 收发数据"], ["close()", "close() 关闭"]]
     : [["socket()", "socket() create"], ["bind()", "bind() to IP:port"], ["listen()", "listen() start listening"], ["accept()", "accept() wait & accept"], ["recv()/send()", "recv() / send() data"], ["close()", "close()"]];
@@ -566,6 +694,35 @@ function SocketRender({ scene, t }: any) {
     ];
   return (
     <Panel>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
+        <div onClick={canClick ? accept : undefined} title={canClick ? t(T("点击服务器 accept 连接", "click the server to accept a connection")) : undefined}
+          style={{ padding: "8px 14px", borderRadius: 12, background: s.who === "server" ? "#eef2ff" : "#f8fafc", border: `2px solid ${s.who === "server" ? "#6366f1" : "#e2e8f0"}`, fontSize: 12, fontWeight: 800, color: "#3730a3", textAlign: "center", cursor: canClick ? "pointer" : "default" }}>
+          {t(T("服务器", "server"))}
+          <div style={{ fontSize: 10, fontWeight: 600, color: "#64748b" }}>{t(T("点击 accept 接受连接", "click to accept a connection"))}</div>
+        </div>
+        <div style={{ width: 72, height: 2, background: "#cbd5e1" }} />
+        <div style={{ padding: "8px 14px", borderRadius: 12, background: s.who === "client" ? "#ecfeff" : "#f8fafc", border: `2px solid ${s.who === "client" ? "#0891b2" : "#e2e8f0"}`, fontSize: 12, fontWeight: 800, color: "#155e75", textAlign: "center" }}>
+          {t(T("客户机", "client"))}
+          <div style={{ fontSize: 10, fontWeight: 600, color: "#64748b" }}>{t(T("connect 发起握手", "connect starts the handshake"))}</div>
+        </div>
+      </div>
+      <StatPanel
+        title={t(T("状态 / 数值", "State / values"))}
+        rows={[
+          [t(T("当前调用", "Current call")), curCall || "-"],
+          [t(T("执行方", "Side")), s.who === "client" ? t(T("客户机", "client")) : t(T("服务器", "server"))],
+          [t(T("套接字状态", "Socket state")), sockState],
+          [t(T("进度", "Progress")), `${curIdx + 1} / ${frameCount}`],
+        ]}
+      />
+      {canClick && (
+        <TriggerHint
+          ready={!atEnd}
+          text={atEnd
+            ? t(T("已完成，点击服务器可重播", "Done; click the server to replay"))
+            : t(T("点击「服务器」accept 接受连接", "click the server to accept a connection"))}
+        />
+      )}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
         <FlowHL title={zh ? "TCP 服务器" : "TCP server"} items={srv} accent="#4f46e5" active={s.who === "server" ? active : -1} />
         <FlowHL title={zh ? "TCP 客户机" : "TCP client"} items={cli} accent="#0891b2" active={s.who === "client" ? active : -1} />

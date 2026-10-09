@@ -27,6 +27,36 @@ function Code({ children, title }: { children: string; title?: string }) {
   );
 }
 
+// 用户驱动的触发器：点击画布对象推进到下一帧（onNext）；末帧点击可重播（reset）
+function advanceHandler(onNext?: () => void, onReset?: () => void, playing?: boolean, atEnd?: boolean) {
+  return (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (playing) return;
+    if (atEnd) onReset?.();
+    else onNext?.();
+  };
+}
+
+// 触发提示：告诉用户点哪个对象推进
+function TriggerHint({ text, ready }: { text: string; ready: boolean }) {
+  return <div style={{ textAlign: "center", fontSize: 11, fontWeight: 700, color: ready ? "#4338ca" : "#059669" }}>{text}</div>;
+}
+
+// 状态/数值面板：逐帧展示 scene 中的当前取值
+function StatPanel({ title, rows }: { title: string; rows: [string, string][] }) {
+  return (
+    <div style={{ padding: "8px 12px", borderRadius: 10, background: "#0f172a", border: "1px solid #1e293b", fontFamily: "ui-monospace, monospace", fontSize: 12, display: "grid", gap: 4 }}>
+      <div style={{ fontWeight: 800, color: "#93c5fd" }}>{title}</div>
+      {rows.map(([k, v], i) => (
+        <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: 16 }}>
+          <span style={{ color: "#94a3b8" }}>{k}</span>
+          <span style={{ color: "#f1f5f9", fontWeight: 700 }}>{v}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------
 // critical-section: Peterson 算法逐帧动画
 //   P0 / P1 交替请求进入临界区，展示 flag / turn 与互斥
@@ -81,12 +111,16 @@ function csGenerate(_config: any): Frame<CsScene>[] {
   return frames;
 }
 
-function CriticalSectionRender({ scene, t }: any) {
+function CriticalSectionRender({ scene, t, onNext, reset, playing, step, count }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as Partial<CsScene>;
   const flags = s.flags ?? [false, false];
   const turn = s.turn ?? 0;
   const inside = s.inside ?? null;
+  const total = count ?? 1;
+  const atEnd = typeof step === "number" && step >= total - 1;
+  const canClick = !!onNext && !playing && total > 1;
+  const advance = advanceHandler(onNext, reset, playing, atEnd);
   const state = (i: 0 | 1) => {
     const j = (1 - i) as 0 | 1;
     if (inside === i) return { label: zh ? "临界区内" : "in CS", bg: "#dcfce7", fg: "#166534", bd: "#6ee7b7" };
@@ -97,7 +131,9 @@ function CriticalSectionRender({ scene, t }: any) {
   const card = (i: 0 | 1) => {
     const st = state(i);
     return (
-      <div key={i} style={{ flex: 1, padding: "10px 12px", borderRadius: 12, background: st.bg, border: `2px solid ${st.bd}` }}>
+      <div key={i} onClick={canClick ? advance : undefined}
+        title={canClick ? t(T("点击该进程，逐步请求 / 进入临界区", "click this process to request / enter the CS")) : undefined}
+        style={{ flex: 1, padding: "10px 12px", borderRadius: 12, background: st.bg, border: `2px solid ${st.bd}`, cursor: canClick ? "pointer" : "default" }}>
         <div style={{ fontWeight: 800, fontSize: 15, color: "#0f172a" }}>{`P${i}`}</div>
         <div style={{ fontFamily: "ui-monospace, monospace", fontSize: 12, color: "#334155", marginTop: 4 }}>
           {`flag[${i}] = ${flags[i] ? "true" : "false"}`}
@@ -122,6 +158,18 @@ function CriticalSectionRender({ scene, t }: any) {
         </div>
         {card(1)}
       </div>
+      {canClick && (
+        <TriggerHint ready={!atEnd} text={atEnd
+          ? t(T("已完成，点击进程可重播", "Done; click a process to replay"))
+          : t(T("点击 P0 或 P1，逐步演示 Peterson 请求 / 进入 / 退出", "click P0 or P1 to step through Peterson request / enter / exit"))} />
+      )}
+      <StatPanel title={t(T("状态 / 数值", "State / values"))} rows={[
+        [t(T("步骤", "Step")), `${(s.step ?? 0) + 1}/${total}`],
+        ["flag[0]", flags[0] ? "true" : "false"],
+        ["flag[1]", flags[1] ? "true" : "false"],
+        ["turn", String(turn)],
+        [t(T("临界区", "Inside")), inside === null ? t(T("空闲", "empty")) : `P${inside}`],
+      ]} />
       <div style={{ textAlign: "center", fontSize: 14 }}>
         <MathText text="$flag[j] \wedge turn=j \Rightarrow \text{spin},\qquad |inside| \le 1$" />
       </div>
@@ -259,7 +307,7 @@ const SEM_CODE = [
   T("if full=0: 消费者阻塞（缓冲区空）", "if full=0: consumer blocks (buffer empty)"),
 ];
 
-function SemaphoreRender({ scene, config, t }: any) {
+function SemaphoreRender({ scene, config, t, onNext, reset, playing, step, count }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as Partial<SemScene>;
   const buffer = s.buffer ?? [];
@@ -269,6 +317,10 @@ function SemaphoreRender({ scene, config, t }: any) {
   const action = s.action ?? "init";
   const role = s.role ?? null;
   const blocked = !!s.blocked;
+  const total = count ?? 1;
+  const atEnd = typeof step === "number" && step >= total - 1;
+  const canClick = !!onNext && !playing && total > 1;
+  const advance = advanceHandler(onNext, reset, playing, atEnd);
   const cap = Math.max(Number(config?.cap) || 0, buffer.length + empty, buffer.length);
   const slots = Array.from({ length: cap }, (_, i) => i < buffer.length);
   const rows: React.ReactNode[][] = zh
@@ -298,6 +350,30 @@ function SemaphoreRender({ scene, config, t }: any) {
       <div style={{ textAlign: "center", fontSize: 13, fontWeight: 800, color: roleColor }}>
         {roleLabel ? `${roleLabel} · ` : ""}{t(SEM_ACTION[action] ?? T(action, action))}
       </div>
+      {canClick && (
+        <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+          <div onClick={advance} title={t(T("点击生产者，推进一步（wait/put/signal）", "click the producer to advance (wait/put/signal)"))}
+            style={{ padding: "7px 18px", borderRadius: 999, background: "#4338ca", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>
+            {zh ? "生产者" : "producer"}
+          </div>
+          <div onClick={advance} title={t(T("点击消费者，推进一步（wait/get/signal）", "click the consumer to advance (wait/get/signal)"))}
+            style={{ padding: "7px 18px", borderRadius: 999, background: "#047857", color: "#fff", fontWeight: 800, fontSize: 13, cursor: "pointer" }}>
+            {zh ? "消费者" : "consumer"}
+          </div>
+        </div>
+      )}
+      {canClick && (
+        <TriggerHint ready={!atEnd} text={atEnd
+          ? t(T("已完成，点击可重播", "Done; click to replay"))
+          : t(T("点击「生产者」或「消费者」，逐次演示 P/V 与缓冲区变化", "click producer or consumer to step through P/V and the buffer"))} />
+      )}
+      <StatPanel title={t(T("状态 / 数值", "State / values"))} rows={[
+        [t(T("已用槽", "Filled")), `${buffer.length}/${cap}`],
+        ["empty", String(empty)],
+        ["full", String(full)],
+        ["mutex", String(mutex)],
+        [t(T("状态", "State")), blocked ? t(T("阻塞", "blocked")) : t(T("运行", "running"))],
+      ]} />
       <div style={{ textAlign: "center", fontSize: 14 }}>
         <MathText text={`$empty = ${empty},\qquad full = ${full},\qquad mutex = ${mutex}$`} />
       </div>
@@ -428,7 +504,7 @@ const BNK_CODE = [
   T("否则 $\\Rightarrow$ 不安全，可能死锁", "otherwise $\\Rightarrow$ unsafe, may deadlock"),
 ];
 
-function DeadlockRender({ scene, config, t }: any) {
+function DeadlockRender({ scene, config, t, onNext, reset, playing, step, count }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as Partial<BnkScene>;
   const avail = [Number(config?.avA) || 0, Number(config?.avB) || 0, Number(config?.avC) || 0];
@@ -436,6 +512,10 @@ function DeadlockRender({ scene, config, t }: any) {
   const finish = s.finish ?? BNK_ALLOC.map(() => false);
   const sequence = s.sequence ?? [];
   const candidate = s.candidate ?? null;
+  const total = count ?? 1;
+  const atEnd = typeof step === "number" && step >= total - 1;
+  const canClick = !!onNext && !playing && total > 1;
+  const advance = advanceHandler(onNext, reset, playing, atEnd);
   const fmt = (a: number[]) => `(${a.join(",")})`;
   const condRows: React.ReactNode[][] = zh
     ? [
@@ -484,6 +564,27 @@ function DeadlockRender({ scene, config, t }: any) {
         head={zh ? ["进程", "Max", "Allocation", "Need = Max - Allocation"] : ["Process", "Max", "Allocation", "Need = Max - Allocation"]}
         rows={rows}
       />
+      {canClick && (
+        <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+          {BNK_ALLOC.map((_, i) => (
+            <div key={i} onClick={advance} title={t(T("点击该进程，试探其 Need 是否 <= Work", "click this process to try its Need against Work"))}
+              style={{ padding: "6px 14px", borderRadius: 10, background: finish[i] ? "#dcfce7" : candidate === i ? "#eef2ff" : "#f8fafc", border: `2px solid ${finish[i] ? "#6ee7b7" : candidate === i ? "#6366f1" : "#e2e8f0"}`, fontFamily: "ui-monospace, monospace", fontWeight: 800, color: "#334155", cursor: "pointer" }}>
+              {`P${i}`}
+            </div>
+          ))}
+        </div>
+      )}
+      {canClick && (
+        <TriggerHint ready={!atEnd} text={atEnd
+          ? t(T("已完成，点击进程可重播", "Done; click a process to replay"))
+          : t(T("点击任一进程，逐个试探并生成安全序列", "click any process to try it and build the safe sequence"))} />
+      )}
+      <StatPanel title={t(T("状态 / 数值", "State / values"))} rows={[
+        ["Work", fmt(work)],
+        ["Finish", `[${finish.map((f) => (f ? "T" : "F")).join(", ")}]`],
+        [t(T("安全序列", "Safe seq")), sequence.map((i) => "P" + i).join(" ") || "—"],
+        [t(T("状态", "State")), s.safe === undefined ? t(T("进行中", "running")) : s.safe ? t(T("安全", "safe")) : t(T("不安全", "unsafe"))],
+      ]} />
       {candidate !== null && candNeed && (
         <Note tone={s.ok ? "info" : "warn"}>
           {zh

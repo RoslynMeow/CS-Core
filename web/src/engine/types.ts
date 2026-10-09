@@ -40,6 +40,10 @@ export interface ModuleDef<S = unknown, C = unknown> {
     onChange?: (c: C) => void;
     inspected?: number | null;
     onInspect?: (id: number | null) => void;
+    step?: number;
+    count?: number;
+    onNext?: () => void;
+    onStep?: (i: number) => void;
   }>;
   Render: ComponentType<{
     scene: S;
@@ -49,6 +53,15 @@ export interface ModuleDef<S = unknown, C = unknown> {
     // 画布节点选中联动（terms 模式：右侧图例/属性面板）
     inspected?: number | null;
     onInspect?: (id: number | null) => void;
+    // 步进驱动：画布内可放「点击触发」的按钮/对象来推进过程
+    step?: number;
+    count?: number;
+    playing?: boolean;
+    onNext?: () => void;
+    onPrev?: () => void;
+    onStep?: (i: number) => void;
+    toggle?: () => void;
+    reset?: () => void;
   }>;
   code?: Text[];
   codeFor?: (config: C) => Text[];
@@ -56,6 +69,8 @@ export interface ModuleDef<S = unknown, C = unknown> {
   bare?: boolean;
   /** 交互式画布：隐藏播放条与右侧栏，点击画布直接改 config 重算（如数字电路） */
   interactive?: boolean;
+  /** 线性动画可点击推进：非播放时点击画布进入下一步，并显示「点击继续」提示（逐帧动画默认开启） */
+  advanceOnCanvas?: boolean;
   /** 门禁：当前配置跑不动本模块时返回原因（展示虚化罩），返回 null 表示可跑 */
   blockedReason?: (config: C) => string | null;
   /** 首页展示元数据（扁平化后由 registry 注入，非功能字段） */

@@ -1,13 +1,36 @@
-import { T } from "../../i18n/lang";
+import { T, type Text } from "../../i18n/lang";
 import { MathText } from "../../lib/tex";
 import type { Frame } from "../../engine/types";
 import { Panel, Note, isZh, makeChapter, type SubDef } from "../common/chapter";
 
 type SubMode = "relationships" | "normalization";
 
-function EntityBox({ title, attrs = [], weak = false }: { title: string; attrs?: string[]; weak?: boolean }) {
+// 用户驱动的「状态 / 数值」面板：展示当前步的关键取值，并提供推进按钮
+function StepPanel({ t, title, rows, onNext, nextLabel, showNext }: {
+  t: (x: Text) => string;
+  title: string;
+  rows: [string, string][];
+  onNext?: () => void;
+  nextLabel: string;
+  showNext: boolean;
+}) {
   return (
-    <div style={{ border: weak ? "4px double #6366f1" : "2px solid #6366f1", borderRadius: 8, background: "#eef2ff", padding: "8px 12px", minWidth: 116, textAlign: "center" }}>
+    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", borderRadius: 10, background: "#0f172a", color: "#e2e8f0", fontSize: 12 }}>
+      <span style={{ fontWeight: 800, color: "#a5b4fc" }}>{title}</span>
+      {rows.map(([k, v]) => (
+        <span key={k} style={{ fontFamily: "ui-monospace, monospace", whiteSpace: "nowrap" }}>{k} = <b style={{ color: "#fde047" }}>{v}</b></span>
+      ))}
+      {showNext && onNext && (
+        <button className="primary" style={{ marginLeft: "auto" }} onClick={(e) => { e.stopPropagation(); onNext(); }}>{nextLabel}</button>
+      )}
+    </div>
+  );
+}
+
+function EntityBox({ title, attrs = [], weak = false, onClick, highlight = false }: { title: string; attrs?: string[]; weak?: boolean; onClick?: (e: any) => void; highlight?: boolean }) {
+  return (
+    <div onClick={onClick}
+      style={{ border: weak ? "4px double #6366f1" : "2px solid #6366f1", borderRadius: 8, background: highlight ? "#e0e7ff" : "#eef2ff", padding: "8px 12px", minWidth: 116, textAlign: "center", cursor: onClick ? "pointer" : "default", boxShadow: highlight ? "0 0 0 3px #a5b4fc" : undefined }}>
       <div style={{ fontWeight: 800, color: "#4338ca", fontSize: 13 }}>{title}</div>
       {attrs.length > 0 && (
         <div style={{ marginTop: 6, paddingTop: 6, borderTop: "1px solid #c7d2fe", display: "grid", gap: 2 }}>
@@ -20,10 +43,10 @@ function EntityBox({ title, attrs = [], weak = false }: { title: string; attrs?:
   );
 }
 
-function Diamond({ label }: { label: string }) {
+function Diamond({ label, onClick, highlight = false }: { label: string; onClick?: (e: any) => void; highlight?: boolean }) {
   return (
-    <div style={{ width: 88, height: 88, display: "grid", placeItems: "center", flexShrink: 0 }}>
-      <div style={{ width: 58, height: 58, transform: "rotate(45deg)", background: "#fef3c7", border: "2px solid #d97706", borderRadius: 6, display: "grid", placeItems: "center" }}>
+    <div onClick={onClick} style={{ width: 88, height: 88, display: "grid", placeItems: "center", flexShrink: 0, cursor: onClick ? "pointer" : "default" }}>
+      <div style={{ width: 58, height: 58, transform: "rotate(45deg)", background: highlight ? "#fde68a" : "#fef3c7", border: "2px solid #d97706", borderRadius: 6, display: "grid", placeItems: "center", boxShadow: highlight ? "0 0 0 3px #fbbf24" : undefined }}>
         <span style={{ transform: "rotate(-45deg)", fontSize: 11, fontWeight: 800, color: "#92400e", textAlign: "center", lineHeight: 1.2 }}>{label}</span>
       </div>
     </div>
@@ -73,15 +96,18 @@ const REL_ATTR: Record<string, [string, string]> = {
   grade: ["成绩", "grade"],
 };
 
-function RelationshipsRender({ scene, t }: any) {
+function RelationshipsRender({ scene, t, playing, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? { step: 0, entities: ["teacher", "office"], rel: "1:1", tables: [] }) as RelScene;
+  const canNext = !!onNext && !playing && s.step < 4;
+  const advance = (e: any) => { e.stopPropagation(); onNext?.(); };
   const ent = (k: string) => (zh ? REL_ENT[k]?.[0] : REL_ENT[k]?.[1]) ?? k;
   const tbl = (k: string) => (zh ? REL_TBL[k]?.[0] : REL_TBL[k]?.[1]) ?? k;
   const attr = (k: string) => (zh ? REL_ATTR[k]?.[0] : REL_ATTR[k]?.[1]) ?? k;
   const card: Record<RelKind, [string, string]> = { "1:1": ["1", "1"], "1:N": ["1", "N"], "M:N": ["M", "N"] };
   const [cl, cr] = card[s.rel] ?? ["1", "1"];
   const junction = s.rel === "M:N" && s.tables.some((x) => x.name === "enroll");
+  const mode = s.rel === "M:N" ? (junction ? (zh ? "中间表" : "junction table") : (zh ? "不可存储" : "cannot store")) : (zh ? "直接存储" : "direct");
   let note: string;
   if (s.rel === "M:N" && !junction) {
     note = zh
@@ -103,12 +129,21 @@ function RelationshipsRender({ scene, t }: any) {
   return (
     <Panel>
       <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 4, flexWrap: "wrap", padding: "10px 8px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-        <EntityBox title={ent(s.entities[0])} />
+        <EntityBox title={ent(s.entities[0])} onClick={canNext ? advance : undefined} highlight={canNext} />
         <Link label={cl} />
-        <Diamond label={s.rel === "M:N" ? (zh ? "选修" : "Enroll") : (zh ? "拥有" : "own")} />
+        <Diamond label={s.rel === "M:N" ? (zh ? "选修" : "Enroll") : (zh ? "拥有" : "own")} onClick={canNext ? advance : undefined} highlight={canNext} />
         <Link label={cr} />
-        <EntityBox title={ent(s.entities[1])} />
+        <EntityBox title={ent(s.entities[1])} onClick={canNext ? advance : undefined} highlight={canNext} />
       </div>
+      <StepPanel t={t} title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("步骤", "Step")), `${s.step + 1}/5`],
+          [t(T("联系", "Relationship")), s.rel],
+          [t(T("基数", "Cardinality")), `${cl} : ${cr}`],
+          [t(T("实体", "Entities")), `${ent(s.entities[0])} / ${ent(s.entities[1])}`],
+          [t(T("形态", "Form")), mode],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(T("下一步 / 分解", "Next / decompose"))} />
       <div style={{ display: "grid", gap: 10 }}>
         {s.tables.map((r, idx) => (
           <div key={r.name + idx} style={{ display: "grid", gap: 4 }}>
@@ -206,9 +241,12 @@ const NORM_CODE = [
   T("return 一组 3NF 关系", "return a set of 3NF relations"),
 ];
 
-function NormalizationRender({ scene, t }: any) {
+function NormalizationRender({ scene, t, playing, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? { step: 0, table: [], issue: "none" }) as NormScene;
+  const canNext = !!onNext && !playing && s.step < 3;
+  const advance = (e: any) => { e.stopPropagation(); onNext?.(); };
+  const form = ["", "1NF", "2NF", "3NF"][s.step] ?? "";
   const attr = (k: string) => (zh ? NORM_ATTR[k]?.[0] : NORM_ATTR[k]?.[1]) ?? k;
   const rel = (k: string) => (zh ? NORM_REL[k]?.[0] : NORM_REL[k]?.[1]) ?? k;
   const issue: Record<NormIssue, [string, string]> = {
@@ -235,9 +273,19 @@ function NormalizationRender({ scene, t }: any) {
         <span style={{ fontWeight: 800 }}>{zh ? `第 ${s.step} 步 · ` : `Step ${s.step} · `}</span>
         <MathText text={issue[s.issue][zh ? 0 : 1]} />
       </Note>
+      <StepPanel t={t} title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("步骤", "Step")), `${s.step}/3`],
+          [t(T("范式", "Form")), s.step === 0 ? t(T("未规范化", "Unnormalized")) : form],
+          [t(T("问题", "Issue")), s.issue === "none" ? t(T("无", "none")) : s.issue],
+          [t(T("关系数", "Relations")), `${s.table.length}`],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(T("下一步 / 规范化", "Next / normalize"))} />
       <div style={{ display: "grid", gap: 12 }}>
         {s.table.map((r) => (
-          <div key={r.name} style={{ display: "grid", gap: 4 }}>
+          <div key={r.name} onClick={canNext ? advance : undefined}
+            title={canNext ? t(T("点击推进到下一个范式", "click to advance to the next normal form")) : undefined}
+            style={{ display: "grid", gap: 4, cursor: canNext ? "pointer" : "default" }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: "#3730a3" }}>{rel(r.name)}</div>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, fontFamily: "ui-monospace, monospace", background: "#fff" }}>

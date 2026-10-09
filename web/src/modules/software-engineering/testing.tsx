@@ -1,4 +1,4 @@
-import { T } from "../../i18n/lang";
+import { T, type Text } from "../../i18n/lang";
 import { MathText } from "../../lib/tex";
 import type { Frame } from "../../engine/types";
 import { Panel, Table, Note, Chips, NumField, TextField, Row, Steps, isZh, makeChapter, type SubDef } from "../common/chapter";
@@ -140,7 +140,27 @@ function coverageGenerate(_config: any): Frame<CoverageScene>[] {
   return frames;
 }
 
-function CoverageRender({ scene, t }: any) {
+// 用户驱动的「状态 / 数值」面板：展示当前步的关键取值，并提供推进按钮
+function StatusPanel({ t, rows, onAdvance, label }: {
+  t: (x: Text) => string;
+  rows: [string, string][];
+  onAdvance?: () => void;
+  label: string;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", borderRadius: 10, background: "#0f172a", color: "#e2e8f0", fontSize: 12 }}>
+      <span style={{ fontWeight: 800, color: "#a5b4fc" }}>{t(T("状态 / 数值", "Status / Values"))}</span>
+      {rows.map(([k, v]) => (
+        <span key={k} style={{ fontFamily: "ui-monospace, monospace", whiteSpace: "nowrap" }}>{k} = <b style={{ color: "#fde047" }}>{v}</b></span>
+      ))}
+      {onAdvance && (
+        <button className="primary" style={{ marginLeft: "auto" }} onClick={(e) => { e.stopPropagation(); onAdvance(); }}>{label}</button>
+      )}
+    </div>
+  );
+}
+
+function CoverageRender({ scene, t, onNext, reset, playing, step, count }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as Partial<CoverageScene>;
   const crit = s.criterion ?? "statement";
@@ -149,6 +169,13 @@ function CoverageRender({ scene, t }: any) {
   const cases = s.cases ?? [];
   const active = s.active ?? null;
   const lines = COVERAGE_CODE.map((l) => t(l));
+
+  const total = count ?? 1;
+  const atEnd = typeof step === "number" && step >= total - 1;
+  const canClick = !playing && total > 1;
+  const doAdvance = () => { if (playing) return; if (atEnd) reset?.(); else onNext?.(); };
+  const onClick = canClick ? (e: any) => { e.stopPropagation(); doAdvance(); } : undefined;
+  const trigger = atEnd ? T("重新开始", "Restart") : T("运行下一个用例", "Run next case");
 
   const curCrit = COVER_CRITERIA.find((c) => c.key === crit) ?? COVER_CRITERIA[0];
   const critName = (c: { zh: string; en: string }) => (zh ? c.zh : c.en);
@@ -181,7 +208,7 @@ function CoverageRender({ scene, t }: any) {
   return (
     <Panel>
       <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-        <div style={{ flex: "1 1 300px", minWidth: 260, padding: "10px 8px", borderRadius: 10, background: "#0f172a", color: "#cbd5e1", fontFamily: "ui-monospace, monospace", fontSize: 12.5, lineHeight: 1.7, overflowX: "auto" }}>
+        <div onClick={onClick} style={{ flex: "1 1 300px", minWidth: 260, padding: "10px 8px", borderRadius: 10, background: "#0f172a", color: "#cbd5e1", fontFamily: "ui-monospace, monospace", fontSize: 12.5, lineHeight: 1.7, overflowX: "auto", cursor: canClick ? "pointer" : "default", outline: canClick ? "2px solid #4338ca" : "none", outlineOffset: 2 }}>
           {lines.map((ln, i) => {
             const on = lineCovered(i);
             const dec = i === 2;
@@ -194,6 +221,7 @@ function CoverageRender({ scene, t }: any) {
           </div>
         </div>
         <div style={{ flex: "2 1 340px", minWidth: 280, display: "grid", gap: 8, alignContent: "start" }}>
+          <div onClick={onClick} style={{ alignSelf: "flex-start", padding: "6px 16px", borderRadius: 999, background: canClick ? "#4338ca" : "#e2e8f0", color: canClick ? "#fff" : "#64748b", fontWeight: 800, fontSize: 12, cursor: canClick ? "pointer" : "default", transition: "background .2s" }}>{t(trigger)}</div>
           <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
             <span style={{ fontSize: 11, fontWeight: 800, color: "#64748b", width: 62, flexShrink: 0 }}>{zh ? "测试用例" : "Cases"}</span>
             {cases.length === 0 && <span style={{ fontSize: 12, color: "#94a3b8" }}>{zh ? "（尚未运行）" : "(none yet)"}</span>}
@@ -220,6 +248,14 @@ function CoverageRender({ scene, t }: any) {
           );
         })}
       </div>
+      <StatusPanel t={t}
+        rows={[
+          [t(T("准则", "Criterion")), critName(curCrit)],
+          [t(T("用例", "Cases")), `${cases.length}/${curCrit.cases.length}`],
+          [t(T("已覆盖语句", "Statements")), `${covS.length}/3`],
+          [t(T("已覆盖分支", "Branches")), `${covB.length}`],
+        ]}
+        onAdvance={canClick ? doAdvance : undefined} label={t(trigger)} />
       <Note tone="warn">
         {zh ? "强弱：判定覆盖 ⊃ 语句覆盖；条件覆盖不蕴含判定覆盖，需「判定/条件覆盖」兼顾；路径覆盖最强但路径数会爆炸，常用基本路径覆盖：" : "Strength: decision ⊃ statement; condition does not imply decision (use decision/condition); path is strongest but explodes, so basic-path coverage is used: "}
         <MathText text="$V(G)=E-N+2=P+1$" />

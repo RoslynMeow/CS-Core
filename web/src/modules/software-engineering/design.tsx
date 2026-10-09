@@ -1,4 +1,4 @@
-import { T } from "../../i18n/lang";
+import { T, type Text } from "../../i18n/lang";
 import type { Frame } from "../../engine/types";
 import { Panel, Note, isZh, makeChapter, type SubDef } from "../common/chapter";
 
@@ -18,15 +18,47 @@ type ObserverScene = {
   messages: string[];
 };
 
-function ObserverRender({ scene, t }: any) {
+// 用户驱动的「状态 / 数值」面板：展示当前步的关键取值，并提供推进按钮
+function StatusPanel({ t, rows, onAdvance, label }: {
+  t: (x: Text) => string;
+  rows: [string, string][];
+  onAdvance?: () => void;
+  label: string;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", borderRadius: 10, background: "#0f172a", color: "#e2e8f0", fontSize: 12 }}>
+      <span style={{ fontWeight: 800, color: "#a5b4fc" }}>{t(T("状态 / 数值", "Status / Values"))}</span>
+      {rows.map(([k, v]) => (
+        <span key={k} style={{ fontFamily: "ui-monospace, monospace", whiteSpace: "nowrap" }}>{k} = <b style={{ color: "#fde047" }}>{v}</b></span>
+      ))}
+      {onAdvance && (
+        <button className="primary" style={{ marginLeft: "auto" }} onClick={(e) => { e.stopPropagation(); onAdvance(); }}>{label}</button>
+      )}
+    </div>
+  );
+}
+
+function ObserverRender({ scene, t, onNext, reset, playing, step, count }: any) {
   const zh = isZh(t);
   const s = (scene ?? { step: 0, subject: { name: "Subject", state: "-" }, observers: [], messages: [] }) as ObserverScene;
+  const total = count ?? 1;
+  const atEnd = typeof step === "number" && step >= total - 1;
+  const canClick = !playing && total > 1;
+  const doAdvance = () => { if (playing) return; if (atEnd) reset?.(); else onNext?.(); };
+  const onClick = canClick ? (e: any) => { e.stopPropagation(); doAdvance(); } : undefined;
+  const trigger = atEnd ? T("重新开始", "Restart")
+    : s.step >= 4 ? T("执行 update()", "Run update()")
+      : s.step >= 3 ? T("通知观察者", "Notify observers")
+        : s.step >= 2 ? T("改变状态", "Change state")
+          : T("注册观察者", "Register observer");
+  const updated = s.observers.filter((o) => o.updated).length;
   return (
     <Panel>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
-        <div style={{ flex: "1 1 190px", padding: "12px 16px", borderRadius: 12, background: "#eef2ff", border: "2px solid #6366f1", textAlign: "center" }}>
+        <div onClick={onClick} style={{ flex: "1 1 190px", padding: "12px 16px", borderRadius: 12, background: "#eef2ff", border: "2px solid #6366f1", textAlign: "center", cursor: canClick ? "pointer" : "default", outline: canClick ? "2px solid #4338ca" : "none", outlineOffset: 2, transition: "outline .2s" }}>
           <div style={{ fontWeight: 800, color: "#3730a3" }}>{s.subject.name}</div>
           <div style={{ fontFamily: "ui-monospace, monospace", fontSize: 13, color: "#4338ca", marginTop: 4 }}>state = {s.subject.state}</div>
+          <div style={{ marginTop: 8, fontSize: 11, fontWeight: 800, color: "#4338ca" }}>{t(trigger)}</div>
         </div>
         <div style={{ display: "grid", gap: 8, flex: "1 1 190px" }}>
           {s.observers.map((o) => (
@@ -41,6 +73,15 @@ function ObserverRender({ scene, t }: any) {
         {s.messages.length === 0 && <div style={{ color: "#94a3b8" }}>{zh ? "（尚无消息）" : "(no messages yet)"}</div>}
         {s.messages.map((m, i) => <div key={i} style={{ color: i === s.messages.length - 1 ? "#7dd3fc" : "#cbd5e1" }}>{m}</div>)}
       </div>
+      <StatusPanel t={t}
+        rows={[
+          [t(T("主题", "Subject")), s.subject.name],
+          [t(T("状态", "State")), s.subject.state],
+          [t(T("观察者", "Observers")), `${s.observers.length}`],
+          [t(T("已更新", "Updated")), `${updated}/${s.observers.length}`],
+          [t(T("消息", "Messages")), `${s.messages.length}`],
+        ]}
+        onAdvance={canClick ? doAdvance : undefined} label={t(trigger)} />
       <Note>{zh ? "观察者模式：主题（Subject）持有观察者列表，状态变化时 $notify()$ 逐一调用 $update()$，实现一对多、松耦合的事件通知。" : "Observer pattern: the Subject keeps a list of observers; on state change $notify()$ calls $update()$ on each — a one-to-many, loosely coupled event notification."}</Note>
     </Panel>
   );

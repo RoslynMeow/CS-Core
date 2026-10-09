@@ -1,4 +1,4 @@
-import { T } from "../../i18n/lang";
+import { T, type Text } from "../../i18n/lang";
 import { MathText } from "../../lib/tex";
 import type { Frame } from "../../engine/types";
 import { Panel, Table, Note, isZh, makeChapter, type SubDef } from "../common/chapter";
@@ -10,6 +10,28 @@ import { Panel, Table, Note, isZh, makeChapter, type SubDef } from "../common/ch
 // =====================================================================
 
 type SubMode = "dual-mode" | "syscall" | "interrupt";
+
+// 用户驱动的「状态 / 数值」面板：展示当前步的关键取值，并提供推进按钮
+function StepPanel({ t, title, rows, onNext, nextLabel, showNext }: {
+  t: (x: Text) => string;
+  title: string;
+  rows: [string, string][];
+  onNext?: () => void;
+  nextLabel: string;
+  showNext: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", borderRadius: 10, background: "#0f172a", color: "#e2e8f0", fontSize: 12 }}>
+      <span style={{ fontWeight: 800, color: "#a5b4fc" }}>{title}</span>
+      {rows.map(([k, v]) => (
+        <span key={k} style={{ fontFamily: "ui-monospace, monospace", whiteSpace: "nowrap" }}>{k} = <b style={{ color: "#fde047" }}>{v}</b></span>
+      ))}
+      {showNext && onNext && (
+        <button className="primary" style={{ marginLeft: "auto" }} onClick={(e) => { e.stopPropagation(); onNext(); }}>{nextLabel}</button>
+      )}
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------
 // dual-mode：用户态 ↔ 内核态 逐帧切换
@@ -23,30 +45,51 @@ const DUAL_EVENT: Record<DualScene["event"], [string, string]> = {
   return: ["处理完毕，切换回用户态继续执行", "done, switch back to user mode and resume"],
 };
 
-function DualModeRender({ scene, t }: any) {
+function DualModeRender({ scene, t, onNext, step, count }: any) {
   const zh = isZh(t);
   const s = (scene ?? { mode: "user", event: "app" }) as DualScene;
   const userActive = s.mode === "user";
+  const canNext = !!onNext && (typeof count !== "number" || step < count - 1);
+  const info = DUAL_EVENT[s.event] ?? DUAL_EVENT.app;
+  const evLabel = s.event === "app" ? T("应用执行", "app runs")
+    : s.event === "trap" ? T("陷入陷阱", "trap")
+    : s.event === "service" ? T("内核服务", "kernel service")
+    : T("返回用户态", "return");
+  const nextLabel = s.event === "app" ? T("点击「应用」发起系统调用", "click app to syscall")
+    : s.event === "trap" ? T("点击「内核」执行特权服务", "click kernel to run service")
+    : s.event === "service" ? T("点击返回用户态", "click to return to user")
+    : T("重新运行应用", "run app again");
   const modeBox = (active: boolean, kind: "user" | "kernel") => {
     const user = kind === "user";
     const bg = user ? "#dbeafe" : "#fef3c7";
     const bd = user ? (active ? "#3b82f6" : "#bfdbfe") : (active ? "#f59e0b" : "#fde68a");
     const fg = user ? "#1e3a8a" : "#92400e";
     const sub = user ? "#334155" : "#78350f";
+    const clickable = active && canNext;
     return (
-      <div style={{ flex: "1 1 200px", padding: "14px 16px", borderRadius: 12, background: bg, border: `2px solid ${bd}`, boxShadow: active ? "0 0 0 3px rgba(59,130,246,.18)" : undefined, opacity: active ? 1 : 0.5 }}>
+      <div onClick={clickable ? (e: any) => { e.stopPropagation(); onNext(); } : undefined}
+        style={{ flex: "1 1 200px", padding: "14px 16px", borderRadius: 12, background: bg, border: `2px solid ${bd}`, boxShadow: active ? "0 0 0 3px rgba(59,130,246,.18)" : undefined, opacity: active ? 1 : 0.5, cursor: clickable ? "pointer" : "default" }}>
         <div style={{ fontWeight: 900, color: fg }}>{user ? (zh ? "用户态 (user mode)" : "User mode") : (zh ? "内核态 (kernel mode)" : "Kernel mode")}</div>
         <div style={{ fontSize: 12, color: sub, marginTop: 4 }}>{user ? (zh ? "应用运行，受限，不能执行特权指令" : "apps run, restricted, no privileged instructions") : (zh ? "OS 运行，可执行特权指令、访问全部资源" : "OS runs, privileged instructions, full access")}</div>
+        <div style={{ marginTop: 8, display: "inline-block", padding: "4px 10px", borderRadius: 999, background: user ? "#bfdbfe" : "#fde68a", color: fg, fontSize: 12, fontWeight: 800 }}>
+          {user ? (zh ? "应用 app" : "app") : (zh ? "内核 kernel" : "kernel")}{clickable ? (zh ? " · 点我推进" : " · click") : ""}
+        </div>
       </div>
     );
   };
-  const info = DUAL_EVENT[s.event] ?? DUAL_EVENT.app;
   return (
     <Panel>
       <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap", alignItems: "stretch" }}>
         {modeBox(userActive, "user")}
         {modeBox(!userActive, "kernel")}
       </div>
+      <StepPanel t={t} title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("当前模式", "Mode")), userActive ? (zh ? "用户态" : "user") : (zh ? "内核态" : "kernel")],
+          [t(T("事件", "Event")), zh ? evLabel.zh : evLabel.en],
+          [t(T("步骤", "Step")), `${(step ?? 0) + 1}/${count ?? 4}`],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(nextLabel)} />
       <div style={{ textAlign: "center", fontSize: 14 }}>
         <MathText text={zh
           ? "$\\text{用户态} \\xrightarrow{\\text{系统调用/中断/异常}} \\text{内核态} \\xrightarrow{\\text{返回}} \\text{用户态}$"
@@ -85,23 +128,41 @@ const SYSCALL_STEPS: { zh: [string, string]; en: [string, string] }[] = [
   { zh: ["⑥ 返回", "结果写回寄存器，切回用户态"], en: ["⑥ Return", "result to register, back to user mode"] },
 ];
 
-function SyscallRender({ scene, t }: any) {
+function SyscallRender({ scene, t, onNext, step, count }: any) {
   const zh = isZh(t);
   const s = (scene ?? { step: 0 }) as SyscallScene;
+  const canNext = !!onNext && (typeof count !== "number" || step < count - 1);
+  const curStep = SYSCALL_STEPS[Math.max(0, Math.min(SYSCALL_STEPS.length - 1, s.step))];
+  const [ca] = zh ? curStep.zh : curStep.en;
+  const inKernel = s.step >= 2 && s.step < 5;
+  const nextLabel = s.step >= SYSCALL_STEPS.length - 1
+    ? T("重新调用 read()", "call read() again")
+    : T("点击推进系统调用路径", "click to advance the syscall path");
   return (
     <Panel>
       <div style={{ display: "grid", gap: 6 }}>
         {SYSCALL_STEPS.map((st, i) => {
           const [a, b] = zh ? st.zh : st.en;
           const cur = i === s.step;
+          const clickable = cur && canNext;
           return (
-            <div key={i} style={{ display: "flex", gap: 12, padding: "8px 14px", borderRadius: 10, background: cur ? "#eef2ff" : "#f8fafc", border: `1px solid ${cur ? "#c7d2fe" : "#e2e8f0"}`, opacity: i <= s.step ? 1 : 0.45 }}>
+            <div key={i} onClick={clickable ? (e: any) => { e.stopPropagation(); onNext(); } : undefined}
+              style={{ display: "flex", gap: 12, padding: "8px 14px", borderRadius: 10, background: cur ? "#eef2ff" : "#f8fafc", border: `1px solid ${cur ? "#c7d2fe" : "#e2e8f0"}`, opacity: i <= s.step ? 1 : 0.45, cursor: clickable ? "pointer" : "default" }}>
               <span style={{ fontWeight: 800, color: cur ? "#4338ca" : "#3730a3", width: 96, flexShrink: 0 }}>{a}</span>
               <span style={{ fontSize: 13, color: "#334155" }}>{b}</span>
+              {clickable && <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, color: "#4338ca", whiteSpace: "nowrap" }}>{zh ? "点我推进" : "click"}</span>}
             </div>
           );
         })}
       </div>
+      <StepPanel t={t} title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("步骤", "Step")), `${s.step + 1}/${SYSCALL_STEPS.length}`],
+          [t(T("阶段", "Phase")), ca],
+          [t(T("模式", "Mode")), inKernel ? (zh ? "内核态" : "kernel") : (zh ? "用户态" : "user")],
+          [t(T("系统调用号", "Syscall no")), "rax = read"],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(nextLabel)} />
       <div style={{ textAlign: "center", fontSize: 13, fontFamily: "ui-monospace, monospace", color: "#475569" }}>
         <MathText text={zh ? "参数经寄存器：$\\text{rax}=\\text{调用号},\\ \\text{rdi},\\ \\text{rsi},\\ \\text{rdx}$" : "args via registers: $\\text{rax}=\\text{syscall\\_no},\\ \\text{rdi},\\ \\text{rsi},\\ \\text{rdx}$"} />
       </div>
@@ -147,9 +208,19 @@ const IRQ_STEPS: { zh: [string, string]; en: [string, string] }[] = [
   { zh: ["⑤ 恢复现场", "恢复寄存器与 PC，返回被中断的指令"], en: ["⑤ Restore", "restore registers & PC, resume interrupted instruction"] },
 ];
 
-function InterruptRender({ scene, t }: any) {
+function InterruptRender({ scene, t, onNext, step, count }: any) {
   const zh = isZh(t);
   const s = (scene ?? { step: 0 }) as IrqScene;
+  const canNext = !!onNext && (typeof count !== "number" || step < count - 1);
+  const curStep = IRQ_STEPS[Math.max(0, Math.min(IRQ_STEPS.length - 1, s.step))];
+  const [ca] = zh ? curStep.zh : curStep.en;
+  const saved = s.step >= 1 && s.step < 4;
+  const deviceClickable = s.step === 0 && canNext;
+  const nextLabel = deviceClickable
+    ? T("点击「设备」发出中断", "click device to raise IRQ")
+    : s.step >= IRQ_STEPS.length - 1
+      ? T("重新触发中断", "raise IRQ again")
+      : T("点击推进中断处理", "click to advance the ISR");
   const rows: React.ReactNode[][] = zh
     ? [
       ["中断 Interrupt", "异步、外部设备", "时钟、网卡、键盘", "抢占式调度的基础"],
@@ -163,18 +234,35 @@ function InterruptRender({ scene, t }: any) {
     ];
   return (
     <Panel>
+      <div style={{ display: "flex", justifyContent: "center" }}>
+        <div onClick={deviceClickable ? (e: any) => { e.stopPropagation(); onNext(); } : undefined}
+          style={{ padding: "10px 18px", borderRadius: 12, background: deviceClickable ? "#fde68a" : "#f8fafc", border: `2px solid ${deviceClickable ? "#f59e0b" : "#e2e8f0"}`, fontWeight: 800, color: "#92400e", fontSize: 13, cursor: deviceClickable ? "pointer" : "default" }}>
+          {zh ? "设备 device · 发出 IRQ" : "device · raise IRQ"}{deviceClickable ? (zh ? " · 点我触发" : " · click") : ""}
+        </div>
+      </div>
       <div style={{ display: "grid", gap: 6 }}>
         {IRQ_STEPS.map((st, i) => {
           const [a, b] = zh ? st.zh : st.en;
           const cur = i === s.step;
+          const clickable = cur && canNext;
           return (
-            <div key={i} style={{ display: "flex", gap: 12, padding: "8px 14px", borderRadius: 10, background: cur ? "#eef2ff" : "#f8fafc", border: `1px solid ${cur ? "#c7d2fe" : "#e2e8f0"}`, opacity: i <= s.step ? 1 : 0.45 }}>
+            <div key={i} onClick={clickable ? (e: any) => { e.stopPropagation(); onNext(); } : undefined}
+              style={{ display: "flex", gap: 12, padding: "8px 14px", borderRadius: 10, background: cur ? "#eef2ff" : "#f8fafc", border: `1px solid ${cur ? "#c7d2fe" : "#e2e8f0"}`, opacity: i <= s.step ? 1 : 0.45, cursor: clickable ? "pointer" : "default" }}>
               <span style={{ fontWeight: 800, color: cur ? "#4338ca" : "#3730a3", width: 96, flexShrink: 0 }}>{a}</span>
               <span style={{ fontSize: 13, color: "#334155" }}>{b}</span>
+              {clickable && <span style={{ marginLeft: "auto", fontSize: 11, fontWeight: 700, color: "#4338ca", whiteSpace: "nowrap" }}>{zh ? "点我推进" : "click"}</span>}
             </div>
           );
         })}
       </div>
+      <StepPanel t={t} title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("步骤", "Step")), `${s.step + 1}/${IRQ_STEPS.length}`],
+          [t(T("阶段", "Phase")), ca],
+          [t(T("现场", "Context")), saved ? (zh ? "已保存" : "saved") : (zh ? "未保存" : "—")],
+          [t(T("T_context", "T_context")), "T_save + T_dispatch + T_restore"],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(nextLabel)} />
       <div style={{ textAlign: "center", fontSize: 14 }}>
         <MathText text="$T_{context} = T_{save} + T_{dispatch} + T_{restore}$" />
       </div>

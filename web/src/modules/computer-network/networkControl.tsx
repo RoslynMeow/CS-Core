@@ -96,18 +96,22 @@ function lsGenerate(config: any): Frame<LsScene>[] {
   });
 }
 
-function LsRender({ scene, config, t }: any) {
+function LsRender({ scene, config, t, step: stepProp, onNext, playing }: any) {
   const zh = isZh(t);
   const src = LS_LABELS.includes(config?.source) ? (config.source as string) : "u";
   const steps = lsDijkstra(src);
   const s = (scene ?? {}) as Partial<LsScene>;
-  const step = typeof s.step === "number" ? Math.max(0, Math.min(steps.length - 1, s.step)) : steps.length - 1;
+  const step = typeof s.step === "number" ? Math.max(0, Math.min(steps.length - 1, s.step)) : (typeof stepProp === "number" ? stepProp : steps.length - 1);
   const upto = steps.slice(0, step + 1);
   const cur = steps[step];
   const dist = (s.dist ?? cur.dist) as Record<string, number>;
   const prev = (s.prev ?? cur.prev) as Record<string, string | null>;
   const N = (s.N ?? cur.N) as string[];
   const selected = (s.selected ?? cur.selected) as string | null;
+  const nextSel = steps[step + 1] ? (steps[step + 1].selected as string) : null;
+  const atEnd = nextSel === null;
+  const advance = () => { if (!atEnd && !playing) onNext?.(); };
+  const onNodeClick = (e: React.MouseEvent) => { e.stopPropagation(); advance(); };
   const INF = Infinity;
 
   const cell = (d: number, p: string | null) => (d === INF ? "∞ / −" : `${d} / ${p ?? "−"}`);
@@ -128,7 +132,7 @@ function LsRender({ scene, config, t }: any) {
     const chain: string[] = [];
     let c: string | null = dst;
     while (c) { chain.unshift(c); if (c === src) break; c = prev[c]; }
-    return [dst, chain.join(" → "), `${dist[dst]}`];
+    return [dst, chain.join(" -> "), `${dist[dst]}`];
   });
 
   const inTree = (a: string, b: string) => prev[b] === a || prev[a] === b;
@@ -151,19 +155,38 @@ function LsRender({ scene, config, t }: any) {
           const [cx, cy] = LS_POS[n];
           const isSrc = n === src;
           const isSel = n === selected;
+          const isNext = n === nextSel;
           const vis = N.includes(n);
           const fill = isSel ? "#fde68a" : isSrc ? "#bbf7d0" : vis ? "#dbeafe" : "#fff";
           const stroke = isSel ? "#d97706" : isSrc ? "#16a34a" : vis ? "#3b82f6" : "#94a3b8";
           return (
-            <g key={n}>
+            <g key={n} onClick={isNext ? onNodeClick : undefined} style={isNext ? { cursor: "pointer" } : undefined}>
               {isSel && <circle cx={cx} cy={cy} r={21} fill="none" stroke="#f59e0b" strokeWidth={2} strokeDasharray="4 3" />}
+              {isNext && <circle cx={cx} cy={cy} r={23} fill="none" stroke="#16a34a" strokeWidth={2.5} strokeDasharray="3 3" />}
               <circle cx={cx} cy={cy} r={16} fill={fill} stroke={stroke} strokeWidth={2} />
               <text x={cx} y={cy + 4} textAnchor="middle" fontSize={13} fontWeight={800} fill="#0f172a" fontFamily="ui-monospace, monospace">{n}</text>
               <text x={cx} y={cy + 30} textAnchor="middle" fontSize={10} fill={vis ? "#1d4ed8" : "#94a3b8"} fontFamily="ui-monospace, monospace">{dist[n] === INF ? "∞" : dist[n]}</text>
+              {isNext && <text x={cx} y={cy - 26} textAnchor="middle" fontSize={10} fill="#16a34a" fontWeight={800} fontFamily="ui-monospace, monospace">{zh ? "点此加入 N'" : "click to add"}</text>}
             </g>
           );
         })}
       </svg>
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+        <span style={{ fontSize: 12, color: "#475569" }}>
+          {zh
+            ? `当前：${step === 0 ? "初始化" : `已加入 ${selected}`}；N' = { ${N.join(", ")} }，每格 D(v) / 前驱`
+            : `now: ${step === 0 ? "init" : `settled ${selected}`}; N' = { ${N.join(", ")} }, each cell D(v) / predecessor`}
+        </span>
+        <button
+          onClick={advance}
+          disabled={atEnd || playing}
+          style={{ marginLeft: "auto", padding: "5px 12px", borderRadius: 999, border: "1px solid #c7d2fe", background: atEnd ? "#e2e8f0" : "#4338ca", color: atEnd ? "#64748b" : "#fff", fontSize: 12, fontWeight: 700, cursor: atEnd ? "default" : "pointer" }}>
+          {zh
+            ? (atEnd ? "已完成" : `加入 N'（点击节点 ${nextSel}）`)
+            : (atEnd ? "done" : `add to N' (click node ${nextSel})`)}
+        </button>
+      </div>
 
       <Table head={head} rows={rows} />
 
@@ -244,7 +267,7 @@ function dvGenerate(config: any): Frame<DvScene>[] {
   return frames;
 }
 
-function DvRender({ scene, config, t }: any) {
+function DvRender({ scene, config, t, onNext, playing }: any) {
   const zh = isZh(t);
   const rounds = Math.max(1, Math.min(10, config?.rounds ?? 6));
   const normal = dvSim(rounds, false);
@@ -256,6 +279,10 @@ function DvRender({ scene, config, t }: any) {
   const round = typeof s.round === "number" ? Math.max(0, Math.min(table.length - 1, s.round)) : table.length - 1;
   const shown = table.slice(0, round + 1);
   const active = shown.length - 1;
+  const row = table[Math.max(0, Math.min(table.length - 1, round))];
+  const atEnd = round >= table.length - 1;
+  const advance = () => { if (!atEnd && !playing) onNext?.(); };
+  const onNodeClick = (e: React.MouseEvent) => { e.stopPropagation(); advance(); };
 
   const rows: React.ReactNode[][] = shown.map((n, i) => {
     const on = i === active;
@@ -271,13 +298,28 @@ function DvRender({ scene, config, t }: any) {
         <text x={130} y={45} textAnchor="middle" fontSize={11} fill="#b91c1c" fontFamily="ui-monospace, monospace">∞ (x–y)</text>
         <text x={265} y={45} textAnchor="middle" fontSize={11} fill="#64748b" fontFamily="ui-monospace, monospace">1</text>
         {[["x", 70], ["y", 200], ["z", 330]].map(([n, cx]) => (
-          <g key={n as string}>
+          <g key={n as string} onClick={atEnd ? undefined : onNodeClick} style={atEnd ? undefined : { cursor: "pointer" }}>
+            {!atEnd && n === "y" && <circle cx={cx as number} cy={55} r={22} fill="none" stroke="#16a34a" strokeWidth={2.5} strokeDasharray="3 3" />}
             <circle cx={cx as number} cy={55} r={16} fill="#dbeafe" stroke="#3b82f6" strokeWidth={2} />
             <text x={cx as number} y={59} textAnchor="middle" fontSize={13} fontWeight={800} fill="#0f172a" fontFamily="ui-monospace, monospace">{n}</text>
           </g>
         ))}
         <text x={200} y={100} textAnchor="middle" fontSize={11} fill="#4338ca" fontWeight={800} fontFamily="ui-monospace, monospace">{zh ? `当前第 ${round} 轮` : `round ${round}`}</text>
       </svg>
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+        <span style={{ fontSize: 12, color: "#475569", fontFamily: "ui-monospace, monospace" }}>
+          {zh
+            ? `第 ${round} 轮：D_y(x)=${fmt(row.dy)}，D_z(x)=${fmt(row.dz)}；毒性逆转通告 ${fmt(row.pdy)} / ${fmt(row.pdz)}`
+            : `round ${round}: D_y(x)=${fmt(row.dy)}, D_z(x)=${fmt(row.dz)}; poisoned ${fmt(row.pdy)} / ${fmt(row.pdz)}`}
+        </span>
+        <button
+          onClick={advance}
+          disabled={atEnd || playing}
+          style={{ marginLeft: "auto", padding: "5px 12px", borderRadius: 999, border: "1px solid #c7d2fe", background: atEnd ? "#e2e8f0" : "#4338ca", color: atEnd ? "#64748b" : "#fff", fontSize: 12, fontWeight: 700, cursor: atEnd ? "default" : "pointer" }}>
+          {zh ? (atEnd ? "已收敛" : "交换一次") : (atEnd ? "converged" : "exchange once")}
+        </button>
+      </div>
 
       <Table
         head={[zh ? "轮次" : "round", zh ? "普通 D_y(x)" : "normal D_y(x)", "D_z(x)", zh ? "毒性逆转 D_y(x)" : "poison D_y(x)", "D_z(x)"]}
@@ -338,7 +380,7 @@ function icmpGenerate(_config: any): Frame<IcmpScene>[] {
   });
 }
 
-function IcmpRender({ scene, t }: any) {
+function IcmpRender({ scene, t, onNext, playing }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as Partial<IcmpScene>;
   const hops = Array.isArray(s.hops) && s.hops.length ? s.hops : ICMP_PATH;
@@ -347,6 +389,9 @@ function IcmpRender({ scene, t }: any) {
   const nodes = ["S", ...ICMP_PATH.map((h) => h.split(" ")[0])];
   const X = (i: number) => 40 + i * 88;
   const Y = 62;
+  const atEnd = done || ttl >= ICMP_PATH.length;
+  const advance = () => { if (!atEnd && !playing) onNext?.(); };
+  const onNodeClick = (e: React.MouseEvent) => { e.stopPropagation(); advance(); };
   return (
     <Panel>
       <svg viewBox="0 0 440 132" style={{ width: "100%", maxWidth: 520, height: "auto", margin: "0 auto", display: "block" }}>
@@ -363,13 +408,16 @@ function IcmpRender({ scene, t }: any) {
         {nodes.map((n, i) => {
           const rev = i > 0 && i <= ttl;
           const cur = i === ttl;
+          const clickable = i === 0 && !atEnd;
           const fill = cur && done ? "#bbf7d0" : cur ? "#fde68a" : rev ? "#dbeafe" : "#fff";
           const stroke = cur && done ? "#16a34a" : cur ? "#d97706" : rev ? "#3b82f6" : "#94a3b8";
           return (
-            <g key={i}>
+            <g key={i} onClick={clickable ? onNodeClick : undefined} style={clickable ? { cursor: "pointer" } : undefined}>
               {cur && <circle cx={X(i)} cy={Y} r={21} fill="none" stroke={cur && done ? "#16a34a" : "#f59e0b"} strokeWidth={2} strokeDasharray="4 3" />}
+              {clickable && <circle cx={X(i)} cy={Y} r={23} fill="none" stroke="#16a34a" strokeWidth={2.5} strokeDasharray="3 3" />}
               <circle cx={X(i)} cy={Y} r={16} fill={fill} stroke={stroke} strokeWidth={2} />
               <text x={X(i)} y={Y + 4} textAnchor="middle" fontSize={12} fontWeight={800} fill="#0f172a" fontFamily="ui-monospace, monospace">{n}</text>
+              {clickable && <text x={X(i)} y={Y - 26} textAnchor="middle" fontSize={10} fill="#16a34a" fontWeight={800} fontFamily="ui-monospace, monospace">{zh ? "点此发送" : "send"}</text>}
               {i > 0 && (
                 <text x={X(i)} y={Y + 32} textAnchor="middle" fontSize={9.5} fill={rev ? "#4338ca" : "#94a3b8"} fontFamily="ui-monospace, monospace">
                   {rev ? ICMP_PATH[i - 1].split(" ")[1] : "?"}
@@ -379,6 +427,23 @@ function IcmpRender({ scene, t }: any) {
           );
         })}
       </svg>
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+        <span style={{ fontSize: 12, color: "#475569" }}>
+          {zh ? `已发现 ${hops.length} 跳：` : `${hops.length} hop(s) found:`}
+        </span>
+        <span style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {hops.map((h, i) => (
+            <span key={i} style={{ fontSize: 11, padding: "2px 8px", borderRadius: 999, background: "#dbeafe", color: "#1e40af", fontFamily: "ui-monospace, monospace" }}>{i + 1}. {h}</span>
+          ))}
+        </span>
+        <button
+          onClick={advance}
+          disabled={atEnd || playing}
+          style={{ marginLeft: "auto", padding: "5px 12px", borderRadius: 999, border: "1px solid #c7d2fe", background: atEnd ? "#e2e8f0" : "#4338ca", color: atEnd ? "#64748b" : "#fff", fontSize: 12, fontWeight: 700, cursor: atEnd ? "default" : "pointer" }}>
+          {zh ? (atEnd ? "探测完成" : `发送探测 (TTL=${ttl + 1})`) : (atEnd ? "done" : `send probe (TTL=${ttl + 1})`)}
+        </button>
+      </div>
 
       <Table
         head={[zh ? "TTL" : "TTL", zh ? "路径节点" : "Hop", zh ? "回送" : "Reply"]}

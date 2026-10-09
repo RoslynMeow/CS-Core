@@ -61,6 +61,29 @@ function Bits({ value, prefix }: { value: number; prefix: number }) {
   );
 }
 
+// 用户驱动交互：内联「状态 / 数值」面板，随 scene 每步刷新
+function Status({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div style={{ padding: "10px 14px", borderRadius: 10, background: "#f8fafc", border: "1px solid #e2e8f0", display: "grid", gap: 6 }}>
+      <div style={{ fontSize: 11, fontWeight: 800, color: "#4338ca", letterSpacing: 0.5 }}>{title}</div>
+      {children}
+    </div>
+  );
+}
+
+function KV({ k, v }: { k: string; v: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "baseline", fontSize: 12, fontFamily: "ui-monospace, monospace" }}>
+      <span style={{ width: 140, flexShrink: 0, color: "#64748b" }}>{k}</span>
+      <span style={{ color: "#0f172a", fontWeight: 700, wordBreak: "break-all" }}>{v}</span>
+    </div>
+  );
+}
+
+function StepHint({ text }: { text: string }) {
+  return <div style={{ textAlign: "center", fontSize: 12, fontWeight: 700, color: "#4338ca" }}>{text}</div>;
+}
+
 // =====================================================================
 // 2) subnet — 子网 / CIDR 计算器
 // =====================================================================
@@ -89,7 +112,7 @@ type SubnetScene = {
   broadcast: string | null;
 };
 
-function SubnetRender({ scene, t }: any) {
+function SubnetRender({ scene, t, step, count, playing, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as SubnetScene;
   const ipInt = ipToInt(String(s.ip ?? ""));
@@ -123,6 +146,14 @@ function SubnetRender({ scene, t }: any) {
     rows.push([zh ? "可用主机范围" : "Host range", `${intToIp(firstHost)} – ${intToIp(lastHost)}`, zh ? "去掉网络号与广播" : "network & broadcast excluded"]);
     rows.push([zh ? "可用主机数" : "Usable hosts", `${hostCount}`, <MathText key="f" text={`$2^{32-${prefix}} - 2 = ${hostCount}$`} />]);
   }
+  const canStep = !!onNext && !playing && (typeof count !== "number" || typeof step !== "number" || step < count - 1);
+  const cue = shown < prefix
+    ? T("点击应用下一位掩码", "click to apply the next mask bit")
+    : s.network === null
+      ? T("点击求网络地址", "click to compute the network address")
+      : s.broadcast === null
+        ? T("点击求广播地址", "click to compute the broadcast address")
+        : T("点击列出可用主机", "click to list usable hosts");
   return (
     <Panel>
       <div style={{ display: "grid", gap: 4 }}>
@@ -133,12 +164,23 @@ function SubnetRender({ scene, t }: any) {
           <span style={{ width: 28, textAlign: "right" }}>IP</span>
           <Bits value={ipInt} prefix={shown} />
         </div>
-        <div style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "center", fontSize: 11, color: "#64748b" }}>
+        <div
+          onClick={canStep ? (e) => { e.stopPropagation(); onNext(); } : undefined}
+          style={{ display: "flex", gap: 10, alignItems: "center", justifyContent: "center", fontSize: 11, color: "#64748b", cursor: canStep ? "pointer" : "default", padding: "4px 8px", borderRadius: 8, border: canStep ? "1px dashed #4338ca" : "1px solid transparent", background: canStep ? "#eef2ff" : "transparent" }}
+        >
           <span style={{ width: 28, textAlign: "right" }}>MASK</span>
           <Bits value={mask} prefix={shown} />
+          {canStep && <span style={{ marginLeft: 8, fontWeight: 800, color: "#4338ca" }}>{t(cue)}</span>}
         </div>
       </div>
       <Table head={zh ? ["项", "值", "说明"] : ["Item", "Value", "Note"]} rows={rows} />
+      <Status title={zh ? "状态 / 数值" : "State / Values"}>
+        <KV k={zh ? "进度" : "Progress"} v={`${typeof step === "number" ? step + 1 : 1} / ${typeof count === "number" ? count : "-"}`} />
+        <KV k={zh ? "已应用掩码" : "Mask bits applied"} v={`${shown} / ${prefix}`} />
+        <KV k={zh ? "网络地址" : "Network"} v={s.network ?? "-"} />
+        <KV k={zh ? "广播地址" : "Broadcast"} v={s.broadcast ?? "-"} />
+        <KV k={zh ? "可用主机范围" : "Host range"} v={s.broadcast ? `${intToIp(firstHost)} - ${intToIp(lastHost)}` : "-"} />
+      </Status>
       <div style={{ textAlign: "center", fontSize: 14 }}>
         <MathText text="$\\text{network} = \\text{IP} \\;\\&\\; \\text{mask}$" />
       </div>
@@ -218,7 +260,7 @@ const NAT_ROWS: [string, string, string, string][] = [
 type NatEntry = { private: string; public: string };
 type NatScene = { step: number; entries: NatEntry[] };
 
-function NatRender({ scene, t }: any) {
+function NatRender({ scene, t, step, count, playing, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? { step: 0, entries: [] }) as NatScene;
   const entries = s.entries ?? [];
@@ -244,14 +286,35 @@ function NatRender({ scene, t }: any) {
     e.public,
     i === entries.length - 1 ? (zh ? "★ 刚写入" : "★ just added") : "",
   ]);
+  const canStep = !!onNext && !playing && (typeof count !== "number" || typeof step !== "number" || step < count - 1);
+  const actIdx = Math.max(0, Math.min(acts.length - 1, s.step));
   return (
     <Panel>
       <div style={{ textAlign: "center", fontSize: 14 }}>
         <MathText text="$\\text{(private IP:port)} \\longleftrightarrow \\text{(public IP:new port)}$" />
       </div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
+        <div
+          onClick={canStep ? (e) => { e.stopPropagation(); onNext(); } : undefined}
+          style={{ padding: "8px 14px", borderRadius: 10, background: canStep ? "#4338ca" : "#eef2ff", color: canStep ? "#fff" : "#3730a3", border: "1px solid #c7d2fe", fontWeight: 800, fontSize: 13, textAlign: "center", cursor: canStep ? "pointer" : "default" }}
+        >
+          {zh ? "内网主机 A" : "Private host A"}
+          <div style={{ fontSize: 11, fontWeight: 500, opacity: 0.9, fontFamily: "ui-monospace, monospace" }}>192.168.1.10:3345</div>
+        </div>
+        <span style={{ color: "#94a3b8", fontWeight: 800, fontFamily: "ui-monospace, monospace" }}>{"->"}</span>
+        <div style={{ padding: "8px 14px", borderRadius: 10, background: "#f8fafc", border: "1px solid #e2e8f0", fontWeight: 800, fontSize: 13 }}>NAT</div>
+        <span style={{ color: "#94a3b8", fontWeight: 800, fontFamily: "ui-monospace, monospace" }}>{"->"}</span>
+        <div style={{ padding: "8px 14px", borderRadius: 10, background: "#f8fafc", border: "1px solid #e2e8f0", fontWeight: 800, fontSize: 13 }}>{zh ? "公网" : "Internet"}</div>
+      </div>
+      {canStep && <StepHint text={t(T("点击「内网主机 A」发送并建立 NAT 映射", "click \"host A\" to send and create a NAT mapping"))} />}
       <Table head={zh ? ["内网 (IP:端口)", "公网 (IP:端口)", "状态"] : ["Private (IP:port)", "Public (IP:port)", "State"]} rows={rows} />
+      <Status title={zh ? "状态 / 数值" : "State / Values"}>
+        <KV k={zh ? "进度" : "Progress"} v={`${typeof step === "number" ? step + 1 : 1} / ${typeof count === "number" ? count : "-"}`} />
+        <KV k={zh ? "映射表项数" : "NAT entries"} v={`${entries.length}`} />
+        <KV k={zh ? "最近写入" : "Latest"} v={entries.length ? `${entries[entries.length - 1].private} -> ${entries[entries.length - 1].public}` : "-"} />
+      </Status>
       {entries.length === 0 && <Note>{zh ? "映射表为空：等待内网主机首次发出分组。" : "Table empty: waiting for the first outbound packet."}</Note>}
-      <Note>{acts[Math.max(0, Math.min(acts.length - 1, s.step))]}</Note>
+      <Note>{acts[actIdx]}</Note>
       <Chips items={zh
         ? [["10.0.0.0/8", "A 类私有网段"], ["172.16.0.0/12", "B 类私有网段"], ["192.168.0.0/16", "C 类私有网段"]]
         : [["10.0.0.0/8", "private class A"], ["172.16.0.0/12", "private class B"], ["192.168.0.0/16", "private class C"]]} />
@@ -313,7 +376,7 @@ function ForwardingControls({ config, onChange, t }: any) {
 
 type FwdScene = { dst: string; checked: number[]; best: number | null; done: boolean; bad?: boolean };
 
-function ForwardingRender({ scene, t }: any) {
+function ForwardingRender({ scene, t, step, count, playing, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? {}) as FwdScene;
   const destInt = ipToInt(String(s.dst ?? ""));
@@ -327,6 +390,7 @@ function ForwardingRender({ scene, t }: any) {
   });
   const best = s.best;
   const header = zh ? ["前缀", "下一跳", "接口", "状态"] : ["Prefix", "Next hop", "Iface", "State"];
+  const canStep = !!onNext && !playing && !s.done && (typeof count !== "number" || typeof step !== "number" || step < count - 1);
   return (
     <Panel>
       {destInt === null && (
@@ -346,7 +410,11 @@ function ForwardingRender({ scene, t }: any) {
           const bd = isBest ? "#86efac" : seen ? (m ? "#c7d2fe" : "#e2e8f0") : "#e2e8f0";
           const state = !seen ? "—" : isBest ? (zh ? "★ 最长匹配" : "★ longest") : m ? (zh ? "匹配" : "match") : (zh ? "不匹配" : "no match");
           return (
-            <div key={i} style={{ display: "flex", gap: 10, alignItems: "center", padding: "8px 12px", borderRadius: 10, background: bg, border: `1px solid ${bd}`, opacity: seen || isBest ? 1 : 0.5 }}>
+            <div
+              key={i}
+              onClick={canStep ? (e) => { e.stopPropagation(); onNext(); } : undefined}
+              style={{ display: "flex", gap: 10, alignItems: "center", padding: "8px 12px", borderRadius: 10, background: bg, border: `1px solid ${bd}`, opacity: seen || isBest ? 1 : 0.5, cursor: canStep ? "pointer" : "default" }}
+            >
               <span style={{ fontFamily: "ui-monospace, monospace", fontWeight: 800, color: "#0f172a", width: 190 }}>{e.net}/{e.prefix}</span>
               <span style={{ fontSize: 12, color: "#64748b", width: 100 }}>{e.nextHop}</span>
               <span style={{ fontSize: 12, color: "#64748b", width: 100 }}>{e.iface}</span>
@@ -357,6 +425,13 @@ function ForwardingRender({ scene, t }: any) {
           );
         })}
       </div>
+      {canStep && <StepHint text={t(T("点击任一表项逐条匹配，取最长前缀", "click a table row to match entries one by one, longest prefix wins"))} />}
+      <Status title={zh ? "状态 / 数值" : "State / Values"}>
+        <KV k={zh ? "进度" : "Progress"} v={`${typeof step === "number" ? step + 1 : 1} / ${typeof count === "number" ? count : "-"}`} />
+        <KV k={zh ? "目的地址" : "Destination"} v={s.dst ?? "-"} />
+        <KV k={zh ? "已检查表项" : "Entries checked"} v={`${checked.size} / ${FWD_TABLE.length}`} />
+        <KV k={zh ? "当前最优前缀" : "Best prefix so far"} v={best !== null && best !== undefined ? `${FWD_TABLE[best].net}/${FWD_TABLE[best].prefix} -> ${FWD_TABLE[best].nextHop}` : "-"} />
+      </Status>
       {destInt !== null && best !== null && (
         <>
           <div style={{ textAlign: "center", fontSize: 12, color: "#64748b" }}>
@@ -503,7 +578,7 @@ function Ipv6Controls({ config, onChange, t }: any) {
 
 type Ipv6Scene = { step: number; groups: string[]; result: string; bad?: boolean };
 
-function Ipv6Render({ scene, t }: any) {
+function Ipv6Render({ scene, t, step, count, playing, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? { step: 0, groups: [], result: "" }) as Ipv6Scene;
   if (s.bad) {
@@ -520,6 +595,12 @@ function Ipv6Render({ scene, t }: any) {
   const groups = s.groups;
   const { start, len } = longestZeroRun(groups);
   const collapse = s.step >= 2 && len >= 2;
+  const canStep = !!onNext && !playing && s.step < 3 && (typeof count !== "number" || typeof step !== "number" || step < count - 1);
+  const cue = s.step === 0
+    ? T("点击去掉前导零", "click to strip leading zeros")
+    : s.step === 1
+      ? T("点击压缩最长全零段", "click to collapse the longest zero run")
+      : T("点击输出结果", "click to output the result");
   return (
     <Panel>
       <div style={{ textAlign: "center", fontSize: 12, color: "#64748b" }}>
@@ -537,9 +618,19 @@ function Ipv6Render({ scene, t }: any) {
           );
         })}
       </div>
-      <div style={{ textAlign: "center", padding: "8px 14px", borderRadius: 10, background: "#0f172a", color: "#e2e8f0", fontFamily: "ui-monospace, monospace", fontSize: 16, letterSpacing: 1 }}>
-        {s.result || "—"}
+      <div
+        onClick={canStep ? (e) => { e.stopPropagation(); onNext(); } : undefined}
+        style={{ textAlign: "center", padding: "8px 14px", borderRadius: 10, background: "#0f172a", color: "#e2e8f0", fontFamily: "ui-monospace, monospace", fontSize: 16, letterSpacing: 1, cursor: canStep ? "pointer" : "default", border: canStep ? "1px dashed #4338ca" : "1px solid transparent" }}
+      >
+        {s.result || "-"}
       </div>
+      {canStep && <StepHint text={t(cue)} />}
+      <Status title={zh ? "状态 / 数值" : "State / Values"}>
+        <KV k={zh ? "进度" : "Progress"} v={`${typeof step === "number" ? step + 1 : 1} / ${typeof count === "number" ? count : "-"}`} />
+        <KV k={zh ? "分组数" : "Groups"} v={`${groups.length} / 8`} />
+        <KV k={zh ? "压缩段" : "Collapsed run"} v={len >= 2 ? `${zh ? "第 " : "groups "}${start + 1}-${start + len} ${zh ? "组" : ""}`.trim() : (zh ? "无" : "none")} />
+        <KV k={zh ? "当前结果" : "Result"} v={s.result || "-"} />
+      </Status>
       <Note>
         {zh
           ? "压缩规则：① 每组删去前导零（至少保留一位，如 0db8 → db8）；② 把最长的一段（≥2 个）连续全零组用 :: 代替，且一个地址最多出现一次 ::；③ 例：2001:0db8:0000:0000:0000:ff00:0042:8329 → 2001:db8::ff00:42:8329。"

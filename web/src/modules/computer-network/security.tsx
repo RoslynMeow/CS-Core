@@ -1,7 +1,7 @@
 import { T } from "../../i18n/lang";
 import { MathText } from "../../lib/tex";
 import type { Frame } from "../../engine/types";
-import { Panel, Note, Chips, NumField, TextField, isZh, makeChapter, type SubDef } from "./shared";
+import { Panel, Table, Note, Chips, NumField, TextField, isZh, makeChapter, type SubDef } from "./shared";
 
 // =====================================================================
 // 计算机网络 · 第8章 网络安全
@@ -10,6 +10,32 @@ import { Panel, Note, Chips, NumField, TextField, isZh, makeChapter, type SubDef
 // =====================================================================
 
 type SubMode = "symmetric" | "publickey" | "integrity" | "tls";
+
+type Kv = [string, React.ReactNode];
+
+// 用户驱动触发器：点击推进到下一帧（onNext）
+function NextButton({ onNext, zh, zhLabel, enLabel, disabled, hint }: { onNext?: () => void; zh: boolean; zhLabel: string; enLabel: string; disabled?: boolean; hint?: string }) {
+  const off = !!disabled || typeof onNext !== "function";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", padding: "8px 12px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
+      <button disabled={off} onClick={(e) => { e.stopPropagation(); if (!off) onNext?.(); }} style={{ padding: "7px 18px", borderRadius: 999, border: "1px solid #c7d2fe", background: off ? "#f1f5f9" : "#4338ca", color: off ? "#94a3b8" : "#fff", fontWeight: 800, fontSize: 13, cursor: off ? "default" : "pointer", fontFamily: "inherit" }}>
+        {zh ? zhLabel : enLabel}
+      </button>
+      {!off && hint && <span style={{ fontSize: 12, color: "#4338ca" }}>{hint}</span>}
+    </div>
+  );
+}
+
+// 内联「状态 / 数值」面板：每步从 scene 派生
+function ValuePanel({ zh, rows }: { zh: boolean; rows: Kv[] }) {
+  if (!rows.length) return null;
+  return (
+    <div style={{ display: "grid", gap: 6, padding: "10px 14px", borderRadius: 10, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+      <div style={{ fontWeight: 800, color: "#1e293b", fontSize: 13 }}>{zh ? "状态 / 数值" : "State / Values"}</div>
+      <Table head={zh ? ["项", "值"] : ["Item", "Value"]} rows={rows as React.ReactNode[][]} />
+    </div>
+  );
+}
 
 // ---------- BigInt 模幂 / 扩展欧几里得（RSA 安全计算） ----------
 
@@ -76,11 +102,23 @@ type CbcScene = {
   key: string;
 };
 
-function SymmetricRender({ scene, t }: any) {
+function SymmetricRender({ scene, t, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? { block: -1, blocks: [], iv: CBC_IV, chain: [], mode: "enc", phase: "init", xor: null, plain: null, key: CBC_KEY }) as CbcScene;
   const n = s.blocks.length;
   const dec = s.mode === "dec";
+  const done = dec && s.block <= 0;
+  const phaseLabel: Record<CbcScene["phase"], string> = zh
+    ? { init: "生成随机 IV", xor: "先异或上一密文", enc: "分组加密 E_K", send: "发送 IV 与密文", dec: "解密后异或还原" }
+    : { init: "random IV", xor: "XOR previous ciphertext", enc: "block encrypt E_K", send: "send IV & ciphertext", dec: "decrypt then XOR" };
+  const rows: Kv[] = [
+    [zh ? "IV = C0" : "IV = C0", s.iv],
+    [zh ? "密钥 K" : "Key K", s.key],
+    [zh ? "阶段" : "Phase", phaseLabel[s.phase]],
+    [zh ? "当前块" : "Current block", s.block < 0 ? "—" : `P${s.block + 1}`],
+    [zh ? "异或中间值 X" : "XOR value X", s.xor ?? "—"],
+    [zh ? "密文链" : "Cipher chain", s.chain.length ? s.chain.join("  ") : "—"],
+  ];
   const box = (bg: string, bd: string, fg: string): React.CSSProperties => ({ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 56, padding: "5px 9px", borderRadius: 9, background: bg, border: `1px solid ${bd}`, color: fg, fontFamily: "ui-monospace, monospace", fontSize: 12, lineHeight: 1.4 });
   const row = (cur: boolean, shown: boolean): React.CSSProperties => ({ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "7px 10px", borderRadius: 10, background: cur ? "#eef2ff" : "#f8fafc", border: `1px solid ${cur ? "#c7d2fe" : "#e2e8f0"}`, opacity: shown ? 1 : 0.45 });
   const arrow = (label: string) => <span style={{ fontSize: 11, color: "#94a3b8", fontFamily: "ui-monospace, monospace", whiteSpace: "nowrap" }}>{label}</span>;
@@ -89,6 +127,8 @@ function SymmetricRender({ scene, t }: any) {
     : { init: "random IV", xor: "XOR previous ciphertext", enc: "block encrypt E_K", send: "send IV & ciphertext", dec: "decrypt then XOR" })[s.phase];
   return (
     <Panel>
+      <NextButton zh={zh} onNext={onNext} disabled={done} hint={zh ? "点击推进 CBC：逐块异或、加密，再逆序解密" : "click to advance CBC: XOR and encrypt block by block, then decrypt"}
+        zhLabel={done ? "解密完成" : s.phase === "dec" ? "解密下一块" : "加密下一块"} enLabel={done ? "done" : s.phase === "dec" ? "decrypt next block" : "encrypt next block"} />
       <div style={{ textAlign: "center", fontSize: 14 }}>
         <MathText text="$C_i = E_K(P_i \oplus C_{i-1}), \qquad P_i = D_K(C_i) \oplus C_{i-1}$" />
       </div>
@@ -137,6 +177,7 @@ function SymmetricRender({ scene, t }: any) {
       <Note>{zh
         ? "每个明文块先与上一密文块异或、再加密：相同明文块得到不同密文；IV 随机且每报文唯一。解密时先解密、再异或还原。"
         : "Each plaintext block is XORed with the previous ciphertext before encryption: equal blocks yield different ciphertext; the IV is fresh per message. Decryption reverses the order."}</Note>
+      <ValuePanel zh={zh} rows={rows} />
     </Panel>
   );
 }
@@ -211,11 +252,19 @@ type RsaScene = {
   dec: bigint | null;
 };
 
-function RsaRender({ scene, t }: any) {
+function RsaRender({ scene, t, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? { step: 0 }) as RsaScene;
   const step = s.step ?? 0;
   const fmt = (v: bigint | null | undefined): string => (v === null || v === undefined ? "—" : `${v}`);
+  const valueRows: Kv[] = [
+    [zh ? "n = p·q" : "n = p·q", fmt(s.n)],
+    [zh ? "φ(n) = (p−1)(q−1)" : "φ(n) = (p−1)(q−1)", fmt(s.phi)],
+    [zh ? "公钥 e" : "Public e", fmt(s.e)],
+    [zh ? "私钥 d" : "Private d", fmt(s.d)],
+    [zh ? "密文 c = mᵉ mod n" : "Cipher c = mᵉ mod n", fmt(s.c)],
+    [zh ? "解密 cᵈ mod n" : "Decrypt cᵈ mod n", fmt(s.dec)],
+  ];
   const rows: [string, string][] = zh
     ? [
       ["① 选取素数", `p = ${s.p}，q = ${s.q}`],
@@ -237,6 +286,8 @@ function RsaRender({ scene, t }: any) {
     ];
   return (
     <Panel>
+      <NextButton zh={zh} onNext={onNext} disabled={step >= 6} hint={zh ? "点击逐步完成 RSA：素数与模数、欧拉函数、求逆、加解密" : "click to run RSA step by step: primes, n, φ, inverse, encrypt/decrypt"}
+        zhLabel={step >= 6 ? "已完成" : "计算下一步"} enLabel={step >= 6 ? "done" : "compute next step"} />
       <div style={{ textAlign: "center", fontSize: 14 }}>
         <MathText text="$K^-(K^+(m)) = m, \qquad K^+(K^-(m)) = m$" />
       </div>
@@ -251,6 +302,7 @@ function RsaRender({ scene, t }: any) {
           );
         })}
       </div>
+      <ValuePanel zh={zh} rows={valueRows} />
       <Note tone={s.d === null ? "warn" : "info"}>
         {zh
           ? "e 必须与 φ(n) 互素才能求逆；朴素 RSA 需配合 OAEP 填充，且 n 要足够大（≥2048 位）以防分解。"
@@ -327,10 +379,16 @@ function IntegrityControls({ config, onChange, t }: any) {
 
 type SigScene = { step: number; hash: string; signature: string; msg: string; ok: boolean };
 
-function IntegrityRender({ scene, t }: any) {
+function IntegrityRender({ scene, t, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? { step: 0, hash: "", signature: "", msg: "", ok: false }) as SigScene;
   const step = s.step ?? 0;
+  const valueRows: Kv[] = [
+    [zh ? "报文 m" : "Message m", s.msg],
+    [zh ? "摘要 h = H(m)" : "Digest h = H(m)", s.hash],
+    [zh ? "签名 σ" : "Signature σ", s.signature],
+    [zh ? "验证结果" : "Verify", s.ok ? (zh ? "通过" : "ok") : (zh ? "失败" : "fail")],
+  ];
   const steps: [string, string][] = zh
     ? [
       ["① 报文 → 摘要", `m = ${s.msg} ⟶ h = H(m) = ${s.hash}`],
@@ -348,6 +406,8 @@ function IntegrityRender({ scene, t }: any) {
     ];
   return (
     <Panel>
+      <NextButton zh={zh} onNext={onNext} disabled={step >= 4} hint={zh ? "点击推进：散列、私钥签名、发送、验证" : "click to advance: hash, sign, send, verify"}
+        zhLabel={step >= 4 ? "验证完成" : "签名 / 发送"} enLabel={step >= 4 ? "verified" : "sign / send"} />
       <div style={{ textAlign: "center", fontSize: 14 }}>
         <MathText text="$h = H(m), \qquad \sigma = K_A^-(h), \qquad K_A^+(\sigma) \stackrel{?}{=} H(m)$" />
       </div>
@@ -370,6 +430,7 @@ function IntegrityRender({ scene, t }: any) {
         <span>{zh ? "发送方 A（私钥 K_A⁻）" : "sender A (private K_A⁻)"}</span>
         <span>{zh ? "接收方 B（公钥 K_A⁺）" : "receiver B (public K_A⁺)"}</span>
       </div>
+      <ValuePanel zh={zh} rows={valueRows} />
       <Note>{zh
         ? "先散列再签名：H(m) 让签名与报文长度无关；任何人有公钥都能验证，但只有 A 能用私钥签名——提供鉴别与不可否认。"
         : "Hash-then-sign: H(m) decouples signature size from the message; anyone with the public key can verify, but only A can sign—giving authentication and non-repudiation."}</Note>
@@ -409,7 +470,7 @@ const SIG_CODE = [
 
 type TlsScene = { step: number };
 
-function TlsRender({ scene, t }: any) {
+function TlsRender({ scene, t, onNext }: any) {
   const zh = isZh(t);
   const s = (scene ?? { step: 0 }) as TlsScene;
   const step = s.step ?? 0;
@@ -430,8 +491,15 @@ function TlsRender({ scene, t }: any) {
       ["5", "Finished", "derive keys from session secret, verify handshake"],
       ["6", "Application data", "symmetric encryption + MAC/AEAD"],
     ];
+  const valueRows: Kv[] = [
+    [zh ? "握手步骤" : "Handshake step", `${step + 1} / 6`],
+    [zh ? "当前消息" : "Current message", steps[step]?.[1] ?? "—"],
+    [zh ? "说明" : "Detail", steps[step]?.[2] ?? "—"],
+  ];
   return (
     <Panel>
+      <NextButton zh={zh} onNext={onNext} disabled={step >= 5} hint={zh ? "点击发送下一条握手消息，逐步建立 TLS 会话" : "click to send the next handshake message, establishing the TLS session"}
+        zhLabel={step >= 5 ? "握手完成" : "发送握手消息"} enLabel={step >= 5 ? "handshake done" : "send handshake message"} />
       <div style={{ display: "grid", gap: 6 }}>
         {steps.map(([n, a, b], i) => {
           const cur = i === step;
@@ -444,6 +512,7 @@ function TlsRender({ scene, t }: any) {
           );
         })}
       </div>
+      <ValuePanel zh={zh} rows={valueRows} />
       <Note>{zh
         ? "前向保密：使用 ECDHE 时，每次会话的临时密钥在结束后销毁；即使服务器长期私钥泄露，也无法解密历史流量。"
         : "Forward secrecy: with ECDHE the ephemeral session key is destroyed after use, so leaking the long-term private key cannot decrypt past traffic."}</Note>

@@ -135,6 +135,7 @@ export function makeChapter<V extends string>(spec: {
     desc: spec.desc,
     tags: spec.tags,
     interactive: spec.interactive ?? !animated,
+    advanceOnCanvas: animated,
     defaultConfig: { subMode: first, ...(spec.subs[first].defaultConfig ?? {}) },
     Controls(props: any) {
       const { config, onChange, t, embedded } = props;

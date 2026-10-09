@@ -21,6 +21,27 @@ function fmtBytes(n: number): string {
   return `${v.toFixed(dec)} ${u[i]}`;
 }
 
+// 用户驱动「状态 / 数值」面板：展示当前步取值，并提供推进按钮
+function StepPanel({ title, rows, onNext, nextLabel, showNext }: {
+  title: string;
+  rows: [string, string][];
+  onNext?: () => void;
+  nextLabel: string;
+  showNext: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", padding: "8px 12px", borderRadius: 10, background: "#0f172a", color: "#e2e8f0", fontSize: 12 }}>
+      <span style={{ fontWeight: 800, color: "#a5b4fc" }}>{title}</span>
+      {rows.map(([k, v]) => (
+        <span key={k} style={{ fontFamily: "ui-monospace, monospace", whiteSpace: "nowrap" }}>{k} = <b style={{ color: "#fde047" }}>{v}</b></span>
+      ))}
+      {showNext && onNext && (
+        <button className="primary" style={{ marginLeft: "auto" }} onClick={(e) => { e.stopPropagation(); onNext(); }}>{nextLabel}</button>
+      )}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------
 // inode 与多级索引（逐帧解析目标块）
 // ---------------------------------------------------------------------
@@ -145,7 +166,7 @@ const INODE_CODE = [
   T("return 数据块地址", "return data block address"),
 ];
 
-function InodeRender({ scene, config, t }: any) {
+function InodeRender({ scene, config, t, onNext, step: frameStep, count, playing }: any) {
   const zh = isZh(t);
   const sc = (scene ?? {}) as Partial<InodeScene>;
   const { b, ptr, d, p, single, double, triple } = inodeGeometry(config);
@@ -153,6 +174,9 @@ function InodeRender({ scene, config, t }: any) {
   const level = sc.level ?? -1;
   const chain = sc.chain ?? [];
   const reads = sc.reads ?? 0;
+  const canNext = !!onNext && !playing && (typeof frameStep !== "number" || typeof count !== "number" || frameStep < count - 1);
+  const advance = (e: React.MouseEvent) => { e.stopPropagation(); if (canNext) onNext(); };
+  const levelName = level < 0 ? "—" : (zh ? ["直接", "一级间接", "二级间接", "三级间接"] : ["direct", "1-indirect", "2-indirect", "3-indirect"])[level];
   const totalBlocks = d + single + double + triple;
   const maxBytes = totalBlocks * b;
   const regions = [
@@ -179,15 +203,18 @@ function InodeRender({ scene, config, t }: any) {
         {regions.map((r) => {
           const active = level === r.lv;
           const contains = offset >= r.lo && offset < r.hi;
+          const clickable = canNext && (active || contains);
           return (
-            <div key={r.lv} style={{ display: "flex", gap: 10, alignItems: "center", padding: "6px 10px", borderRadius: 8,
+            <div key={r.lv} onClick={clickable ? advance : undefined} style={{ display: "flex", gap: 10, alignItems: "center", padding: "6px 10px", borderRadius: 8,
               background: active ? r.bg : contains ? "#f8fafc" : "#fff",
               border: `2px solid ${active ? r.bd : contains ? "#cbd5e1" : "#f1f5f9"}`,
+              cursor: clickable ? "pointer" : "default",
               opacity: level >= 0 && !contains && !active ? 0.5 : 1 }}>
               <span style={{ width: 90, fontSize: 11, fontWeight: 800, color: active ? "#92400e" : "#475569" }}>{r.label}</span>
               <span style={{ fontSize: 11, color: "#64748b", fontFamily: "ui-monospace, monospace", flex: 1 }}>{`[${r.lo.toLocaleString()}, ${(r.hi - 1).toLocaleString()}]`}</span>
               {contains && <span style={{ fontSize: 10, color: "#4338ca", fontWeight: 800 }}>{zh ? "含 q" : "has q"}</span>}
               {active && <span style={{ fontSize: 10, color: "#b45309", fontWeight: 800 }}>{zh ? "命中" : "hit"}</span>}
+              {clickable && <span style={{ fontSize: 10, color: "#4338ca", fontWeight: 800 }}>{zh ? "点此读取下一级" : "click to read next"}</span>}
             </div>
           );
         })}
@@ -199,10 +226,19 @@ function InodeRender({ scene, config, t }: any) {
           : chain.map((c, i) => (
             <span key={i} style={{ display: "flex", alignItems: "center", gap: 6 }}>
               {i > 0 && <span style={{ color: "#94a3b8" }}>→</span>}
-              <span style={{ fontSize: 11, fontFamily: "ui-monospace, monospace", background: "#eef2ff", color: "#3730a3", padding: "2px 6px", borderRadius: 6 }}>{c}</span>
+              <span onClick={canNext ? advance : undefined} style={{ fontSize: 11, fontFamily: "ui-monospace, monospace", background: "#eef2ff", color: "#3730a3", padding: "2px 6px", borderRadius: 6, cursor: canNext ? "pointer" : "default" }}>{c}</span>
             </span>
           ))}
       </Row>
+      <StepPanel
+        title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("目标偏移", "Offset")), String(offset)],
+          [t(T("层级", "Level")), levelName],
+          [t(T("读盘", "Reads")), String(reads)],
+          [t(T("指针链", "Chain")), chain.length ? chain.join(" -> ") : "—"],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(T("读取下一级指针块", "Read next pointer block"))} />
       <div style={{ textAlign: "center", fontSize: 14 }}>
         <MathText text={`$B_{\\max} = (d + p + p^{2} + p^{3})\\cdot b = ${fmtBytes(maxBytes)}$`} />
       </div>
@@ -268,7 +304,7 @@ const ALLOC_CODE = [
   T("随机跳转目标块，统计所需读盘次数", "jump to the target block, count required reads"),
 ];
 
-function AllocationRender({ scene, t }: any) {
+function AllocationRender({ scene, t, onNext, step: frameStep, count, playing }: any) {
   const zh = isZh(t);
   const sc = (scene ?? {}) as Partial<AllocScene>;
   const mode = sc.mode ?? "contiguous";
@@ -276,6 +312,8 @@ function AllocationRender({ scene, t }: any) {
   const phase = sc.phase ?? "seq";
   const target = sc.target ?? 5;
   const step = sc.step ?? 0;
+  const canNext = !!onNext && !playing && (typeof frameStep !== "number" || typeof count !== "number" || frameStep < count - 1);
+  const advance = (e: React.MouseEvent) => { e.stopPropagation(); if (canNext) onNext(); };
   const N = 6;
   const modes: AllocMode[] = ["contiguous", "linked", "indexed"];
   const randomReads: Record<AllocMode, number> = { contiguous: 1, linked: target + 1, indexed: 2 };
@@ -318,15 +356,25 @@ function AllocationRender({ scene, t }: any) {
         {Array.from({ length: N }, (_, i) => {
           const at = phase === "random" ? target : step;
           const on = i === at && (phase === "random" || step < N);
+          const clickable = canNext && on;
           return (
-            <div key={i} style={{ width: 44, textAlign: "center", padding: "6px 0", borderRadius: 8, fontSize: 11,
+            <div key={i} onClick={clickable ? advance : undefined} style={{ width: 44, textAlign: "center", padding: "6px 0", borderRadius: 8, fontSize: 11,
               background: on ? "#4338ca" : "#f1f5f9", color: on ? "#fff" : "#475569",
-              border: `1px solid ${on ? "#4338ca" : "#e2e8f0"}`, fontFamily: "ui-monospace, monospace", fontWeight: on ? 800 : 500 }}>
+              border: `1px solid ${on ? "#4338ca" : "#e2e8f0"}`, fontFamily: "ui-monospace, monospace", fontWeight: on ? 800 : 500, cursor: clickable ? "pointer" : "default" }}>
               {i}
             </div>
           );
         })}
       </div>
+      <StepPanel
+        title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("方式", "Scheme")), ALLOC_LABEL[mode][zh ? "zh" : "en"]],
+          [t(T("阶段", "Phase")), phase === "random" ? (zh ? "随机访问" : "random") : (zh ? "顺序访问" : "sequential")],
+          [t(T("目标块", "Target")), `#${target + 1}`],
+          [t(T("读盘", "Reads")), String(reads)],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(T("读取下一块", "Read next block"))} />
       <Table
         head={zh ? ["方式", "元数据", "顺序读盘", "随机读盘", "评价"] : ["Scheme", "Metadata", "Seq reads", "Rand reads", "Verdict"]}
         rows={rows}
@@ -450,11 +498,13 @@ const JOURNAL_CODE = [
   T("recover(): 重放已提交事务 (redo)", "recover(): replay committed transactions (redo)"),
 ];
 
-function JournalingRender({ scene, t }: any) {
+function JournalingRender({ scene, t, onNext, step: frameStep, count, playing }: any) {
   const zh = isZh(t);
   const sc = (scene ?? { step: 0 }) as Partial<JournalScene>;
   const step = Math.max(0, Math.min(JOURNAL_STATE.length - 1, sc.step ?? 0));
   const st = JOURNAL_STATE[step];
+  const canNext = !!onNext && !playing && (typeof frameStep !== "number" || typeof count !== "number" || frameStep < count - 1);
+  const advance = (e: React.MouseEvent) => { e.stopPropagation(); if (canNext) onNext(); };
   const phases: [string, string][] = [
     ["① 写日志", "① write journal"],
     ["② 提交", "② commit"],
@@ -463,8 +513,8 @@ function JournalingRender({ scene, t }: any) {
   ];
   const activePhase = step >= 1 && step <= 4 ? step - 1 : -1;
   const recovering = step >= 5;
-  const cell = (label: string, value: React.ReactNode, tint: string) => (
-    <div style={{ flex: "1 1 220px", minWidth: 200, border: `2px solid ${tint}`, borderRadius: 10, overflow: "hidden", background: "#fff" }}>
+  const cell = (label: string, value: React.ReactNode, tint: string, onClick?: (e: React.MouseEvent) => void) => (
+    <div onClick={onClick} style={{ flex: "1 1 220px", minWidth: 200, border: `2px solid ${tint}`, borderRadius: 10, overflow: "hidden", background: "#fff", cursor: onClick ? "pointer" : "default" }}>
       <div style={{ background: tint, color: "#fff", padding: "5px 10px", fontWeight: 800, fontSize: 12 }}>{label}</div>
       <div style={{ padding: 10, display: "grid", gap: 5, minHeight: 78 }}>{value}</div>
     </div>
@@ -474,10 +524,11 @@ function JournalingRender({ scene, t }: any) {
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
         {phases.map(([zhL, enL], i) => {
           const on = i === activePhase;
+          const clickable = canNext && on;
           return (
-            <div key={i} style={{ flex: "1 1 120px", minWidth: 108, padding: "8px 10px", borderRadius: 10, textAlign: "center",
+            <div key={i} onClick={clickable ? advance : undefined} style={{ flex: "1 1 120px", minWidth: 108, padding: "8px 10px", borderRadius: 10, textAlign: "center",
               background: on ? "#eef2ff" : "#f8fafc", border: `2px solid ${on ? "#6366f1" : "#e2e8f0"}`,
-              color: on ? "#4338ca" : "#64748b", fontWeight: on ? 800 : 500, fontSize: 12, transition: "all .2s" }}>
+              color: on ? "#4338ca" : "#64748b", fontWeight: on ? 800 : 500, fontSize: 12, transition: "all .2s", cursor: clickable ? "pointer" : "default" }}>
               {zh ? zhL : enL}
             </div>
           );
@@ -489,7 +540,7 @@ function JournalingRender({ scene, t }: any) {
           : st.journal.map((j, i) => (
             <div key={i} style={{ fontSize: 12, fontFamily: "ui-monospace, monospace", padding: "3px 7px", borderRadius: 6,
               background: j === "commit" ? "#dcfce7" : "#eef2ff", color: j === "commit" ? "#047857" : "#3730a3", fontWeight: j === "commit" ? 800 : 500 }}>{j}</div>
-          )), "#6366f1")}
+          )), "#6366f1", canNext ? advance : undefined)}
         {cell(zh ? "数据区 (home)" : "Home location",
           <div style={{ fontSize: 12 }}>
             <span style={{ fontFamily: "ui-monospace, monospace", padding: "3px 7px", borderRadius: 6,
@@ -498,6 +549,16 @@ function JournalingRender({ scene, t }: any) {
             </span>
           </div>, "#0f766e")}
       </div>
+      <StepPanel
+        title={t(T("状态 / 数值", "Status / Values"))}
+        rows={[
+          [t(T("步骤", "Step")), `${step + 1}/${typeof count === "number" ? count : JOURNAL_STATE.length}`],
+          [t(T("日志", "Journal")), st.journal.length ? st.journal.join(" | ") : (zh ? "空" : "empty")],
+          [t(T("已提交", "Committed")), st.committed ? (zh ? "是" : "yes") : (zh ? "否" : "no")],
+          [t(T("数据区", "Home")), st.home],
+          [t(T("崩溃", "Crash")), st.crash ? (zh ? "是" : "yes") : (zh ? "否" : "no")],
+        ]}
+        onNext={onNext} showNext={canNext} nextLabel={t(T("推进日志 / 提交", "Advance journal / commit"))} />
       {st.crash && (
         <Note tone="warn">
           {zh
