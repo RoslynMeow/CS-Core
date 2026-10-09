@@ -5,29 +5,13 @@
 \clearpage
 
 
-\subsection{流水线原理}
+\subsection{流水线思想与时空图}
 
-流水线（Pipeline）将一条指令的执行分解为多个阶段，不同指令的不同阶段**在时间上重叠执行**。类比工厂流水线：每个工位（阶段）同时处理不同产品（指令）。
+单个组合电路完成一条指令的全部工作，需要依次经过取指、译码、执行、访存、写回等若干步骤。
+若让每条指令串行走完全部步骤，则在任意时刻电路中只有一小部分在被使用，大量硬件处于空闲。
+\textbf{流水线}（Pipeline）的核心思想，就是把一条指令的执行切分为若干个延时相当的功能段，让不同指令的\textbf{不同功能段在时间上重叠执行}——正如工厂装配线上，每个工位（功能段）在同一时刻处理着不同产品（指令）的不同工序。
 
-\begin{definition}[流水线加速比]
-假设 $k$ 级流水线执行 $n$ 条指令（无冒险）：
-\begin{equation}
-T_{\text{流水}} = \text{填充时间} + (n-1) \times \text{最优段延时}
-\end{equation}
-加速比 $S \approx k$（当 $n \gg k$ 时）。
-\end{definition}
-
-\subsection{经典五级流水线}
-
-MIPS 五级流水线：
-
-\begin{itemize}
-    \item \textbf{IF}（Instruction Fetch）：取指令
-    \item \textbf{ID}（Instruction Decode）：译码 + 读寄存器
-    \item \textbf{EX}（Execute）：ALU 运算 / 地址计算
-    \item \textbf{MEM}（Memory Access）：访存（读/写数据存储器）
-    \item \textbf{WB}（Write Back）：结果写回寄存器
-\end{itemize}
+理解流水线最直观的工具是\textbf{时空图}（Space-Time Diagram）：横轴为时间（时钟周期），纵轴为功能段，一条指令的推进在图上表现为一条自左下到右上的斜线。
 
 \begin{figure}[H]
 \centering
@@ -41,93 +25,382 @@ MIPS 五级流水线：
     lbl/.style={font=\scriptsize}, hd/.style={font=\scriptsize\bfseries}
 ]
     \def\cs{1.07}
-    \foreach \c in {1,...,9} { \node[hd] at ({\c*\cs-0.5*\cs}, 0.5) {C\c}; }
+    \foreach \c in {1,...,9} { \node[hd] at ({\c*\cs-0.5*\cs}, 0.6) {C\c}; }
+    \foreach \s/\st in {1/IF,2/ID,3/EX,4/MEM,5/WB} {
+        \node[lbl] at ({-0.7}, {-\s*\cs+0.5*\cs}) {\st};
+    }
     \foreach \i/\n in {1/{$I_1$},2/{$I_2$},3/{$I_3$},4/{$I_4$},5/{$I_5$}} {
-        \node[lbl] at (-0.7, {-\i*\cs}) {\n};
+        \node[lbl] at ({-1.9}, {-\i*\cs+0.5*\cs}) {\n};
     }
     \foreach \i in {1,...,5} {
         \foreach \s/\st in {1/IF,2/ID,3/EX,4/MEM,5/WB} {
             \pgfmathtruncatemacro{\c}{\i+\s-1}
-            \node[st\s] at ({\c*\cs-0.5*\cs}, {-\i*\cs}) {\st};
+            \node[st\s] at ({\c*\cs-0.5*\cs}, {-\i*\cs+0.5*\cs}) {\st};
         }
     }
-    \node[lbl] at ({5*\cs}, {-6.1*\cs}) {理想流水线：$n$ 条指令耗时 $n+k-1$ 周期（$k=5$）};
+    \draw[->] ({0.0}, {0.95}) -- ({9.2*\cs}, {0.95}) node[right, font=\scriptsize] {时间（周期）};
+    \draw[->] ({-0.2}, {0.95}) -- ({-0.2}, {-5.4*\cs}) node[below, font=\scriptsize] {功能段};
+    \node[lbl, anchor=west] at ({5.2*\cs}, {-6.1*\cs}) {理想流水线：$n$ 条指令耗时 $n+k-1$ 周期（此处 $k=5$）};
 \end{tikzpicture}
-\caption{五级流水线时空图（无冒险，$S\approx k$）}
+\caption{五级流水线时空图（无冒险）：填充 $k-1$ 个周期后每周期流出一条结果}
 \label{fig:pipeline_spacetime}
 \end{figure}
 
-\subsection{流水线冒险（Pipeline Hazards）}
-
-冒险是指流水线在正常推进中遇到的阻碍，分三类：
-
-\subsubsection{结构冒险（Structural Hazard）}
-
-多个指令争用同一硬件资源。
-
-\textbf{解决方案}：增加硬件（如分离指令缓存和数据缓存——哈佛结构）、流水化功能单元。
-
-\subsubsection{数据冒险（Data Hazard）}
-
-后续指令依赖前一条指令尚未写回的结果。
-
-\begin{example}[数据冒险]
-\begin{lstlisting}
-add  $1, $2, $3    # $1 在 WB 阶段才被写入
-sub  $4, $1, $5    # 但 sub 的 ID 阶段就需要 $1——冒险！
-\end{lstlisting}
-\end{example}
-
-\textbf{解决方案}：
-
-\begin{enumerate}
-    \item \textbf{转发/旁路（Forwarding / Bypassing）}：在结果"产生时刻"（EX 阶段结束）直接送给下一条指令的 EX 阶段入口，跳过写回再读出的等待。
-    \item \textbf{插入气泡（Stall / Bubble）}：在无法转发时（如 $\texttt{lw}$ 后紧接使用该数据），暂停流水线一个周期。
-    \item \textbf{编译调度}：重排指令顺序，增大数据依赖的距离。
-\end{enumerate}
-
-\subsubsection{控制冒险（Control Hazard）}
-
-分支/跳转指令改变程序流，后续已取指令可能无效。
-
-\textbf{解决方案}：
-
+图~\ref{fig:pipeline_spacetime} 揭示了两点关键事实：
 \begin{itemize}
-    \item \textbf{流水线阻塞（Stall）}：等分支结果再取下一指令（浪费周期）
-    \item \textbf{分支预测（Branch Prediction）}：预测分支走向，提前取指
-    \item \textbf{延迟分支（Delayed Branch）}：分支后执行一条"延迟槽"指令
+    \item 流水线存在 $k-1$ 个周期的\textbf{填充（fill）}阶段，此阶段尚未满载；
+    \item 进入稳定状态后，\textbf{每个时钟周期都有一条指令完成}，吞吐率不再随指令数增长。
 \end{itemize}
 
-\subsection{分支预测}
+\subsection{理想加速比与吞吐率}
+
+为定量刻画，设流水线有 $k$ 级，每级延时为 $T_s$，稳态下时钟周期 $T_{\text{clk}} = T_s$（各级已平衡）。
+执行 $n$ 条指令时：
+
+\begin{equation}
+T_{\text{串行}} = n \cdot k \cdot T_s
+\end{equation}
+
+即每条指令都完整地穿过 $k$ 级，共需 $n k$ 个段延时。
+
+\begin{equation}
+T_{\text{流水}} = \bigl(k + (n-1)\bigr) \cdot T_s = (n + k - 1) \cdot T_s
+\end{equation}
+
+其中 $k$ 个周期用于填充，此后每周期完成一条，完成余下 $n-1$ 条需 $n-1$ 个周期。
+
+\begin{equation}
+S = \frac{T_{\text{串行}}}{T_{\text{流水}}}
+  = \frac{n k T_s}{(n+k-1) T_s}
+  = \frac{n k}{n+k-1}
+  \xrightarrow[\;n \gg k\;]{} k
+\label{eq:ideal_speedup}
+\end{equation}
+
+由式~\eqref{eq:ideal_speedup} 可见，当指令数远大于级数时，\textbf{理想加速比趋于流水线级数 $k$}。
+吞吐率（单位时间完成的指令数）为
+
+\begin{equation}
+\text{TP} = \frac{n}{T_{\text{流水}}} = \frac{n}{(n+k-1) T_s}
+  \xrightarrow[\;n \gg k\;]{} \frac{1}{T_s} = \frac{1}{T_{\text{clk}}},
+\label{eq:throughput}
+\end{equation}
+
+即稳态吞吐率的理论上限是\textbf{每周期一条指令}（IPC $= 1$）。
+
+\begin{example}[理想加速比与吞吐率]
+取 $k = 5$ 级流水线，每级延时 $T_s = 1\,\text{ns}$（$T_{\text{clk}} = 1\,\text{ns}$），执行 $n = 1000$ 条指令。
+\begin{itemize}
+    \item 串行：$T_{\text{串行}} = n k T_s = 1000 \times 5 \times 1 = 5000\,\text{ns}$，吞吐率 $1000/5000 = 0.2\,\text{条/ns}$。
+    \item 流水：$T_{\text{流水}} = (n+k-1) T_s = (1000+5-1) \times 1 = 1004\,\text{ns}$，吞吐率 $1000/1004 \approx 0.996\,\text{条/ns}$。
+    \item 加速比 $S = 5000/1004 \approx 4.98$，非常接近理论上限 $k = 5$（差距来自 $k-1=4$ 个填充周期，仅占约 $0.4\%$）。
+\end{itemize}
+若 $n$ 缩小到 $20$，则 $T_{\text{流水}} = (20+4) = 24\,\text{ns}$，$S = 100/24 \approx 4.17$——\textbf{指令越少，填充开销占比越大，加速比越远离 $k$}。
+\end{example}
+
+\subsection{经典五级流水线}
+
+\subsubsection{五个阶段}
+
+MIPS 类 RISC 处理器把指令执行划分为五个延时均衡的阶段（表~\ref{tab:pipe_stages}）。
 
 \begin{table}[H]
 \centering
-\caption{分支预测策略}
-\label{tab:branch_prediction}
-\begin{tabulary}{\textwidth}{CCC}
+\caption{五级流水线各阶段的功能}
+\label{tab:pipe_stages}
+\begin{tabulary}{\textwidth}{CCL}
 \toprule
-\textbf{策略} & \textbf{原理} & \textbf{准确率} \\
+\textbf{阶段} & \textbf{全称} & \textbf{主要功能} \\
 \midrule
-静态预测 & 向后分支（循环）预测跳转 & 约 65\% \\
-1-bit 动态预测 & 记录上次跳转与否 & 约 80\% \\
-2-bit 饱和计数器 & 两次跳转成功才改预测 & 约 90\% \\
-GShare / 锦标赛 & 结合全局历史 + 局部模式 & 95\%+ \\
+IF & Instruction Fetch & 以 PC 为地址取出指令，并计算 PC $+$ 4 \\
+ID & Instruction Decode & 译码、读寄存器堆、生成立即数、识别分支 \\
+EX & Execute & ALU 运算、分支地址/条件判断、访存地址计算 \\
+MEM & Memory Access & 读/写数据存储器（仅 load/store 做实际访存） \\
+WB & Write Back & 将结果写回寄存器堆（仅需写回的指令） \\
 \bottomrule
 \end{tabulary}
 \end{table}
 
-\subsection{超标量与乱序执行}
+一条典型的 \texttt{lw} 指令在其存在的每个周期只占用对应的一段硬件，其余四段硬件同时服务于其他指令，这正是流水线提升资源利用率的方式。
 
+\subsubsection{流水线寄存器的作用}
+
+要让不同阶段“各自干各自的”，必须把\textbf{每一级的中间结果锁存下来}，交给下一级在下一个时钟周期使用。
+连接相邻两级之间的小型寄存器称为\textbf{流水线寄存器}（Pipeline Register），它们受同一时钟驱动，是流水线的“传送带”（表~\ref{tab:pipe_regs}）。
+
+\begin{table}[H]
+\centering
+\caption{四条流水线寄存器及其携带的信息}
+\label{tab:pipe_regs}
+\begin{tabulary}{\textwidth}{CL}
+\toprule
+\textbf{流水线寄存器} & \textbf{传递的内容} \\
+\midrule
+IF/ID & 取出的指令字、PC $+$ 4（供后续分支与 \texttt{jal} 使用） \\
+ID/EX & 读出的两个寄存器值、立即数、目标寄存器号、已译码的控制信号 \\
+EX/MEM & ALU 结果、待写入存储器的数据、目标寄存器号、存储器/写回控制信号 \\
+MEM/WB & 访存读出的数据或 ALU 结果、目标寄存器号、写回控制信号 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+流水线寄存器带来的\textbf{代价}是延迟增大（每级多一次寄存器的建立/保持时间），收益是电路可以被安全地划分到不同周期。
+它也是理解冒险的钥匙：数据必须“写入”一个寄存器后，才可能在下一周期被别的阶段读到。
+
+\subsubsection{时空图}
+
+结合图~\ref{fig:pipeline_spacetime}，$I_1$ 的 WB 与 $I_5$ 的 IF 发生在同一周期（C5）。
+在满载区段，每个周期的边界恰好有 $\{1\,\text{IF},\,1\,\text{ID},\,1\,\text{EX},\,1\,\text{MEM},\,1\,\text{WB}\}$ 各一次，硬件利用率达到 $100\%$（忽略冒险）。
+
+\subsection{流水线冒险}
+
+理想流水线要求“每条指令都能按时进入下一级”，但\textbf{冒险}（Hazard）会打破这一假设。
+冒险分三类：\textbf{结构冒险}（资源冲突）、\textbf{数据冒险}（数据依赖）、\textbf{控制冒险}（控制转移）。
+
+\subsubsection{结构冒险}
+
+当两条指令在同一周期争用同一硬件资源时，发生结构冒险。例如经典的“单存储器”设计里，IF 要取指令、MEM 要读写数据，二者同时访问存储器冲突。
+常用解决手段见表~\ref{tab:structural}。
+
+\begin{table}[H]
+\centering
+\caption{结构冒险的常见来源与对策}
+\label{tab:structural}
+\begin{tabulary}{\textwidth}{CL}
+\toprule
+\textbf{冲突来源} & \textbf{对策} \\
+\midrule
+取指与访存争用存储器 & 分离指令 cache 与数据 cache（哈佛结构） \\
+写回与译码争用寄存器堆 & 前半个周期写、后半个周期读，或增设写端口 \\
+功能单元未流水化 & 将乘除法器等改为流水线化，或增加多份功能单元 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsubsection{数据冒险与数据前递}
+
+当某条指令要用的数据还没被前一条指令产生或写回时，就出现数据冒险。
+其中最常见的是\textbf{先写后读}（Read After Write, RAW）：
+
+\begin{example}[RAW 数据冒险]
+\begin{lstlisting}
+add  $1, $2, $3    # $1 在 WB 阶段才写入寄存器堆
+sub  $4, $1, $5    # 但 sub 在 ID 阶段就要读 $1 —— 读到的是旧值，冒险！
+\end{lstlisting}
+若不处理，\texttt{sub} 会读到过时的 \texttt{\$1}，程序结果错误。
+\end{example}
+
+朴素的做法是插气泡等待，但等待很浪费。观察时空图可以发现：\texttt{add} 的 ALU 结果在 \textbf{EX 结束时已算出}，\texttt{sub} 的 EX 阶段要到下一个周期才开始——两者正好差一个周期，\textbf{结果可以在产生点直接被“旁路”过去}。这就是\textbf{前递}（Forwarding，也叫旁路 Bypassing），如图~\ref{fig:forwarding} 所示。
+
+\begin{figure}[H]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[>=Stealth, font=\small]
+    \def\w{1.5}
+    \node[draw, minimum width=\w cm, minimum height=0.85cm, fill=blue!12]   (IF)  at (0.0,0) {IF};
+    \node[draw, minimum width=\w cm, minimum height=0.85cm, fill=blue!12]   (ID)  at (2.4,0) {ID};
+    \node[draw, minimum width=\w cm, minimum height=0.85cm, fill=green!18]  (EX)  at (4.8,0) {EX};
+    \node[draw, minimum width=\w cm, minimum height=0.85cm, fill=orange!22] (MEM) at (7.2,0) {MEM};
+    \node[draw, minimum width=\w cm, minimum height=0.85cm, fill=violet!18] (WB)  at (9.6,0) {WB};
+
+    \node[draw, fill=gray!15, minimum width=0.24cm, minimum height=1.15cm] (r2) at (3.6,0) {};
+    \node[draw, fill=gray!15, minimum width=0.24cm, minimum height=1.15cm] (r3) at (6.0,0) {};
+    \node[draw, fill=gray!15, minimum width=0.24cm, minimum height=1.15cm] (r4) at (8.4,0) {};
+    \node[above=0.16cm of r2, font=\scriptsize] {ID/EX};
+    \node[above=0.16cm of r3, font=\scriptsize] {EX/MEM};
+    \node[above=0.16cm of r4, font=\scriptsize] {MEM/WB};
+
+    \draw[->, red, thick]  (r3.south) -- ++(0,-1.1) -| ([xshift=0.30cm]EX.south);
+    \draw[->, teal, thick] (r4.south) -- ++(0,-1.8) -| ([xshift=-0.30cm]EX.south);
+
+    \node[red,  font=\scriptsize] at (5.7,-1.05) {前递（EX/MEM）};
+    \node[teal, font=\scriptsize] at (6.6,-1.75) {前递（MEM/WB）};
+
+    \node[draw, rounded corners, align=center, font=\scriptsize, fill=yellow!15]
+        at (4.8,-2.7) {RAW 冒险\\由前递消除};
+\end{tikzpicture}%
+}
+\caption{数据前递：把 EX/MEM、MEM/WB 中已算出的结果直接旁路到 EX 阶段输入}
+\label{fig:forwarding}
+\end{figure}
+
+前递并非万能。若生产数据的指令是 \texttt{lw}，其数据要到 MEM 阶段末才可用，而消费指令的 EX 紧接其后——前递也来不及，此时必须\textbf{插入一个气泡}（见 \ref{sec:stall} 小节）。
+更一般地，流水线需要\textbf{前递单元}在 EX 入口处比较“源寄存器号”与“EX/MEM、MEM/WB 中的目标寄存器号”，若匹配则选择前递数据而非寄存器堆数据。
+
+\subsubsection{控制冒险}
+
+分支、跳转等控制转移指令会改变 PC，而流水线在分支结果算出之前就已按顺序取入了后续指令（对 \texttt{beq} 而言，分支是否发生要到 EX 阶段才确定）。
+若分支真的跳转，已取入的指令就是\textbf{错误的}，必须作废，这就是控制冒险。
+控制冒险造成的损失称为\textbf{分支惩罚}（Branch Penalty），其大小取决于“何时知道分支去向”和“预测是否正确”。
+
+\subsection{停顿、分支惩罚与分支预测}
+\label{sec:stall}
+
+\subsubsection{停顿与分支延迟槽}
+
+\textbf{停顿}（Stall）是最简单的应对：让相关指令或后续取指暂停若干周期，向流水线中插入不产生副作用的\textbf{气泡}（Bubble，常以“清空控制信号”的空操作实现）。
+分支引起的停顿周期数即惩罚；一个常见的折中是\textbf{分支延迟槽}（Branch Delay Slot）：无论分支是否 jump，紧随分支之后的那一条指令都照常执行，编译器把一条“一定会执行”的指令填入该槽，从而把惩罚从 $2$ 个周期降到 $1$ 个周期。
+
+\subsubsection{静态预测}
+
+\textbf{静态预测}在编译或上电时固定策略，硬件简单：
 \begin{itemize}
-    \item \textbf{超标量（Superscalar）}：每个周期发射多条指令。IPC > 1，需多个功能单元并行。
-    \item \textbf{乱序执行（Out-of-Order Execution）}：不按程序顺序执行指令，只保留"提交"（commit）顺序。用重排序缓冲区（ROB）和寄存器重命名消除假依赖。
-    \item \textbf{同时多线程（SMT / Hyper-threading）}：同一核心交替执行两个线程的指令，隐藏访存延迟。
+    \item \textbf{总是预测跳转}（always taken）：适合循环回边等高频跳转，但每次循环退出都错一次；
+    \item \textbf{总是预测不跳转}（always not taken）：实现最简单（顺序取指即可），适合“分支大多不跳”的代码。
 \end{itemize}
 
-\subsection{流水线的性能极限}
+\subsubsection{动态预测}
 
-\[
-\text{实际IPC} = \text{理想IPC} \times (1 - \text{冒险损失})
-\]
+\textbf{动态预测}在运行时依据历史记录预测，准确率更高。
+最基础的是\textbf{1 位预测器}：用 1 bit 记录该分支“上次跳/未跳”，本次就预测相同结果。它对循环的“边界抖动”敏感——每次循环退出都会连错两次。
+改进方案是\textbf{2 位饱和计数器}（2-bit Saturating Counter）：计数器的增减需要连续两次相反结果才翻转预测，从而过滤单次抖动，如图~\ref{fig:twobit} 所示。
 
-影响流水线效率的主要因素：缓存缺失、数据依赖链长度、分支误预测惩罚、指令发射带宽。
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    >=Stealth, font=\scriptsize,
+    state/.style={draw, circle, minimum size=1.35cm, align=center},
+    both/.style={->, thick}
+]
+    \node[state, fill=red!18]    (c0) at (0,0)    {$c=0$\\强不跳};
+    \node[state, fill=orange!18] (c1) at (3.6,0)  {$c=1$\\弱不跳};
+    \node[state, fill=green!18]  (c2) at (7.2,0)  {$c=2$\\弱跳};
+    \node[state, fill=blue!18]   (c3) at (10.8,0) {$c=3$\\强跳};
+
+    \draw[both] (c0) -- node[above]{T} (c1);
+    \draw[both] (c1) -- node[above]{T} (c2);
+    \draw[both] (c2) -- node[above]{T} (c3);
+    \draw[both] (c1) -- node[below]{NT} (c0);
+    \draw[both] (c2) -- node[below]{NT} (c1);
+    \draw[both] (c3) -- node[below]{NT} (c2);
+
+    \draw[both] (c0) to[out=150,in=210,looseness=6] node[left]{NT} (c0);
+    \draw[both] (c3) to[out=30,in=-30,looseness=6]  node[right]{T} (c3);
+
+    \node[anchor=north, font=\scriptsize] at (5.4,-1.6) {$c \ge 2$ 预测跳转，$c < 2$ 预测不跳};
+\end{tikzpicture}
+\caption{2 位饱和计数器分支预测状态机：T 跳、NT 不跳}
+\label{fig:twobit}
+\end{figure}
+
+2 位预测器的更新规则可用算法~\ref{alg:twobit} 描述。
+
+\begin{algorithm}[H]
+\caption{两位饱和计数器分支预测}
+\label{alg:twobit}
+\begin{algorithmic}[1]
+\State 对每条分支维护计数器 $c \in \{0,1,2,3\}$，初值 $c \gets 1$
+\For{每条分支指令 $b$}
+    \If{$c \ge 2$}
+        \State 预测结果 $\gets$ \textbf{跳转}
+    \Else
+        \State 预测结果 $\gets$ \textbf{不跳转}
+    \EndIf
+    \State 执行后得到真实结果 $r$
+    \If{$r = \text{跳转}$}
+        \State $c \gets \min(3,\, c+1)$
+    \Else
+        \State $c \gets \max(0,\, c-1)$
+    \EndIf
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\begin{example}[分支预测准确率与误预测代价]
+某程序共 $n = 10^4$ 条指令，其中分支指令占 $20\%$，即 $2000$ 条；每次误预测的惩罚为 $2$ 个周期。
+三种预测器的准确率与误预测次数如下表：
+
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+\textbf{预测器} & \textbf{准确率} & \textbf{误预测次数} & \textbf{额外停顿周期} \\
+\midrule
+静态（总是不跳） & $65\%$ & $700$ & $700 \times 2 = 1400$ \\
+1 位动态预测器   & $82\%$ & $360$ & $360 \times 2 = 720$ \\
+2 位饱和计数器   & $90\%$ & $200$ & $200 \times 2 = 400$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+误预测次数 $=$ 分支总数 $\times (1 - \text{准确率})$，例如 2 位预测器为 $2000 \times 10\% = 200$。
+可见准确率每提高一点，都能显著减少昂贵的停顿周期——这正是现代处理器把分支预测器做得越来越复杂的原因。
+\end{example}
+
+\subsection{流水线性能分析}
+
+引入停顿后，理想“每周期一条”不再成立。设平均每条指令因各类冒险额外停顿 $s$ 个周期（stalls per instruction），则
+
+\begin{equation}
+\text{CPI} = 1 + s,
+\qquad
+T = n \cdot \text{CPI} \cdot T_{\text{clk}} = n \cdot (1 + s) \cdot T_{\text{clk}} .
+\label{eq:cpi}
+\end{equation}
+
+式~\eqref{eq:cpi} 与式~\eqref{eq:ideal_speedup} 联合给出\textbf{含停顿的实际加速比}：
+
+\begin{equation}
+S = \frac{n k T_s}{n (1+s) T_s} = \frac{k}{1 + s}
+\qquad (n \gg k).
+\label{eq:speedup_stall}
+\end{equation}
+
+可见实际加速比总是被因子 $1/(1+s)$ 拉低；$s = 0$ 时才恢复到理想值 $k$。
+等效地，含停顿的吞吐率为
+
+\begin{equation}
+\text{TP} = \frac{n}{T} = \frac{1}{(1+s)\,T_{\text{clk}}} \quad (\text{条/周期}) .
+\label{eq:tp_stall}
+\end{equation}
+
+需要提醒的是，若以“有效率”$\eta = 1/(1+s)$ 表示流水线被冒险浪费的比例，则个别教材也把上式等价地写成 $T = \dfrac{n\,T_{\text{clk}}}{1+\text{stalls}}$ 的形式来强调吞吐率下降，本质相同，只是记号约定不同。
+
+\begin{example}[含停顿的加速比]
+沿用 $k = 5$、$T_{\text{clk}} = 1\,\text{ns}$、$n = 10^4$ 条指令，采用 2 位预测器（额外停顿 $400$ 周期）。
+\begin{itemize}
+    \item 理想周期数（含填充）$C_{\text{ideal}} = n + k - 1 = 10004$，串行时间 $T_{\text{串行}} = n k T_s = 50000\,\text{ns}$。
+    \item 理想加速比 $S_{\text{ideal}} = 50000 / 10004 \approx 5.00$。
+    \item 含停顿周期数 $C = 10004 + 400 = 10404$，$T = 10404\,\text{ns}$。
+    \item 实际加速比 $S = 50000 / 10404 \approx 4.81$。
+    \item 校验：$\text{CPI} = 10404 / 10^4 = 1.04$，故 $s = 0.04$；由式~\eqref{eq:speedup_stall}，$S \approx 5 / 1.04 \approx 4.81$，与逐周期计算一致。
+\end{itemize}
+\end{example}
+
+\subsection{超标量与乱序执行}
+
+单发射流水线每周期最多一条指令（IPC $\le 1$）。突破这一上限需要更深层的指令级并行技术。
+
+\begin{table}[H]
+\centering
+\caption{从标量流水线到多发射技术的演进}
+\label{tab:superscalar}
+\begin{tabulary}{\textwidth}{CCL}
+\toprule
+\textbf{技术} & \textbf{每周期发射} & \textbf{要点} \\
+\midrule
+标量流水线 & 1 & IPC $\le 1$，顺序发射、顺序完成 \\
+超标量（Superscalar） & $m > 1$ & 每周期取/译码/发射多条，需多个功能单元并行 \\
+乱序执行（OoO） & 动态 & 按数据就绪而非程序顺序执行，乱序完成、顺序提交 \\
+同时多线程（SMT） & 动态 & 一个核心交替执行多个线程的指令，隐藏访存延迟 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\textbf{超标量}通过复制数据通路、每周期发射多条互不冲突的指令来提升 IPC（现代处理器常为 $2 \sim 6$ 发射）。
+\textbf{乱序执行}则放松“按程序顺序执行”的约束：用\textbf{重排序缓冲区}（Reorder Buffer, ROB）暂存已执行但尚未提交的结果，用\textbf{寄存器重命名}（Register Renaming）消除 \\
+\textsf{WAR}、\textsf{WAW} 等\textbf{假依赖}，只保留真正的数据依赖，最后仍按程序顺序\textbf{提交}（Commit）以保证精确异常。
+
+一句话概括演进逻辑：流水线用\textbf{时间重叠}换取吞吐率；超标量在此之上用\textbf{空间复制}；乱序执行再用\textbf{动态调度}填满被依赖链和访存延迟“挖出”的空洞。
+
+\subsection{本章小结与常见误区}
+
+本章从流水线思想出发，给出了理想加速比 $S \approx k$ 与吞吐率上限 $1/T_{\text{clk}}$，剖析了五级流水线的 IF/ID/EX/MEM/WB 结构、流水线寄存器的锁存作用，以及结构冒险、数据冒险（RAW 与前递）、控制冒险（死区、分支惩罚、延迟槽、静态/动态预测）三类问题，最后给出含停顿的性能模型 $\text{CPI} = 1+s$（式~\eqref{eq:cpi}）与超标量、乱序执行的进阶方向。
+
+\textbf{常见误区}：
+\begin{itemize}
+    \item \textbf{把理想加速比当成实际加速比}。$S \approx k$ 只在无冒险、指令数 $n \gg k$ 时成立；考虑填充、停顿后应使用 $S = k/(1+s)$，实际加速比通常明显小于 $k$。
+    \item \textbf{认为流水线级数越多越好}。级数增加会使填充开销、冒险概率、流水线寄存器延迟与时钟偏斜上升，存在收益递减，甚至因 $T_{\text{clk}}$ 无法继续减小而得不偿失。
+    \item \textbf{以为前递能解决一切 RAW}。\texttt{lw} 后立即使用其结果时，数据可用时刻晚于消费指令 EX 的起点，仍须插入一个气泡（load-use 冒险）。
+    \item \textbf{混淆吞吐率与延迟}。流水线提升的是吞吐率，单条指令的\textbf{延迟}反而因经过寄存器而略微增加。
+    \item \textbf{忽视异常与分支的后果}。只有把乱序执行的结果按序提交，才能保证分支误预测和异常发生时现场可以精确回滚。
+\end{itemize}

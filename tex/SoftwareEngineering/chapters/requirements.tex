@@ -11,39 +11,95 @@
 \endgroup
 \clearpage
 
-\section{需求获取方法}
+需求工程 (Requirements Engineering, RE) 是软件生命周期中\textbf{最先、也最难逆转}的阶段。大量实证研究表明，需求阶段的缺陷若拖到测试或维护阶段才被发现，其修复代价将呈数量级增长。本章建立一条主线：\textbf{需求是什么 $\to$ 如何获取 $\to$ 如何分类与规格化 $\to$ 如何用用例刻画 $\to$ 如何管理变更}。
+
+\section{需求与需求工程}
+
+\subsection{什么是需求}
+
+\textbf{需求 (Requirement)} 是对目标系统\textbf{应当做什么}、以及\textbf{做到什么程度}的陈述，是设计、实现、测试与验收的共同基准。需求既包含用户期望，也包含业务、法律、技术与环境施加的约束。需求描述的是问题域（problem space）而非解决方案（solution space）——这是全文最重要的分界线：
 
 \begin{itemize}
-    \item \textbf{需求}：用户对目标系统的期望与约束，分为功能需求与非功能需求；它是设计、实现与验收的共同基准。
-    \item \textbf{需求工程}：获取 (elicitation) $\to$ 分析 (analysis) $\to$ 规格说明 (specification) $\to$ 验证 (validation) $\to$ 管理 (management) 的迭代过程。
-    \item \textbf{干系人 (Stakeholder)}：所有受系统影响或能影响系统的人与组织，是需求获取的信息来源。
+    \item \textbf{问题域（需求）}：系统要解决什么问题、满足谁的什么目标。
+    \item \textbf{解空间（设计）}：用什么架构、算法、数据库、框架去解决。
 \end{itemize}
+
+\textbf{干系人 (Stakeholder)} 是所有受系统影响或能影响系统的人与组织：最终用户、业务方、运维、法务、监管机构、外部系统接口方等。干系人缺失是需求不完整的最常见根因，故需求工作始于\textbf{干系人识别}。
+
+\subsection{需求工程的五项活动}
+
+需求工程不是一次性的「收集」，而是一个\textbf{迭代}过程，由五项相互衔接的活动组成：
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=Stealth,
+    act/.style={draw, rounded corners, fill=blue!5, minimum width=2.15cm,
+        minimum height=1.0cm, align=center, node distance=1.0cm}]
+    \node[act] (e) {需求获取\\elicitation};
+    \node[act, right=of e] (a) {需求分析\\analysis};
+    \node[act, right=of a] (s) {规格说明\\specification};
+    \node[act, right=of s] (v) {需求验证\\validation};
+    \node[act, right=of v] (m) {需求管理\\management};
+    \draw[->] (e) -- (a);
+    \draw[->] (a) -- (s);
+    \draw[->] (s) -- (v);
+    \draw[->] (v) -- (m);
+    \draw[->] (m.south) to[bend right=38] (e.south);
+\end{tikzpicture}
+\caption{需求工程的五项活动：获取 $\to$ 分析 $\to$ 规格说明 $\to$ 验证 $\to$ 管理（管理贯穿始终，并反馈驱动下一轮获取）}
+\end{figure}
 
 \begin{table}[H]
 \centering
-\caption{常用需求获取方法}
-\begin{tabulary}{\textwidth}{CCL}
+\caption{需求工程五项活动的目标与产出}
+\begin{tabulary}{\textwidth}{CLCL}
 \toprule
-方法 & 做法 & 适用与要点 \\
+活动 & 目标 & 关键手段 & 主要产出 \\
 \midrule
-访谈 (Interview) & 与干系人一对一或小组交流 & 深入挖掘隐含需求；成本高、依赖访谈技巧 \\
-问卷 (Questionnaire) & 结构化问题批量收集 & 覆盖广、易统计；难以追问细节 \\
-观察 (Observation) & 到现场观察真实工作流 & 发现用户未说出口的需求；耗时、可能干扰 \\
-原型 (Prototype) & 用可运行或低保真原型试错 & 澄清模糊需求；易被误当成最终产品 \\
-文档分析 (Document Analysis) & 分析现有表单、手册、旧系统 & 快速获取业务规则；文档可能已过时 \\
+获取 (Elicitation) & 发现并收集原始需求 & 访谈、问卷、观察、原型、JAD & 需求来源清单、原始素材 \\
+分析 (Analysis) & 甄别、归类、协商、建模 & 需求分类、冲突协商、用例建模 & 需求模型、优先级 \\
+规格说明 (Specification) & 写成规范、可验证的文档 & 结构化条目、图表、模板 & SRS 文档 \\
+验证 (Validation) & 确认写下的就是用户要的 & 评审、原型确认、检查表 & 评审记录、缺陷清单 \\
+管理 (Management) & 控制变更与追溯 & 基线、变更控制、追溯矩阵 & 基线版本、CR 记录、矩阵 \\
 \bottomrule
 \end{tabulary}
 \end{table}
 
-\section{需求管理}
+\textbf{常见误解}：把「获取」等同于「需求工程」。实际上，捕获到的原始需求往往是冲突、模糊、冗余的，「分析」与「验证」才是把素材打磨成规格的关键。
+
+\section{需求获取方法}
+
+获取方法的选择取决于\textbf{信息的性质}与\textbf{干系人的可及性}。不同方法在覆盖广度、深度、成本与偏误上各有取舍，实践中通常\textbf{组合使用}。
+
+\begin{table}[H]
+\centering
+\caption{常用需求获取方法对比}
+\begin{tabulary}{\textwidth}{LCCL}
+\toprule
+方法 & 做法 & 优点 & 局限与适用 \\
+\midrule
+访谈 (Interview) & 与干系人一对一或小组交谈 & 深入挖掘隐含需求、可追问 & 成本高、依赖技巧；适合关键干系人 \\
+问卷 (Questionnaire) & 结构化问题批量收集 & 覆盖广、易统计、成本低 & 难以追问细节；适合已知问题的普查 \\
+观察 (Observation) & 到现场观察真实工作流 & 发现用户「未说出口」的需求 & 耗时、可能干扰工作；适合流程型系统 \\
+原型 (Prototype) & 用可运行或低保真原型试错 & 澄清模糊需求、反馈直观 & 易被误当成最终产品；适合界面与交互 \\
+文档分析 (Document Analysis) & 分析现有表单、手册、旧系统 & 快速获取业务规则与数据 & 文档可能过时、未必反映实况 \\
+联合应用开发 (JAD) & 多方干系人集中研讨会 & 快速达成共识、暴露冲突 & 组织成本高、需专业主持；适合跨部门项目 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\textbf{联合应用开发 (Joint Application Development, JAD)} 是一种结构化的群体获取技术：把用户、业务方、开发者集中到同一会议室，由\textbf{中立主持人 (facilitator)} 引导，在若干天内通过议程、白板与原型快速收敛需求。JAD 的价值在于\textbf{把冲突提前暴露在会议桌上}，而不是让它在编码后期爆发。
 
 \begin{itemize}
-    \item \textbf{基线 (Baseline)}：需求通过评审后冻结，作为后续变更与验收的基准。
-    \item \textbf{变更控制 (Change Control)}：变更申请 (CR) $\to$ 影响分析 $\to$ 批准或拒绝 $\to$ 更新基线，避免需求无序蔓延 (scope creep)。
-    \item \textbf{追溯矩阵 (Traceability Matrix)}：在需求、设计、代码与测试用例之间建立双向链接，保证覆盖与影响分析。
+    \item \textbf{选择原则}：深入单个关键角色用访谈；广撒网用问卷；看「真实行为」用观察；需求模糊用原型；有历史资料用文档分析；需要快速达成跨部门共识用 JAD。
+    \item \textbf{三角验证}：同一需求尽量用两种以上方法交叉确认，降低单一来源的偏误。
 \end{itemize}
 
-\section{需求分类与规格说明}
+\section{需求分类}
+
+\subsection{功能需求与非功能需求}
+
+需求首先分为\textbf{功能需求 (Functional Requirement)} 与\textbf{非功能需求 (Non-functional Requirement)}。前者描述系统「做什么」，后者描述系统「做得怎样」。
 
 \begin{table}[H]
 \centering
@@ -54,52 +110,180 @@
 \midrule
 关注点 & 系统「做什么」 & 系统「做得怎样」 \\
 表述 & 输入 $\to$ 处理 $\to$ 输出 & 可度量的质量指标 \\
-示例 & 用户可下单、支付 & 响应 $<2$\,s、并发 $1000$ \\
-验证方式 & 功能测试、验收测试 & 性能/安全/压力测试 \\
-失败后果 & 功能缺失或错误 & 系统不可用或不达标 \\
+示例 & 用户可下单、支付、退款 & 响应 $< 2$\,s、并发 $1000$、可用性 $99.9\%$ \\
+验证方式 & 功能测试、验收测试 & 性能/安全/压力/恢复测试 \\
+失败后果 & 功能缺失或行为错误 & 系统不可用或不达标 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{非功能需求的类别}
+
+非功能需求常被忽视，却往往是系统成败的真正瓶颈。常见的质量属性分类如下：
+
+\begin{table}[H]
+\centering
+\caption{主要非功能需求类别与可度量示例}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+类别 & 关注点 & 示例度量 \\
+\midrule
+性能 (Performance) & 响应时间、吞吐量、并发、资源占用 & 95\% 请求 $< 500$\,ms；峰值 $2000$\,TPS \\
+安全 (Security) & 认证、授权、加密、审计、抗攻击 & 全链路 TLS；密码加盐哈希；等保三级 \\
+可用性/易用性 (Usability) & 易学、易操作、可访问、可恢复 & 新用户 10 分钟内完成首单；WCAG 2.1 AA \\
+可靠性 (Reliability) & 平均无故障、故障恢复、容错 & MTBF $> 720$\,h；RTO $< 30$\,min \\
+可维护性 (Maintainability) & 可修改、可测试、可复用、低耦合 & 圈复杂度 $< 15$；单元测试覆盖率 $> 80\%$ \\
 \bottomrule
 \end{tabulary}
 \end{table}
 
 \begin{itemize}
-    \item \textbf{性能 (Performance)}：响应时间、吞吐量、并发用户数、资源占用。
-    \item \textbf{安全 (Security)}：认证、授权、加密、审计、抗攻击能力。
-    \item \textbf{可用性 (Usability)}：易学习、易操作、可访问、出错可恢复（注意与 availability「可靠性/可用性」区分）。
-    \item \textbf{可维护性 (Maintainability)}：可修改、可测试、可复用、低耦合高内聚。
+    \item \textbf{可度量是硬要求}：非功能需求必须能写成带阈值、带条件的指标。「系统要快」不是需求；「在 4 核 8GB 环境下，95\% 的商品查询响应时间 $< 500$\,ms」才是需求。
+    \item \textbf{术语辨析}：可用性 (Usability，易用) 与可用性 (Availability，可用/在线) 中文常同名，英文不同词，须结合上下文区分，避免混淆。
+    \item \textbf{约束 (Constraint)} 是另一类特殊需求：如必须使用某数据库、必须符合某法规、预算与工期上限等。
 \end{itemize}
 
-\noindent 需求规格说明 (SRS) 应满足以下特征：
+\section{软件需求规格说明}
+
+\subsection{规格说明的特征}
+
+\textbf{软件需求规格说明 (Software Requirements Specification, SRS)} 是需求工程的正式产物（参见 ISO/IEC/IEEE 29148）。一份合格的 SRS 应具备七项特征，它们也可当作评审检查表：
+
+\begin{table}[H]
+\centering
+\caption{SRS 应具备的七项特征}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+特征 & 含义 & 反例 / 检验 \\
+\midrule
+正确 (Correct) & 真实反映干系人的需要 & 用户确认「这就是我要的」 \\
+无歧义 (Unambiguous) & 每条只有一种解释 & 避免「适当」「快速」「友好」等模糊词 \\
+完整 (Complete) & 涵盖全部功能、约束与边界 & 检查是否有「待定 (TBD)」遗漏 \\
+一致 (Consistent) & 条目之间无冲突矛盾 & 两条需求不得给出相反的约束 \\
+可验证 (Verifiable) & 能用测试或度量客观判定 & 「界面美观」不可验证；「响应 $< 2$\,s」可验证 \\
+可修改 (Modifiable) & 结构清晰、条目独立、改一处不牵连全局 & 用编号与引用，避免重复描述 \\
+可追溯 (Traceable) & 需求可双向链接到来源、设计、代码、测试 & 每条需求有唯一标识并可追溯到上游 \\ 
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{SRS 的文档结构}
+
+SRS 的组织应服务于「可读、可查、可追溯」。一个经典的骨架如下：
+
+\begin{table}[H]
+\centering
+\caption{SRS 的典型文档结构}
+\begin{tabulary}{\textwidth}{LL}
+\toprule
+章节 & 主要内容 \\
+\midrule
+1 引言 & 目的、范围、术语定义、参考文档、读者对象 \\
+2 总体描述 & 产品前景、用户特征、运行环境、约束、假设与依赖 \\
+3 具体需求 & 功能需求、外部接口、非功能需求、数据需求（逐条编号） \\
+4 验证与追溯 & 需求的验收标准、追溯关系、与测试用例的映射 \\
+附录 & 原型图、词汇表、数据字典、原型或界面草图 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
 \begin{itemize}
-    \item 正确 (Correct)：真实反映干系人的需求。
-    \item 无歧义 (Unambiguous)：只有一种解释。
-    \item 完整 (Complete)：涵盖所有功能、约束与边界。
-    \item 一致 (Consistent)：条目之间无冲突、无矛盾。
-    \item 可验证 (Verifiable)：能用测试或度量客观判定是否满足。
+    \item \textbf{良构 (well-formed)}：每条需求应写明\textbf{触发条件、主体、行为、对象、约束与验收标准}，并\textbf{原子化}（一条只描述一件事），便于测试与追溯。
+    \item \textbf{需求编号}：为每条需求分配唯一标识（如 \texttt{FR-07}、\texttt{NFR-03}），这是追溯矩阵的基础。
+    \item \textbf{反向需求}：显式写出系统「不做什么」，避免范围被无限外扩。
 \end{itemize}
 
 \section{用例建模}
 
+用例建模从\textbf{外部视角}描述系统「为谁提供什么服务」，是需求分析与用户沟通的核心工具。其基本元素包括参与者、用例以及它们之间的关系。
+
+\subsection{参与者、用例与关系}
+
+\begin{table}[H]
+\centering
+\caption{用例图的构成元素}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+要素 & 图形 & 说明 \\
+\midrule
+参与者 (Actor) & 火柴人 & 系统外部的用户或外部系统 \\
+用例 (Use Case) & 椭圆 & 系统提供的一项完整、可交付价值的功能 \\
+系统边界 (Boundary) & 矩形框 & 框内是用例，框外是参与者 \\
+关联 (Association) & 实线 & 参与者与用例之间的通信 \\
+包含 (include) & 虚线箭头 + \textit{include} & 基础用例\textbf{必然}执行被包含用例（公共步骤） \\
+扩展 (extend) & 虚线箭头 + \textit{extend} & 扩展用例在\textbf{特定条件}下插入基础用例 \\
+泛化 (Generalization) & 空心三角 & 参与者或用例之间的继承（is-a）关系 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{include、extend 与泛化的方向与语义}
+\begin{tabulary}{\textwidth}{LLCL}
+\toprule
+关系 & 箭头方向 & 触发条件 & 语义 \\
+\midrule
+include & 基础用例 $\to$ 被包含用例 & 必然执行 & 抽取多个用例共有的步骤（如「登录」「校验权限」） \\
+extend & 扩展用例 $\to$ 基础用例 & 条件触发 & 给基础用例附加可选行为（如「申请退款」扩展「提交订单」） \\
+泛化 & 子 $\to$ 父 & --- & 子继承父的属性与行为；参与者泛化表示角色包含关系 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{用例图}
+
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[font=\small, node distance=1.8cm]
-    \node[draw, ellipse, minimum width=3cm, minimum height=1cm] (login) {登录系统};
-    \node[draw, ellipse, minimum width=3cm, minimum height=1cm, below=of login] (verify) {验证身份};
-    \node[draw, ellipse, minimum width=3cm, minimum height=1cm, right=3.2cm of login] (register) {注册账户};
-    \node[left=1.4cm of login] (user) {\textbf{用户}};
-    \draw (user) -- (login);
-    \draw[->, dashed] (login) -- node[right, font=\scriptsize]{\texttt{<<include>>}} (verify);
-    \draw[->, dashed] (register) -- node[above, font=\scriptsize]{\texttt{<<extend>>}} (login);
+\begin{tikzpicture}[font=\small, >=Stealth]
+    \draw[rounded corners, thick, fill=blue!3] (2.2,-3.0) rectangle (8.6,2.2);
+    \node[font=\small\bfseries] at (5.4, 1.9) {网上商城};
+
+    \coordinate (customer) at (-1.2, 1.0);
+    \draw[thick] (customer) ++(0,0.34) circle (0.11);
+    \draw[thick] (customer) ++(0,0.23) -- ++(0,-0.35);
+    \draw[thick] (customer) ++(-0.16,0.06) -- ++(0.32,0);
+    \draw[thick] (customer) ++(0,-0.12) -- ++(-0.14,-0.30);
+    \draw[thick] (customer) ++(0,-0.12) -- ++(0.14,-0.30);
+    \node[font=\small] at (-1.2, -0.4) {客户};
+
+    \coordinate (admin) at (-1.2, -2.2);
+    \draw[thick] (admin) ++(0,0.34) circle (0.11);
+    \draw[thick] (admin) ++(0,0.23) -- ++(0,-0.35);
+    \draw[thick] (admin) ++(-0.16,0.06) -- ++(0.32,0);
+    \draw[thick] (admin) ++(0,-0.12) -- ++(-0.14,-0.30);
+    \draw[thick] (admin) ++(0,-0.12) -- ++(0.14,-0.30);
+    \node[font=\small] at (-1.2, -3.6) {管理员};
+
+    \node[draw, ellipse, fill=green!8, align=center,
+        minimum width=2.3cm, minimum height=0.85cm] (browse) at (4.0, 1.1) {浏览商品};
+    \node[draw, ellipse, fill=green!8, align=center,
+        minimum width=2.3cm, minimum height=0.85cm] (order) at (4.0, -0.5) {提交订单};
+    \node[draw, ellipse, fill=green!8, align=center,
+        minimum width=2.3cm, minimum height=0.85cm] (pay) at (4.0, -2.1) {支付};
+    \node[draw, ellipse, fill=green!8, align=center,
+        minimum width=2.3cm, minimum height=0.85cm] (login) at (7.2, 0.3) {登录};
+    \node[draw, ellipse, fill=yellow!12, align=center,
+        minimum width=2.3cm, minimum height=0.85cm] (refund) at (7.2, -1.0) {申请退款};
+    \node[draw, ellipse, fill=green!8, align=center,
+        minimum width=2.3cm, minimum height=0.85cm] (manage) at (7.2, -2.3) {管理商品};
+
+    \draw (customer) -- (browse);
+    \draw (customer) -- (order);
+    \draw (customer) -- (pay);
+    \draw (admin) -- (manage);
+
+    \draw[dashed, ->] (order) -- node[midway, above, font=\scriptsize]{\textit{include}} (login);
+    \draw[dashed, ->] (refund) -- node[midway, left, font=\scriptsize]{\textit{extend}} (order);
 \end{tikzpicture}
-\caption{用例图要素：参与者、用例、include 与 extend 关系}
+\caption{用例图示例：网上商城的参与者、用例及 include/extend 关系（黄色用例为扩展用例）}
 \end{figure}
 
-\begin{itemize}
-    \item \textbf{参与者 (Actor)}：与系统交互的角色，可以是人或外部系统。
-    \item \textbf{用例 (Use Case)}：系统向参与者提供的一个完整、有价值的功能单元。
-    \item \textbf{include}：基础用例必然执行被包含用例（公共步骤抽取），箭头由基础用例指向被包含用例。
-    \item \textbf{extend}：扩展用例在特定条件下插入基础用例，基础用例不依赖扩展。
-    \item \textbf{泛化 (Generalization)}：参与者或用例之间的继承 (is-a) 关系。
-\end{itemize}
+\noindent\textbf{include 与 extend 的区别}：include 抽取的是\textbf{必然执行}的公共步骤，箭头由基础用例指向被包含用例；extend 附加的是\textbf{条件触发}的可选行为，箭头由扩展用例指向基础用例。二者方向相反，语义也相反。
+
+\subsection{用例描述模板}
+
+用例图只给出「有哪些用例」，每个用例的细节须用\textbf{用例描述 (Use Case Description)} 展开。标准模板包含前置条件、主流程、备选流程与后置条件：
 
 \begin{table}[H]
 \centering
@@ -109,11 +293,158 @@
 条目 & 内容 \\
 \midrule
 用例名称 & 动词短语，如「提交订单」 \\
+用例编号 & 唯一标识，便于追溯 \\
 参与者 & 触发该用例的主参与者与次参与者 \\
+概述 & 一两句话说明用例目标与价值 \\
 前置条件 & 用例开始前系统必须满足的状态 \\
+触发事件 & 启动该用例的事件或条件 \\
 主流程 & 正常路径的编号步骤序列 \\
 备选流程 & 异常或分支路径的处理 \\
-后置条件 & 用例结束后系统的状态与产出 \\
+后置条件 & 用例结束后的系统状态与产出 \\
 \bottomrule
 \end{tabulary}
 \end{table}
+
+\subsection{用例描述示例}
+
+\begin{table}[H]
+\centering
+\caption{用例描述示例：提交订单（UC-03）}
+\begin{tabulary}{\textwidth}{CL}
+\toprule
+条目 & 内容 \\
+\midrule
+用例名称 & 提交订单 \\
+用例编号 & UC-03 \\
+参与者 & 主：客户；次：支付网关 \\
+概述 & 客户将购物车中的商品结算并生成订单，随后进入支付。 \\
+前置条件 & 客户已登录；购物车至少包含一件商品。 \\
+触发事件 & 客户在结算页点击「确认下单」。 \\
+主流程 &
+1. 客户进入结算页，确认商品、数量与收货地址；\newline
+2. 系统计算商品金额、运费与可用优惠；\newline
+3. 客户选择支付方式并点击「确认下单」；\newline
+4. 系统校验库存与地址合法性；\newline
+5. 系统生成订单，状态置为「待支付」并锁定库存；\newline
+6. 系统跳转支付网关，客户完成支付；\newline
+7. 支付成功后，系统将订单置为「已支付」并发送通知。 \\
+备选流程 &
+A1 库存不足：第 4 步若库存不足，提示缺货并允许修改数量或删除商品；\newline
+A2 地址非法：校验失败时返回第 1 步要求重新填写；\newline
+A3 支付超时：15 分钟内未支付，订单自动取消并释放库存。 \\
+后置条件 &
+成功：生成一条「已支付」订单，库存扣减，产生支付流水；\newline
+失败：订单为「待支付」或「已取消」，库存不扣减或已回滚。 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\section{需求管理}
+
+需求一旦开始，就会不断变化。需求管理的目的不是「禁止变化」，而是让变化\textbf{可控、可见、可追溯}。
+
+\subsection{基线与变更控制}
+
+\textbf{基线 (Baseline)} 是需求通过评审后\textbf{冻结}下来的一个版本，作为后续开发、测试与验收的共同基准。基线并非不可变，而是「变更必须走流程」。
+
+\textbf{变更控制 (Change Control)} 用来防止需求无序蔓延（scope creep）。其典型流程为：
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=Stealth,
+    b/.style={draw, rounded corners, fill=blue!5, minimum width=2.4cm,
+        minimum height=0.85cm, align=center}]
+    \node[b] (cr) at (0, 0) {提出变更申请\\CR};
+    \node[b] (an) at (3.6, 0) {影响分析\\成本/进度/风险};
+    \node[b] (cc) at (7.6, 0) {变更控制委员会\\评审 CCB};
+    \node[b] (up) at (7.6, -1.9) {更新基线与文档};
+    \node[b] (rej) at (3.6, -1.9) {记录并归档\\拒绝理由};
+    \draw[->] (cr) -- (an);
+    \draw[->] (an) -- (cc);
+    \draw[->] (cc) -- (up);
+    \draw[->] (cc) -- node[left, font=\scriptsize]{拒绝} (rej);
+    \draw[->] (rej.west) -- (cr.south) ;
+\end{tikzpicture}
+\caption{需求变更控制流程：申请 $\to$ 影响分析 $\to$ CCB 评审 $\to$ 批准并更新基线，或拒绝并归档}
+\end{figure}
+
+\begin{itemize}
+    \item \textbf{变更申请 (Change Request, CR)}：记录变更内容、提出人与理由。
+    \item \textbf{影响分析 (Impact Analysis)}：评估对成本、进度、质量、其他需求与已有实现的影响，依据追溯矩阵定位波及范围。
+    \item \textbf{变更控制委员会 (Change Control Board, CCB)}：由业务、开发、测试等代表组成，负责批准或拒绝。
+    \item \textbf{一个常见误区}：口头答应变更、不走流程，导致「文档说一套、代码做一套」，追溯彻底失效。
+\end{itemize}
+
+\subsection{需求追溯矩阵}
+
+\textbf{需求追溯矩阵 (Requirements Traceability Matrix, RTM)} 在需求、设计、代码与测试用例之间建立\textbf{双向链接}，用于保证覆盖完整、支持影响分析与验收。其两个方向为：
+
+\begin{itemize}
+    \item \textbf{前向追溯}：由需求 $\to$ 设计 $\to$ 编码 $\to$ 测试，检查每条需求是否都被实现与验证。
+    \item \textbf{后向追溯}：由测试/代码 $\to$ 需求，检查是否存在「无需求来源」的镀金功能。
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small]
+    \def\cw{1.9}
+    \def\rh{0.85}
+    \node at ({0.5*\cw}, {0.5*\rh}) {};
+    \node at ({1.5*\cw}, {0.5*\rh}) {设计};
+    \node at ({2.5*\cw}, {0.5*\rh}) {编码};
+    \node at ({3.5*\cw}, {0.5*\rh}) {测试};
+    \node at ({0.5*\cw}, {-0.5*\rh}) {\texttt{FR1}};
+    \node at ({0.5*\cw}, {-1.5*\rh}) {\texttt{FR2}};
+    \node at ({0.5*\cw}, {-2.5*\rh}) {\texttt{FR3}};
+    \node at ({0.5*\cw}, {-3.5*\rh}) {\texttt{FR4}};
+    \draw (0,0) grid[xstep=\cw, ystep=\rh] (4*\cw, -4*\rh);
+    \node at ({1.5*\cw}, {-0.5*\rh}) {$\checkmark$};
+    \node at ({2.5*\cw}, {-0.5*\rh}) {$\checkmark$};
+    \node at ({3.5*\cw}, {-0.5*\rh}) {$\checkmark$};
+    \node at ({1.5*\cw}, {-1.5*\rh}) {$\checkmark$};
+    \node at ({2.5*\cw}, {-1.5*\rh}) {$\checkmark$};
+    \node at ({3.5*\cw}, {-1.5*\rh}) {$\checkmark$};
+    \node at ({1.5*\cw}, {-2.5*\rh}) {$\checkmark$};
+    \node at ({3.5*\cw}, {-2.5*\rh}) {$\checkmark$};
+    \node at ({1.5*\cw}, {-3.5*\rh}) {$\checkmark$};
+\end{tikzpicture}
+\caption{需求追溯矩阵示例：$\checkmark$ 表示该需求已由对应设计、编码或测试覆盖；\texttt{FR3} 缺少编码覆盖、\texttt{FR4} 缺少编码与测试覆盖，暴露追溯缺口}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{追溯矩阵的常见用途}
+\begin{tabulary}{\textwidth}{LL}
+\toprule
+用途 & 说明 \\
+\midrule
+覆盖检查 & 找出未被任何测试覆盖的需求，防止漏测 \\
+镀金清查 & 找出没有需求来源的代码或功能，防止过度实现 \\
+影响分析 & 变更某需求时，快速定位受影响的模块与用例 \\
+验收依据 & 逐条对照需求与测试，支撑验收与审计 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\section{本章小结}
+
+\begin{itemize}
+    \item 需求工程的五项活动是\textbf{获取 $\to$ 分析 $\to$ 规格说明 $\to$ 验证 $\to$ 管理}，且高度迭代，管理贯穿始终。
+    \item 获取方法（访谈、问卷、观察、原型、文档分析、JAD）各有取舍，宜组合并交叉验证。
+    \item 需求分为\textbf{功能需求}与\textbf{非功能需求}；后者必须可度量，性能、安全、易用、可靠、可维护是常见质量属性。
+    \item SRS 应满足\textbf{正确、无歧义、完整、一致、可验证、可修改、可追溯}七项特征，并逐条编号。
+    \item 用例建模从外部视角刻画系统服务，注意 include（必然）、extend（条件）与泛化的区别；用例描述模板补齐前置/主流程/备选/后置。
+    \item 需求管理通过\textbf{基线、变更控制、追溯矩阵}让变化可控、可查、可追溯。
+\end{itemize}
+
+\section{常见误区}
+
+\begin{itemize}
+    \item \textbf{把设计混入需求}：需求回答「做什么」，若写成「用 Redis 缓存实现」就把解空间当成了问题域，限制了设计自由。
+    \item \textbf{需求镀金 (Gold Plating)}：实现用户并未要求的功能，看似「贴心」，实则增加成本、风险与维护负担，且常常无需求来源。
+    \item \textbf{需求蔓延 (Scope Creep)}：不做影响分析就不断「顺手加一点」，导致进度与预算失控。
+    \item \textbf{不可度量的非功能需求}：如「系统要快、要安全、要友好」，无法验证，等价于没有需求。
+    \item \textbf{遗漏干系人与隐含需求}：只看直接用户，忽略运维、法务、接口方，导致上线后大量返工。
+    \item \textbf{用例粒度过细}：把用例写成逐步 UI 操作或设计细节，既难维护，也越界到了设计。
+    \item \textbf{需求与测试脱节}：缺少追溯矩阵，验收时说不清「这条需求到底测没测」。
+\end{itemize}

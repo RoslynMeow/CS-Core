@@ -11,49 +11,122 @@
 \endgroup
 \clearpage
 
-\section{测试层次与 V 模型}
+\section{测试目标与原则}
 
-软件测试按「由小到大、由内到外」分为四个层次：先保证单元正确，再保证组装正确，最后验证系统与业务目标。
+\subsection{测试的定义与目标}
+
+软件测试（Software Testing）是\textbf{使用人工或自动手段来运行或测定某个软件系统的过程}，其目的在于检验它是否满足规定的需求，或是弄清预期结果与实际结果之间的差别。Myers 给出了更强调「找错」的定义：\emph{测试是为了发现错误而执行程序的过程}；一个好的测试用例是那些能够发现尚未发现的错误的用例，而一次「成功」的测试正是找出了新缺陷的测试。
+
+测试服务于两个目标：
 
 \begin{itemize}
-    \item \textbf{单元测试}：验证单个函数或模块的内部逻辑与分支。
-    \item \textbf{集成测试}：验证模块之间的接口、数据传递与协作。
-    \item \textbf{系统测试}：在完整系统上验证功能需求与非功能需求。
-    \item \textbf{验收测试}：由用户确认系统是否满足业务需求（$\alpha$ 测试、$\beta$ 测试）。
+    \item \textbf{验证（Verification）}：回答「我们是否正确地构造了产品？」（Are we building the product right?），即检查程序是否符合规格说明与设计文档。
+    \item \textbf{确认（Validation）}：回答「我们是否构造了正确的产品？」（Are we building the right product?），即检查系统是否真正满足用户的业务需求。
 \end{itemize}
+
+因此，测试不只是「运行程序」，更是一个贯穿需求到维护的\textbf{信息收集与质量评估}活动：它既发现缺陷，也为项目决策提供关于质量与风险的信息。
+
+\subsection{测试与调试的区别}
+
+初学者常把测试与调试混为一谈，但二者在目的、起点与执行者上都不同，见表~\ref{tab:test-debug}。
 
 \begin{table}[H]
 \centering
-\caption{测试层次的目标与执行者}
-\begin{tabulary}{\textwidth}{CCC}
+\caption{测试与调试的区别}
+\label{tab:test-debug}
+\begin{tabulary}{\textwidth}{LLL}
 \toprule
-层次 & 目标 & 执行者 \\
+维度 & 测试（Testing） & 调试（Debugging） \\
 \midrule
-单元测试 & 验证单个函数/模块的内部逻辑 & 开发人员 \\
-集成测试 & 验证模块间接口与数据传递 & 开发/测试人员 \\
-系统测试 & 验证完整系统的功能与非功能需求 & 独立测试团队 \\
-验收测试 & 用户确认是否满足业务需求 & 用户/客户 \\
+目的 & 发现缺陷\emph{是否存在} & \emph{定位并修复}已发现的缺陷 \\
+起点 & 已知需求/规格，未知缺陷 & 已知缺陷（失败用例） \\
+方法 & 有计划地设计用例并执行 & 推理、假设检验、逐段排查 \\
+活动 & 设计、执行、比较、报告 & 复现、定位、修改、验证 \\
+结束标志 & 按计划完成、覆盖率达标 & 缺陷被修复、失败用例通过 \\
+执行者 & 独立测试人员 & 开发人员 \\
+特征 & 可计划、可重复、可度量 & 依赖经验与直觉，难预测 \\
 \bottomrule
 \end{tabulary}
 \end{table}
 
+可见：测试是「找病」，调试是「治病」。测试提供症状（失败现象），调试据此定位病根并给出处方。
+
+\subsection{测试的基本原则}
+
+\begin{itemize}
+    \item \textbf{尽早测试（Test Early）}：缺陷发现得越早，修复代价越低。缺陷的破坏性随时间放大，见表~\ref{tab:cost}。
+    \item \textbf{独立测试}：开发人员应避免测试自己的程序（心理上不愿否定自己的成果），关键系统应由独立测试团队或第三方执行，测试用例也应独立设计。
+    \item \textbf{缺陷聚集（Defect Clustering）}：经验表明约 $80\%$ 的缺陷集中在约 $20\%$ 的模块中（二八法则）。测试资源应优先投向高风险、高复杂度模块。
+    \item \textbf{经济性（Economies）}：穷尽测试在数学上不可能（输入组合爆炸），必须围绕风险与成本选择「性价比最高」的用例集合。
+    \item \textbf{杀虫剂悖论（Pesticide Paradox）}：同一组用例反复使用后，其发现新缺陷的能力会下降，需定期评审并更新用例。
+    \item \textbf{无错谬误}：即使程序没有错误，如果需求本身有误，它仍是无用的；测试不能替代需求验证。
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{缺陷在不同阶段被发现时的相对修复成本}
+\label{tab:cost}
+\begin{tabulary}{\textwidth}{CCL}
+\toprule
+发现阶段 & 相对修复成本 & 说明 \\
+\midrule
+需求/设计评审 & $1$ & 早期静态检查，代价最低 \\
+编码 & $5$ & 修改局部代码 \\
+单元/集成测试 & $10$ & 需回改设计与代码 \\
+系统测试 & $20$ & 影响面扩散，需回归 \\
+验收/发布后 & $50\sim100$ & 可能涉及版本回退与用户损失 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+Dijkstra 有一句名言概括了测试的极限：\emph{测试能证明缺陷的存在，却无法证明缺陷的不存在}。因此测试是一类「抽样」活动，其结论只能降低风险，而不能给出「零缺陷」的保证。
+
+\section{测试层次与 V 模型}
+
+\subsection{四个测试层次}
+
+软件测试按「由小到大、由内到外」分为四个层次：先保证单元正确，再保证组装正确，最后验证系统与业务目标，见表~\ref{tab:levels}。
+
+\begin{table}[H]
+\centering
+\caption{测试层次的目标、对象与执行者}
+\label{tab:levels}
+\begin{tabulary}{\textwidth}{CCLL}
+\toprule
+层次 & 测试对象 & 目标 & 执行者 \\
+\midrule
+单元测试 & 函数/方法/类 & 验证模块内部逻辑与分支 & 开发人员 \\
+集成测试 & 模块间的接口 & 验证接口、数据传递与协作 & 开发/测试人员 \\
+系统测试 & 完整系统 & 验证功能与非功能需求 & 独立测试团队 \\
+验收测试 & 交付给用户的系统 & 确认是否满足业务需求 & 用户/客户 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{V 模型}
+
+V 模型把开发过程与测试过程对应起来：左边自顶向下逐层细化（需求 $\to$ 编码），右边自底向上逐层验证（单元 $\to$ 验收）。关键思想是\emph{每一层的测试计划应在对应的开发阶段就制定}：需求阶段写验收/系统测试计划，设计阶段写集成测试计划，编码阶段写单元测试计划，见图~\ref{fig:vmodel}。
+
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[font=\small, node distance=1.15cm and 3.6cm]
-    \node[draw, rounded corners] (req) {需求分析};
-    \node[draw, rounded corners, below=of req] (design) {概要设计};
-    \node[draw, rounded corners, below=of design] (detail) {详细设计};
-    \node[draw, rounded corners, below=of detail] (code) {编码};
+\begin{tikzpicture}[font=\small, >=Stealth,
+    dev/.style={draw, rounded corners, align=center, fill=blue!5,
+        minimum width=3.0cm, minimum height=0.95cm},
+    test/.style={draw, rounded corners, align=center, fill=green!6,
+        minimum width=3.0cm, minimum height=0.95cm}]
+    \node[dev] (req) at (0,0) {需求分析\\（验收测试计划）};
+    \node[dev, below=1.15cm of req] (design) {概要设计\\（系统测试计划）};
+    \node[dev, below=1.15cm of design] (detail) {详细设计\\（集成测试计划）};
+    \node[dev, below=1.15cm of detail] (code) {编码\\（单元测试计划）};
 
-    \node[draw, rounded corners, right=of req] (acc) {验收测试};
-    \node[draw, rounded corners, below=of acc] (sys) {系统测试};
-    \node[draw, rounded corners, below=of sys] (int) {集成测试};
-    \node[draw, rounded corners, below=of int] (unit) {单元测试};
+    \node[test] (acc) at (7.2,0) {验收测试\\验证需求};
+    \node[test, below=1.15cm of acc] (sys) {系统测试\\验证设计};
+    \node[test, below=1.15cm of sys] (int) {集成测试\\验证接口};
+    \node[test, below=1.15cm of int] (unit) {单元测试\\验证模块};
 
     \draw[->] (req) -- (design);
     \draw[->] (design) -- (detail);
     \draw[->] (detail) -- (code);
-
     \draw[->] (unit) -- (int);
     \draw[->] (int) -- (sys);
     \draw[->] (sys) -- (acc);
@@ -62,32 +135,108 @@
     \draw[dashed, <->] (design) -- (sys);
     \draw[dashed, <->] (detail) -- (int);
     \draw[dashed, <->] (code) -- (unit);
+
+    \node[align=center, font=\small\bfseries, below=0.55cm of code]
+        {开发过程\\（自顶向下细化）};
+    \node[align=center, font=\small\bfseries, below=0.55cm of unit]
+        {测试过程\\（自底向上验证）};
 \end{tikzpicture}
 \caption{V 模型：左侧开发阶段与右侧测试阶段一一对应}
+\label{fig:vmodel}
 \end{figure}
 
-\begin{center}
-\begin{minipage}{0.9\textwidth}
-\small V 模型把开发与测试对应起来：左边自顶向下逐层细化（需求 $\to$ 编码），右边自底向上逐层验证（单元 $\to$ 验收）。每一层的测试计划应在对应开发阶段就制定——需求阶段写验收/系统测试计划，设计阶段写集成测试计划，编码阶段写单元测试计划，从而尽早发现缺陷，降低修复代价。
-\end{minipage}
-\end{center}
+\subsection{集成测试策略、桩与驱动}
 
-\section{黑盒测试与白盒测试}
-
-\subsection{黑盒测试}
-
-黑盒测试只关心「输入--输出」，不考虑程序内部结构，常用方法如下。
+集成测试把已通过单元测试的模块按设计组装起来，重点验证\textbf{接口}。由于被集成时某些下层或上层模块尚未就绪，需要用替身模块占位：
 
 \begin{itemize}
-    \item \textbf{等价类划分}：把输入域划分为若干等价类，同类中输入任取一个即可代表整个类。分为\emph{有效等价类}（合法输入）与\emph{无效等价类}（非法输入）。
-    \item \textbf{边界值分析}：缺陷大多藏在边界，取 $\min-1,\ \min,\ \min+1,\ \max-1,\ \max,\ \max+1$ 设计用例。
-    \item \textbf{因果图}：把「原因（输入条件）」与「结果（输出动作）」用图形表达，再转化为判定表来设计测试用例，处理输入组合与约束。
+    \item \textbf{桩（Stub）}：模拟被测模块所\emph{调用}的下层模块，返回预定的（可能是伪造的）结果。
+    \item \textbf{驱动（Driver）}：模拟调用被测模块的\emph{上层}模块，负责提供输入、触发调用并输出结果。
 \end{itemize}
+
+三种常见集成策略见表~\ref{tab:integration}。
+
+\begin{table}[H]
+\centering
+\caption{集成测试的三种策略}
+\label{tab:integration}
+\begin{tabulary}{\textwidth}{CLLL}
+\toprule
+策略 & 集成方向 & 优点 & 缺点 \\
+\midrule
+自顶向下 & 从主控模块向下 & 只需桩；早期验证主控逻辑，利于演示 & 需大量桩；底层关键模块晚测试 \\
+自底向上 & 从底层模块向上 & 只需驱动；早期验证底层关键模块 & 主控逻辑与整体框架晚验证，不能早期演示 \\
+三明治 & 上下同时、向中间汇合 & 兼顾两者；适合中间层最关键的场景 & 桩与驱动都需，成本较高 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+自底向上集成只需编写驱动，其过程如算法~\ref{alg:bottomup} 所示。
+
+\begin{algorithm}[H]
+\caption{自底向上集成测试}
+\label{alg:bottomup}
+\begin{algorithmic}[1]
+\Procedure{BottomUpIntegration}{模块集合 $M$}
+    \State 按调用层次把 $M$ 划分为若干层
+    \For{每个底层模块 $m$}
+        \State 为 $m$ 编写驱动模块 $D_m$
+        \State 用 $D_m$ 独立测试 $m$
+    \EndFor
+    \While{$M$ 中仍有未集成的模块}
+        \State 选取其\emph{所有下层模块均已测试通过}的模块 $p$
+        \State 用驱动替代尚未就绪的上层模块，测试 $p$ 与其下层模块的接口
+        \State 将测试通过的 $p$ 加入已集成集合
+    \EndWhile
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+\section{黑盒测试方法}
+
+黑盒测试（功能测试）只关心「输入 $\to$ 输出」，不考虑程序内部结构，依据规格说明设计用例。常用方法有等价类划分、边界值分析、因果图/判定表和错误推测。
+
+\subsection{等价类划分}
+
+\textbf{等价类划分}把输入域划分为若干子集，使同一子集中的任意输入对「发现缺陷」具有相同效果，于是每类只需取一个代表值。等价类分为\emph{有效等价类}（合法输入）与\emph{无效等价类}（非法输入）。
+
+\begin{itemize}
+    \item 有效等价类：判断程序是否实现了规定的功能。
+    \item 无效等价类：判断程序对非法输入是否正确处理（报错、容错）。
+\end{itemize}
+
+设计规则：为每个有效等价类设计一个用例；为每个无效等价类\emph{单独}设计一个用例（一次只覆盖一个无效类，避免相互掩盖）。
+
+\textbf{例题}：某输入框要求年龄 $x$ 为 $[1,100]$ 的整数。等价类划分见表~\ref{tab:equi}。
+
+\begin{table}[H]
+\centering
+\caption{年龄输入的等价类划分（要求 $x\in[1,100]$ 的整数）}
+\label{tab:equi}
+\begin{tabulary}{\textwidth}{CCLL}
+\toprule
+类别 & 编号 & 描述 & 代表值 \\
+\midrule
+有效 & E1 & $1\le x\le100$ 的整数 & $50$ \\
+无效 & E2 & $x<1$（低于下界） & $0$ \\
+无效 & E3 & $x>100$（高于上界） & $101$ \\
+无效 & E4 & 非整数（含小数、非数字） & \texttt{"abc"} \\
+无效 & E5 & 空输入 & （空串） \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+由表~\ref{tab:equi} 可得 $5$ 个用例：E1 期待「接受」，E2--E5 期待「拒绝并给出相应提示」。
+
+\subsection{边界值分析}
+
+缺陷大多藏在边界，因为开发者常把条件写成 $<$/$>$,处理「等于边界」时易出错。边界值分析在等价类的基础上，取每类的\emph{边界}及其\emph{邻点}作为用例。对区间 $[1,100]$，应取 $\min-1,\ \min,\ \min+1,\ \max-1,\ \max,\ \max+1$ 共 $6$ 个边界值，见表~\ref{tab:boundary}。
 
 \begin{table}[H]
 \centering
 \caption{边界值分析示例（输入范围 $[1,100]$）}
-\begin{tabulary}{\textwidth}{CCC}
+\label{tab:boundary}
+\begin{tabulary}{\textwidth}{CCL}
 \toprule
 边界点 & 取值 & 预期结果 \\
 \midrule
@@ -101,67 +250,198 @@ $\max+1$ & $101$ & 无效（高于上界） \\
 \end{tabulary}
 \end{table}
 
-\subsection{白盒测试}
+\textbf{边界值 vs.\ 等价类}：等价类划分关注「类」，边界值分析关注「点」。工程上二者常结合使用——先用等价类确定输入域，再在每类边界取点。
 
-白盒测试依据程序内部逻辑设计用例，常见覆盖准则由弱到强为：语句覆盖、判定覆盖、条件覆盖、路径覆盖。
+\subsection{因果图与判定表}
 
-\begin{itemize}
-    \item \textbf{语句覆盖}：每条可执行语句至少执行一次。
-    \item \textbf{判定覆盖}（分支覆盖）：每个判定的真、假分支至少各执行一次。
-    \item \textbf{条件覆盖}：每个原子条件的真、假至少各取一次。
-    \item \textbf{路径覆盖}：每条独立路径至少执行一次，最强但路径数可能指数增长。
-\end{itemize}
+当输入之间存在\textbf{组合与约束}时，逐个条件孤立测试会遗漏组合缺陷。因果图把「原因（输入条件）」与「结果（输出动作）」用图形表达，再用\textbf{判定表}把逻辑组合展开为规则。
+
+判定表由四部分组成：\emph{条件桩}（所有条件）、\emph{动作桩}（所有动作）、\emph{条件项}（各条件的取值）、\emph{动作项}（各规则下执行的动作）。条件取值为 $T$（真）、$F$（假）、$-$（无关，可化简合并）。
+
+\textbf{例题}：登录功能的判定表见表~\ref{tab:decision}，其中每条竖列称为一条\emph{规则}。
+
+\begin{table}[H]
+\centering
+\caption{登录功能的判定表}
+\label{tab:decision}
+\begin{tabulary}{\textwidth}{LCCC}
+\toprule
+条件 / 动作 & 规则 R1 & 规则 R2 & 规则 R3 \\
+\midrule
+条件桩：用户已注册 $C_1$ & $T$ & $F$ & $T$ \\
+条件桩：密码正确 $C_2$   & $T$ & $-$ & $F$ \\
+\midrule
+动作桩：登录成功 $A_1$       & $\checkmark$ &  &  \\
+动作桩：提示「用户不存在」$A_2$ &  & $\checkmark$ &  \\
+动作桩：提示「密码错误」$A_3$   &  &  & $\checkmark$ \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+因果图中常用约束记号见（行内说明）：\textbf{异（E）}表示至多一个原因为真；\textbf{或（I）}表示至少一个为真；\textbf{唯一（O）}表示恰好一个为真；\textbf{要求（R）}表示若 $a$ 为真则 $b$ 必须为真；\textbf{屏蔽（M）}表示 $a$ 为真时 $b$ 必为假。判定表由「条件桩 $\times$ 动作桩」的逻辑组合构成，是因果图的表格化形式，也是自动生成用例的依据。
+
+\subsection{错误推测}
+
+\textbf{错误推测}依靠测试人员的经验与直觉，列出程序可能出错的情形并据此设计用例。常见猜测对象包括：空值/零值、非法输入、越界数据、重复数据、并发冲突、以及历史上同类模块易错之处。错误推测效率高但依赖个人经验，通常作为等价类、边界值等方法之外的\textbf{补充}。
+
+\section{白盒测试与逻辑覆盖}
+
+白盒测试（结构测试）依据程序内部逻辑设计用例，以\emph{覆盖率}衡量测试的充分程度。逻辑覆盖准则由弱到强依次为：语句覆盖、判定覆盖、条件覆盖、判定/条件覆盖、条件组合覆盖、路径覆盖。
+
+\subsection{被测程序示例}
+
+考虑如下函数：判定 $D=(a>0)\ \&\&\ (b>0)$ 由两个原子条件 $C_1:a>0$、$C_2:b>0$ 组成。
 
 \begin{lstlisting}[language=C]
 int f(int a, int b) {
     int x = 0;
-    if (a > 0 && b > 0) {   /* 判定 D，含原子条件 a>0 与 b>0 */
-        x = a + b;
+    if (a > 0 && b > 0) {   /* 判定 D = C1 && C2 */
+        x = a + b;          /* 语句 S */
     }
     return x;
 }
 \end{lstlisting}
 
+\subsection{六种覆盖准则}
+
+\begin{itemize}
+    \item \textbf{语句覆盖}：每条可执行语句至少执行一次。
+    \item \textbf{判定覆盖}（分支覆盖）：每个判定的真、假分支至少各执行一次。
+    \item \textbf{条件覆盖}：每个原子条件的真、假至少各取一次。
+    \item \textbf{判定/条件覆盖}：同时满足判定覆盖与条件覆盖。
+    \item \textbf{条件组合覆盖}：每个判定中各原子条件的所有真假组合至少出现一次。
+    \item \textbf{路径覆盖}：源程序中每条可能的路径至少执行一次，最强但路径数可能指数增长。
+\end{itemize}
+
+针对上例，各准则的最少用例数与代表性用例见表~\ref{tab:coverage}。
+
 \begin{table}[H]
 \centering
-\caption{覆盖准则强弱与示例最少用例数（短路求值）}
-\begin{tabulary}{\textwidth}{CCC}
+\caption{逻辑覆盖准则的最少用例数与强弱关系（示例 $D=(a>0)\ \&\&\ (b>0)$）}
+\label{tab:coverage}
+\begin{tabulary}{\textwidth}{CCL}
 \toprule
-覆盖准则 & 含义 & 本例最少用例数 \\
+覆盖准则 & 最少用例数 & 代表性用例 $(a,b)$ \\
 \midrule
-语句覆盖 & 每条可执行语句至少一次 & 1（如 $a=2,b=2$） \\
-判定覆盖 & 判定 $D$ 的真、假各一次 & 2（如 $(2,2)$、$(-1,2)$） \\
-条件覆盖 & $a>0$、$b>0$ 的真假各一次 & 2（如 $(2,2)$、$(-1,-1)$） \\
-路径覆盖 & 每条独立路径至少一次 & 3（短路三条路径） \\
+语句覆盖       & $1$ & $(2,2)$ \\
+判定覆盖       & $2$ & $(2,2)$、$(-1,2)$ \\
+条件覆盖       & $2$ & $(2,2)$、$(-1,-1)$ \\
+判定/条件覆盖  & $2$ & $(2,2)$、$(-1,-1)$ \\
+条件组合覆盖   & $4$ & $(2,2)$、$(2,-1)$、$(-1,2)$、$(-1,-1)$ \\
+路径覆盖       & $2$ & $(2,2)$、$(-1,2)$ \\
 \bottomrule
 \end{tabulary}
 \end{table}
 
 \begin{center}
-\begin{minipage}{0.9\textwidth}
-\small 强弱关系：满足判定覆盖一定满足语句覆盖（判定覆盖 $\supsetneq$ 语句覆盖）；条件覆盖\emph{不}一定满足判定覆盖，需「判定/条件覆盖」同时保证；路径覆盖最强，但独立路径数随分支爆炸，工程上常用基于圈复杂度 $V(G)=E-N+2$ 的基本路径覆盖加以控制。
+\begin{minipage}{0.94\textwidth}
+\small
+\textbf{强弱关系}：语句覆盖最弱；\emph{满足判定覆盖一定满足语句覆盖}（判定覆盖 $\supsetneq$ 语句覆盖），但语句覆盖不一定满足判定覆盖。条件覆盖\emph{不}蕴含判定覆盖（满足了各条件真假，判定可能仍只取一个分支），反之判定覆盖也不蕴含条件覆盖，因此引入\textbf{判定/条件覆盖}同时保证二者。条件组合覆盖蕴含判定/条件覆盖，是最强的条件类准则。路径覆盖最强，但独立路径数随分支爆炸，工程上常用基于圈复杂度 $V(G)=E-N+2$ 的\textbf{基本路径覆盖}加以控制。
 \end{minipage}
 \end{center}
 
-\section{测试用例设计与回归测试}
+\subsection{基本路径测试}
 
-一个好的测试用例应包含四要素：\textbf{前置条件}、\textbf{输入数据}、\textbf{操作步骤}、\textbf{预期输出}，并且要能唯一判定「通过/失败」。
+圈复杂度（Cyclomatic Complexity）$V(G)=E-N+2$（$E$ 为控制流图边数，$N$ 为结点数）既是独立路径数下界，也是程序复杂度的度量。基本路径测试以 $V(G)$ 为目标，构造一组线性独立的路径并为之设计用例（算法~\ref{alg:basicpath}）。
+
+\begin{algorithm}[H]
+\caption{基本路径测试用例设计}
+\label{alg:basicpath}
+\begin{algorithmic}[1]
+\Require 被测模块的控制流图 $G$ 与模块接口
+\Ensure 一组覆盖全部基本路径的测试用例
+\State 由 $G$ 计算 $V(G)=E-N+2$
+\State 选取一条「最典型」的路径作为基线路径
+\For{$i=1$ \textbf{to} $V(G)$}
+    \State 通过翻转某个判定结点，导出第 $i$ 条独立路径
+\EndFor
+\For{每条独立路径}
+    \State 反推能沿该路径执行的输入数据，生成一个用例
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\section{测试用例设计综合与回归测试}
+
+\subsection{测试用例的要素与设计顺序}
+
+一个好的测试用例应包含四要素：\textbf{前置条件}、\textbf{输入数据}、\textbf{操作步骤}、\textbf{预期输出}，并且必须能\emph{唯一}判定「通过/失败」。用例模板见表~\ref{tab:case}。
+
+\begin{table}[H]
+\centering
+\caption{测试用例模板示例（登录功能）}
+\label{tab:case}
+\begin{tabulary}{\textwidth}{LLLL}
+\toprule
+用例编号 & 前置条件 & 输入 & 预期输出 \\
+\midrule
+TC-01 & 用户已注册 & 正确账号 + 正确密码 & 登录成功，进入主页 \\
+TC-02 & 无 & 未注册账号 + 任意密码 & 提示「用户不存在」 \\
+TC-03 & 用户已注册 & 正确账号 + 错误密码 & 提示「密码错误」 \\
+TC-04 & 用户已注册 & 账号正确、密码为空 & 提示「密码不能为空」 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+黑盒与白盒各有所长，实践中应\textbf{组合使用}，设计顺序通常为：
 
 \begin{itemize}
-    \item 设计顺序通常为：先划分等价类 $\to$ 补充边界值 $\to$ 用因果图/判定表处理组合 $\to$ 用白盒准则补齐未覆盖分支。
-    \item \textbf{回归测试}：修改代码后重新运行原有测试，确认没有引入新的缺陷或破坏既有功能。
+    \item 先用\textbf{等价类划分}确定输入域并覆盖有效/无效类；
+    \item 再用\textbf{边界值分析}补齐各类的边界点；
+    \item 用\textbf{因果图/判定表}处理多条件组合；
+    \item 用\textbf{错误推测}追加经验性用例；
+    \item 最后用\textbf{白盒覆盖准则}检查分支/路径，补齐尚未覆盖的逻辑。
 \end{itemize}
+
+\subsection{回归测试}
+
+修改代码（修缺陷、加功能、重构）后，必须重新运行测试以避免\textbf{引入新缺陷}或\textbf{破坏既有功能}，这一活动称为\textbf{回归测试}。常见策略见表~\ref{tab:regression}。
 
 \begin{table}[H]
 \centering
 \caption{回归测试的常见策略}
-\begin{tabulary}{\textwidth}{CC}
+\label{tab:regression}
+\begin{tabulary}{\textwidth}{CCL}
 \toprule
-策略 & 说明 \\
+策略 & 范围 & 说明 \\
 \midrule
-全量回归 & 重跑全部用例，最安全但代价最高 \\
-选择回归 & 只重跑受影响模块及其依赖的用例 \\
-优先级回归 & 先跑高风险、高优先级用例 \\
+全量回归 & 全部用例 & 最安全但代价最高，适合发布前 \\
+选择回归 & 受影响模块及依赖 & 依据变更影响分析挑选用例 \\
+优先级回归 & 高风险/高优先级用例 & 先跑关键路径，尽早暴露问题 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+为降低回归成本，应尽可能\emph{自动化}测试：把核心用例固化为可重复运行的脚本，并纳入持续集成（CI），使每次提交都自动触发回归。
+
+\section{本章小结}
+
+本章围绕「目标 $\to$ 层次 $\to$ 方法 $\to$ 设计」展开：
+
+\begin{itemize}
+    \item \textbf{目标与原则}：测试兼有验证与确认双重目标，遵循尽早、独立、缺陷聚集、经济性、杀虫剂悖论等原则；测试与调试是「找病」与「治病」两种不同活动。
+    \item \textbf{层次与 V 模型}：单元、集成、系统、验收由小到大；V 模型把开发与测试阶段一一对应，测试计划前移。集成时用桩（模拟下层）与驱动（模拟上层），可采用自顶向下、自底向上或三明治策略。
+    \item \textbf{黑盒方法}：等价类划分、边界值分析、因果图/判定表、错误推测，从规格说明出发，只关注输入输出。
+    \item \textbf{白盒方法}：语句、判定、条件、判定/条件、条件组合、路径覆盖由弱到强；以圈复杂度控制基本路径数量。
+    \item \textbf{综合与回归}：用例需含前置条件、输入、步骤、预期输出；黑盒与白盒组合设计，修改后执行回归测试。
+\end{itemize}
+
+\subsection*{常见误区}
+
+\begin{table}[H]
+\centering
+\caption{测试中的常见误区与正确认识}
+\begin{tabulary}{\textwidth}{LL}
+\toprule
+常见误区 & 正确认识 \\
+\midrule
+测试就是调试 & 测试负责发现缺陷，调试负责定位与修复，二者执行者与目标不同 \\
+测试通过就说明没有缺陷 & 测试是抽样，只能证明缺陷存在，不能证明缺陷不存在 \\
+测试应在编码完成后才开始 & 测试计划与用例应随需求、设计同步制定，尽早暴露缺陷 \\
+覆盖率达到 $100\%$ 即质量达标 & 覆盖率只反映代码被执行，不反映逻辑正确；语句覆盖 $100\%$ 仍可能漏判 \\
+开发者测试自己的程序足够 & 独立性原则要求关键系统由独立人员或第三方测试 \\
+需要做到穷尽测试 & 输入组合爆炸，应基于风险与成本选择高性价比用例 \\
+用固定用例反复测试即可 & 杀虫剂悖论：用例需随系统演进而更新迭代 \\
 \bottomrule
 \end{tabulary}
 \end{table}

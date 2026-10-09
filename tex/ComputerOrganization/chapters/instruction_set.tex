@@ -5,46 +5,389 @@
 \clearpage
 
 
-\subsection{指令集架构（ISA）}
+\subsection{指令系统：软件与硬件的接口}
 
-指令集架构（Instruction Set Architecture, ISA）是\textbf{软件与硬件的接口}。它定义了：
+计算机系统可以粗略地划分为\textbf{软件层}与\textbf{硬件层}：软件层用高级语言、汇编语言描述算法，硬件层由晶体管、门电路与数据通路完成实际运算。二者必须约定一套共同语言，才能保证同一段程序在任意合规的实现上得到相同结果。这套共同语言就是\textbf{指令系统}，其完整的规范描述称为\textbf{指令集架构}（Instruction Set Architecture, ISA）。
+
+\begin{definition}[指令集架构]
+指令集架构是程序员可见的机器抽象：它规定了机器能够执行的全部指令、可以访问的寄存器与存储空间、支持的数据类型，以及指令的编码与寻址规则；但它\emph{不}规定这些功能如何用硬件实现。ISA 是软件与硬件之间的一份\textbf{契约}。
+\end{definition}
+
+\subsubsection{ISA 在分层体系中的位置}
+
+同一个 ISA 可以有多种不同的硬件实现（例如 MIPS 的单周期、多周期、流水线实现，或 x86 的历代处理器）。只要它们对同一程序产生相同的结果，就都“实现了”该 ISA。把“做什么”（ISA）与“怎么做”（微架构）分离，带来的好处是：编译器只需面向 ISA 生成代码，硬件工程师只需按 ISA 设计电路，软硬件得以\textbf{独立演进}。
+
+\begin{figure}[H]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[font=\small,>=Stealth]
+\node[draw,minimum width=11cm,minimum height=0.9cm,fill=blue!8,align=center] (sw) at (0,2.0)
+    {应用程序 \quad 编译器 \quad 操作系统};
+\node[draw,minimum width=11cm,minimum height=0.9cm,fill=green!15,align=center] (isa) at (0,0.6)
+    {\textbf{指令集架构 (ISA)}\quad 指令格式 $\cdot$ 寄存器 $\cdot$ 寻址方式 $\cdot$ 数据类型};
+\node[draw,minimum width=11cm,minimum height=0.9cm,fill=orange!15,align=center] (hw) at (0,-0.8)
+    {数据通路 \quad 控制器 \quad 存储层次 \quad I/O 硬件};
+\draw[<->] (sw) -- (isa);
+\draw[<->] (isa) -- (hw);
+\node[font=\scriptsize,anchor=west] at (5.6,1.3) {软件可见};
+\node[font=\scriptsize,anchor=west] at (5.6,-0.1) {硬件实现};
+\end{tikzpicture}%
+}
+\caption{ISA 是软件与硬件之间的接口：上承软件、下启硬件}
+\label{fig:isa_layers}
+\end{figure}
+
+\subsubsection{ISA 规定的内容}
+
+一套完备的 ISA 通常需要定义以下要素：
+
 \begin{itemize}
-    \item 寄存器组：名称、数量、位宽
-    \item 指令格式：操作码+操作数的编码方式
-    \item 寻址方式：如何定位操作数
-    \item 数据类型：支持的整数/浮点数宽
-    \item I/O 模型：内存映射/独立 I/O
+    \item \textbf{指令格式}：操作码与操作数如何编码，指令有多长；
+    \item \textbf{寄存器组}：有哪些寄存器、数量、位宽与用途约定；
+    \item \textbf{寻址方式}：如何由指令字段定位到操作数或内存地址；
+    \item \textbf{数据类型}：支持哪些整数宽度、是否有浮点、字节序；
+    \item \textbf{中断与异常}：发生异常时寄存器与栈如何维护；
+    \item \textbf{I/O 模型}：使用内存映射 I/O 还是独立 I/O 端口。
 \end{itemize}
 
-\subsection{RISC 与 CISC}
+本章以经典的 RISC 架构 \textbf{MIPS} 为主线讲解，并在末尾对比 CISC 与 RISC 的设计哲学。
+
+\subsection{指令格式}
+
+\subsubsection{指令的组成}
+
+一条机器指令本质上是一串定长或变长的二进制位，通常由两部分组成：
+
+\begin{itemize}
+    \item \textbf{操作码}（opcode）：指明这条指令“做什么”；
+    \item \textbf{操作数域}：指明“对谁做”，可以存放寄存器号、立即数、或地址偏移。
+\end{itemize}
+
+MIPS 采用\textbf{定长 32 位}指令，按用途分为三种格式：R 型（寄存器型）、I 型（立即数型）、J 型（跳转型）。
+
+\subsubsection{三种指令格式的字段划分}
 
 \begin{table}[H]
 \centering
-\caption{RISC 与 CISC 对比}
-\label{tab:risc_cisc}
-\begin{tabulary}{\textwidth}{CCC}
+\caption{MIPS 三种指令格式的字段与位宽}
+\label{tab:mips_fields}
+\begin{tabulary}{\textwidth}{CCCC}
 \toprule
-\textbf{特征} & \textbf{RISC} & \textbf{CISC} \\
+\textbf{格式} & \textbf{字段顺序（位宽）} & \textbf{总计} & \textbf{主要用途} \\
 \midrule
-指令长度 & 定长（如 32-bit） & 变长（1–15 字节） \\
-指令数量 & 少（约 100 条） & 多（约 300+ 条） \\
-寻址方式 & 简单（Load/Store 架构） & 复杂（可直接访存运算） \\
-典型代表 & MIPS、ARM、RISC-V & x86、VAX \\
-硬件设计 & 简洁，易流水 & 复杂，需微程序 \\
-编译负担 & 重（编译器优化关键） & 轻（硬件承担更多） \\
+R 型 & op(6) + rs(5) + rt(5) + rd(5) + shamt(5) + funct(6) & 32 & 算术、逻辑、移位 \\
+I 型 & op(6) + rs(5) + rt(5) + immediate(16) & 32 & 立即数运算、访存、分支 \\
+J 型 & op(6) + address(26) & 32 & 无条件跳转 \\
 \bottomrule
 \end{tabulary}
 \end{table}
 
-\subsection{MIPS 指令集}
+\begin{table}[H]
+\centering
+\caption{MIPS 各字段的含义}
+\label{tab:mips_field_meaning}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+\textbf{字段} & \textbf{位宽} & \textbf{含义} \\
+\midrule
+op & 6 & 操作码，最高 6 位；全 0 表示 R 型，由 funct 决定具体运算 \\
+rs & 5 & 第一源操作数寄存器号（$0\sim31$） \\
+rt & 5 & 第二源操作数寄存器号，或 I 型的目标寄存器号 \\
+rd & 5 & R 型的目标寄存器号 \\
+shamt & 5 & 移位量（shift amount），仅移位指令使用 \\
+funct & 6 & 功能码，与 op=0 配合区分 R 型运算 \\
+immediate & 16 & 立即数或地址偏移，参与符号扩展 \\
+address & 26 & 跳转目标地址的低 26 位（字地址） \\
+\bottomrule
+\end{tabulary}
+\end{table}
 
-MIPS 是经典 RISC 架构，32 个 32 位通用寄存器（\$0 始终为 0），Load/Store 架构。
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    fld/.style={draw, minimum height=0.8cm, font=\small, anchor=west},
+    b6/.style={fld, minimum width=1.32cm},
+    b5/.style={fld, minimum width=1.10cm},
+    b16/.style={fld, minimum width=3.52cm},
+    b26/.style={fld, minimum width=5.72cm},
+    lbl/.style={font=\small, anchor=east}
+]
+    % R 型
+    \node[b6] (r1) at (0,0) {op};
+    \node[b5, right=0pt of r1] (r2) {rs};
+    \node[b5, right=0pt of r2] (r3) {rt};
+    \node[b5, right=0pt of r3] (r4) {rd};
+    \node[b5, right=0pt of r4] (r5) {shamt};
+    \node[b6, right=0pt of r5] (r6) {funct};
+    \node[lbl] at (-0.3,0) {R 型};
+    \node[font=\scriptsize, below=0.05cm of r1.south west, anchor=north west] {31};
+    \node[font=\scriptsize, below=0.05cm of r6.south east, anchor=north east] {0};
 
-\subsubsection{MIPS 寄存器约定}
+    % I 型
+    \node[b6] (i1) at (0,-1.4) {op};
+    \node[b5, right=0pt of i1] (i2) {rs};
+    \node[b5, right=0pt of i2] (i3) {rt};
+    \node[b16, right=0pt of i3] (i4) {immediate};
+    \node[lbl] at (-0.3,-1.4) {I 型};
+    \node[font=\scriptsize, below=0.05cm of i1.south west, anchor=north west] {31};
+    \node[font=\scriptsize, below=0.05cm of i4.south east, anchor=north east] {0};
+
+    % J 型
+    \node[b6] (j1) at (0,-2.8) {op};
+    \node[b26, right=0pt of j1] (j2) {address};
+    \node[lbl] at (-0.3,-2.8) {J 型};
+    \node[font=\scriptsize, below=0.05cm of j1.south west, anchor=north west] {31};
+    \node[font=\scriptsize, below=0.05cm of j2.south east, anchor=north east] {0};
+\end{tikzpicture}
+\caption{MIPS 三种指令格式的位域划分（R：6/5/5/5/5/6，I：6/5/5/16，J：6/26）}
+\label{fig:mips_formats}
+\end{figure}
+
+位域从左到右对应\textbf{高位到低位}，最高位 MSB 为第 31 位、最低位 LSB 为第 0 位。这样划分的共同点是：\textbf{op 固定占最高 6 位}，因此译码器可以先用这 6 位快速判断格式类别，再决定如何解释剩余字段。这种“先看前缀、再分派”的思路正是流水线译码的关键。
+
+\subsection{寻址方式}
+
+指令要访问操作数，就必须通过某种\textbf{寻址方式}计算出操作数所在的位置。若操作数在存储器中，则计算出的位置称为\textbf{有效地址}（Effective Address, EA）。下面逐一介绍九种经典寻址方式。
+
+\begin{figure}[H]
+\centering
+\resizebox{\textwidth}{!}{%
+\newcommand{\addrmem}[1]{%
+  \draw[fill=gray!10] (#1) rectangle ++(0.9,1.8);
+  \draw (#1) ++(0,0.6) -- ++(0.9,0);
+  \draw (#1) ++(0,1.2) -- ++(0.9,0);
+}
+\begin{tikzpicture}[font=\small,>=Stealth,
+    box/.style={draw, rounded corners, font=\scriptsize, align=center}]
+    % (a) 立即数
+    \begin{scope}[shift={(0, 0)}]
+        \node[box, minimum width=1.9cm, minimum height=0.6cm] (ins) at (1.0,1.5) {指令 + \#imm};
+        \node[box, minimum width=1.9cm, minimum height=0.6cm] (opd) at (1.0,0.3) {操作数 $= \text{imm}$};
+        \draw[->] (ins) -- (opd);
+        \node[font=\scriptsize, anchor=north] at (1.7,-0.55) {(a) 立即数};
+    \end{scope}
+    % (b) 寄存器
+    \begin{scope}[shift={(4.7, 0)}]
+        \node[box, minimum width=1.5cm, minimum height=1.4cm] (reg) at (0.9,0.9) {寄存器组};
+        \node[box, minimum width=1.0cm, minimum height=0.6cm] (opd) at (3.2,0.9) {$R[i]$};
+        \draw[->] ([yshift=0.2cm]reg.east) -- (opd.west);
+        \node[font=\scriptsize, anchor=north] at (1.7,-0.55) {(b) 寄存器};
+    \end{scope}
+    % (c) 直接
+    \begin{scope}[shift={(9.4, 0)}]
+        \node[box, minimum width=2.0cm, minimum height=0.6cm] (ins) at (0.9,1.5) {指令: 地址 $A$};
+        \addrmem{2.7,0}
+        \draw[->] (ins) -- (3.15,0.9);
+        \node[font=\scriptsize, anchor=west] at (3.7,0.9) {$M[A]$};
+        \node[font=\scriptsize, anchor=north] at (1.7,-0.55) {(c) 直接};
+    \end{scope}
+    % (d) 间接
+    \begin{scope}[shift={(0, -3.4)}]
+        \node[box, minimum width=2.0cm, minimum height=0.6cm] (ins) at (0.9,1.5) {指令: 地址 $A$};
+        \addrmem{2.7,0}
+        \draw[->] (ins) -- (3.15,1.5);
+        \node[font=\scriptsize, anchor=west] at (3.7,1.5) {$EA$};
+        \draw[->] (3.15,1.4) -- (3.15,1.05);
+        \node[font=\scriptsize, anchor=west] at (3.7,0.9) {$M[EA]$};
+        \node[font=\scriptsize, anchor=north] at (1.7,-0.55) {(d) 间接};
+    \end{scope}
+    % (e) 寄存器间接
+    \begin{scope}[shift={(4.7, -3.4)}]
+        \node[box, minimum width=1.5cm, minimum height=1.2cm] (reg) at (0.9,0.9) {寄存器\\$R$};
+        \addrmem{2.7,0}
+        \draw[->] (reg) -- (3.15,0.9);
+        \node[font=\scriptsize, anchor=west] at (3.7,0.9) {$M[R]$};
+        \node[font=\scriptsize, anchor=north] at (1.7,-0.55) {(e) 寄存器间接};
+    \end{scope}
+    % (f) 基址
+    \begin{scope}[shift={(9.4, -3.4)}]
+        \node[box, minimum width=1.6cm, minimum height=0.5cm] (base) at (0.95,1.6) {基址 $R$};
+        \node[box, minimum width=1.2cm, minimum height=0.5cm] (off) at (0.95,0.8) {偏移 $d$};
+        \node[circle, draw, inner sep=1pt, font=\scriptsize] (plus) at (0.95,0.05) {$+$};
+        \draw (base) -- (plus); \draw (off) -- (plus);
+        \addrmem{2.7,0}
+        \draw[->] (plus) -- (3.15,0.9);
+        \node[font=\scriptsize, anchor=west] at (3.7,0.9) {$M[R+d]$};
+        \node[font=\scriptsize, anchor=north] at (1.7,-0.55) {(f) 基址};
+    \end{scope}
+    % (g) 变址
+    \begin{scope}[shift={(0, -6.8)}]
+        \node[box, minimum width=1.6cm, minimum height=0.5cm] (idx) at (0.95,1.6) {变址 $R$};
+        \node[box, minimum width=1.2cm, minimum height=0.5cm] (off) at (0.95,0.8) {偏移 $d$};
+        \node[circle, draw, inner sep=1pt, font=\scriptsize] (plus) at (0.95,0.05) {$+$};
+        \draw (idx) -- (plus); \draw (off) -- (plus);
+        \addrmem{2.7,0}
+        \draw[->] (plus) -- (3.15,0.9);
+        \node[font=\scriptsize, anchor=west] at (3.7,0.9) {$M[R+d]$};
+        \node[font=\scriptsize, anchor=north] at (1.7,-0.55) {(g) 变址};
+    \end{scope}
+    % (h) 相对
+    \begin{scope}[shift={(4.7, -6.8)}]
+        \node[box, minimum width=1.6cm, minimum height=0.5cm] (pc) at (0.95,1.6) {PC};
+        \node[box, minimum width=1.2cm, minimum height=0.5cm] (off) at (0.95,0.8) {偏移 $d$};
+        \node[circle, draw, inner sep=1pt, font=\scriptsize] (plus) at (0.95,0.05) {$+$};
+        \draw (pc) -- (plus); \draw (off) -- (plus);
+        \addrmem{2.7,0}
+        \draw[->] (plus) -- (3.15,0.9);
+        \node[font=\scriptsize, anchor=west] at (3.7,0.9) {$M[PC+d]$};
+        \node[font=\scriptsize, anchor=north] at (1.7,-0.55) {(h) 相对};
+    \end{scope}
+    % (i) 堆栈
+    \begin{scope}[shift={(9.4, -6.8)}]
+        \node[box, minimum width=1.0cm, minimum height=0.5cm] (sp) at (0.6,0.9) {SP};
+        \addrmem{2.7,0}
+        \draw[->] (sp) -- (3.15,1.5);
+        \node[font=\scriptsize, anchor=west] at (3.7,1.5) {栈顶};
+        \node[font=\scriptsize, anchor=west] at (3.7,0.3) {栈底};
+        \node[font=\scriptsize, anchor=north] at (1.7,-0.55) {(i) 堆栈};
+    \end{scope}
+\end{tikzpicture}%
+}
+\caption{九种寻址方式示意（方框为寄存器/指令，右侧分格为存储器）}
+\label{fig:addressing}
+\end{figure}
+
+\subsubsection{各种寻址方式的有效地址计算式}
+
+\begin{itemize}
+    \item \textbf{立即数寻址}：操作数就在指令中，不存在访存，操作数 $= \text{imm}$；
+    \item \textbf{寄存器寻址}：操作数 $= R[i]$，速度最快；
+    \item \textbf{直接寻址}：$EA = A$，指令直接给出内存地址；
+    \item \textbf{间接寻址}：$EA = M[A]$，内存中的内容再作为地址，可一次访存两次取值；
+    \item \textbf{寄存器间接寻址}：$EA = R[i]$，寄存器里存的是地址；
+    \item \textbf{基址寻址}：$EA = R_{\text{base}} + d$，适合定位数组/结构体基址；
+    \item \textbf{变址寻址}：$EA = R_{\text{index}} + d$，适合循环遍历数组；
+    \item \textbf{相对寻址}：$EA = PC_{\text{next}} + (d \ll 2)$，用于分支，代码可重定位；
+    \item \textbf{堆栈寻址}：$EA = SP$，按下推（push，$SP \gets SP - 4$）与弹出（pop，$SP \gets SP + 4$）存取。
+\end{itemize}
 
 \begin{table}[H]
 \centering
-\caption{MIPS 寄存器用途}
+\caption{寻址方式对比}
+\label{tab:addressing_cmp}
+\begin{tabulary}{\textwidth}{CCCCC}
+\toprule
+\textbf{方式} & \textbf{操作数位置} & \textbf{有效地址 $EA$} & \textbf{访存次数} & \textbf{MIPS 支持} \\
+\midrule
+立即数 & 指令中 & 无 & 0 & \texttt{addi} \\
+寄存器 & 寄存器 & 无 & 0 & \texttt{add} \\
+直接 & 存储器 & $A$ & 1 & 少见 \\
+间接 & 存储器 & $M[A]$ & 2 & 无 \\
+寄存器间接 & 存储器 & $R[i]$ & 1 & 基址的特例 \\
+基址 & 存储器 & $R_{\text{base}} + d$ & 1 & \texttt{lw} 8(\$t1) \\
+变址 & 存储器 & $R_{\text{index}} + d$ & 1 & 借用基址 \\
+相对 & 存储器 & $PC + d$ & 1 & \texttt{beq} / \texttt{bne} \\
+堆栈 & 存储器 & $SP$ & 1 & \texttt{push} / \texttt{pop} \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{MIPS 常用指令分类}
+
+MIPS 指令按功能大致分为五类，表~\ref{tab:mips_inst} 给出各类代表指令及其格式。
+
+\begin{table}[H]
+\centering
+\caption{MIPS 指令分类与示例}
+\label{tab:mips_inst}
+\begin{tabulary}{\textwidth}{CCCC}
+\toprule
+\textbf{类别} & \textbf{代表指令} & \textbf{格式} & \textbf{功能} \\
+\midrule
+算术运算 & \texttt{add} \texttt{sub} \texttt{addi} \texttt{mult} & R / I & 加减乘除，注意溢出 \\
+逻辑运算 & \texttt{and} \texttt{or} \texttt{xor} \texttt{sll} \texttt{srl} & R / I & 按位运算与移位 \\
+访存 & \texttt{lw} \texttt{sw} \texttt{lb} \texttt{sb} & I & Load/Store，只有它们访存 \\
+分支 & \texttt{beq} \texttt{bne} \texttt{slt} & I / R & 比较后条件跳转 \\
+跳转 & \texttt{j} \texttt{jal} \texttt{jr} & J / R & 无条件跳转、过程调用 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsubsection{示例机器码}
+
+\begin{table}[H]
+\centering
+\caption{常用 MIPS 指令及其 32 位机器码}
+\label{tab:mips_machine}
+\begin{tabulary}{\textwidth}{CCCC}
+\toprule
+\textbf{汇编指令} & \textbf{格式} & \textbf{语义} & \textbf{机器码} \\
+\midrule
+\texttt{add \$t0,\$t1,\$t2} & R & \$t0 = \$t1 + \$t2 & 0x012A4020 \\
+\texttt{addi \$t0,\$t1,100} & I & \$t0 = \$t1 + 100 & 0x20940064 \\
+\texttt{lw \$t0,8(\$t1)} & I & \$t0 = M[\$t1+8] & 0x8D280008 \\
+\texttt{sw \$t0,8(\$t1)} & I & M[\$t1+8] = \$t0 & 0xAD280008 \\
+\texttt{beq \$t0,\$t1,4} & I & if \$t0=\$t1 goto PC+4+16 & 0x11090004 \\
+\texttt{j 0x00400000} & J & 无条件跳到 0x00400000 & 0x08100000 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsubsection{完整例题：把汇编翻译成机器码}
+
+\begin{example}[汇编 $\to$ 机器码]
+把 \texttt{add \$t0, \$t1, \$t2} 翻译为 32 位机器码。已知 R 型指令：\texttt{add} 的 op $=0$、funct $=0x20$；寄存器号 \$t0=8，\$t1=9，\$t2=10。
+
+\begin{enumerate}
+    \item 确定格式：\texttt{add} 是 R 型，目标寄存器写入 rd，源在 rs 与 rt。因此 rd $=\$t0=8$，rs $=\$t1=9$，rt $=\$t2=10$。
+    \item 逐字段转二进制：
+    \[
+    \underbrace{000000}_{op}\ \underbrace{01001}_{rs=9}\ \underbrace{01010}_{rt=10}\ \underbrace{01000}_{rd=8}\ \underbrace{00000}_{shamt}\ \underbrace{100000}_{funct=0x20}
+    \]
+    \item 拼接为 32 位并按每 4 位一组转十六进制：
+    \[
+    0000\ 0001\ 0010\ 1010\ 0100\ 0000\ 0010\ 0000 = \texttt{0x012A4020}
+    \]
+\end{enumerate}
+故机器码为 \texttt{0x012A4020}，与表~\ref{tab:mips_machine} 一致。
+\end{example}
+
+\begin{example}[机器码 $\to$ 汇编：反向译码]
+给定机器码 \texttt{0x012A4020}，还原其汇编指令。
+\begin{enumerate}
+    \item 展开为二进制：\texttt{0000 0001 0010 1010 0100 0000 0010 0000}。
+    \item 按 R 型切分字段：op $=000000$（即 R 型），rs $=01001=9$，rt $=01010=10$，rd $=01000=8$，shamt $=00000$，funct $=100000=0x20$。
+    \item 查功能码表：op $=0$ 且 funct $=0x20$ 表示 \texttt{add}。
+    \item 组装：rd $=8$（\$t0），rs $=9$（\$t1），rt $=10$（\$t2）。
+\end{enumerate}
+结果为 \texttt{add \$t0, \$t1, \$t2}。整个译码过程可归结为“取指 $\to$ 定格式 $\to$ 切字段 $\to$ 查表 $\to$ 组装”五步。
+\end{example}
+
+\subsection{CISC 与 RISC}
+
+按照指令系统的复杂度，处理器可分为两大流派：\textbf{CISC}（复杂指令集计算机）与 \textbf{RISC}（精简指令集计算机）。
+
+\begin{table}[H]
+\centering
+\caption{CISC 与 RISC 对比}
+\label{tab:risc_cisc}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+\textbf{特征} & \textbf{RISC（MIPS、ARM、RISC-V）} & \textbf{CISC（x86、VAX）} \\
+\midrule
+指令长度 & 定长（如 32 位） & 变长（1$\sim$15 字节） \\
+指令数量 & 少（约 100 条） & 多（约 300 条以上） \\
+寻址方式 & 简单，仅 Load/Store 访存 & 复杂，运算可直接访存 \\
+寄存器数量 & 多（32 个通用寄存器） & 少（8 个，x86-64 扩展到 16） \\
+指令执行周期 & 大多单周期，利于流水 & 周期不一，需微程序 \\
+控制器 & 硬布线为主 & 微程序为主 \\
+编译负担 & 重，依赖编译器优化 & 轻，硬件承担更多 \\
+设计哲学 & 让常用指令更快 & 让指令更贴近高级语言 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+RISC 的核心理念是：\textbf{指令简单规整 $\to$ 便于流水线 $\to$ 提高主频与吞吐}。由于访存只有 Load/Store 两条指令，运算指令的延迟可控，流水线设计大为简化。这也是现代 RISC（ARM、RISC-V）在移动与嵌入式领域占据主导的原因；而 x86 通过把复杂指令在内部译码为类 RISC 的微操作，兼顾了兼容性与性能。
+
+\subsection{过程调用与栈帧}
+
+\subsubsection{调用约定}
+
+过程（函数）调用需要解决四个问题：\textbf{如何传递参数}、\textbf{如何保存返回地址}、\textbf{如何保存调用者/被调用者的寄存器}、\textbf{如何返回结果}。MIPS 用一组寄存器约定来规范这些行为，见表~\ref{tab:mips_regs}。
+
+\begin{table}[H]
+\centering
+\caption{MIPS 寄存器用途约定}
 \label{tab:mips_regs}
 \begin{tabulary}{\textwidth}{CCC}
 \toprule
@@ -52,101 +395,132 @@ MIPS 是经典 RISC 架构，32 个 32 位通用寄存器（\$0 始终为 0）�
 \midrule
 \$0 & \$zero & 恒为 0 \\
 \$1 & \$at & 汇编器保留 \\
-\$2–\$3 & \$v0–\$v1 & 函数返回值 \\
-\$4–\$7 & \$a0–\$a3 & 函数参数 \\
-\$8–\$15 & \$t0–\$t7 & 临时变量 \\
-\$16–\$23 & \$s0–\$s7 & 保存变量（需恢复） \\
+\$2--\$3 & \$v0 \$v1 & 函数返回值 \\
+\$4--\$7 & \$a0--\$a3 & 前 4 个函数参数 \\
+\$8--\$15 & \$t0--\$t7 & 临时变量（caller-saved） \\
+\$16--\$23 & \$s0--\$s7 & 保存变量（callee-saved，需恢复） \\
 \$29 & \$sp & 栈指针 \\
+\$30 & \$fp & 帧指针 \\
 \$31 & \$ra & 返回地址 \\
 \bottomrule
 \end{tabulary}
 \end{table}
 
-\subsubsection{三种指令格式}
-
+约定要点：
 \begin{itemize}
-    \item \textbf{R 型}（寄存器型）：op(6) + rs(5) + rt(5) + rd(5) + shamt(5) + funct(6)
-    \item \textbf{I 型}（立即数型）：op(6) + rs(5) + rt(5) + immediate(16)
-    \item \textbf{J 型}（跳转型）：op(6) + address(26)
+    \item \textbf{参数传递}：前 4 个参数放 \$a0--\$a3，超出部分通过栈传递；
+    \item \textbf{返回值}：放在 \$v0（必要时 \$v1）；
+    \item \textbf{返回地址}：\texttt{jal} 把下一条指令地址存入 \$ra，返回时用 \texttt{jr \$ra}；
+    \item \textbf{寄存器保护}：\$t 系列由调用者负责保存（若需要），\$s 系列由被调用者保存并恢复。
 \end{itemize}
+
+\subsubsection{栈帧结构}
+
+被调用过程若需要保存 \$ra、\$s 寄存器或使用局部变量，就在栈上分配一块\textbf{栈帧}（stack frame）。MIPS 的栈向\textbf{低地址}方向生长：分配时 $SP$ 减小，释放时 $SP$ 增大。典型布局如图~\ref{fig:stackframe}。
 
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[
-    f6/.style={draw, minimum width=1.1cm, minimum height=0.7cm, font=\small},
-    f5/.style={draw, minimum width=1.0cm, minimum height=0.7cm, font=\small},
-    f16/.style={draw, minimum width=2.9cm, minimum height=0.7cm, font=\small},
-    f26/.style={draw, minimum width=4.6cm, minimum height=0.7cm, font=\small},
-    lbl/.style={font=\small}
-]
-    \node[f6] (r1) at (0,0) {op};
-    \node[f5, right=0pt of r1] (r2) {rs};
-    \node[f5, right=0pt of r2] (r3) {rt};
-    \node[f5, right=0pt of r3] (r4) {rd};
-    \node[f5, right=0pt of r4] (r5) {shamt};
-    \node[f6, right=0pt of r5] (r6) {funct};
-    \node[lbl, left=0.25cm of r1] {R 型};
-
-    \node[f6] (i1) at (0,-1.0) {op};
-    \node[f5, right=0pt of i1] (i2) {rs};
-    \node[f5, right=0pt of i2] (i3) {rt};
-    \node[f16, right=0pt of i3] (i4) {immediate};
-    \node[lbl, left=0.25cm of i1] {I 型};
-
-    \node[f6] (j1) at (0,-2.0) {op};
-    \node[f26, right=0pt of j1] (j2) {address};
-    \node[lbl, left=0.25cm of j1] {J 型};
+\begin{tikzpicture}[font=\small,>=Stealth]
+    \draw (1,0.4) rectangle (6.2,6.0);
+    \draw (1,1.4) -- (6.2,1.4);
+    \draw (1,2.4) -- (6.2,2.4);
+    \draw (1,3.4) -- (6.2,3.4);
+    \draw (1,4.2) -- (6.2,4.2);
+    \draw (1,5.0) -- (6.2,5.0);
+    \node at (3.6,5.5) {调用者的栈帧};
+    \node[align=center] at (3.6,4.6) {参数 5 $\sim$ n\\（参数多于 4 个时）};
+    \node at (3.6,3.8) {返回地址 \texttt{\$ra}};
+    \node at (3.6,2.9) {保存的 \texttt{\$s0} $\sim$ \texttt{\$s7}};
+    \node at (3.6,1.9) {局部变量};
+    \node[align=center] at (3.6,0.9) {临时变量 / 对齐填充};
+    \node[anchor=west,font=\scriptsize] at (6.35,6.0) {高地址};
+    \node[anchor=west,font=\scriptsize] at (6.35,0.4) {低地址};
+    \draw[->] (6.7,0.4) -- (6.2,0.4);
+    \node[anchor=west,font=\scriptsize] at (6.75,0.4) {\texttt{\$sp}（栈顶）};
+    \draw[->] (6.7,4.2) -- (6.2,4.2);
+    \node[anchor=west,font=\scriptsize] at (6.75,4.2) {\texttt{\$fp}（帧指针）};
+    \draw[->,thick] (0.5,5.6) -- (0.5,1.0)
+        node[midway,left,font=\scriptsize,align=center] {栈\\生长\\方向};
 \end{tikzpicture}
-\caption{MIPS 三种指令格式（R：6/5/5/5/5/6，I：6/5/5/16，J：6/26）}
-\label{fig:mips_formats}
+\caption{MIPS 栈帧结构：栈向低地址生长，\texttt{\$sp} 指向当前帧顶}
+\label{fig:stackframe}
 \end{figure}
 
-\begin{example}[MIPS 指令示例]
-\begin{lstlisting}[caption={MIPS 汇编示例：数组求和}]
-    # 计算 a[0] + a[1] + ... + a[9]
+一个遵循约定的过程体可用如下汇编模板描述：
+
+\begin{lstlisting}[caption={MIPS 过程调用模板：保存/恢复现场}]
+    # ---- 建立栈帧 ----
+    addi $sp, $sp, -12    # 分配 12 字节栈帧
+    sw   $ra, 8($sp)      # 保存返回地址
+    sw   $s0, 4($sp)      # 保存 callee-saved 寄存器
+    sw   $s1, 0($sp)
+    # ---- 过程体 ----
+    # ... 使用 $s0/$s1 与局部变量 ...
+    move $v0, $s0         # 设置返回值
+    # ---- 恢复现场 ----
+    lw   $s1, 0($sp)
+    lw   $s0, 4($sp)
+    lw   $ra, 8($sp)
+    addi $sp, $sp, 12     # 释放栈帧
+    jr   $ra              # 返回调用者
+\end{lstlisting}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small,>=Stealth,
+    box/.style={draw, rounded corners, align=center, font=\scriptsize}]
+    \node[box, minimum width=2.0cm, minimum height=0.8cm] (caller) at (0,2.2) {调用者};
+    \node[box, minimum width=2.0cm, minimum height=0.8cm] (jal) at (3.2,2.2) {\texttt{jal f}：\\\$ra $\gets$ PC+4};
+    \node[box, minimum width=2.0cm, minimum height=0.8cm] (callee) at (3.2,0.6) {被调用者 \texttt{f}：\\压栈保护 \$ra/\$s};
+    \node[box, minimum width=2.0cm, minimum height=0.8cm] (jr) at (0,0.6) {\texttt{jr \$ra}：\\弹栈恢复并返回};
+    \draw[->] (caller) -- (jal);
+    \draw[->] (jal) -- (callee);
+    \draw[->] (callee) -- (jr);
+    \draw[->] (jr) -- (caller);
+\end{tikzpicture}
+\caption{过程调用与返回的控制流：\texttt{jal} 保存返回地址，\texttt{jr \$ra} 据此返回}
+\label{fig:callflow}
+\end{figure}
+
+\subsubsection{示例：数组求和}
+
+\begin{example}[数组求和的汇编实现]
+\begin{lstlisting}[caption={计算 a[0] + a[1] + ... + a[9]}]
     li   $t0, 0          # sum = 0
     li   $t1, 0          # i = 0
     la   $t2, array      # $t2 = &a[0]
 loop:
-    lw   $t3, 0($t2)     # $t3 = a[i]
+    lw   $t3, 0($t2)     # $t3 = a[i]      (基址偏移寻址)
     addu $t0, $t0, $t3   # sum += $t3
     addi $t1, $t1, 1     # i++
-    addi $t2, $t2, 4     # $t2 += 4 (next word)
+    addi $t2, $t2, 4     # $t2 += 4 (下一个字)
     blt  $t1, 10, loop   # if i < 10 goto loop
 done:
-    move $v0, $t0        # return sum
+    move $v0, $t0        # 返回 sum
 \end{lstlisting}
+其中 \texttt{lw} 使用了基址偏移寻址（$EA = \$t2 + 0$），\texttt{blt} 由 \texttt{slt}+\texttt{bne} 组合实现，体现了 RISC“用简单指令组合出复杂语义”的思想。
 \end{example}
 
-\subsubsection{寻址方式}
+\subsection{本章小结}
 
 \begin{itemize}
-    \item \textbf{寄存器寻址}：$\text{add } \$1, \$2, \$3$
-    \item \textbf{立即数寻址}：$\text{addi } \$1, \$2, 100$
-    \item \textbf{基址偏移寻址}：$\text{lw } \$1, 8(\$2)$（$\$1 = M[\$2+8]$）
-    \item \textbf{PC 相对寻址}：$\text{beq } \$1, \$2, \text{label}$（$\text{PC} = \text{PC}+4 + \text{offset}\times4$）
-    \item \textbf{伪直接寻址}：$\text{j } \text{addr}$（跳转地址 = $\text{PC}$ 高 4 位拼接 26 位地址 $\times4$）
+    \item \textbf{ISA 是软硬件接口}：它规定了指令格式、寄存器、寻址方式与数据类型，是可移植性的基础；同一 ISA 可有多种微架构实现。
+    \item \textbf{MIPS 三种格式}：R 型（6/5/5/5/5/6）、I 型（6/5/5/16）、J 型（6/26），op 固定占最高 6 位，便于快速译码。
+    \item \textbf{寻址方式}统一用有效地址 $EA$ 刻画：立即/寄存器无需访存，直接/间接/寄存器间接/基址/变址/相对/堆栈各有公式与适用场景。
+    \item \textbf{指令分类}：算术、逻辑、访存、分支、跳转；只有 Load/Store 访存是 RISC 的关键特征。
+    \item \textbf{汇编与机器码}可双向翻译：定格式 $\to$ 切字段 $\to$ 转进制（或查表）。
+    \item \textbf{过程调用}依赖调用约定：\$a 传参、\$v 返回、\$ra 存返回地址、\$t/\$s 划分保存责任，\$sp 维护向低地址生长的栈帧。
 \end{itemize}
 
-\subsection{过程调用约定}
+\subsection{常见误区}
 
-MIPS 过程调用用 $\texttt{jal}$（jump and link）跳转并保存返回地址到 \$ra，用 $\texttt{jr \$ra}$ 返回。
-
-\begin{lstlisting}[caption={MIPS 过程调用示例}]
-    # 调用
-    jal  my_func          # $ra = PC+4; 跳转到 my_func
-    
-    # 过程内部（栈帧）
-    addi $sp, $sp, -8     # 分配栈帧
-    sw   $ra, 4($sp)      # 保存返回地址
-    sw   $s0, 0($sp)      # 保存 callee-saved 寄存器
-    # ... 过程体 ...
-    lw   $s0, 0($sp)      # 恢复 $s0
-    lw   $ra, 4($sp)      # 恢复 $ra
-    addi $sp, $sp, 8      # 释放栈帧
-    jr   $ra              # 返回
-\end{lstlisting}
-
-\subsection{x86 指令集简介}
-
-x86 是典型的 CISC 架构：变长指令（1–15 字节），寄存器较少（8 个通用寄存器，x86-64 扩展到 16 个），支持内存直接参与运算（非 Load/Store）。x86-64 是目前桌面/服务器主流架构。
+\begin{itemize}
+    \item \textbf{把 ISA 与微架构混为一谈}：ISA 是软件可见的抽象，微架构是具体电路实现；同一 ISA 的性能可以差别巨大。
+    \item \textbf{认为所有 MIPS 指令都能访存}：只有 \texttt{lw}/\texttt{sw} 等 Load/Store 指令访问内存，算术逻辑指令只操作寄存器。
+    \item \textbf{混淆直接寻址与间接寻址}：直接寻址 $EA = A$ 只访存一次；间接寻址 $EA = M[A]$ 需访存两次。
+    \item \textbf{混淆基址与变址}：两者公式都是 $R+d$，区别在语义——基址寄存器放“基址”、偏移变，变址寄存器放“下标”、基址固定（现代处理器常不区分）。
+    \item \textbf{相对寻址忘记左移}：MIPS 分支偏移以“字”为单位，$EA = PC + (\text{offset} \ll 2)$，不是简单的 $PC + \text{offset}$。
+    \item \textbf{忘记恢复 \$ra}：若过程内还会调用其它过程，必须先保存 \$ra 再调用，否则返回地址被覆盖，\texttt{jr \$ra} 将跳错。
+    \item \textbf{栈指针方向弄反}：MIPS 栈向低地址生长，分配栈帧用 \texttt{addi \$sp, \$sp, -n}，释放用 \texttt{+n}。
+    \item \textbf{误解寄存器号位宽}：32 个寄存器只需 5 位（$2^5=32$），因此 rs/rt/rd 各占 5 位，而不是把 32 位都留给一个操作数。
+\end{itemize}

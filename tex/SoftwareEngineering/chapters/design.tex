@@ -11,9 +11,75 @@
 \endgroup
 \clearpage
 
-\section{SOLID 五原则}
+需求工程回答「\textbf{做什么}」，软件设计回答「\textbf{怎么做}」。设计把需求模型逐步转化为可编码、可验证的蓝图，是衔接分析与实现的关键桥梁。本章先讲设计过程与基本目标，再讲指导类设计的 SOLID 原则，然后给出可复用的设计模式，接着讨论决定系统整体骨架的体系结构风格，最后用耦合与内聚两类度量把「设计好坏」量化。
 
-SOLID 是一组面向对象设计的指导思想，目标是让系统在需求变化时「改动局部、稳定整体」。
+\section{设计过程与目标}
+
+\subsection{从需求到实现}
+
+软件设计通常分四类活动，自顶向下、由粗到精地展开：
+
+\begin{table}[H]
+\centering
+\caption{软件设计的四类活动}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+设计活动 & 关注问题 & 典型产物 \\
+\midrule
+体系结构设计 & 系统由哪些子系统组成、如何交互、技术选型 & 架构图、分层/MVC/微服务方案 \\
+数据设计 & 数据如何组织、存储、持久化 & ER 图、表结构、缓存策略 \\
+接口设计 & 模块之间「约定什么」& 接口签名、消息格式、API 契约 \\
+组件设计 & 每个模块内部「怎么实现」& 类图、算法、状态机 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+四类活动并非严格串行：接口设计会反过来约束组件设计，体系结构也可能在组件细化时被修正。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=Stealth, node distance=0.9cm,
+    box/.style={draw, rounded corners, fill=blue!6, minimum width=2.6cm,
+        minimum height=0.8cm, align=center}]
+    \node[box] (req) {需求模型\\(用例 / ER)};
+    \node[box, fill=green!8, below=of req] (arch) {体系结构设计};
+    \node[box, fill=green!8, below=of arch] (data) {数据与接口设计};
+    \node[box, fill=green!8, below=of data] (comp) {组件设计};
+    \node[box, fill=orange!10, below=of comp] (code) {实现（编码）};
+    \draw[->, thick] (req) -- (arch);
+    \draw[->, thick] (arch) -- (data);
+    \draw[->, thick] (data) -- (comp);
+    \draw[->, thick] (comp) -- (code);
+    \draw[->, dashed, gray] (comp.east) to[bend left=55] node[right, font=\footnotesize]{反馈修正} (arch.east);
+\end{tikzpicture}
+\caption{需求到实现：设计逐层细化，并允许反馈修正}
+\end{figure}
+
+\subsection{四条基本目标}
+
+\begin{itemize}
+    \item \textbf{抽象 (Abstraction)}：忽略与当前问题无关的细节，只保留本质特征。分出\textbf{过程抽象}（把「一组操作」看成一个动作）与\textbf{数据抽象}（把「一组数据及其操作」看成一个类型）。
+    \item \textbf{模块化 (Modularization)}：把系统分解为可独立开发、测试、替换的模块。分而治之能降低单点复杂度，但分解过细又会抬高模块间的通信成本，存在最优粒度。
+    \item \textbf{信息隐藏 (Information Hiding)}：模块只通过接口暴露「做什么」，把「怎么做」——数据结构、算法、易变细节——藏在内部。调用者只依赖契约，实现可自由替换。
+    \item \textbf{逐步求精 (Stepwise Refinement)}：自顶向下、由粗到精地补充细节，每一步都在前一步的抽象之上展开，直到足以编码。
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{抽象与信息隐藏的对比}
+\begin{tabulary}{\textwidth}{CCL}
+\toprule
+概念 & 侧重点 & 在图书馆系统中的体现 \\
+\midrule
+抽象 & 保留本质、丢弃细节 & 把「借书」定义为接口方法 \texttt{borrow()}，不关心内部如何校验 \\
+信息隐藏 & 对外只露接口、对内封装实现 & 把「逾期天数计算规则」藏在 \texttt{Loan} 内部，规则变化不外溢 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\section{软件设计原则}
+
+面向对象设计的基本准则是「\textbf{高内聚、低耦合}」。SOLID 是这一准则的五个可操作推论，目标是让系统在需求变化时「改动局部、稳定整体」。
 
 \begin{table}[H]
 \centering
@@ -31,22 +97,77 @@ SOLID 是一组面向对象设计的指导思想，目标是让系统在需求�
 \end{tabulary}
 \end{table}
 
+\subsection{单一职责原则（SRP）}
+
+\textbf{定义}：一个类应当只有一个引起它变化的原因，即只承担一项职责。
+
+\textbf{反例}：\texttt{Invoice} 类同时负责「计算金额」「格式化输出」「写入数据库」。财务规则、打印格式、存储介质任一变化都要改这个类，且三种变更相互干扰。
+
+\textbf{改进}：拆分为 \texttt{Invoice}（金额计算）、\texttt{InvoicePrinter}（格式化）、\texttt{InvoiceRepository}（持久化）。每个类只随一类需求变化。
+
+\subsection{开闭原则（OCP）}
+
+\textbf{定义}：软件实体应对扩展开放、对修改关闭。新增功能应尽量通过「增加代码」而非「修改已有代码」完成。
+
+\textbf{反例}——每次新增折扣类型都要改 \texttt{switch}：
+
+\begin{lstlisting}[language=Java, caption={OCP 反例与改进}, captionpos=b]
+// 反例：每加一种会员类型就要修改这个方法
+double discount(Member m) {
+    switch (m.getType()) {
+        case "NORMAL": return 1.0;
+        case "VIP":    return 0.9;
+        // 新增类型 -> 修改此处
+    }
+}
+
+// 改进：把算法抽象为接口，新增类型只需新增一个类
+interface PricingPolicy { double discount(Member m); }
+class VipPricing implements PricingPolicy {
+    public double discount(Member m) { return 0.9; }
+}
+\end{lstlisting}
+
+\textbf{改进}：引入多态或策略模式，把易变的分支逻辑收敛到可扩展的抽象之后。
+
+\subsection{里氏替换原则（LSP）}
+
+\textbf{定义}：所有引用基类的地方必须能透明地使用其子类对象，且不改变程序的可期望行为。
+
+\textbf{反例}：\texttt{Square} 继承 \texttt{Rectangle} 并覆写 \texttt{setWidth} 同时修改宽和高。调用者按矩形语义先设宽再设高，得到的面积与预期不符。子类\textbf{加强了前置/后置约束}，破坏了基类契约。
+
+\textbf{改进}：不要用「正方形是矩形」的数学直觉做继承；让二者共享一个 \texttt{Shape} 接口，各自实现 \texttt{area()}。
+
+\subsection{接口隔离原则（ISP）}
+
+\textbf{定义}：客户端不应被强迫依赖它不使用的接口，应把「胖接口」拆成多个小而专的接口。
+
+\textbf{反例}：一个 \texttt{Worker} 接口含 \texttt{work()}、\texttt{eat()}、\texttt{sleep()}，机器人工人被迫实现 \texttt{eat()}、\texttt{sleep()} 并抛出异常。
+
+\textbf{改进}：拆成 \texttt{Workable} 与 \texttt{Feedable}，机器人工人只实现 \texttt{Workable}。
+
+\subsection{依赖倒置原则（DIP）}
+
+\textbf{定义}：高层模块不应依赖低层模块，二者都应依赖抽象；抽象不应依赖细节，细节应依赖抽象。
+
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[font=\small, node distance=1.4cm]
-    \node[draw, rounded corners, fill=blue!8, minimum width=4.2cm] (high) {高层模块（业务策略）};
-    \node[draw, rounded corners, fill=green!12, minimum width=4.2cm, below=1.4cm of high] (abs) {抽象接口 (Abstract)};
-    \node[draw, rounded corners, fill=orange!12, minimum width=4.2cm, below=1.4cm of abs] (low) {低层模块（实现细节）};
+\begin{tikzpicture}[font=\small, >=Stealth, node distance=1.3cm]
+    \node[draw, rounded corners, fill=blue!8, minimum width=4.4cm, align=center] (high) {高层模块\\业务策略（订单结算）};
+    \node[draw, rounded corners, fill=green!14, minimum width=4.4cm, align=center, below=1.3cm of high] (abs) {\guillemotleft interface\guillemotright\\PaymentGateway};
+    \node[draw, rounded corners, fill=orange!12, minimum width=4.4cm, align=center, below=1.3cm of abs] (low) {低层模块\\支付宝 / 微信支付实现};
     \draw[->, thick] (high) -- (abs);
     \draw[->, thick, dashed] (low) -- (abs);
-    \node[right=0.25cm of abs, font=\footnotesize, text=green!50!black] {双方都依赖抽象};
+    \node[right=0.3cm of abs, font=\footnotesize, text=green!50!black, align=left] {双方都依赖抽象；\\抽象不依赖具体实现};
 \end{tikzpicture}
 \caption{依赖倒置：高层与低层都依赖抽象，抽象不依赖细节}
 \end{figure}
 
-\noindent 依赖倒置把「高层直接依赖低层」翻转为「双方依赖抽象」，从而使业务策略不受具体实现替换的影响，也便于替换为测试替身。
+\textbf{反例}：结算服务直接 \texttt{new AlipayGateway()}，换支付渠道就必须改高层代码。\textbf{改进}：高层持有 \texttt{PaymentGateway} 接口，由外部注入具体实现，既方便替换，也便于在测试中注入替身（mock）。
 
 \section{设计模式}
+
+设计模式是对「特定上下文中反复出现的设计问题」的可复用解决方案。它给出的是结构化经验，而非可直接拷贝的代码。
 
 \subsection{模式分类}
 
@@ -68,90 +189,170 @@ SOLID 是一组面向对象设计的指导思想，目标是让系统在需求�
 
 \begin{table}[H]
 \centering
-\caption{代表设计模式的意图与适用场景}
-\begin{tabulary}{\textwidth}{CCL}
+\caption{代表设计模式的意图、结构与适用场景}
+\begin{tabulary}{\textwidth}{CCLL}
 \toprule
-模式 & 意图 & 适用 \\
+模式 & 意图 & 结构要点 & 适用 \\
 \midrule
-单例 (Singleton) & 保证一个类仅有一个实例并提供全局访问点 & 全局配置、连接池、日志器 \\
-工厂方法 (Factory Method) & 定义创建对象的接口，由子类决定实例化哪个类 & 框架扩展点、解耦创建与使用 \\
-观察者 (Observer) & 一对多依赖，主题变化时自动通知所有观察者 & 事件通知、GUI 事件、消息订阅 \\
-策略 (Strategy) & 封装可互换的算法，使其可独立变化 & 多种计费/排序/压缩算法切换 \\
-装饰器 (Decorator) & 动态给对象添加职责，比继承更灵活 & 流式 I/O、动态叠加功能 \\
+单例 (Singleton) & 保证仅有一个实例并提供全局访问点 & 私有构造 + 静态实例 + 静态获取方法 & 全局配置、连接池、日志器 \\
+工厂方法 (Factory Method) & 定义创建接口，由子类决定实例化哪个类 & Creator 声明工厂方法，ConcreteCreator 返回产品 & 框架扩展点、解耦创建与使用 \\
+观察者 (Observer) & 一对多依赖，主题变化时自动通知所有观察者 & Subject 维护观察者列表，状态变化即遍历通知 & 事件通知、GUI 事件、消息订阅 \\
+策略 (Strategy) & 封装可互换的算法，使其可独立变化 & Context 持有 Strategy 接口，运行时替换实现 & 多种计费/排序/压缩算法切换 \\
+装饰器 (Decorator) & 动态给对象添加职责，比继承更灵活 & 装饰器实现同一接口并持有被装饰对象 & 流式 I/O、动态叠加功能 \\
 \bottomrule
 \end{tabulary}
 \end{table}
 
+\subsubsection{策略模式}
+
+\textbf{意图}：把一族可互换算法各自封装成类，让它们可以互相替换，且算法的变化独立于使用它的客户端。
+
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[font=\small, node distance=1.0cm and 2.4cm]
-    \node[draw, rounded corners] (ctx) {Context};
-    \node[draw, rounded corners, align=center, right=of ctx] (strat) {\guillemotleft interface\guillemotright\\Strategy};
-    \node[draw, rounded corners, below=0.7cm of strat] (a) {ConcreteStrategyA};
-    \node[draw, rounded corners, below=0.7cm of a] (b) {ConcreteStrategyB};
+\begin{tikzpicture}[font=\small, >=Stealth, node distance=0.7cm and 2.6cm]
+    \node[draw, rounded corners, align=center] (ctx) {Context\\(计价上下文)};
+    \node[draw, rounded corners, align=center, right=of ctx] (strat) {\guillemotleft interface\guillemotright\\Strategy\\\texttt{compute()} };
+    \node[draw, rounded corners, right=of strat] (a) {NormalPricing};
+    \node[draw, rounded corners, below=0.7cm of a] (b) {VipPricing};
+    \node[draw, rounded corners, below=0.7cm of b] (c) {CouponPricing};
+    \draw[->, dashed] (a) -- (strat);
+    \draw[->, dashed] (b) -- (strat);
+    \draw[->, dashed] (c) -- (strat);
     \draw[->] (ctx) -- node[above, font=\footnotesize] {持有} (strat);
-    \draw[->] (a) -- (strat);
-    \draw[->] (b) -- (strat);
 \end{tikzpicture}
 \caption{策略模式：上下文持有抽象策略，运行时替换具体算法}
 \end{figure}
 
+\textbf{适用}：结算有会员价、优惠券价等多种算法，且未来会持续新增。若用 \texttt{if-else} 堆叠，每次新增都要改动上下文，违反 OCP；用策略则只需新增一个实现类。
+
+\subsubsection{观察者模式}
+
+\textbf{意图}：定义对象间的一对多依赖，当主题状态改变时，所有依赖它的观察者都会自动收到通知并更新。
+
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[font=\small, node distance=1.2cm and 2.6cm]
-    \node[draw, rounded corners] (subject) {Subject（主题）};
-    \node[draw, rounded corners, align=center, right=of subject] (obs) {\guillemotleft interface\guillemotright\\Observer};
-    \node[draw, rounded corners, below=0.7cm of obs] (o1) {ObserverA};
-    \node[draw, rounded corners, below=0.7cm of o1] (o2) {ObserverB};
-    \draw[->] (subject) -- node[above, font=\footnotesize] {通知 notify()} (obs);
-    \draw[->] (o1) -- (obs);
-    \draw[->] (o2) -- (obs);
+\begin{tikzpicture}[font=\small, >=Stealth, node distance=0.7cm and 2.8cm]
+    \node[draw, rounded corners, align=center] (subject) {Subject\\\texttt{attach() / detach() / notify()}};
+    \node[draw, rounded corners, align=center, right=of subject] (obs) {\guillemotleft interface\guillemotright\\Observer\\\texttt{update()} };
+    \node[draw, rounded corners, right=of obs] (c1) {EmailNotifier};
+    \node[draw, rounded corners, below=0.7cm of c1] (c2) {SmsNotifier};
+    \node[draw, rounded corners, below=0.7cm of c2] (c3) {AuditLogger};
+    \draw[->] (subject.east) -- node[above, font=\footnotesize, align=center] {通知\\notify()} (obs.west);
+    \draw[->, dashed] (c1) -- (obs);
+    \draw[->, dashed] (c2) -- (obs);
+    \draw[->, dashed] (c3) -- (obs);
 \end{tikzpicture}
 \caption{观察者模式：主题在状态变化时遍历通知观察者列表}
 \end{figure}
 
-\section{软件架构}
+\textbf{适用}：图书借阅系统中，「借阅成功」这一主题事件需要触发邮件、短信、审计日志三种响应，且响应方会持续增加。观察者让主题只依赖抽象，新增响应方无需改动主题。
+
+\section{软件体系结构风格}
+
+体系结构风格规定系统「整体如何组织」：子系统如何划分、如何交互、数据与控制如何流动。选型的核心是\textbf{权衡}，没有普适最优。
 
 \begin{table}[H]
 \centering
-\caption{常见软件架构对比}
-\begin{tabulary}{\textwidth}{CCL}
+\caption{常见软件体系结构风格对比}
+\begin{tabulary}{\textwidth}{CCLL}
 \toprule
-架构 & 特点 & 优点 / 代价 \\
+风格 & 特点 & 优点 & 代价 \\
 \midrule
-分层 (Layered) & 上层调用下层，层间通过接口隔离 & 结构清晰、易测试 / 调用穿透与性能损耗 \\
-MVC & 模型、视图、控制器分离，视图随模型更新 & UI 与业务解耦、多视图复用 / 控制器易膨胀 \\
-微服务 (Microservices) & 按业务边界拆分为独立部署的服务 & 独立伸缩、技术异构、故障隔离 / 分布式与运维复杂 \\
-事件驱动 (Event-driven) & 组件通过事件异步通信，发布--订阅 & 松耦合、可扩展、异步削峰 / 最终一致、调试困难 \\
+分层 (Layered) & 上层调用下层，层间通过接口隔离 & 结构清晰、易测试、关注点分离 & 调用穿透、性能损耗 \\
+MVC & 模型、视图、控制器分离，视图随模型更新 & UI 与业务解耦、多视图复用 & 控制器易膨胀 \\
+微服务 (Microservices) & 按业务边界拆为独立部署的服务 & 独立伸缩、技术异构、故障隔离 & 分布式与运维复杂 \\
+事件驱动 (Event-driven) & 组件通过事件异步通信、发布--订阅 & 松耦合、可扩展、异步削峰 & 最终一致、调试困难 \\
+仓库 (Repository) & 所有组件共享一个中心数据仓库 & 数据一致、便于集成 & 中心仓库成为瓶颈与单点 \\
 \bottomrule
 \end{tabulary}
 \end{table}
 
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[font=\small, node distance=0.55cm]
-    \node[draw, rounded corners, fill=blue!8, minimum width=8.5cm] (pres) {表现层 Presentation};
-    \node[draw, rounded corners, fill=green!8, minimum width=8.5cm, below=of pres] (biz) {业务层 Business};
-    \node[draw, rounded corners, fill=orange!8, minimum width=8.5cm, below=of biz] (dao) {持久层 Persistence};
-    \node[draw, rounded corners, fill=gray!12, minimum width=8.5cm, below=of dao] (db) {数据库 Database};
+\begin{tikzpicture}[font=\small, >=Stealth, node distance=0.55cm]
+    \node[draw, rounded corners, fill=blue!8, minimum width=8.5cm, align=center] (pres) {表现层 Presentation\\（页面 / 控制器）};
+    \node[draw, rounded corners, fill=green!8, minimum width=8.5cm, align=center, below=of pres] (biz) {业务层 Business\\（领域逻辑 / 服务）};
+    \node[draw, rounded corners, fill=orange!8, minimum width=8.5cm, align=center, below=of biz] (dao) {持久层 Persistence\\（数据访问对象 DAO）};
+    \node[draw, rounded corners, fill=gray!12, minimum width=8.5cm, align=center, below=of dao] (db) {数据库 Database};
     \draw[->] (pres) -- (biz);
     \draw[->] (biz) -- (dao);
     \draw[->] (dao) -- (db);
 \end{tikzpicture}
-\caption{分层架构：关注点自上而下逐层分离}
+\caption{分层架构：关注点自上而下逐层分离，每层仅调用相邻下层}
 \end{figure}
 
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[font=\small, node distance=1.6cm]
-    \node[draw, rounded corners, fill=blue!8, minimum width=2.8cm] (view) {View（视图）};
-    \node[draw, rounded corners, fill=green!10, minimum width=2.8cm, right=2.2cm of view] (ctrl) {Controller（控制器）};
-    \node[draw, rounded corners, fill=orange!10, minimum width=2.8cm, below=1.6cm of ctrl] (model) {Model（模型）};
-    \draw[->] (view) -- (ctrl);
-    \draw[->] (ctrl) -- (model);
-    \draw[->, dashed] (model) -- node[right, font=\footnotesize] {更新} (view);
+\begin{tikzpicture}[font=\small, >=Stealth, node distance=1.6cm,
+    mc/.style={draw, rounded corners, fill=blue!8, minimum width=3.0cm, align=center}]
+    \node[mc] (view) {View（视图）\\显示与渲染};
+    \node[mc, fill=green!10, right=2.4cm of view] (ctrl) {Controller（控制器）\\接收输入、调度};
+    \node[mc, fill=orange!10, below=1.6cm of ctrl] (model) {Model（模型）\\业务状态与规则};
+    \draw[->] (view) -- node[above, font=\footnotesize]{用户操作} (ctrl);
+    \draw[->] (ctrl) -- node[right, font=\footnotesize]{改状态} (model);
+    \draw[->, dashed] (model) -- node[left, font=\footnotesize]{更新通知} (view);
 \end{tikzpicture}
 \caption{MVC：控制器处理输入、模型保存状态、视图订阅模型}
 \end{figure}
 
-\noindent 架构选型的核心是权衡：分层适合关注点分离的常规业务系统；MVC 适合交互式 UI；微服务适合需要独立伸缩与团队自治的大型系统；事件驱动适合高并发、松耦合的集成场景。
+选型建议：分层适合关注点分离的常规业务系统；MVC 适合交互式 UI；微服务适合需要独立伸缩与团队自治的大型系统；事件驱动适合高并发、松耦合的集成场景；仓库风格适合以数据一致性为核心的批处理系统。
+
+\section{设计度量}
+
+「高内聚、低耦合」是设计的核心目标，可以用两个方向相反的度量刻画\textbf{模块独立性}：
+
+\begin{itemize}
+    \item \textbf{内聚 (Cohesion)}：模块内部各元素彼此关联的紧密程度。内聚\textbf{越高越好}。
+    \item \textbf{耦合 (Coupling)}：模块之间相互依赖的紧密程度。耦合\textbf{越低越好}。
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{内聚的七个等级（由高到低）}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+等级 & 含义 & 评价 \\
+\midrule
+功能内聚 & 所有元素共同完成\textbf{单一}功能 & 最好 \\
+顺序内聚 & 元素输出是下一元素的输入 & 好 \\
+通信内聚 & 元素操作\textbf{同一}数据集 & 较好 \\
+过程内聚 & 元素按特定执行顺序组合 & 中 \\
+时间内聚 & 元素在同一时间段内执行 & 较差 \\
+逻辑内聚 & 元素由参数选择执行其一 & 差 \\
+偶然内聚 & 元素之间没有实质关系 & 最差 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{耦合的六个等级（由低到高）}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+等级 & 含义 & 评价 \\
+\midrule
+数据耦合 & 仅通过参数传递简单数据 & 最好 \\
+标记耦合 & 传递整个数据结构，但只用到其中一部分 & 较好 \\
+控制耦合 & 传递控制标志以指挥对方行为 & 中 \\
+外部耦合 & 依赖外部环境/协议 & 较差 \\
+公共耦合 & 多个模块共享全局数据 & 差 \\
+内容耦合 & 一个模块直接访问另一模块内部 & 最差 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\noindent 设计的目标是\textbf{提高内聚、降低耦合}：把强相关的逻辑收进同一模块（功能内聚），把模块之间的交互退化为最小必要的数据耦合，并用接口与信息隐藏隔离易变实现。
+
+\section{本章小结与常见误区}
+
+本章从设计过程出发，建立了「过程 $\to$ 原则 $\to$ 模式 $\to$ 架构 $\to$ 度量」的主线：设计把需求细化为可实现的蓝图；SOLID 指导类的职责划分；设计模式沉淀可复用的协作经验；体系结构决定系统骨架；耦合与内聚把设计质量量化。
+
+常见误区：
+
+\begin{itemize}
+    \item \textbf{为模式而模式}：小系统硬套抽象工厂、观察者，反而增加理解成本。模式应服务于变化点。
+    \item \textbf{把继承当复用}：为复用代码滥用继承，容易触犯 LSP，且父类变动冲击所有子类。优先组合而非继承。
+    \item \textbf{误解「对修改关闭」}：OCP 不是禁止修改任何代码，而是把变化隔离到可扩展点，让核心逻辑免于频繁改动。
+    \item \textbf{把分层当万能}：层层穿透调用会带来性能损耗；分层过细还会制造大量无意义的转发代码。
+    \item \textbf{只谈概念不看度量}：设计优劣要落到耦合与内聚上，能用度量解释「为什么这样拆」才是有效设计。
+\end{itemize}

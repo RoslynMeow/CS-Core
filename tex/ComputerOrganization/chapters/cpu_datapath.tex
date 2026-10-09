@@ -5,106 +5,447 @@
 \clearpage
 
 
-\subsection{单周期 CPU 概述}
+数据通路（datapath）是 CPU 中"搬运和处理数据"的部分：它由寄存器、存储器、运算器和连线组成，负责按指令的语义让数据在部件之间流动。控制器决定"怎么动"，数据通路决定"数据往哪走"。本章以经典 MIPS 单周期实现为蓝本，逐层拆解各部件的输入输出、五步执行流程、四类指令的数据流、控制信号的位置以及决定时钟周期的关键路径。
 
-单周期 CPU 在\textbf{一个时钟周期内}完成从取指到写回的全部操作。CPI = 1，但时钟周期受最慢指令（如 $\texttt{lw}$）限制。
+\subsection{数据通路的组成部件}
 
-\subsection{数据通路组件}
+\begin{definition}[数据通路]
+数据通路是执行部件（ALU、寄存器堆、存储器）与它们之间数据连线的集合。任一时刻，数据通路的行为由一组\textbf{控制信号}决定：多路选择器选通哪条支路、寄存器堆是否写入、存储器是读还是写。
+\end{definition}
+
+单周期数据通路由六个核心部件构成。理解每一个部件的\textbf{输入}与\textbf{输出}是分析数据流的第一步。
 
 \begin{table}[H]
 \centering
-\caption{基本数据通路组件}
+\caption{数据通路核心部件的输入与输出}
 \label{tab:datapath_components}
-\begin{tabulary}{\textwidth}{CCC}
+\begin{tabulary}{\textwidth}{LCL}
 \toprule
-\textbf{组件} & \textbf{功能} & \textbf{控制信号} \\
+\textbf{部件} & \textbf{输入} & \textbf{输出} \\
 \midrule
-程序计数器（PC） & 存放下一条指令地址 & PCWrite \\
-指令存储器 & 按地址取指令 & — \\
-寄存器堆 & 32 个 32 位通用寄存器 & RegWrite \\
-ALU & 算术/逻辑运算 & ALUOp, ALUSrc \\
-数据存储器 & 读写数据 & MemRead, MemWrite \\
-多路选择器（MUX） & 选择数据来源 & 选择信号 \\
-符号扩展单元 & 16-bit $\to$ 32-bit 扩展 & — \\
+程序计数器 PC & 下一条指令地址（由 PC 来源 MUX 给出）、时钟 & 当前指令地址 \\
+指令存储器 & 指令地址 & 32 位指令字（机器码） \\
+寄存器堆（32$\times$32 位） & 读地址 rs、rt；写地址（rt 或 rd）；写数据；RegWrite & 读出数据 A、读出数据 B \\
+ALU & 操作数 A、操作数 B、ALUOp & 运算结果、Zero（结果是否为零） \\
+数据存储器 & 地址、写数据、MemRead、MemWrite & 读出数据 \\
+符号扩展单元 & 16 位立即数 & 32 位符号扩展立即数 \\
 \bottomrule
 \end{tabulary}
 \end{table}
 
-\subsection{基本指令的执行}
-
-\subsubsection{R 型指令}
-
-\begin{equation}
-\text{add } \$rd, \$rs, \$rt \quad \longrightarrow \quad \$rd = \$rs + \$rt
-\end{equation}
-
-数据流：$\text{PC} \to \text{取指} \to \text{译码（读} \$rs, \$rt\text{）} \to \text{ALU} \to \text{写回} \$rd \to \text{PC+4}$
-
-\subsubsection{I 型：lw}
-
-\begin{equation}
-\text{lw } \$rt, \text{offset}(\$rs) \quad \longrightarrow \quad \$rt = M[\$rs + \text{SignExt}(16\text{-bit offset})]
-\end{equation}
-
-数据流：$\text{PC} \to \text{取指} \to \text{译码（读} \$rs\text{）} \to \text{ALU 算地址} \to \text{访存} \to \text{写回} \$rt \to \text{PC+4}$
-
-存储器访问额外需要 ALU 用于地址计算，结果经数据存储器读出。
-
-\subsubsection{I 型：sw}
-
-\begin{equation}
-\text{sw } \$rt, \text{offset}(\$rs) \quad \longrightarrow \quad M[\$rs + \text{SignExt}(16\text{-bit offset})] = \$rt
-\end{equation}
-
-与 lw 类似，但写入方向相反——寄存器的值写入存储器而非读回。
-
-\subsubsection{I 型：beq}
-
-\begin{equation}
-\text{beq } \$rs, \$rt, \text{label} \quad \longrightarrow \quad \text{if } \$rs = \$rt \text{ then } \text{PC} \leftarrow \text{PC}+4 + \text{offset}\times4
-\end{equation}
-
-ALU 做减法判断是否相等。若相等，PC 取分支目标（PC+4 + offset$\times$4），否则取 PC+4。
-
-\subsection{完整单周期数据通路}
-
-将上述组件用多路选择器和总线连接，形成完整的 MIPS 单周期数据通路。控制信号由控制器根据指令操作码生成。
+各部件要点：
 
 \begin{itemize}
-    \item \textbf{取指阶段}：PC 送指令存储器，取出 32 位指令
-    \item \textbf{译码阶段}：寄存器堆读出 rs、rt 值，符号扩展立即数
-    \item \textbf{执行阶段}：ALU 执行运算（算术 / 地址计算 / 比较）
-    \item \textbf{访存阶段}：读/写数据存储器（仅 lw / sw）
-    \item \textbf{写回阶段}：结果写回寄存器堆（ALU 结果 / 存储器数据）
+    \item \textbf{PC}：唯一保存"程序位置"的时序部件。它只在时钟沿更新，新值来自前端的 PC 来源 MUX（PC+4 或分支目标）。
+    \item \textbf{指令存储器}：只读，输入地址、输出该地址处的 32 位指令字。取指与访存是两个独立的存储器（指令存储器 vs 数据存储器），这正是"哈佛结构"的雏形。
+    \item \textbf{寄存器堆}：双读单写。$\$0$ 恒为 0，写操作在时钟沿发生；单周期中"读旧值、写新值"发生在同一周期内，读口看到的是本周期的旧值。
+    \item \textbf{ALU}：运算核心，既能做加减逻辑（R 型），也能做地址加法（lw/sw），还能做相等比较（beq）。
+    \item \textbf{数据存储器}：由 MemRead/MemWrite 控制方向。读与写互斥，单周期内每个周期至多一次访存。
+    \item \textbf{符号扩展单元}：把 16 位立即数按\textbf{符号位}扩展成 32 位。注意区分"零扩展"（用于无符号逻辑运算）与"符号扩展"（用于地址偏移与有符号立即数）。
 \end{itemize}
+
+\subsection{单周期执行的五个阶段}
+
+无论指令类型如何，单周期 CPU 都在\textbf{一个时钟周期内}走完从取指到写回的全部动作。从逻辑上可分为五步：
+
+\begin{table}[H]
+\centering
+\caption{单周期执行的五个阶段}
+\label{tab:five_stages}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+\textbf{阶段} & \textbf{名称} & \textbf{主要动作与部件} \\
+\midrule
+IF & 取指 & PC 送指令存储器，取出 32 位指令；同时计算 PC+4 \\
+ID & 译码/读寄存器 & 拆出 op/rs/rt/rd/imm；寄存器堆读出 rs、rt；符号扩展 imm \\
+EX & 执行/地址计算 & ALU 运算：R 型算术逻辑、lw/sw 地址、beq 比较 \\
+MEM & 访存 & 仅 lw 读数据存储器，sw 写数据存储器，其余指令空转 \\
+WB & 写回 & 结果写回寄存器堆（R 型用 ALU 结果，lw 用存储器数据） \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\resizebox{\textwidth}{!}{%
+\begin{tikzpicture}[
+    >=latex,
+    comp/.style={draw, rounded corners, minimum width=1.8cm, minimum height=0.8cm,
+                 font=\small, fill=blue!10, align=center},
+    mux/.style={draw, minimum width=1.0cm, minimum height=1.4cm,
+                font=\tiny, fill=orange!20, align=center},
+    e/.style={->, >=latex, thick},
+    w/.style={font=\scriptsize, fill=white, inner sep=1pt},
+    stg/.style={draw, dashed, rounded corners, gray}
+]
+    % ---- 五级阶段背景 ----
+    \fill[gray!6] (-1.6,-3.8) rectangle (5.0,2.6);
+    \draw[stg] (-1.6,-3.8) rectangle (5.0,2.6);
+    \fill[gray!6] (5.2,-3.8) rectangle (9.0,2.6);
+    \draw[stg] (5.2,-3.8) rectangle (9.0,2.6);
+    \fill[gray!6] (9.2,-3.8) rectangle (13.6,2.6);
+    \draw[stg] (9.2,-3.8) rectangle (13.6,2.6);
+    \fill[gray!6] (13.8,-1.8) rectangle (16.8,2.6);
+    \draw[stg] (13.8,-1.8) rectangle (16.8,2.6);
+    \fill[gray!6] (17.0,-1.8) rectangle (20.4,2.6);
+    \draw[stg] (17.0,-1.8) rectangle (20.4,2.6);
+
+    \node at (1.7,2.95) {\scriptsize IF 取指};
+    \node at (7.1,2.95) {\scriptsize ID 译码};
+    \node at (11.4,2.95) {\scriptsize EX 执行};
+    \node at (15.3,2.95) {\scriptsize MEM 访存};
+    \node at (18.7,2.95) {\scriptsize WB 写回};
+
+    % ---- 部件 ----
+    \node[mux]  (pcmux) at (0,1.9)   {MUX};
+    \node[comp] (pc)    at (0,0.4)   {PC};
+    \node[comp] (pcadd) at (0,-2.4)  {PC+4\\加法器};
+    \node[comp] (im)    at (3.2,0.4) {指令\\存储器};
+    \node[comp] (rf)    at (7.0,0.2) {寄存器堆};
+    \node[comp] (se)    at (7.0,-2.8){符号\\扩展};
+    \node[mux]  (muxsrc)at (10.2,-2.0){MUX\\ALUSrc};
+    \node[comp] (alu)   at (12.0,0.2){ALU};
+    \node[comp] (dm)    at (15.2,0.2){数据\\存储器};
+    \node[mux]  (mmux)  at (18.4,0.2){MUX\\MemtoReg};
+
+    % ---- 连线 ----
+    \draw[e] (pcmux.south) -- (pc.north);
+    \draw[e] (pc.east) -- node[w,midway,above]{地址} (im.west);
+    \draw[e] (pc.south) -- (pcadd.north);
+    \draw[e] (pcadd.west) -- (-1.1,-2.4) -- (-1.1,1.9)
+             -- node[w,near start,above]{PC+4} (pcmux.west);
+    \draw[e] (0,3.9) -- (0,2.6);
+    \node[w] at (1.3,3.75) {分支目标（来自 EX）};
+
+    \draw[e] (im.east) -- node[w,midway,above]{指令[31:0]} (rf.west);
+    \draw[e] (im.south) -- (3.2,-2.8) -- node[w,midway,above]{imm[15:0]} (se.west);
+    \draw[e] (rf.east) -- node[w,midway,above]{rs} (alu.west);
+    \draw[e] (rf.south) -- (8.2,-1.0) -- (10.2,-1.0) -- (muxsrc.north);
+    \node[w] at (8.2,-0.72) {rt};
+    \draw[e] (se.east) -- (10.2,-2.8) -- (muxsrc.south);
+    \node[w] at (8.9,-2.55) {imm32};
+    \draw[e] (muxsrc.east) -| (alu.south);
+    \node[w] at (11.2,-1.35) {B};
+
+    \draw[e] (alu.east) -- node[w,midway,above]{结果} (dm.west);
+    \draw[e] (dm.east) -- node[w,midway,above]{读出数据} (mmux.west);
+    \draw[e] (12.9,0.2) -- (12.9,2.15) -- (18.4,2.15) -- (mmux.north);
+    \node[w] at (15.0,2.38) {ALU 结果};
+    \draw[e] (mmux.east) -- (20.9,0.2) -- (20.9,3.6)
+             -- node[w,pos=0.5,above]{写回 \$rd/\$rt} (8.2,3.6) |- (rf.north);
+\end{tikzpicture}%
+}
+\caption{MIPS 单周期数据通路总图（虚线框为五个逻辑阶段）}
+\label{fig:single_cycle_datapath}
+\end{figure}
+
+图~\ref{fig:single_cycle_datapath} 中三个 MUX 是数据通路的"岔路口"：PC 来源 MUX（PC+4 / 分支目标）、ALU 第二输入 MUX（rt / imm32）、写回数据 MUX（ALU 结果 / 存储器数据）。控制信号正是通过控制这三个 MUX 以及寄存器堆和存储器的读写使能来完成指令分派。
+
+\subsection{四类指令的数据流}
+
+同一张数据通路之所以能执行不同指令，是因为控制信号为每条指令"点亮"不同的路径。下面用四张子图分别标出 R 型、lw、sw、beq 的活跃部件，灰色（浅蓝）方块为参与运算的部件。
+
+\subsubsection{R 型指令（add/sub/and/or/slt）}
+
+\begin{equation}
+\text{add } \$rd, \$rs, \$rt \quad \Longrightarrow \quad \$rd \leftarrow \$rs + \$rt
+\end{equation}
 
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[
-    b/.style={draw, rounded corners, minimum width=1.9cm, minimum height=0.85cm, font=\small, fill=blue!8, align=center},
+    n/.style={draw, rounded corners, minimum height=0.75cm, font=\scriptsize,
+              fill=blue!8, align=center, inner sep=3pt},
     e/.style={->, >=latex, thick},
-    lbl/.style={font=\scriptsize, fill=white, inner sep=1pt}
+    w/.style={font=\scriptsize}
 ]
-    \node[b] (pc)  at (0,0) {PC};
-    \node[b] (im)  at (2.8,0) {指令存储器};
-    \node[b] (rf)  at (5.9,1.2) {寄存器堆};
-    \node[b] (alu) at (5.9,-1.2) {ALU};
-    \node[b] (dm)  at (9.0,0) {数据存储器};
-    \node[b] (mux) at (11.7,0) {写回 MUX};
-    \draw[e] (pc)--(im) node[lbl,midway,below]{地址};
-    \draw[e] (im)--(rf) node[lbl,midway,above]{指令};
-    \draw[e] (im) |- (alu);
-    \draw[e] (rf)--(alu) node[lbl,midway,right]{rs,rt};
-    \draw[e] (alu)--(dm) node[lbl,midway,above]{地址};
-    \draw[e] (dm)--(mux);
-    \draw[e] (alu) -| (mux);
-    \draw[e] (mux) |- (rf);
-    \node[lbl] at (5.9,-2.5){取指 $\to$ 译码 $\to$ 执行 $\to$ 访存 $\to$ 写回，单周期内完成};
+    \node[n] (pc)  {PC};
+    \node[n, right=0.55cm of pc]  (im)  {指令\\存储器};
+    \node[n, right=0.55cm of im]  (rf)  {寄存器堆\\读 \$rs,\$rt};
+    \node[n, right=0.55cm of rf]  (alu) {ALU\\\$rs+\$rt};
+    \node[n, right=0.55cm of alu] (wb)  {写回 \$rd};
+    \draw[e] (pc) -- (im);
+    \draw[e] (im) -- (rf);
+    \draw[e] (rf) -- (alu);
+    \draw[e] (alu) -- (wb);
+    \node[w, below=0.12cm of rf]  {无访存};
+    \node[w, below=0.12cm of wb]  {RegDst=1};
+    \node[w, below=0.5cm of im]   {PC+4};
 \end{tikzpicture}
-\caption{MIPS 单周期数据通路（ALU 算地址，写回经 MUX 选择）}
-\label{fig:single_cycle_datapath}
+\caption{R 型指令数据流：寄存器堆两读一写，ALU 直接产出，不访存}
+\label{fig:flow_r}
 \end{figure}
 
-\subsection{关键路径与性能}
+R 型的特征：\textbf{RegDst=1}（写回目标取 rd），\textbf{ALUSrc=0}（ALU 第二输入来自寄存器 rt），\textbf{MemtoReg=0}（写回 ALU 结果），\textbf{RegWrite=1}，\textbf{MemRead=MemWrite=0}。
 
-单周期 CPU 的时钟周期由最长路径（$\texttt{lw}$ 指令：取指+译码+ALU+访存+写回）决定。这导致简单指令（如 $\texttt{add}$）也必须等待相同的长周期，效率很低。这是后续流水线设计的直接动机。
+\subsubsection{I 型：lw（取字）}
+
+\begin{equation}
+\text{lw } \$rt, \text{offset}(\$rs) \quad \Longrightarrow \quad \$rt \leftarrow M[\$rs + \text{SignExt}(\text{offset})]
+\end{equation}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    n/.style={draw, rounded corners, minimum height=0.75cm, font=\scriptsize,
+              fill=blue!8, align=center, inner sep=3pt},
+    hi/.style={draw, rounded corners, minimum height=0.75cm, font=\scriptsize,
+               fill=green!18, align=center, inner sep=3pt},
+    e/.style={->, >=latex, thick},
+    w/.style={font=\scriptsize}
+]
+    \node[n]  (pc)  {PC};
+    \node[n, right=0.55cm of pc]  (im)  {指令\\存储器};
+    \node[n, right=0.55cm of im]  (rf)  {寄存器堆\\读 \$rs};
+    \node[hi, right=0.55cm of rf] (alu) {ALU\\地址 \$rs+imm};
+    \node[hi, right=0.55cm of alu](dm)  {数据存储器\\读};
+    \node[n, right=0.55cm of dm]  (wb)  {写回 \$rt};
+    \draw[e] (pc) -- (im);
+    \draw[e] (im) -- (rf);
+    \draw[e] (rf) -- (alu);
+    \draw[e] (alu) -- node[w,midway,above]{} (dm);
+    \draw[e] (dm) -- (wb);
+    \node[w, below=0.12cm of rf] {立即数经符号扩展};
+    \node[w, below=0.12cm of wb] {RegDst=0};
+\end{tikzpicture}
+\caption{lw 数据流：ALU 算地址，访存读出的数据写回 rt}
+\label{fig:flow_lw}
+\end{figure}
+
+lw 的特征：\textbf{ALUSrc=1}（ALU 第二输入取符号扩展立即数），\textbf{MemRead=1}，\textbf{MemtoReg=1}（写回的是存储器数据），\textbf{RegDst=0}（写回目标取 rt），\textbf{RegWrite=1}。它是全部指令中路径最长的一条，第~\ref{sec:critical_path} 节将说明其影响。
+
+\subsubsection{I 型：sw（存字）}
+
+\begin{equation}
+\text{sw } \$rt, \text{offset}(\$rs) \quad \Longrightarrow \quad M[\$rs + \text{SignExt}(\text{offset})] \leftarrow \$rt
+\end{equation}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    n/.style={draw, rounded corners, minimum height=0.75cm, font=\scriptsize,
+              fill=blue!8, align=center, inner sep=3pt},
+    hi/.style={draw, rounded corners, minimum height=0.75cm, font=\scriptsize,
+               fill=green!18, align=center, inner sep=3pt},
+    e/.style={->, >=latex, thick},
+    w/.style={font=\scriptsize}
+]
+    \node[n]  (pc)  {PC};
+    \node[n, right=0.55cm of pc]  (im)  {指令\\存储器};
+    \node[n, right=0.55cm of im]  (rf)  {寄存器堆\\读 \$rs,\$rt};
+    \node[hi, right=0.55cm of rf] (alu) {ALU\\地址 \$rs+imm};
+    \node[hi, right=0.55cm of alu](dm)  {数据存储器\\写};
+    \draw[e] (pc) -- (im);
+    \draw[e] (im) -- (rf);
+    \draw[e] (rf) -- (alu);
+    \draw[e] (alu) -- (dm);
+    \draw[e] (rf.south) .. controls +(0,-0.8) and +(0,-0.8) ..
+        node[w,below,pos=0.5]{写数据 \$rt} (dm.south);
+    \node[w, below=1.0cm of rf] {RegWrite=0};
+    \node[w, below=0.12cm of dm] {MemWrite=1};
+\end{tikzpicture}
+\caption{sw 数据流：与 lw 共享地址计算，但数据由寄存器堆流向存储器}
+\label{fig:flow_sw}
+\end{figure}
+
+sw 与 lw 的差异在于\textbf{方向相反}：地址仍由 ALU 计算，但 \$rt 的值作为\textbf{写数据}直接送入数据存储器；同时 \textbf{RegWrite=0}、\textbf{MemWrite=1}、\textbf{MemRead=0}，写回阶段实际不产生效果。这也是 sw 与 lw 共用同一条数据通路的直观体现。
+
+\subsubsection{I 型：beq（相等则分支）}
+
+\begin{equation}
+\text{beq } \$rs, \$rt, \text{label} \quad \Longrightarrow \quad
+\text{若 } \$rs = \$rt \text{，则 } \text{PC} \leftarrow \text{PC}+4 + \text{offset}\times 4
+\end{equation}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    n/.style={draw, rounded corners, minimum height=0.75cm, font=\scriptsize,
+              fill=blue!8, align=center, inner sep=3pt},
+    hi/.style={draw, rounded corners, minimum height=0.75cm, font=\scriptsize,
+               fill=green!18, align=center, inner sep=3pt},
+    e/.style={->, >=latex, thick},
+    w/.style={font=\scriptsize}
+]
+    \node[n]  (pc)  {PC};
+    \node[n, right=0.55cm of pc]  (im)  {指令\\存储器};
+    \node[n, right=0.55cm of im]  (rf)  {寄存器堆\\读 \$rs,\$rt};
+    \node[hi, right=0.55cm of rf] (alu) {ALU\\\$rs-\$rt};
+    \node[hi, right=0.55cm of alu](mux) {PC 来源\\MUX};
+    \draw[e] (pc) -- (im);
+    \draw[e] (im) -- (rf);
+    \draw[e] (rf) -- (alu);
+    \draw[e] (alu) -- node[w,midway,above]{Zero} (mux);
+    \draw[e] (mux.south) .. controls +(0,-0.9) and +(0,-1.6) ..
+        node[w,below,pos=0.5]{相等则取分支目标，否则 PC+4} (pc.south);
+    \node[w, below=0.12cm of rf] {RegWrite=0};
+    \node[w, below=0.12cm of alu] {Branch=1};
+\end{tikzpicture}
+\caption{beq 数据流：ALU 相减产生 Zero，控制 PC 来源 MUX}
+\label{fig:flow_beq}
+\end{figure}
+
+beq 的特征：\textbf{ALUSrc=0}（两个操作数都来自寄存器，做 \$rs-\$rt），\textbf{RegWrite=0}、\textbf{MemRead=MemWrite=0}（不写回、不访存），\textbf{Branch=1}。分支目标由\textbf{另一个加法器}计算：先把 16 位 offset \textbf{符号扩展}，再\textbf{左移 2 位}（$\times 4$，因为指令按字对齐），最后与 \textbf{PC+4} 相加。
+
+\subsection{控制信号在数据通路中的位置}
+
+控制器从指令中提取 \texttt{op} 与 \texttt{funct}，产生全部控制信号。它们并不集中在一处，而是\textbf{分散地}作用在各个部件上：
+
+\begin{table}[H]
+\centering
+\caption{各控制信号作用的部件}
+\label{tab:signal_location}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+\textbf{控制信号} & \textbf{作用部件} & \textbf{作用} \\
+\midrule
+RegDst & 写回寄存器号 MUX & 选 rt（0）或 rd（1）作为写地址 \\
+RegWrite & 寄存器堆 & 写使能 \\
+ALUSrc & ALU 输入 MUX & 第二操作数选 rt（0）或立即数（1） \\
+MemRead / MemWrite & 数据存储器 & 读/写使能 \\
+MemtoReg & 写回数据 MUX & 写回选 ALU 结果（0）或存储器数据（1） \\
+Branch / PCSrc & PC 来源 MUX & 选 PC+4 或分支目标 \\
+ALUOp & ALU 控制逻辑 & 00 加、01 减、10 由 funct 决定 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    b/.style={draw, rounded corners, minimum width=2.0cm, minimum height=0.9cm,
+              font=\small, fill=green!12, align=center},
+    d/.style={draw, rounded corners, minimum width=2.6cm, minimum height=0.55cm,
+              font=\scriptsize, fill=blue!8, align=center},
+    e/.style={->, >=latex, thick},
+    w/.style={font=\scriptsize}
+]
+    \node[b] (cu) at (0,0) {主控制器};
+    \node[d] (s1) at (5.4,1.8)  {RegDst, RegWrite};
+    \node[d] (s2) at (5.4,0.6)  {ALUSrc, MemtoReg};
+    \node[d] (s3) at (5.4,-0.6) {MemRead, MemWrite};
+    \node[d] (s4) at (5.4,-1.8) {ALUOp, Branch/PCSrc};
+    \draw[e] (cu) -- (s1);
+    \draw[e] (cu) -- (s2);
+    \draw[e] (cu) -- (s3);
+    \draw[e] (cu) -- (s4);
+    \node[w, left=0.25cm of cu] {op, funct};
+\end{tikzpicture}
+\caption{主控制器把控制信号分发到各数据通路部件}
+\label{fig:control_signals}
+\end{figure}
+
+\textbf{ALU 输入来源的选择}：ALU 的第一操作数固定来自寄存器堆的 A 口（rs）；第二操作数经 \texttt{ALUSrc} MUX 在"寄存器 B 口（rt）"与"符号扩展立即数"之间二选一。R 型与 beq 选 rt，lw/sw 选立即数。
+
+\textbf{写回来源的选择}：写回数据经 \texttt{MemtoReg} MUX 在"ALU 结果"与"存储器读出数据"之间二选一。R 型选 ALU 结果，lw 选存储器数据；写地址则由 \texttt{RegDst} 在 rt 与 rd 间选择。四条指令的控制信号取值汇总如下。
+
+\begin{table}[H]
+\centering
+\caption{四类指令的控制信号取值}
+\label{tab:signals_by_inst}
+\begin{tabulary}{\textwidth}{CCCCC}
+\toprule
+\textbf{信号} & \textbf{R 型} & \textbf{lw} & \textbf{sw} & \textbf{beq} \\
+\midrule
+RegDst   & 1 & 0 & $\times$ & $\times$ \\
+RegWrite & 1 & 1 & 0 & 0 \\
+ALUSrc   & 0 & 1 & 1 & 0 \\
+MemRead  & 0 & 1 & 0 & 0 \\
+MemWrite & 0 & 0 & 1 & 0 \\
+MemtoReg & 0 & 1 & $\times$ & $\times$ \\
+Branch   & 0 & 0 & 0 & 1 \\
+ALUOp    & 10 & 00 & 00 & 01 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+表中 $\times$ 表示"无关项"（don't care）：当 RegWrite=0 时，写地址与写回数据都不会被使用，因此 RegDst 与 MemtoReg 取任意值都不影响结果。
+
+\subsection{关键路径与性能}
+\label{sec:critical_path}
+
+数据通路中每条指令走过的最长组合逻辑延迟称为该指令的\textbf{关键路径（critical path）}。单周期 CPU 的时钟周期必须容纳\textbf{所有指令中最长的那条}，否则快路径上早已算完的结果也会被最慢的指令拖到下一个时钟沿。
+
+对 MIPS 单周期实现，\textbf{lw} 的关键路径最长，它依次穿过：
+
+\begin{center}
+PC（时钟到输出）$\to$ 指令存储器（取指）$\to$ 寄存器堆读 $\to$ ALU（算地址）$\to$ 数据存储器（读）$\to$ 寄存器堆写（建立）。
+\end{center}
+
+其它指令短一截：R 型不含访存，sw 不含写回，beq 既不访存也不写回。
+
+\begin{table}[H]
+\centering
+\caption{各部件延迟假设（用于关键路径计算）}
+\label{tab:delays}
+\begin{tabulary}{\textwidth}{CC}
+\toprule
+\textbf{部件} & \textbf{延迟 (ps)} \\
+\midrule
+PC 时钟到输出 $t_{pcq}$ & 30 \\
+指令存储器访问 $t_{im}$ & 250 \\
+寄存器堆读 $t_{read}$ & 150 \\
+ALU 运算 $t_{alu}$ & 200 \\
+数据存储器访问 $t_{mem}$ & 250 \\
+寄存器堆写建立 $t_{setup}$ & 100 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{example}[单周期时钟周期的计算]
+给定表~\ref{tab:delays} 的延迟，求四条指令各自的关键路径延迟，进而确定时钟周期与主频。
+
+\textbf{R 型}（PC $\to$ 取指 $\to$ 读寄存器 $\to$ ALU $\to$ 写回）：
+\begin{equation}
+t_{pcq} + t_{im} + t_{read} + t_{alu} + t_{setup}
+= 30 + 250 + 150 + 200 + 100 = 730\ \text{ps}.
+\end{equation}
+
+\textbf{lw}（最长）：
+\begin{equation}
+t_{pcq} + t_{im} + t_{read} + t_{alu} + t_{mem} + t_{setup}
+= 30 + 250 + 150 + 200 + 250 + 100 = 980\ \text{ps}.
+\end{equation}
+
+\textbf{sw}（无写回）：
+\begin{equation}
+t_{pcq} + t_{im} + t_{read} + t_{alu} + t_{mem}
+= 30 + 250 + 150 + 200 + 250 = 880\ \text{ps}.
+\end{equation}
+
+\textbf{beq}（无访存、无写回）：
+\begin{equation}
+t_{pcq} + t_{im} + t_{read} + t_{alu}
+= 30 + 250 + 150 + 200 = 630\ \text{ps}.
+\end{equation}
+
+最长路径为 lw 的 $980$ ps，故时钟周期为
+\begin{equation}
+T_{\text{clk}} = \max = 980\ \text{ps}, \qquad
+f = \frac{1}{T_{\text{clk}}} = \frac{1}{980 \times 10^{-12}\ \text{s}} \approx 1.02\ \text{GHz}.
+\end{equation}
+
+由于单周期 CPI $=1$，平均每条指令耗时即 $980$ ps，约为 $1020$ MIPS。注意 R 型只需 $730$ ps 却同样被拖到 $980$ ps，浪费了约 $25\%$ 的时间——这正是把各阶段拆成五级流水线（下一章）的直接动机：拆分后时钟周期可缩短到约 $250$ ps，主频提升近四倍。
+\end{example}
+
+\subsection{本章小结}
+
+\begin{itemize}
+    \item 数据通路由 PC、指令存储器、寄存器堆、ALU、数据存储器、符号扩展单元及若干多路选择器构成；每个部件都有明确的输入输出。
+    \item 单周期执行分为 IF、ID、EX、MEM、WB 五步，全部在一个时钟周期内完成，CPI $=1$。
+    \item R 型不访存，lw 读存储器、sw 写存储器、beq 用 ALU 相减并改写 PC；四者共用一条通路，仅控制信号不同。
+    \item 三个关键 MUX 分别控制 PC 来源、ALU 第二输入、写回数据来源；控制信号分散作用于各部件。
+    \item 时钟周期由最长关键路径（lw）决定，简单指令被迫等待，效率低——这是流水线的动机。
+\end{itemize}
+
+\subsection{常见误区}
+
+\begin{itemize}
+    \item \textbf{PC 会自动加 4？} 数据通路里\textbf{没有}独立的"PC 自增计数器"。PC+4 必须由\textbf{一个专用加法器}算出，再经 PC 来源 MUX 送回 PC；即使是 sw/beq 也要计算 PC+4。
+    \item \textbf{分支偏移直接用？} beq 的 16 位 offset 是\textbf{有符号}数，须先\textbf{符号扩展}、再\textbf{左移 2 位}（$\times 4$），且要加到 \textbf{PC+4} 而非当前 PC 上。
+    \item \textbf{比较用 ALU 结果？} beq 判断相等看的是 ALU 的 \textbf{Zero 标志}（\$rs-\$rt=0），不是 ALU 的数据输出；\$rs-\$rt 的数值本身被丢弃。
+    \item \textbf{把两个加法器搞混？} 一个是 PC+4 加法器，另一个是分支目标加法器（PC+4 + offset$\times4$），二者功能不同。
+    \item \textbf{写回目标固定？} R 型写 rd，I 型（lw）写 rt，靠 RegDst 选择；写回阶段还要靠 MemtoReg 区分"ALU 结果"与"存储器数据"。
+    \item \textbf{符号扩展 vs 零扩展：} 地址偏移和算术立即数用\textbf{符号扩展}；无符号位运算用\textbf{零扩展}，二者不可混用。
+    \item \textbf{sw 不需要写回？} 正确。sw 的 RegWrite=0，虽仍有 WB 阶段，但不产生任何寄存器写入。
+\end{itemize}

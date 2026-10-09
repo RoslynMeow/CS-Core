@@ -5,60 +5,191 @@
 \vspace*{\fill}
 \chapter{算法定义与渐近分析}
 \begin{center}
-本章探讨评价算法优劣的统一数学度量衡，建立时间与空间复杂度的渐进趋势评估模型。
+本章探讨评价算法优劣的统一数学度量衡，建立时间与空间复杂度的渐进趋势评估模型，并给出分析算法复杂度的系统方法。
 \end{center}
 \vspace*{\fill}
 \endgroup
 \clearpage
 
 
-\section{算法的定义与四大核心特征}
+\section{算法的定义与五个特性}
+
+\subsection{从直观到形式化}
+
+\textbf{直观定义}：算法 (Algorithm) 是求解某一类问题的、由有限条指令组成的有穷操作序列。给出合法的输入，它按确定规则执行有限步后产生所要求的输出。
+
+\textbf{形式定义}：设 $\mathcal{P}$ 为基本操作集，算法是 $\mathcal{P}$ 上的有限序列
+\begin{equation}
+A=\langle op_1,op_2,\dots,op_k\rangle,\qquad op_i\in\mathcal{P},
+\end{equation}
+并配备三种控制构造子：\emph{顺序}（依次执行）、\emph{分支}（依条件选择）、\emph{循环}（有条件重复）。其功能可用前后置断言（Hoare 三元组）刻画：
+\begin{equation}
+\{Pre\}\;A\;\{Post\},
+\end{equation}
+即只要前置条件 $Pre$ 成立且算法终止，则后置条件 $Post$ 必成立。
+
+\subsection{五个基本特性}
+
+一个操作序列要成为算法，必须同时满足以下五个特性（见表 \ref{tab:five_features}）。
+
+\begin{table}[H]
+\centering
+\caption{算法的五个基本特性}
+\label{tab:five_features}
+\begin{tabularx}{\textwidth}{l l X}
+\toprule
+特性 & 形式化描述 & 含义 \\
+\midrule
+有穷性 & $\exists B,\ \text{步数}(A)\le B$ & 对任意合法输入，算法在有限步内终止，且每一步在有限时间内完成 \\
+确定性 & $\forall$ 状态，后继状态唯一 & 每条指令含义明确、无歧义，相同输入必得相同输出 \\
+可行性 & $\forall op_i\in\mathcal{P}$，$op_i$ 可执行 & 每个操作原则上都可由基本运算有限次实现 \\
+输入 & $I\in\mathcal{D}_{in}^{*}$ & 有零个或多个输入，取自特定对象的集合 \\
+输出 & $O\in\mathcal{D}_{out}^{+}$ & 有一个或多个输出，且满足 $Post(I,O)$ \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{算法与程序的区别}
+
+算法是\emph{与语言无关}的求解方法，程序是算法在某种\emph{具体语言}中的实现。二者关系见表 \ref{tab:algo_vs_prog}。需要特别强调：程序不必满足有穷性（例如操作系统、服务器主循环可长期运行），而算法必须有穷。此外，同一个算法可以有多个程序实现，其执行时间仅相差常数因子（见第 \ref{sec:law} 节的分析法则）。
+
+\begin{table}[H]
+\centering
+\caption{算法与程序的对比}
+\label{tab:algo_vs_prog}
+\begin{tabularx}{\textwidth}{l X X}
+\toprule
+维度 & 算法 & 程序 \\
+\midrule
+存在形式 & 抽象的求解步骤（伪代码、数学记号） & 具体语言的可执行代码 \\
+有穷性 & 必须终止 & 可不终止（交互式、系统程序） \\
+确定性 & 每步唯一 & 可含随机、并发等非确定因素 \\
+依赖 & 与语言、机器无关 & 依赖编译器、运行环境 \\
+评价 & 渐进复杂度（$n\to\infty$ 的趋势） & 实际运行时间、内存占用 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{问题规模与基本操作}
+
+\subsection{问题规模}
+
+\textbf{问题规模 (Problem Size)} 是刻画输入大小的量，记为 $n$。它必须选取最能反映算法工作量的参数：排序问题中为待排元素个数；矩阵乘法中为矩阵阶数；图算法中常为顶点数 $|V|$ 与边数 $|E|$；求 $n!$ 时即为 $n$ 本身。规模选错会导致复杂度阶被低估。
+
+\subsection{基本操作}
+
+\textbf{基本操作 (Basic Operation)} 是算法中执行次数最多、且其单次代价为常数 $O(1)$ 的操作。算法的运行时间可近似为
+\begin{equation}
+T(n)=c\cdot C(n),
+\end{equation}
+其中 $C(n)$ 为基本操作执行次数，$c$ 为一次基本操作的机器相关常数。常见基本操作：比较、赋值、加减乘除、数组下标访问、指针解引用。选择合适的基本操作，是把运行时间转化为可分析函数的关键。
+
+\subsection{最好、最坏与平均情况}
+
+同一算法在不同输入上代价不同，故需区分三种情形：
 
 \begin{itemize}
-    \item \textbf{对象}：算法为基本操作集 $\mathcal{P}$ 上的有限序列 $A=\langle op_1,\dots,op_k\rangle$，配备控制构造子（顺序、分支、循环）。
-    \item \textbf{规约 (Specification)}：前置 $Pre$ 与后置 $Post$ 的谓词变换 $ \{Pre\} A \{Post\}$。
-    \item \textbf{四大特征}：
-    \begin{enumerate}
-        \item \textbf{有穷性}：$\exists B$ 使执行步数 $\le B$；每步有穷时间内完成。
-        \item \textbf{确定性}：$\forall$ 状态，下一步唯一。
-        \item \textbf{可行性}：每 $op_i\in\mathcal{P}$ 可实现。
-        \item \textbf{输入/输出}：$I\in\mathcal{D}_{in}^*$, $O\in\mathcal{D}_{out}^+$，满足 $Post(I,O)$。
-    \end{enumerate}
+    \item \textbf{最好情况 (Best Case)}：使 $C(n)$ 最小的输入，给出下界直觉。如顺序查找首元素即命中。
+    \item \textbf{最坏情况 (Worst Case)}：使 $C(n)$ 最大的输入，给出\emph{保证性上界}，是最常用的度量。如顺序查找目标缺席或位于末尾。
+    \item \textbf{平均情况 (Average Case)}：对输入按某概率分布取期望 $\mathbb{E}[C(n)]$，需先假设分布（常见为均匀分布）。
 \end{itemize}
 
-\section{算法的描述层级}
+以顺序查找为例，设目标等概率出现在任意位置，平均比较次数为
+\begin{equation}
+\mathbb{E}[C(n)]=\frac{1}{n}\sum_{i=1}^{n} i=\frac{n+1}{2}=\Theta(n),
+\end{equation}
+与最坏情况 $\Theta(n)$ \emph{同阶}。但快速排序的情形差异显著：最坏 $O(n^2)$，平均 $O(n\log n)$，见第 \ref{sec:recurrence} 节。
+
+\section{渐进记号}
+
+渐进记号忽略常数因子与低阶项，只刻画 $n\to\infty$ 时增长的本质趋势。以下均设 $f,g:\mathbb{N}\to\mathbb{R}^{+}$。
+
+\subsection{五种记号的形式化定义}
 
 \begin{itemize}
-    \item \textbf{规约层}：用谓词逻辑描述 $Pre/Post$。
-    \item \textbf{细化层}：用伪代码与控制算子表达，与语言无关的数学记号（本书采用）。
-    \item \textbf{实现层}：高级语言对细化的语义实现（如 C/Java/Python 的编译/解释），编译器保持语义等价。
-    \item \textbf{定理}：伪代码到语言实现的翻译保持 $Pre/Post$，仅时空常数因子变化。
+    \item \textbf{大 $O$（渐进上界）}：$f(n)=O(g(n))$ 当且仅当
+    \begin{equation}
+    \exists c>0,\ \exists n_0>0,\ \forall n\ge n_0:\quad 0\le f(n)\le c\,g(n).
+    \end{equation}
+    \item \textbf{大 $\Omega$（渐进下界）}：$f(n)=\Omega(g(n))$ 当且仅当
+    \begin{equation}
+    \exists c>0,\ \exists n_0>0,\ \forall n\ge n_0:\quad 0\le c\,g(n)\le f(n).
+    \end{equation}
+    \item \textbf{大 $\Theta$（紧界）}：$f(n)=\Theta(g(n))$ 当且仅当 $f(n)=O(g(n))$ 且 $f(n)=\Omega(g(n))$，即存在 $c_1,c_2>0,n_0$ 使 $c_1 g(n)\le f(n)\le c_2 g(n)$ 对一切 $n\ge n_0$ 成立。
+    \item \textbf{小 $o$（严格上界）}：$f(n)=o(g(n))$ 当且仅当 $\forall c>0,\ \exists n_0>0,\ \forall n\ge n_0:\ 0\le f(n)<c\,g(n)$，等价于 $\lim_{n\to\infty} f(n)/g(n)=0$。注意 $O$ 允许同阶，$o$ 不允许。
+    \item \textbf{小 $\omega$（严格下界）}：$f(n)=\omega(g(n))$ 当且仅当 $\forall c>0,\ \exists n_0>0,\ \forall n\ge n_0:\ f(n)>c\,g(n)$，等价于 $\lim_{n\to\infty} f(n)/g(n)=+\infty$。
 \end{itemize}
 
-\section{算法的时间复杂度 (Time Complexity)}
+\subsection{上界常数的几何意义}
 
-评价标准为输入规模 $n$ 与资源消耗的渐进趋势，非绝对计时。
-
-\subsection{渐进记号定义}
-
-\begin{itemize}
-    \item \textbf{大 O（上界）}：$\exists c>0,n_0>0$ 使 $\forall n\ge n_0, T(n)\le c\cdot f(n)$，记 $T(n)=O(f(n))$。
-    \item \textbf{$\Omega$（下界）}：$\exists c>0,n_0$ 使 $T(n)\ge c\cdot f(n)$。
-    \item \textbf{$\Theta$（紧界）}：$T(n)=O(f(n))\land T(n)=\Omega(f(n))$。
-\end{itemize}
-
-\subsection{复杂度阶数}
-
-随着 $n$ 增长，不同阶的消耗显著分流（见图 \ref{fig:big_o_curves}）。
+图 \ref{fig:bigO_bound} 直观展示 $f(n)=O(g(n))$ 的含义：在 $n\ge n_0$ 的右半轴，曲线 $f(n)$ 始终位于 $c\,g(n)$ 之下，故 $c\,g(n)$ 是 $f(n)$ 的一个渐进上界。
 
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}
 \begin{axis}[
-    width=15cm, height=10cm,
+    width=13cm, height=8cm,
     axis lines=left,
     axis line style={-latex, thick},
-    xlabel={输入规模},
+    xlabel={$n$}, ylabel={代价},
+    xmin=0, xmax=7, ymin=0, ymax=250,
+    xtick={0,1,2,3,4,5,6,7},
+    ytick={0,50,100,150,200,250},
+    domain=0:7, samples=100,
+    clip=true,
+    legend pos=north west,
+    legend style={draw=none, font=\small},
+    every axis x label/.style={at={(ticklabel* cs:1)}, anchor=north},
+    every axis y label/.style={at={(ticklabel* cs:1)}, anchor=south},
+]
+    \addplot[thick, blue] {3*x^2+10};
+    \addlegendentry{$f(n)=3n^2+10$}
+    \addplot[thick, red] {5*x^2};
+    \addlegendentry{$c\,g(n)=5n^2$}
+    \draw[dashed, gray, thick] (axis cs:3,0) -- (axis cs:3,250);
+    \node[anchor=north east, font=\small, gray] at (axis cs:3,250) {$n_0=3$};
+    \filldraw[black] (axis cs:3,37) circle (1.5pt);
+    \node[anchor=west, font=\small] at (axis cs:3.1,30) {交点 ($n_0$ 后 $f\le cg$)};
+\end{axis}
+\end{tikzpicture}
+\caption{$f(n)=O(g(n))$ 的几何意义：$n\ge n_0$ 后 $f(n)$ 被 $c\,g(n)$ 压制}
+\label{fig:bigO_bound}
+\end{figure}
+
+\subsection{常见复杂度阶的排序}
+
+当 $n$ 增大，不同阶的函数增长速率急剧分化。常用阶由低到高的排序见表 \ref{tab:order}。
+
+\begin{table}[H]
+\centering
+\caption{常见复杂度阶由低到高排序}
+\label{tab:order}
+\begin{tabularx}{\textwidth}{c l X}
+\toprule
+次序 & 阶 & 典型来源 \\
+\midrule
+1 & $O(1)$ & 数组随机访问、哈希查找期望 \\
+2 & $O(\log n)$ & 二分查找、平衡树检索 \\
+3 & $O(n)$ & 线性扫描、计数排序 \\
+4 & $O(n\log n)$ & 归并/堆排序、分治算法 \\
+5 & $O(n^2)$ & 冒泡/插入排序、朴素矩阵乘法 \\
+6 & $O(n^3)$ & 朴素矩阵乘法链、Floyd 全源最短路 \\
+7 & $O(2^n)$ & 子集枚举、朴素斐波那契递归 \\
+8 & $O(n!)$ & 全排列枚举、旅行商暴力解 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+阶的增长速率呈指数级分化（见图 \ref{fig:big_o_curves}）：在 $n=40$ 时 $O(2^n)$ 与 $O(n!)$ 已远超 $O(n^2)$ 数个数量级。这解释了为何降低复杂度阶（如用 $O(n\log n)$ 排序替代 $O(n^2)$）比优化常数因子重要得多。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=15cm, height=9cm,
+    axis lines=left,
+    axis line style={-latex, thick},
+    xlabel={输入规模 $n$},
     ylabel={资源消耗},
     xmin=-2, xmax=45, ymin=-2.5, ymax=45,
     xtick={0,10,20,30,40},
@@ -92,90 +223,276 @@
     \node[anchor=south west, font=\small, red!60!black] at (axis cs:0,20) {$O(n!)$ };
 \end{axis}
 \end{tikzpicture}
-\caption{大 O 渐进曲线趋势对比}
+\caption{常见复杂度阶的渐进曲线对比}
 \label{fig:big_o_curves}
 \end{figure}
 
-\subsection{复杂度组合原理}
+\section{算法分析的基本法则}
+\label{sec:law}
+
+\subsection{加法法则与乘法法则}
+
+设 $T_1(n)=O(f(n))$，$T_2(n)=O(g(n))$。
 
 \begin{itemize}
-    \item \textbf{串联}：$O(a)+O(b)=O(\max(a,b))$。
-    \item \textbf{嵌套}：$O(a)\cdot O(b)=O(a\cdot b)$。
+    \item \textbf{加法法则（顺序/取最大）}：两个先后执行的语句块总代价为
+    \begin{equation}
+    T(n)=T_1(n)+T_2(n)=O(f(n))+O(g(n))=O(\max(f(n),g(n))).
+    \end{equation}
+    \item \textbf{乘法法则（嵌套/取乘积）}：若外层执行 $O(f(n))$ 次、每次触发代价 $O(g(n))$ 的内层，则总代价为
+    \begin{equation}
+    T(n)=T_1(n)\cdot T_2(n)=O(f(n))\cdot O(g(n))=O(f(n)\,g(n)).
+    \end{equation}
 \end{itemize}
 
-\subsection{主定理（递归树证明）}
+加法法则的直觉是「木桶由最长板决定」；乘法法则对应循环嵌套。二者可反复套用，将复杂程序逐层化简。
 
-\begin{itemize}
-    \item \textbf{对象}：$T(n) = aT(n/b) + f(n)$，$a\ge1$，$b>1$，$f$ 渐进正。
-    \item \textbf{递归树}：深度 $L=\log_b n$，第 $j$ 层 $a^j$ 个节点，单节点代价 $f(n/b^j)$，层代价 $a^j f(n/b^j)$，叶 $a^L = n^{\log_b a}$ 个 $\Theta(1)$。
-    \item \textbf{定理（主定理）}：记 $n^{\log_b a}$ 与 $f(n)$ 比较：
-    \begin{enumerate}
-        \item 若 $f(n) = O(n^{\log_b a-\epsilon})$，则 $T(n) = \Theta(n^{\log_b a})$（叶主导）。
-        \item 若 $f(n) = \Theta(n^{\log_b a})$，则 $T(n) = \Theta(n^{\log_b a}\log n)$（每层等量）。
-        \item 若 $f(n) = \Omega(n^{\log_b a+\epsilon})$ 且 $af(n/b)\le cf(n)$（$c<1$，正则），则 $T(n) = \Theta(f(n))$（根主导）。
-    \end{enumerate}
-\end{itemize}
+\subsection{代码片段复杂度例题}
 
-\section{算法的空间复杂度 (Space Complexity)}
+\textbf{例 1（单层线性循环）}：如下片段外层循环执行 $n$ 次，循环体为 $O(1)$。由乘法法则 $T(n)=n\cdot O(1)=O(n)$。
 
-衡量随 $n$ 增长的\textbf{辅助空间}增幅（含递归栈）。
+\begin{algorithm}[H]
+\caption{单层循环求和}
+\begin{algorithmic}[1]
+\State $s \gets 0$
+\For{$i \gets 1$ \textbf{to} $n$}
+    \State $s \gets s + A[i]$
+\EndFor
+\State \Return $s$
+\end{algorithmic}
+\end{algorithm}
 
-\subsection{\texorpdfstring{$O(1)$}{O(1)} 常数级（In-place）}
+\textbf{例 2（双重嵌套循环）}：内外层各 $n$ 次，循环体 $O(1)$。由乘法法则 $T(n)=O(n)\cdot O(n)=O(n^2)$。
 
-原地修改，仅常数个辅助槽位 $\tau$ 中转。
+\begin{algorithm}[H]
+\caption{双重嵌套循环}
+\begin{algorithmic}[1]
+\State $s \gets 0$
+\For{$i \gets 1$ \textbf{to} $n$}
+    \For{$j \gets 1$ \textbf{to} $n$}
+        \State $s \gets s + A[i]\cdot B[j]$
+    \EndFor
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\textbf{例 3（对数循环）}：变量 $i$ 每次翻倍，迭代次数为满足 $2^k\le n$ 的最大 $k$ 加一，即 $\lfloor \log_2 n\rfloor+1$，故 $T(n)=O(\log n)$。
+
+\begin{algorithm}[H]
+\caption{倍增循环}
+\begin{algorithmic}[1]
+\State $i \gets 1$
+\While{$i \le n$}
+    \State $i \gets 2i$
+\EndWhile
+\end{algorithmic}
+\end{algorithm}
+
+\textbf{例 4（外层线性、内层对数）}：外层 $n$ 次，内层倍增循环 $O(\log n)$，由乘法法则得 $T(n)=O(n\log n)$。
+
+\begin{algorithm}[H]
+\caption{线性外层嵌套对数内层}
+\begin{algorithmic}[1]
+\For{$i \gets 1$ \textbf{to} $n$}
+    \State $j \gets 1$
+    \While{$j \le n$}
+        \State $j \gets 2j$
+    \EndWhile
+\EndFor
+\end{algorithmic}
+\end{algorithm}
+
+\textbf{例 5（条件递减）}：如下片段中 $i$ 每次减 $2$，执行 $\lceil n/2 \rceil$ 次，$T(n)=O(n)$；可见循环步长只改变常数因子，不改变阶。
+
+\begin{algorithm}[H]
+\caption{步长非一的线性循环}
+\begin{algorithmic}[1]
+\State $i \gets n$
+\While{$i \ge 1$}
+    \State $s \gets s + A[i]$
+    \State $i \gets i - 2$
+\EndWhile
+\end{algorithmic}
+\end{algorithm}
+
+\section{递归算法的复杂度分析}
+\label{sec:recurrence}
+
+\subsection{递推式与递归树}
+
+许多分治算法的代价满足\textbf{递推式 (Recurrence)}
+\begin{equation}
+T(n)=a\,T(n/b)+f(n),
+\end{equation}
+其含义为：把规模 $n$ 的问题分解为 $a$ 个规模 $n/b$ 的子问题，\emph{分解与合并}的额外代价为 $f(n)$。$a\ge 1,b>1$。
+
+\textbf{递归树 (Recursion Tree)} 把递推式逐层展开：根为 $f(n)$；第 $j$ 层有 $a^j$ 个节点，每节点代价 $f(n/b^j)$，故该层总代价为 $a^j f(n/b^j)$；当 $n/b^L=1$ 时到达叶层，深度 $L=\log_b n$，叶节点数 $a^{L}=n^{\log_b a}$，每叶代价 $\Theta(1)$。总代价为各层之和。图 \ref{fig:recursion_tree} 给出 $T(n)=2T(n/2)+n$ 的递归树。
 
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[
-    cell/.style={draw, minimum width=1.4cm, minimum height=0.75cm, font=\ttfamily},
-    lbl/.style={font=\small}
+    nd/.style={draw, rounded corners, minimum width=1.2cm, minimum height=0.55cm, font=\small},
+    e/.style={draw, thick},
+    lbl/.style={font=\small},
+    ann/.style={font=\small, red}
 ]
-    \matrix (arr) [matrix of nodes, nodes={cell}, column sep=-\pgflinewidth] {
-        $d_1$ & $d_2$ & $d_3$ & $d_4$ \\
-    };
-    \node[lbl, anchor=south west] at ($(arr.north west)+(0,0.15)$) {原数组 $A$:};
-    \draw[<->, >=latex, thick]
-        ($(arr-1-1.south)+(0,-0.25)$) to[bend right=35]
-        node[midway, below, lbl] {交换}
-        ($(arr-1-2.south)+(0,-0.25)$);
-    \node[lbl, anchor=north west, align=left] at ($(arr.south west)+(0,-1.0)$) {
-        $\longrightarrow$ 借助常数槽位 $\tau$ 临时中转\\
-        （辅助空间 $O(1)$）
-    };
+    \node[nd] (r) at (0,0) {$n$};
+    \node[nd] (l1) at (-1.7,-1.1) {$n/2$};
+    \node[nd] (r1) at (1.7,-1.1) {$n/2$};
+    \draw[e] (r)--(l1); \draw[e] (r)--(r1);
+    \node[nd] (a) at (-2.7,-2.2) {$n/4$};
+    \node[nd] (b) at (-0.9,-2.2) {$n/4$};
+    \node[nd] (c) at (0.9,-2.2) {$n/4$};
+    \node[nd] (d) at (2.7,-2.2) {$n/4$};
+    \draw[e] (l1)--(a); \draw[e] (l1)--(b);
+    \draw[e] (r1)--(c); \draw[e] (r1)--(d);
+    \node[lbl] (dots) at (-1.8,-3.1) {$\cdots\ \cdots$};
+    \node[nd] (leaf) at (3.9,-4.1) {$\Theta(1)$};
+    \draw[e, dashed] (dots)--(leaf);
+    \node[ann, anchor=west] at (2.6,-0.1) {层 $0$：代价 $n$};
+    \node[ann, anchor=west] at (3.0,-1.1) {层 $1$：代价 $2\cdot n/2=n$};
+    \node[ann, anchor=west] at (3.4,-2.2) {层 $2$：代价 $4\cdot n/4=n$};
+    \node[ann, anchor=west] at (3.9,-4.1) {叶层 $L=\log_2 n$：$n$ 个 $\Theta(1)$};
 \end{tikzpicture}
-\caption{原地置换 (Swap In-place) 内存状态机模型}
-\label{fig:space_o1}
+\caption{$T(n)=2T(n/2)+n$ 的递归树：每层代价均为 $n$}
+\label{fig:recursion_tree}
 \end{figure}
 
-\subsection{\texorpdfstring{$O(\log n)$}{O(log n)} 递归栈}
+由图可见每层代价均为 $n$，共 $L+1=\log_2 n+1$ 层，于是
+\begin{equation}
+T(n)=n(\log_2 n+1)=\Theta(n\log n).
+\end{equation}
 
-递归深度 $H$ 的调用栈辅助空间为 $O(H)$，平衡分治时 $H=O(\log n)$（如快排期望）。
+\subsection{代入法}
 
-\subsection{\texorpdfstring{$O(n)$}{O(n)} 线性辅助（Clone）}
+\textbf{代入法 (Substitution Method)}：先猜想解的界，再用数学归纳法验证并求出常数。以 $T(n)=2T(n/2)+n$ 为例，猜想 $T(n)=O(n\log n)$，即证 $T(n)\le c\,n\log n$。
 
-需与输入等大副本 $A'$ 时辅助 $O(n)$（如归并、哈希表）。
+\begin{align}
+T(n) &= 2T(n/2)+n \notag\\
+     &\le 2\,c\,(n/2)\log_2(n/2)+n \notag\\
+     &= c\,n(\log_2 n-1)+n \notag\\
+     &= c\,n\log_2 n - (c-1)n \notag\\
+     &\le c\,n\log_2 n,\qquad \text{当 } c\ge 1.
+\end{align}
 
-\begin{figure}[H]
+归纳成立，故 $T(n)=O(n\log n)$；再证下界 $T(n)=\Omega(n\log n)$ 即得 $\Theta(n\log n)$。代入法的要点是\emph{保留低阶项}以凑出目标式子，并在最后取定足够大的常数 $c$。
+
+\subsection{主定理 (Master Theorem)}
+
+对形如 $T(n)=a\,T(n/b)+f(n)$（$a\ge1,\ b>1$）的递推式，令临界值 $n^{\log_b a}$，比较它与 $f(n)$ 的阶：
+
+\begin{table}[H]
 \centering
-\begin{tikzpicture}[
-    cell/.style={draw, minimum width=1.4cm, minimum height=0.75cm, font=\ttfamily},
-    lbl/.style={font=\small}
-]
-    \matrix (src) [matrix of nodes, nodes={cell}, column sep=-\pgflinewidth] {
-        $d_1$ & $d_2$ & $d_3$ & $d_4$ \\
-    };
-    \node[lbl, anchor=south west] at ($(src.north west)+(0,0.15)$) {原数组 $A$（规模 $n$）:};
-    \matrix (dst) [matrix of nodes, nodes={cell}, column sep=-\pgflinewidth, below=1.6cm of src] {
-        $d'_1$ & $d'_2$ & $d'_3$ & $d'_4$ \\
-    };
-    \node[lbl, anchor=south west] at ($(dst.north west)+(0,0.15)$) {辅助数组 $A'$（随 $n$ 线性增长）:};
-    \node[lbl, anchor=west] at ($(dst.east)+(0.3,0)$) {$\leftarrow$ 空间复杂度 $O(n)$};
-\end{tikzpicture}
-\caption{副本克隆 (Clone) 内存空间扩张模型}
-\label{fig:space_on}
-\end{figure}
+\caption{主定理的三种情形（$\varepsilon>0$ 为任意小常数）}
+\label{tab:master}
+\begin{tabularx}{\textwidth}{c l X}
+\toprule
+情形 & 条件 & 结论 \\
+\midrule
+1 & $f(n)=O(n^{\log_b a-\varepsilon})$ & $T(n)=\Theta(n^{\log_b a})$（叶层主导） \\
+2 & $f(n)=\Theta(n^{\log_b a})$ & $T(n)=\Theta(n^{\log_b a}\log n)$（各层均衡） \\
+3 & $f(n)=\Omega(n^{\log_b a+\varepsilon})$ 且 $a\,f(n/b)\le c\,f(n)\,(c<1)$ & $T(n)=\Theta(f(n))$（根层主导） \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
-\subsection{摊还分析}
+情形 3 中的附加条件 $a\,f(n/b)\le c\,f(n)$（$c<1$）称为\emph{正则条件}，用于保证子问题代价随层数指数衰减。
 
-并查集的 $O(\alpha(n))$ 为摊还界，需在本章度量下理解（见经典算法章）。
+\subsection{主定理例题}
 
+\textbf{例 6}：$T(n)=2T(n/2)+n$。此处 $a=2,b=2$，临界值 $n^{\log_2 2}=n$。而 $f(n)=n=\Theta(n)$，落入\textbf{情形 2}，故
+\begin{equation}
+T(n)=\Theta(n\log n),
+\end{equation}
+与递归树、代入法的结论一致，对应归并排序的复杂度。
+
+\textbf{例 7}：$T(n)=2T(n/2)+n^2$。仍为 $a=2,b=2$，临界值 $n$，而 $f(n)=n^2=\Omega(n^{1+\varepsilon})$（取 $\varepsilon=1$）。检查正则条件：$a\,f(n/b)=2\cdot(n/2)^2=n^2/2\le c\,n^2$（取 $c=1/2<1$）成立，落入\textbf{情形 3}，故
+\begin{equation}
+T(n)=\Theta(n^2).
+\end{equation}
+
+\textbf{例 8}：$T(n)=9T(n/3)+n$。临界值 $n^{\log_3 9}=n^2$，而 $f(n)=n=O(n^{2-\varepsilon})$，落入\textbf{情形 1}，故 $T(n)=\Theta(n^2)$。
+
+\subsection{归并排序的算法与复杂度}
+
+归并排序是上述递推式的典型来源：将数组二分，递归排序左右两半，再在线性时间内归并。
+
+\begin{algorithm}[H]
+\caption{归并排序 (Merge Sort)}
+\begin{algorithmic}[1]
+\Procedure{MergeSort}{$A, lo, hi$}
+    \If{$lo \ge hi$}
+        \State \Return \Comment{至多一个元素已有序}
+    \EndIf
+    \State $mid \gets \lfloor (lo+hi)/2 \rfloor$
+    \State \text{MergeSort}($A, lo, mid$) \Comment{递归左半}
+    \State \text{MergeSort}($A, mid+1, hi$) \Comment{递归右半}
+    \State \text{Merge}($A, lo, mid, hi$) \Comment{线性合并}
+\EndProcedure
+\Procedure{Merge}{$A, lo, mid, hi$}
+    \State 将 $A[lo..mid]$ 与 $A[mid+1..hi]$ 按序并入临时数组 $B$
+    \State 将 $B$ 复制回 $A[lo..hi]$
+\EndProcedure
+\end{algorithmic}
+\end{algorithm}
+
+设归并代价为 $cn$，递归代价满足 $T(n)=2T(n/2)+\Theta(n)$，由主定理情形 2 得 $T(n)=\Theta(n\log n)$；额外空间为临时数组 $B$，为 $\Theta(n)$（见第 \ref{sec:space} 节）。
+
+\section{空间复杂度}
+\label{sec:space}
+
+\textbf{空间复杂度 (Space Complexity)} 度量算法运行所需存储随 $n$ 的增长，通常只计\emph{辅助空间}（不含输入本身）。它由三部分构成：
+
+\begin{itemize}
+    \item \textbf{原地 (In-place)}：仅使用常数个辅助单元，$S(n)=O(1)$。如冒泡排序、堆排序、数组逆置（借助常数槽位 $\tau$ 交换）。
+    \item \textbf{递归栈 (Recursion Stack)}：递归深度为 $H$ 时，调用栈所占辅助空间为 $O(H)$。平衡分治（如归并、快排期望）为 $O(\log n)$；偏斜递归（如朴素斐波那契、退化的快排）为 $O(n)$。
+    \item \textbf{额外数组/结构}：显式分配与 $n$ 成比例的空间。归并排序需 $\Theta(n)$ 临时数组；哈希表、邻接矩阵为 $O(n)$、$O(n^2)$。
+\end{itemize}
+
+表 \ref{tab:space} 汇总常见算法的空间代价。
+
+\begin{table}[H]
+\centering
+\caption{常见算法的空间复杂度对比}
+\label{tab:space}
+\begin{tabularx}{\textwidth}{l c X}
+\toprule
+算法 & 辅助空间 & 说明 \\
+\midrule
+数组逆置 & $O(1)$ & 常数槽位交换，原地 \\
+冒泡 / 插入 / 选择排序 & $O(1)$ & 原地排序 \\
+堆排序 & $O(1)$ & 原地，递归下滤可改为迭代 \\
+归并排序 & $O(n)$ & 需等大临时数组 \\
+快速排序（期望） & $O(\log n)$ & 递归栈深度期望 $O(\log n)$ \\
+快速排序（最坏） & $O(n)$ & 划分极度不平衡 \\
+朴素斐波那契递归 & $O(n)$ & 递归深度 $n$ \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+需要区分「输入空间」与「辅助空间」。归并排序总占用 $O(n)+O(n)=O(n)$，其额外部分为线性；而原地排序的额外部分为常数。分析时要明确报告哪一部分，否则结论会不一致。
+
+\section{本章小结与常见误区}
+
+\subsection{小结}
+
+\begin{itemize}
+    \item 算法是满足\emph{有穷性、确定性、可行性、输入、输出}五特性的有限操作序列，与具体程序实现相区别。
+    \item 分析以\emph{问题规模 $n$} 与\emph{基本操作}为基础，须区分最好、最坏、平均三种情形；最坏情况给出保证性上界。
+    \item 渐进记号 $O,\Omega,\Theta,o,\omega$ 用 $\exists c,n_0$ 形式化定义，忽略常数因子与低阶项。阶的排序为 $O(1)<O(\log n)<O(n)<O(n\log n)<O(n^2)<O(2^n)<O(n!)$。
+    \item 基本法则是加法法则 $O(\max)$ 与乘法法则 $O(\text{乘积})$，可逐层化简循环与嵌套。
+    \item 递归分析有三件工具：递归树（看层求和）、代入法（归纳验证）、主定理（查表判定），三者结论应一致。
+    \item 空间复杂度关注辅助空间：原地为 $O(1)$，递归栈为 $O(H)$，显式结构可能为 $O(n)$ 或更高。
+\end{itemize}
+
+\subsection{常见误区}
+
+\begin{enumerate}
+    \item \textbf{把 $O$ 当作「精确等于」}：$T(n)=O(n)$ 只是上界，也可能是 $\Theta(\log n)$。写 $T(n)=O(n^2)$ 却实际为 $\Theta(n\log n)$ 虽正确但不紧。
+    \item \textbf{混淆 $O$ 与 $\Theta$}：断言「快排是 $O(n\log n)$」不严谨，因其最坏为 $O(n^2)$；准确说法为「快排期望/平均 $\Theta(n\log n)$，最坏 $\Theta(n^2)$」。
+    \item \textbf{忽略问题规模的定义}：同一循环写法在不同规模参数下阶不同。图算法用 $|V|,|E|$ 双参数时，不可简单记作 $O(n)$。
+    \item \textbf{循环变量步长判断失误}：`i *= 2` 是 $O(\log n)$，而 `i += 2` 仍是 $O(n)$；只数「循环写了几个」而不数迭代次数会算错。
+    \item \textbf{主定理越界使用}：情形 3 忘记校验正则条件，或 $f(n)$ 与临界值之间存在间隙（如 $f(n)=n\log n$ 与 $n^{\log_b a}=n$ 之间）时主定理不直接适用，需用递归树或代入法。
+    \item \textbf{遗漏递归栈空间}：递归算法即使没有显式数组，也占 $O(H)$ 栈空间，勿误判为 $O(1)$。
+    \item \textbf{以常数优化替代降阶}：把 $O(n^2)$ 的常数从 $10$ 降到 $1$ 远不如将算法改进为 $O(n\log n)$；当 $n$ 很大时，阶的差异最终压倒一切常数因子。
+\end{enumerate}

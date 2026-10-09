@@ -5,79 +5,397 @@
 \vspace*{\fill}
 \chapter{软件工程概述与过程模型}
 \begin{center}
-软件工程用「工程化」的方法控制软件的成本、进度与质量。本章建立「软件危机--过程模型--生命周期--敏捷」四块基石。
+软件工程用「工程化」的方法控制软件的成本、进度与质量。本章建立「软件危机--过程模型--生命周期--敏捷」四块基石，并引入缺陷代价与质量度量的定量视角。
 \end{center}
 \vspace*{\fill}
 \endgroup
 \clearpage
 
-\section{软件与软件危机}
+\section{软件、软件危机与软件工程}
 
-\begin{itemize}
-    \item \textbf{软件}：程序 + 数据 + 文档。它是逻辑产品，无物理磨损，但会因变更而「退化」。
-    \item \textbf{软件危机}：需求不清、进度失控、成本超支、质量低、维护难。
-    \item \textbf{软件工程}：将系统化、规范化、可度量的工程方法应用于软件的开发、运行与维护。
-\end{itemize}
+\subsection{软件的定义与本质}
 
-\section{软件过程模型}
+\textbf{软件}是计算机程序、数据以及相关文档的集合。程序是「做什么、怎么做」的可执行描述；数据是程序处理的对象与配置；文档记录需求、设计、接口与使用说明，是软件可被理解、维护与交接的载体。三者缺一不可：只有程序而无文档，软件便无法维护；只有文档而无程序，软件便无法运行。
 
 \begin{table}[H]
 \centering
-\caption{常见过程模型对比}
-\begin{tabulary}{\textwidth}{CCC}
+\caption{软件与硬件特性的对比}
+\begin{tabulary}{\textwidth}{LLL}
 \toprule
-模型 & 特点 & 适用 \\
+维度 & 硬件 & 软件 \\
 \midrule
-瀑布 (Waterfall) & 阶段线性、文档驱动 & 需求稳定、合同型 \\
-迭代/增量 & 分轮交付，逐步完善 & 中大型、需求渐进 \\
-螺旋 (Spiral) & 迭代 + 风险分析 & 高风险大型项目 \\
-原型 (Prototype) & 先做可运行原型澄清需求 & 需求模糊 \\
-敏捷 (Agile) & 短迭代、响应变化、可工作软件 & 需求多变、小团队 \\
+本质 & 物理实体 & 逻辑产品，无形 \\
+制造方式 & 传统意义的「制造」 & 一次开发，成本集中在设计 \\
+磨损 & 物理磨损、老化 & 无磨损，但会因变更而「退化」 \\
+失效曲线 & 浴盆曲线（早期/偶发/耗损） & 理想为阶梯退化，实际因维护引入缺陷而上升 \\
+复制成本 & 随产量分摊 & 近乎零边际成本 \\
+度量 & 可直接测量几何、重量 & 多为间接度量（复杂度、缺陷密度） \\
 \bottomrule
 \end{tabulary}
 \end{table}
 
-\section{软件生命周期}
+\noindent 软件不会像硬件那样「用坏」，但会因持续的变更而逐渐腐化：每一次修改都可能在原有结构中埋下不一致，最终使命名、接口与文档彼此脱节，这一现象称为\textbf{软件退化}或\textbf{腐化}。因此维护不是可选项，而是与开发同等重要的工程活动。
+
+\subsection{软件危机}
+
+20 世纪 60 年代，硬件能力迅速提升、软件规模急剧膨胀，但开发仍停留在「个人手工作坊」模式，导致大量项目失败。这种「软件的生产与需求之间的严重不适应」被称为\textbf{软件危机}。
+
+\begin{table}[H]
+\centering
+\caption{软件危机的典型表现}
+\begin{tabulary}{\textwidth}{LL}
+\toprule
+表现 & 说明 \\
+\midrule
+需求不清且频繁变更 & 用户说不清需求，开发前未充分确认，返工频繁 \\
+进度与成本失控 & 估算靠猜，项目频繁延期、超预算 \\
+质量低下 & 缺陷多、可靠性差、性能不达标 \\
+维护困难 & 结构混乱、文档缺失，修改一处影响一片 \\
+生产率增长缓慢 & 硬件按摩尔定律增长，软件生产率提升有限 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\noindent 软件危机的根源不在技术工具，而在于\textbf{缺乏工程化的组织与管理}：把软件当作「编程」而非「工程」。软件工程正是对这一危机的系统性回应。
+
+\subsection{软件工程的定义与目标}
+
+\textbf{软件工程}是「将系统化、规范化、可度量的方法应用于软件的开发、运行和维护，即把工程方法运用于软件」。其目标是：在\textbf{给定成本与进度}下，交付\textbf{满足需求、质量可用}的软件，并使软件在其整个生命周期内可维护、可演化。
+
+软件工程区别于「会编程」的关键在于三个方面：\textbf{过程}（有组织的开发步骤与模型）、\textbf{方法}（需求、设计、测试等具体技术）、\textbf{工具}（支撑过程与方法的自动化手段）。三者常被称为软件工程的「三要素」。
+
+\section{软件过程模型}
+
+\textbf{软件过程}是开发软件时一组有序的活动、约束与产物。\textbf{过程模型}（又称生命周期模型）是对过程的抽象，规定「先做什么、再做什么、如何迭代、何时交付」。没有放之四海皆准的模型，模型的选择取决于需求稳定性、项目规模、风险水平与团队能力。
+
+\subsection{瀑布模型}
+
+瀑布模型把开发划分为若干严格顺序的阶段：需求分析、设计、编码、测试、维护。上一阶段的产物经评审通过后才能进入下一阶段，阶段之间以文档为接口。
 
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[font=\small, node distance=1.3cm]
-    \node[draw, rounded corners] (req) {需求};
-    \node[draw, rounded corners, right=of req] (design) {设计};
-    \node[draw, rounded corners, right=of design] (impl) {实现};
-    \node[draw, rounded corners, right=of impl] (test) {测试};
-    \node[draw, rounded corners, right=of test] (maint) {维护};
+\begin{tikzpicture}[font=\small, >=Stealth,
+    phase/.style={draw, rounded corners, fill=blue!5, minimum width=3.4cm,
+        minimum height=0.72cm, align=center}]
+    \node[phase] (req) at (0,0) {需求分析};
+    \node[phase, below=0.55cm of req] (design) {概要/详细设计};
+    \node[phase, below=0.55cm of design] (impl) {编码实现};
+    \node[phase, below=0.55cm of impl] (test) {测试};
+    \node[phase, below=0.55cm of test] (maint) {运行与维护};
     \draw[->] (req) -- (design);
     \draw[->] (design) -- (impl);
     \draw[->] (impl) -- (test);
     \draw[->] (test) -- (maint);
+    \draw[->, dashed, gray] (design.east) to[bend left=50] (req.east);
+    \draw[->, dashed, gray] (impl.east) to[bend left=50] (design.east);
+    \draw[->, dashed, gray] (test.east) to[bend left=50] (impl.east);
+    \node[right, font=\scriptsize, text=gray, align=left] at (1.9,-5.2)
+        {虚线：反馈与返工\\（代价随阶段快速上升）};
 \end{tikzpicture}
-\caption{软件生命周期的主要阶段}
+\caption{瀑布模型：阶段线性推进，反馈导致大量返工}
 \end{figure}
 
-\noindent 维护成本常占生命周期总成本的 $60\%\sim80\%$；需求与设计缺陷的修复代价随阶段指数增长：
-\begin{equation}
-    C_{\text{fix}}(\text{阶段}) \propto e^{\,k\cdot \text{阶段序号}}
-\end{equation}
+\noindent\textbf{机制}：文档驱动、阶段性评审、一次性交付。\textbf{优点}：过程清晰、里程碑明确、便于管理与合同外包。\textbf{缺点}：难以应对需求变更；缺陷发现晚，返工代价高；用户到后期才见到可运行系统。\textbf{适用}：需求稳定、技术成熟、以合同为约束的工程项目。
 
-\section{敏捷与 Scrum}
+\subsection{迭代增量模型}
 
-\begin{itemize}
-    \item \textbf{敏捷宣言}：个体与互动、可工作软件、客户合作、响应变化 高于 流程与工具、详尽文档、合同谈判、遵循计划。
-    \item \textbf{Scrum}：Sprint（1--4 周）、产品待办列表 (Product Backlog)、冲刺待办列表、每日站会、评审与回顾。
-    \item \textbf{XP}：结对编程、测试驱动开发 (TDD)、持续集成、小步发布。
-\end{itemize}
+迭代增量模型把系统切分为若干\textbf{增量}，每一轮\textbf{迭代}完成一个可运行、可交付的子集，逐步逼近完整系统。它承认需求会演进，通过多轮循环来收敛。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=Stealth,
+    it/.style={draw, rounded corners, fill=green!6, minimum width=2.5cm,
+        minimum height=0.8cm, align=center}]
+    \node[it] (i1) at (0,0) {迭代 1\\核心功能};
+    \node[it] (i2) at (3.2,0) {迭代 2\\扩展功能};
+    \node[it] (i3) at (6.4,0) {迭代 3\\完善与优化};
+    \draw[->] (i1) -- (i2);
+    \draw[->] (i2) -- (i3);
+    \draw[->, dashed] (i1.south) to[bend right=40] (i1.south);
+    \node[below=0.5cm of i1, font=\scriptsize, align=center] (r1) {需求/设计/编码/测试};
+    \node[below=0.5cm of i2, font=\scriptsize, align=center] (r2) {需求/设计/编码/测试};
+    \node[below=0.5cm of i3, font=\scriptsize, align=center] (r3) {需求/设计/编码/测试};
+    \draw[->, gray] (i1.south) -- (r1.north);
+    \draw[->, gray] (i2.south) -- (r2.north);
+    \draw[->, gray] (i3.south) -- (r3.north);
+    \draw[->, dashed] (i3.north) to[bend left=35] node[above, font=\scriptsize]{下一轮修正} (i1.north);
+\end{tikzpicture}
+\caption{迭代增量模型：每轮迭代交付一个可运行的增量}
+\end{figure}
+
+\noindent\textbf{机制}：把大系统拆小，每轮都走一遍「需求--设计--实现--测试」，尽快交付可用增量以获取反馈。\textbf{优点}：早期见效、风险分散、适应变更。\textbf{缺点}：需要良好的架构与集成策略，否则后期集成困难；迭代次数与范围难控。\textbf{适用}：中大型、需求渐进明确的项目。
+
+\subsection{螺旋模型}
+
+螺旋模型由 Boehm 提出，把迭代与\textbf{风险分析}结合。每圈螺旋包含四个象限：制定计划、风险分析、实施工程、客户评估。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=Stealth, scale=1.0]
+    \draw[thick, -{Stealth}] plot[variable=\t, domain=0:900, samples=320]
+        ({\t/90*0.24*cos(\t)},{\t/90*0.24*sin(\t)});
+    \draw[gray, dashed] (0,0) circle (2.4);
+    \node[align=center, font=\scriptsize] at (3.0,2.0) {制定计划\\确定目标与方案};
+    \node[align=center, font=\scriptsize] at (-3.0,2.0) {风险分析\\评估并化解};
+    \node[align=center, font=\scriptsize] at (-3.0,-2.0) {实施工程\\开发与验证};
+    \node[align=center, font=\scriptsize] at (3.0,-2.0) {客户评估\\评审与下一圈};
+\end{tikzpicture}
+\caption{螺旋模型：每一圈以风险分析为核心，半径随进度增大}
+\end{figure}
+
+\noindent\textbf{机制}：每圈先识别并评估风险，风险高的部分优先探索与原型验证。\textbf{优点}：显式管理风险，适合高风险项目。\textbf{缺点}：风险分析需要专门技能，管理成本高，小项目不划算。\textbf{适用}：大型、高风险、需求不确定的项目。
+
+\subsection{原型模型}
+
+原型模型先快速构建一个\textbf{可运行原型}，用它澄清模糊需求，再据此开发正式产品。原型可分为\textbf{探索型}（需求不明确时用于沟通）与\textbf{演化型}（逐步演化成最终产品）。
+
+\noindent\textbf{机制}：快速构建、用户试用、反馈修正。\textbf{优点}：有效澄清需求、降低沟通误差。\textbf{缺点}：用户易把原型误当成品；抛弃型原型若不舍弃会损害质量；工具与快速开发要求高。\textbf{适用}：需求模糊、用户参与度高、界面与交互密集的项目。
+
+\subsection{敏捷模型}
+
+敏捷以「短迭代、持续交付、响应变化」为核心，强调可工作软件高于详尽文档、客户合作高于合同谈判。它并非单一模型，而是一组价值观下的实践族（Scrum、XP、看板等）。
+
+\noindent\textbf{机制}：2--4 周短迭代内完成一小批高价值功能，持续集成与持续反馈。\textbf{优点}：适应变化、交付频繁、贴近用户。\textbf{缺点}：大规模协同与文档、合规场景挑战大；对团队纪律与用户参与要求高。\textbf{适用}：需求多变、团队小型且自组织、可接受渐进交付的项目。
+
+\subsection{过程模型对比}
 
 \begin{table}[H]
 \centering
-\caption{Scrum 三种角色与三类工件}
-\begin{tabulary}{\textwidth}{CC}
+\caption{常见过程模型对比}
+\begin{tabulary}{\textwidth}{LLLL}
 \toprule
-角色 & 工件 \\
+模型 & 核心机制 & 优点 & 缺点 / 适用 \\
 \midrule
-产品负责人 (PO) & 产品待办列表 \\
-Scrum Master & 冲刺待办列表 \\
-开发团队 & 增量 (Increment) \\
+瀑布 & 线性阶段、文档驱动 & 清晰、里程碑明确、易管理 & 难应变、返工贵 / 需求稳定、合同型 \\
+迭代增量 & 多轮交付可运行增量 & 早期见效、适应变更 & 集成难、范围难控 / 中大型、渐进需求 \\
+螺旋 & 迭代 + 显式风险分析 & 主动控风险 & 成本高、需专门技能 / 高风险大型项目 \\
+原型 & 先做可运行原型 & 澄清需求、沟通好 & 易被误当成品 / 需求模糊 \\
+敏捷 & 短迭代、响应变化 & 灵活、交付频繁 & 重协同、文档弱 / 需求多变、小团队 \\
 \bottomrule
 \end{tabulary}
 \end{table}
+
+\section{软件生命周期、阶段与缺陷代价}
+
+\subsection{生命周期各阶段与交付物}
+
+\textbf{软件生命周期}是从需求提出到软件退役的全过程。虽然模型不同，但其中反复出现的核心活动与交付物基本一致。
+
+\begin{table}[H]
+\centering
+\caption{生命周期各阶段的主要活动与交付物}
+\begin{tabulary}{\textwidth}{LLLL}
+\toprule
+阶段 & 主要活动 & 关键交付物 & 质量关口 \\
+\midrule
+需求 & 获取、分析、确认需求 & 需求规格说明书、用例模型 & 需求评审通过 \\
+设计 & 架构与详细设计 & 设计说明书、类图/结构图、接口定义 & 设计评审通过 \\
+实现 & 编码、单元测试 & 源码、单元测试用例、构建脚本 & 代码评审、CI 通过 \\
+测试 & 集成、系统、验收测试 & 测试计划、测试报告、缺陷记录 & 质量门禁通过 \\
+维护 & 改正、适应、完善、预防 & 变更记录、回归测试、发布说明 & 回归无退化 \\
+退役 & 数据迁移、下线 & 迁移方案、退役公告 & 数据完整迁移 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{缺陷修复代价随阶段增长}
+
+一个缺陷发现得越晚，修复代价越高：需求阶段只需改一句话，维护阶段可能要重做设计、修改代码、重跑全部测试。经验上，修复代价随阶段序号近似\textbf{指数增长}：
+
+\begin{equation}
+    C_{\text{fix}}(s) \;\propto\; e^{\,k\cdot s}, \qquad s = 1,2,\dots \;\text{为阶段序号}
+\end{equation}
+
+其中 $k$ 为增长系数。$k$ 越大，说明该组织改动成本越高，越应把质量「前置」。这一规律是\textbf{尽早测试、持续测试}与\textbf{缺陷左移}的根本依据。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.85\textwidth, height=7cm,
+    xlabel={阶段序号（1 需求，2 设计，3 编码，4 测试，5 维护）},
+    ylabel={相对修复代价},
+    xtick={1,2,3,4,5},
+    xticklabels={需求,设计,编码,测试,维护},
+    ymin=0, ymax=110,
+    legend pos=north west,
+    grid=major,
+    thick]
+    \addplot[blue, domain=1:5, samples=80]{exp(1.15*(x-1))};
+    \addlegendentry{$k=1.15$（变更频繁）}
+    \addplot[red, domain=1:5, samples=80]{exp(0.7*(x-1))};
+    \addlegendentry{$k=0.7$（过程规范）}
+\end{axis}
+\end{tikzpicture}
+\caption{缺陷修复代价随阶段指数增长（$k$ 越大曲线越陡）}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{「缺陷左移」的直观示例：同一缺陷在不同阶段修复（$k=1.15$，需求阶段代价记为 1）}
+\begin{tabulary}{\textwidth}{CCCC}
+\toprule
+修复阶段 & 阶段序号 $s$ & 相对代价 $e^{k(s-1)}$ & 与需求阶段相比 \\
+\midrule
+需求 & 1 & $1.0$ & $1\times$ \\
+设计 & 2 & $3.2$ & $\approx 3\times$ \\
+编码 & 3 & $10.0$ & $\approx 10\times$ \\
+测试 & 4 & $31.5$ & $\approx 30\times$ \\
+维护 & 5 & $99.5$ & $\approx 100\times$ \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{quote}
+\textbf{例 1（缺陷代价估算）} 某团队在需求阶段修复一个缺陷成本为 500 元，增长系数 $k=1.15$。若该缺陷直到维护阶段（$s=5$）才被发现，估算其修复代价；并说明缺陷左移到设计阶段可节省多少。
+
+\textbf{解}：由式 (1)，维护阶段相对代价 $e^{1.15\times(5-1)}=e^{4.6}\approx 99.5$，故
+\[
+C_{\text{maint}} \approx 500 \times 99.5 = 49{,}750\ \text{元}.
+\]
+若在设计阶段（$s=2$）发现并修复，相对代价 $e^{1.15}\approx 3.16$，代价约 $500\times 3.16\approx 1{,}580$ 元。节省约 $49{,}750-1{,}580\approx 48{,}170$ 元，即\textbf{约 $97\%$}。结论：需求与设计评审每投入少量成本，都可能有数十倍的回报。
+\end{quote}
+
+\section{敏捷宣言、Scrum 与 XP}
+
+\subsection{敏捷宣言}
+
+2001 年发布的《敏捷宣言》提出四条价值观：\textbf{个体与互动}高于流程与工具；\textbf{可工作的软件}高于详尽的文档；\textbf{客户合作}高于合同谈判；\textbf{响应变化}高于遵循计划。宣言同时承认右项也有价值，只是更看重左项，速度与灵活性由此而来。
+
+\subsection{Scrum：角色、工件与仪式}
+
+Scrum 是最流行的敏捷框架，通过固定的角色、工件与仪式保证「短周期、可预测、可改进」。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=Stealth,
+    box/.style={draw, rounded corners, minimum width=2.8cm,
+        minimum height=0.85cm, align=center}]
+    \node[box, fill=orange!10] (backlog) at (0,0) {产品待办列表};
+    \node[box, fill=blue!6, right=1.2cm of backlog] (plan) {冲刺计划会};
+    \node[box, fill=green!8, below=1.1cm of plan, minimum width=3.4cm] (sprint) {冲刺 Sprint（1--4 周）};
+    \node[box, fill=yellow!12, below=1.1cm of sprint] (daily) {每日站会};
+    \node[box, fill=orange!8, right=1.2cm of daily] (incr) {可交付增量};
+    \node[box, fill=purple!8, above=1.1cm of incr] (review) {评审 + 回顾};
+    \draw[->] (backlog) -- (plan);
+    \draw[->] (plan) -- (sprint);
+    \draw[->] (sprint) -- (daily);
+    \draw[->] (daily) -- (incr);
+    \draw[->] (incr) -- (review);
+    \draw[->, dashed] (review.north) to[bend left=45] (backlog.north);
+\end{tikzpicture}
+\caption{Scrum 冲刺流程：从产品待办列表到增量，再经评审与回顾进入下一轮}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{Scrum 的角色、工件与仪式}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+类别 & 组成 & 职责 / 说明 \\
+\midrule
+角色 & 产品负责人 (PO) & 管理产品待办列表，对价值与优先级负责 \\
+角色 & Scrum Master & 保障流程、移除障碍、促进改进 \\
+角色 & 开发团队 & 自组织地交付增量 \\
+工件 & 产品待办列表 & 全部需求的有序列表（PO 维护） \\
+工件 & 冲刺待办列表 & 本轮选定的任务与计划 \\
+工件 & 增量 & 满足「完成定义」的可工作产品 \\
+仪式 & 冲刺计划会 & 选定本轮目标与待办 \\
+仪式 & 每日站会 & 同步进展、暴露障碍（15 分钟） \\
+仪式 & 冲刺评审 & 向干系人演示增量并收集反馈 \\
+仪式 & 冲刺回顾 & 改进团队工作方式 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{XP 核心实践}
+
+极限编程（XP）强调工程实践的极致执行，核心技术实践包括：
+
+\begin{itemize}
+    \item \textbf{结对编程}：两人共用一台机器，一人编码、一人审查，实时保证质量与知识传播。
+    \item \textbf{测试驱动开发 (TDD)}：先写失败的测试（红），再写刚好通过的代码（绿），最后重构（重构）。
+    \item \textbf{持续集成}：频繁把代码集成到主干并自动构建、测试，尽早暴露集成缺陷。
+    \item \textbf{小步发布}：以极短周期交付小版本，快速获取真实反馈。
+    \item \textbf{简单设计}：不做过度设计，只满足当前需求，随需重构。
+    \item \textbf{重构}：在不改变外部行为的前提下持续改善内部结构。
+\end{itemize}
+
+\section{软件质量与度量}
+
+\subsection{ISO 质量模型要点}
+
+ISO/IEC 25010 将软件产品质量划分为若干可评价的特性，用于把「好不好」拆解为可度量的维度。
+
+\begin{table}[H]
+\centering
+\caption{ISO/IEC 25010 产品质量特性要点}
+\begin{tabulary}{\textwidth}{LL}
+\toprule
+质量特性 & 含义要点 \\
+\midrule
+功能适合性 (Functional Suitability) & 功能完整、正确，覆盖用户的真实需求 \\
+性能效率 (Performance Efficiency) & 时间行为、资源利用、容量满足要求 \\
+兼容性 (Compatibility) & 与其他系统共存、可互操作 \\
+易用性 (Usability) & 易学、易用、界面友好、可访问 \\
+可靠性 (Reliability) & 成熟度、可用性、容错、可恢复 \\
+安全性 (Security) & 保密性、完整性、不可否认、可审计 \\
+可维护性 (Maintainability) & 模块化、可复用、易分析、易修改、易测试 \\
+可移植性 (Portability) & 可适应、可安装、可替换 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{常用度量}
+
+\textbf{缺陷密度}把缺陷数按规模归一，便于跨项目比较：
+
+\begin{equation}
+    D = \frac{N_{\text{defect}}}{\text{Size}} \quad
+    \bigl[\text{缺陷/KLOC}\bigr],
+\end{equation}
+其中 $N_{\text{defect}}$ 为统计期内发现的缺陷数，$\text{Size}$ 为代码规模（千行，KLOC）。
+
+\textbf{可靠性}用失效概率度量。若失效服从速率为 $\lambda$ 的指数分布，则在时刻 $t$ 仍正常工作的可靠度为
+
+\begin{equation}
+    R(t) = e^{-\lambda t}, \qquad \text{平均无故障时间}\ \mathrm{MTBF} = \frac{1}{\lambda}.
+\end{equation}
+
+\noindent 由式 (3) 可见：$\lambda$ 越小，$R(t)$ 越高、MTBF 越长。可靠性目标通常转化为对 $\lambda$ 或 MTBF 的量化要求。
+
+\begin{quote}
+\textbf{例 2（缺陷密度与可靠性）} 某模块共 40 KLOC，集成测试期间发现 120 个缺陷，且上线后运行 1{,}000 小时发生 2 次失效（按指数分布、失效相互独立）。求缺陷密度，并估计 MTBF 与运行 500 小时的可靠度。
+
+\textbf{解}：缺陷密度
+\[
+D = \frac{120}{40} = 3.0\ \text{缺陷/KLOC}.
+\]
+失效速率 $\lambda = 2/1000 = 2\times10^{-3}\ /\text{小时}$，故
+\[
+\mathrm{MTBF} = \frac{1}{\lambda} = 500\ \text{小时}, \qquad
+R(500) = e^{-2\times10^{-3}\times 500} = e^{-1}\approx 0.368.
+\]
+即平均无故障运行约 500 小时；运行 500 小时后可靠度约 $36.8\%$，若要求更可靠则须降低 $\lambda$（通过修复缺陷、加固设计实现）。
+\end{quote}
+
+\section{本章小结与常见误区}
+
+本章主线可归纳为四块基石：
+
+\begin{itemize}
+    \item \textbf{软件与软件危机}：软件是程序、数据与文档的逻辑产品，无磨损但会腐化；危机源于缺乏工程化组织。
+    \item \textbf{过程模型}：瀑布、迭代增量、螺旋、原型、敏捷各有取舍，选择取决于需求稳定性、规模与风险。
+    \item \textbf{生命周期与缺陷代价}：各阶段有明确交付物与质量关口；缺陷修复代价随阶段指数增长，故须质量前置。
+    \item \textbf{敏捷与质量度量}：敏捷用短迭代快速响应变化；质量可用 ISO 特性、缺陷密度与可靠性等指标量化。
+\end{itemize}
+
+\noindent\textbf{常见误区}
+
+\begin{itemize}
+    \item \textbf{「敏捷等于不写文档、不设计」}：敏捷是「可工作软件高于详尽文档」，而非取消设计。没有架构与约定，短迭代很快会陷入返工。
+    \item \textbf{「瀑布已过时」}：在需求稳定、强合同约束的场景下，瀑布仍高效；问题不在模型本身，而在于用错场合。
+    \item \textbf{「测试是编码之后的一个阶段」}：测试应贯穿全过程并尽早介入，缺陷左移的收益远超事后测试。
+    \item \textbf{「缺陷密度越低质量越好」不可一概而论}：它受规模口径、缺陷定义与测试充分性影响，须结合场景解读，不能跨口径直接比较。
+    \item \textbf{「覆盖率越高越好」}：高覆盖率不等于高质量，关键在于测到业务关键路径与边界条件。
+\end{itemize}

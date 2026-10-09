@@ -13,78 +13,460 @@
 
 \section{操作系统做什么}
 
+操作系统（Operating System, OS）是对计算机硬件的第一层、也是最基础的一层软件封装。
+它既把「裸机」的复杂细节隐藏起来，又承担着在众多竞争的程序之间分配资源的职责。
+可以从三个互补的视角来理解它的职能：
+
 \begin{itemize}
-    \item \textbf{资源管理者}：分配 CPU、内存、I/O 设备，解决多程序竞争。
-    \item \textbf{抽象提供者}：把磁盘抽象成文件、把 CPU 抽象成进程、把内存抽象成地址空间。
-    \item \textbf{控制程序}：保护与隔离，防止程序越权。
+    \item \textbf{资源管理者}：CPU、内存、磁盘、外设在任意时刻都只能被有限个程序使用，
+        OS 负责分配、回收与仲裁，使多道程序能够安全、公平、高效地并发推进。
+    \item \textbf{抽象提供者}：把物理 CPU 抽象成\textbf{进程/线程}，把物理内存抽象成\textbf{地址空间}，
+        把磁盘扇区抽象成\textbf{文件}，把设备控制器抽象成\textbf{统一的设备接口}。
+        抽象让程序员不必直面硬件，也使软件具备可移植性。
+    \item \textbf{控制程序}：负责保护与隔离。它需要防止应用程序越权访问硬件或彼此的内存，
+        并在程序出错时把损害限制在局部。
 \end{itemize}
 
-\subsection{内核结构}
+\noindent 三者并不矛盾：抽象使资源更易使用，管理使资源分配有序，控制保证系统不被滥用。
+可以把它概括为一句话——
+
+\begin{equation}
+    \text{OS} = \underbrace{\text{抽象}}_{\text{更好用}} \;+\; \underbrace{\text{管理}}_{\text{更有序}} \;+\; \underbrace{\text{保护}}_{\text{更安全}}.
+\end{equation}
+
+\subsection{操作系统的发展历程}
+
+OS 的形态由「硬件条件」与「使用需求」共同塑造，大体经历了三个阶段。
+早期计算机昂贵而 CPU 相对稀缺，于是人们希望让 CPU 尽量「不空闲」，诞生了\textbf{批处理}；
+当用户希望机器像电话一样即时响应时，出现了\textbf{分时}；
+当计算必须与外部物理过程同步、结果迟到即失效时，产生了\textbf{实时}系统。
+
 \begin{table}[H]
 \centering
-\caption{内核结构对比}
-\begin{tabulary}{\textwidth}{CCC}
+\caption{操作系统发展的三个阶段}
+\begin{tabulary}{\textwidth}{LLLL}
 \toprule
-结构 & 特点 & 代表 \\
+阶段 & 核心目标 & 交互方式 & 关键特征 \\
 \midrule
-单体内核 (Monolithic) & 全部服务在内核态，性能高、耦合紧 & Linux \\
-微内核 (Microkernel) & 仅核心机制在内核，服务在用户态 & Minix, QNX \\
-混合内核 (Hybrid) & 折中 & Windows, macOS \\
+批处理 & 提高 CPU 与作业吞吐率 & 成批提交，无交互 & 单道 $\to$ 多道批处理，作业排队、通道与中断引入 \\
+分时 & 公平、快速响应多用户 & 终端交互、时间片轮转 & 响应时间 $R$ 可预期，同时性/独立性/及时性/交互性 \\
+实时 & 在硬性时限内完成 & 事件驱动、优先级抢占 & 分硬实时/软实时，强调\textbf{可预测性}而非单纯快 \\
 \bottomrule
 \end{tabulary}
 \end{table}
 
-\section{双模式与特权指令}
+\noindent 多道批处理的核心思想是：当一道作业等待 I/O 时，立即切换到另一道作业，
+使 CPU 与 I/O 设备尽可能并行工作，从而提升\emph{系统吞吐率}。
+分时系统则把 CPU 时间切成\textbf{时间片}轮转分配给各终端用户，
+代价是频繁的上下文切换（见第 \ref{sec:context} 节）；
+实时系统最关心「最坏情况」是否满足截止期，因此常用优先级抢占与可预测的调度策略。
 
-CPU 提供至少两种模式：
+\section{内核结构}
+
+内核（kernel）是 OS 中最核心、常驻内存、运行于特权态的部分。
+按「哪些功能放在内核态、哪些放到用户态」的不同取舍，形成了三种主流结构。
+
 \begin{itemize}
-    \item \textbf{用户态 (user mode)}：应用运行，受限。
-    \item \textbf{内核态 (kernel mode)}：OS 运行，可执行特权指令。
+    \item \textbf{单体内核（Monolithic Kernel）}：文件系统、内存管理、设备驱动、网络协议栈
+        等几乎所有服务都运行在内核态、共享同一地址空间，模块之间直接函数调用。
+        优点是\textbf{调用路径短、性能高}；缺点是\textbf{耦合紧}，任一部分出现缺陷都可能使整个系统崩溃，
+        且模块边界模糊、维护困难。Linux 属于此类（尽管其支持可动态加载的内核模块）。
+    \item \textbf{微内核（Microkernel）}：内核中只保留最基本的机制——
+        进程调度、地址空间、进程间通信（IPC）与中断处理；
+        文件系统、驱动、网络等服务被移到用户态，作为\textbf{服务器进程}运行。
+        优点是内核小、\textbf{可靠性与可扩展性好}、易移植；缺点是服务之间必须通过 IPC 通信，
+        \textbf{模式切换与消息传递的开销大}、性能受损。Minix、QNX 是代表。
+    \item \textbf{混合内核（Hybrid Kernel）}：折中方案，
+        既保留微内核的模块化结构，又把性能敏感的服务（如图形、文件系统）放回内核态运行。
+        Windows NT 系列、macOS（XNU）属于此类。
 \end{itemize}
-特权指令（如修改页表基址、开关中断、I/O 指令）只能在核心态执行。模式由状态寄存器中的一位控制。
-
-\begin{equation}
-    \text{用户态} \xrightarrow{\text{系统调用 / 中断 / 异常}} \text{内核态} \xrightarrow{\text{返回}} \text{用户态}
-\end{equation}
-
-\section{系统调用}
-
-系统调用是用户程序请求内核服务的受控入口，通过 \textbf{trap} 指令陷入内核。
 
 \begin{figure}[H]
 \centering
-\begin{tikzpicture}[font=\small, node distance=1.6cm]
-    \node[draw, rounded corners] (app) {用户程序};
-    \node[draw, rounded corners, below=of app] (lib) {库函数 (libc)};
-    \node[draw, rounded corners, below=of lib] (trap) {\texttt{trap} 陷入};
-    \node[draw, rounded corners, below=of trap] (kernel) {内核服务分发};
-    \draw[->] (app) -- (lib);
-    \draw[->] (lib) -- (trap);
-    \draw[->] (trap) -- (kernel);
+\begin{tikzpicture}[font=\small, align=center, >=stealth,
+    svc/.style={draw, rounded corners, fill=white, minimum width=2.1cm, minimum height=0.55cm, inner sep=2pt},
+    core/.style={draw, rounded corners, fill=red!10, minimum width=2.3cm, minimum height=0.9cm, inner sep=2pt}]
+    % ---------- Monolithic ----------
+    \node[draw, rounded corners, fill=blue!8, minimum width=2.9cm, minimum height=4.4cm] (mono) at ({0,0}) {};
+    \node[font=\bfseries] at ({0,1.75}) {单体内核};
+    \node[svc] at ({0,0.95}) {文件系统};
+    \node[svc] at ({0,0.25}) {内存管理};
+    \node[svc] at ({0,-0.45}) {设备驱动};
+    \node[svc] at ({0,-1.15}) {网络协议};
+    \node[font=\scriptsize, gray] at ({0,-1.95}) {全部在内核态};
+
+    % ---------- Microkernel ----------
+    \node[draw, rounded corners, fill=green!8, minimum width=3.0cm, minimum height=4.4cm] (micro) at ({5.0,0}) {};
+    \node[font=\bfseries] at ({5.0,1.75}) {微内核};
+    \node[svc, fill=orange!12] at ({5.0,0.95}) {文件服务};
+    \node[svc, fill=orange!12] at ({5.0,0.25}) {设备服务};
+    \node[svc, fill=orange!12] at ({5.0,-0.45}) {网络服务};
+    \node[core] at ({5.0,-1.25}) {\textbf{微内核}\\IPC/调度/中断};
+    \node[font=\scriptsize, gray] at ({5.0,1.45}) {（用户态）};
+    \node[font=\scriptsize, gray] at ({5.0,-2.05}) {仅核心机制在内核态};
+
+    % ---------- Hybrid ----------
+    \node[draw, rounded corners, fill=violet!8, minimum width=2.9cm, minimum height=4.4cm] (hyb) at ({10.0,0}) {};
+    \node[font=\bfseries] at ({10.0,1.75}) {混合内核};
+    \node[svc, fill=orange!12] at ({10.0,0.95}) {部分服务（用户态）};
+    \node[svc] at ({10.0,0.25}) {文件系统};
+    \node[svc] at ({10.0,-0.45}) {设备驱动};
+    \node[core] at ({10.0,-1.25}) {\textbf{核心内核}\\调度/内存/IPC};
+    \node[font=\scriptsize, gray] at ({10.0,-2.05}) {性能敏感者回内核态};
+
+    % ---------- dividers and labels ----------
+    \draw[dashed, gray] ({3.4,-2.6}) -- ({3.4,2.6});
+    \draw[dashed, gray] ({8.2,-2.6}) -- ({8.2,2.6});
+    \node[font=\scriptsize] at ({1.7,2.75}) {功能全在内核};
+    \node[font=\scriptsize] at ({6.6,2.75}) {内核最小化};
+    \node[font=\scriptsize] at ({9.1,2.75}) {折中};
 \end{tikzpicture}
-\caption{系统调用的陷入路径}
+\caption{三种内核结构的服务分布对比：单体内核（全在内核态）、微内核（服务下沉用户态）、混合内核（核心 + 部分内核态服务）}
 \end{figure}
-
-常见系统调用类别：进程控制（\texttt{fork}, \texttt{exec}, \texttt{exit}）、文件（\texttt{open}, \texttt{read}, \texttt{write}）、设备（\texttt{ioctl}）、信息（\texttt{getpid}）、通信（\texttt{pipe}, \texttt{socket}）。
-
-\section{中断、异常与陷阱}
 
 \begin{table}[H]
 \centering
-\caption{三种进入内核的事件}
-\begin{tabulary}{\textwidth}{CCC}
+\caption{三种内核结构的多维对比}
+\begin{tabulary}{\textwidth}{LLLLL}
 \toprule
-类型 & 来源 & 例子 \\
+结构 & 服务运行位置 & 优点 & 缺点 & 代表 \\
 \midrule
-中断 (Interrupt) & 异步、外部设备 & 时钟、网卡、键盘 \\
-异常 (Exception) & 同步、当前指令 & 除零、缺页、非法指令 \\
-陷阱 (Trap) & 同步、主动请求 & 系统调用 \\
+单体内核 & 几乎全部在内核态 & 调用直接、性能高 & 耦合紧、可靠性差、难维护 & Linux \\
+微内核 & 仅核心机制在内核态 & 内核小、可靠、可扩展、易移植 & 频繁 IPC、性能损失 & Minix, QNX \\
+混合内核 & 核心 + 性能敏感服务在内核态 & 兼顾性能与模块化 & 结构复杂、边界模糊 & Windows, macOS \\
 \bottomrule
 \end{tabulary}
 \end{table}
 
-\noindent 处理流程：保存现场（PC、寄存器）→ 根据中断向量跳转处理程序 → 恢复现场并返回。时钟中断是抢占式调度的基础。
+\section{用户态与内核态}
+
+硬件通过给 CPU 设定不同的\textbf{执行模式}来实现保护。至少需要两种模式：
+
+\begin{itemize}
+    \item \textbf{用户态（user mode）}：应用程序运行于此，只能访问自己的地址空间，
+        不能执行可能危及系统的指令，也不能直接操纵设备。
+    \item \textbf{内核态（kernel mode，又称核心态/管理态）}：OS 内核运行于此，
+        可访问全部内存与外设，可执行\textbf{特权指令}。
+\end{itemize}
+
+\subsection{特权指令}
+
+\textbf{特权指令}（privileged instruction）是指那些只能在核心态执行、如果在用户态执行会触发
+陷阱（trap）的指令，例如：
+
+\begin{itemize}
+    \item 开关中断（\texttt{cli}/\texttt{sti}）、加载中断向量表；
+    \item 修改页表基址寄存器、刷新 TLB；
+    \item 直接进行 I/O 端口读写；
+    \item 设置 CPU 模式位、停机指令（\texttt{halt}）。
+\end{itemize}
+
+\noindent 与之相对，加、减、跳转、访存等是\textbf{非特权指令}，两种模式下都能执行。
+核心态并非「性能更高」，它只是一种权限：CPU 通过一个模式位（存放在程序状态字/状态寄存器中）
+来判断当前是否允许执行特权指令。
+
+\subsection{模式切换与双模式的意义}
+
+用户态到内核态的切换由三类事件触发：\textbf{系统调用}（主动请求服务）、
+\textbf{中断}（外部设备异步发来）、\textbf{异常}（当前指令引发，如除零、缺页）。
+内核态返回用户态则通过一条专门的\textbf{特权返回指令}完成。
+
+\begin{equation}
+    \text{用户态} \;\xrightarrow{\ \text{系统调用 / 中断 / 异常}\ }\; \text{内核态}
+    \;\xrightarrow{\ \text{特权返回指令}\ }\; \text{用户态}
+\end{equation}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, align=center, >=stealth]
+    \draw[fill=blue!8, rounded corners] ({0,1.3}) rectangle ({8.4,2.7});
+    \node at ({4.2,2.0}) {\textbf{用户态}：应用程序、库函数——受限执行，只能发系统调用};
+
+    \draw[fill=red!10, rounded corners] ({0,-0.1}) rectangle ({8.4,1.3});
+    \node at ({4.2,0.6}) {\textbf{内核态}：内核代码——可执行特权指令，访问全部资源};
+
+    \draw[->, thick] ({2.0,2.7}) -- ({2.0,1.3});
+    \node[font=\scriptsize, anchor=east] at ({1.85,2.0}) {trap\\系统调用/中断/异常};
+
+    \draw[->, thick] ({6.4,1.3}) -- ({6.4,2.7});
+    \node[font=\scriptsize, anchor=west] at ({6.55,2.0}) {特权返回\\（restore）};
+
+    \draw[dashed, gray] ({0,1.3}) -- ({8.4,1.3});
+    \node[font=\scriptsize, gray, anchor=west] at ({0.1,1.42}) {模式边界（由状态寄存器模式位控制）};
+\end{tikzpicture}
+\caption{双模式切换：用户态经 trap 陷入内核态，内核经特权返回指令回到用户态}
+\end{figure}
+
+\noindent \textbf{为什么需要双模式？} 如果所有代码都能执行特权指令，
+那么一个程序的一条错误指令或一次恶意访问就可能覆盖内核数据、关闭中断或直接读写磁盘，
+从而使整个系统崩溃或失控。双模式把「可信的内核」与「不可信的应用」在\emph{权限}上彻底隔开：
+应用想干特权的事，必须通过受控入口请求内核代劳，内核在入口处检查权限、参数与合法性后才执行。
+这正是「保护」职能的硬件基础。
+
+\section{系统调用}
+
+\textbf{系统调用}（system call）是操作系统提供给用户程序的、请求内核服务的受控入口，
+是「用户态」与「内核态」之间唯一的合法通道。它表面上像普通函数调用，
+实际却会跨越模式边界、进入内核执行特权操作。
+
+\subsection{陷入（trap）机制与参数传递}
+
+用户程序通常不直接书写系统调用指令，而是调用 C 库（如 glibc）提供的\textbf{包装函数}。
+包装函数把\textbf{系统调用号}放入约定寄存器，把参数按约定摆放，
+再执行一条能引发陷入的指令——在 x86 上是 \texttt{int 0x80} 或 \texttt{sysenter}/\texttt{syscall}，
+在 RISC-V 上是 \texttt{ecall}，在 ARM 上是 \texttt{svc}。该指令使 CPU 切换到内核态，
+并跳转到由\textbf{中断/异常向量表}指定的内核入口。
+
+参数有三种常见传递方式：
+
+\begin{itemize}
+    \item \textbf{寄存器传参}：参数少时把参数放进指定寄存器，最快，但寄存器数量有限；
+    \item \textbf{栈传参}：把参数压入用户栈，内核按指针读取；
+    \item \textbf{参数块传参}：把参数放在内存块中，将块地址放入寄存器传给内核，
+        适合参数很多或参数长度可变（如 \texttt{execve}）的场合。
+\end{itemize}
+
+\subsection{系统调用的类别}
+
+系统调用数量众多，按功能可分为五大类：
+
+\begin{table}[H]
+\centering
+\caption{系统调用的常见类别}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+类别 & 典型调用 & 作用 \\
+\midrule
+进程控制 & \texttt{fork}, \texttt{exec}, \texttt{exit}, \texttt{wait} & 创建、替换、终止、等待进程 \\
+文件管理 & \texttt{open}, \texttt{read}, \texttt{write}, \texttt{close}, \texttt{lseek} & 打开、读写、定位、关闭文件 \\
+设备管理 & \texttt{ioctl}, \texttt{read}, \texttt{write} & 请求设备操作与控制 \\
+信息维护 & \texttt{getpid}, \texttt{time}, \texttt{alarm} & 获取/设置系统与进程信息 \\
+进程通信 & \texttt{pipe}, \texttt{socket}, \texttt{shmget}, \texttt{send}/\texttt{recv} & 管道、共享内存、套接字通信 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{实例：\texttt{read} 的完整流程}
+
+下图为一次 \texttt{read(fd, buf, n)} 从用户态到内核态再返回的完整路径。
+左侧为运行模式，右侧为具体动作，中间虚线是模式边界：
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, align=center, >=stealth, node distance=1.15cm,
+    u/.style={draw, rounded corners, fill=blue!6, minimum width=6.4cm, inner sep=5pt},
+    k/.style={draw, rounded corners, fill=red!8, minimum width=6.4cm, inner sep=5pt}]
+    \node[u] (app) {应用程序调用 \texttt{read(fd, buf, n)}};
+    \node[u, below=of app] (lib) {C 库包装函数：系统调用号 $\to$ 寄存器；\\参数按约定摆放到寄存器/栈};
+    \node[u, below=of lib] (trap) {\texttt{ecall} / \texttt{int 0x80} 触发陷入};
+    \node[k, below=of trap] (disp) {内核入口：保存现场，据调用号\\查系统调用表并分发到 \texttt{sys\_read}};
+    \node[k, below=of disp] (svc) {VFS $\to$ 文件系统：校验 \texttt{fd}、定位文件、\\把数据从页缓存拷入用户 \texttt{buf}};
+    \node[k, below=of svc] (ret) {把返回值放入用户可见寄存器，恢复现场};
+    \node[u, below=of ret] (done) {执行特权返回指令，\texttt{read} 返回读取字节数};
+
+    \draw[->] (app) -- (lib);
+    \draw[->] (lib) -- (trap);
+    \draw[->] (trap) -- (disp);
+    \draw[->] (disp) -- (svc);
+    \draw[->] (svc) -- (ret);
+    \draw[->] (ret) -- (done);
+
+    \draw[dashed, gray] ({3.9,3.0}) -- ({3.9,-0.3});
+    \node[font=\scriptsize, gray, rotate=90, anchor=south] at ({3.75,-0.6}) {模式边界};
+\end{tikzpicture}
+\caption{\texttt{read} 系统调用的完整路径：库包装 $\to$ 陷入 $\to$ 分发 $\to$ 服务 $\to$ 返回用户态}
+\end{figure}
+
+\noindent 内核侧的通用分发逻辑可概括为下面的算法：
+
+\begin{algorithm}[H]
+\caption{系统调用的陷入与分发（内核侧）}
+\begin{algorithmic}[1]
+\State 硬件/入口保存用户态现场：PC、状态寄存器、通用寄存器入内核栈
+\State 从约定寄存器读出\textbf{系统调用号} $nr$
+\If{$nr$ 越界或无效}
+    \State \Return 错误码（如 $-ENOSYS$）
+\EndIf
+\State 按约定（寄存器/栈/参数块）取出参数，并做拷贝与合法性校验
+\State 调用 \texttt{syscall\_table[$nr$]} 指向的服务例程
+\State 把服务例程的返回值写入用户可见寄存器
+\State 恢复现场，执行特权返回指令，回到用户程序
+\end{algorithmic}
+\end{algorithm}
+
+\noindent 由此可见，一次系统调用的开销 = 模式切换 + 现场保存/恢复 + 参数与结果拷贝 + 内核服务本身。
+它比普通函数调用昂贵得多，因此高性能程序常通过\textbf{批量化}（一次读写更多数据）
+或\textbf{减少调用次数}（缓冲、mmap）来摊薄这一开销。
+
+\section{中断、异常与陷阱}
+
+\subsection{三者的区别}
+
+「中断」常被笼统地用来指代所有「打断当前执行、转入内核」的事件，但严格来说三者来源不同。
+关键区分点是\textbf{同步性}：它发生在当前指令流的哪个位置、是否可预期。
+
+\begin{table}[H]
+\centering
+\caption{中断、异常与陷阱的对比}
+\begin{tabulary}{\textwidth}{LLLLL}
+\toprule
+类型 & 来源 & 同步/异步 & 典型例子 & 处理后的返回点 \\
+\midrule
+中断 (Interrupt) & 外部设备/时钟 & 异步 & 时钟、网卡、键盘 & 被中断指令的下一条指令 \\
+异常 (Exception) & 当前指令执行 & 同步 & 除零、缺页、非法指令 & 修复后重执行（或终止进程） \\
+陷阱 (Trap) & 程序主动请求 & 同步 & 系统调用、断点 & 下一条指令 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\noindent 记忆要点：\textbf{中断是「意外来访」}（来自外部、任意时刻），
+\textbf{异常是「自我报错」}（由当前指令引起、可复现），
+\textbf{陷阱是「主动敲门」}（程序有意请求内核服务）。
+系统调用在实现上正是利用陷阱机制进入内核的。
+
+\subsection{中断处理流程}
+
+无论哪类事件，内核的处理骨架都是一致的，可概括为四步：
+\textbf{保存现场 $\to$ 查向量表 $\to$ 执行处理程序 $\to$ 恢复现场并返回}。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, align=center, >=stealth, node distance=1.3cm,
+    every node/.style={draw, rounded corners, fill=blue!6, inner sep=5pt, minimum width=4.6cm}]
+    \node (ev) {事件发生：设备/指令/系统调用};
+    \node[below=of ev] (save) {\textbf{保存现场}\\PC、状态字、通用寄存器压栈};
+    \node[below=of save] (vec) {\textbf{查向量表}\\由中断号取得处理程序入口};
+    \node[below=of vec] (hand) {\textbf{执行处理程序}\\服务设备、更新状态、唤醒进程};
+    \node[below=of hand, fill=green!12] (rest) {\textbf{恢复现场并返回}\\弹出寄存器，特权返回指令};
+    \draw[->] (ev) -- (save);
+    \draw[->] (save) -- (vec);
+    \draw[->] (vec) -- (hand);
+    \draw[->] (hand) -- (rest);
+    \draw[->, dashed] (rest.east) -- ++(2.0,0) |- (ev.east);
+\end{tikzpicture}
+\caption{中断处理流程：保存现场 $\to$ 查向量表 $\to$ 处理 $\to$ 恢复返回}
+\end{figure}
+
+\noindent \textbf{中断向量表}是一张由硬件索引的数组：每个中断号对应一个处理程序入口地址。
+事件发生时，硬件自动把\textbf{程序计数器}、\textbf{状态寄存器}等最小现场压栈（或保存到约定位置），
+再按中断号跳转；需要保存更多寄存器时由处理程序（软件）补齐。
+处理完毕后按相反顺序恢复，使被中断的程序像什么都没发生一样继续运行——
+这一「透明性」是中断机制最重要的性质。
+
+\subsection{时钟中断与抢占}
+
+\textbf{时钟中断}是操作系统夺回 CPU 控制权的手段。硬件定时器以固定周期（如每 1 ms）产生一次
+时钟中断；每次中断，内核都获得执行机会，可以：
+
+\begin{itemize}
+    \item 更新时间、递减当前进程的时间片计数；
+    \item 判断当前进程是否用完时间片，或是否有更高优先级进程就绪；
+    \item 若是，则触发\textbf{抢占}——保存当前进程的上下文，切换到另一个进程。
+\end{itemize}
+
+\noindent 没有时钟中断，一个陷入死循环的用户程序将永久占据 CPU，内核再也无法运行。
+因此，时钟中断是\textbf{抢占式调度}的物理基础，也是「分时」得以成立的前提。
+
+\section{上下文切换的开销}
+\label{sec:context}
+
+当内核决定从进程 $A$ 切换到进程 $B$ 时，必须保存 $A$ 的\textbf{上下文}
+（寄存器、PC、栈指针、内存管理信息等），装入 $B$ 的上下文。
+这一过程称为\textbf{上下文切换}。它的直接开销可分解为三段：
 
 \begin{equation}
     T_{\text{context}} = T_{\text{save}} + T_{\text{dispatch}} + T_{\text{restore}}
 \end{equation}
+
+\noindent 其中 $T_{\text{save}}$ 为保存旧进程现场，$T_{\text{dispatch}}$ 为调度器选择下一个进程，
+$T_{\text{restore}}$ 为装入新进程现场。除直接开销外，还存在\textbf{间接开销}：
+切换后新进程的 TLB 与缓存大多失效，需要一段「冷启动」才能恢复命中率，
+这部分记为 $T_{\text{cold}}$，往往远大于直接开销。若把时间片记为 $q$，
+则上下文切换占用的 CPU 时间比例为
+
+\begin{equation}
+    \eta = \frac{T_{\text{context}} + T_{\text{cold}}}{\,q + T_{\text{context}} + T_{\text{cold}}\,}
+        \;\approx\; \frac{T_{\text{context}} + T_{\text{cold}}}{q}.
+\end{equation}
+
+\noindent 由上式可见：\textbf{时间片越小，切换越频繁，开销比例越高}；
+但时间片过大又会牺牲交互响应速度。调度器必须在「低开销」与「快响应」之间权衡。
+
+\begin{table}[H]
+\centering
+\caption{影响上下文切换开销的主要因素}
+\begin{tabulary}{\textwidth}{LL}
+\toprule
+因素 & 影响 \\
+\midrule
+需保存的寄存器数量 & 寄存器越多，$T_{\text{save}}$、$T_{\text{restore}}$ 越大 \\
+是否切换地址空间 & 切换页表基址会牵动 TLB 刷新，间接开销显著上升 \\
+TLB / 缓存状态 & 切换后大量失效，$T_{\text{cold}}$ 可达直接开销的数倍 \\
+调度器复杂度 & 选择算法的代价计入 $T_{\text{dispatch}}$（O(1) 与遍历有别） \\
+CPU 与内存层次结构 & 流水线、多级缓存的深度影响现场恢复代价 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection*{例题：一次上下文切换开销估算}
+
+设某系统时间片 $q = 10\ \mathrm{ms}$，一次切换中：
+保存现场 $T_{\text{save}} = 1.2\ \mu s$，调度决策 $T_{\text{dispatch}} = 0.8\ \mu s$，
+恢复现场 $T_{\text{restore}} = 1.0\ \mu s$；
+切换后新进程因 TLB/缓存失效平均额外损失 $T_{\text{cold}} = 4.0\ \mu s$。
+求切换的总开销及 CPU 有效利用率。
+
+\textbf{解：} 直接开销
+
+\begin{equation}
+    T_{\text{context}} = 1.2 + 0.8 + 1.0 = 3.0\ \mu s,
+\end{equation}
+
+\noindent 计入间接开销后，一次切换实际占用 CPU
+
+\begin{equation}
+    T_{\text{total}} = T_{\text{context}} + T_{\text{cold}} = 3.0 + 4.0 = 7.0\ \mu s.
+\end{equation}
+
+\noindent 每个时间片只发生一次切换，故有效利用率
+
+\begin{equation}
+    \frac{q}{q + T_{\text{total}}} = \frac{10000}{10000 + 7} \approx 99.93\%,
+\end{equation}
+
+\noindent 即开销约 $0.07\%$。若为提升响应速度把时间片减半为 $1\ \mathrm{ms}$，
+则开销比例升至 $7/1000 = 0.70\%$——提高了十倍。可见时间片的选择直接影响系统效率，
+这正是「时间片大小」成为分时系统核心调参项的原因。
+
+\section{本章小结}
+
+\begin{itemize}
+    \item OS 兼具\textbf{资源管理者、抽象提供者、控制程序}三重身份；
+        其形态随硬件与需求演化为批处理、分时、实时。
+    \item 内核结构分\textbf{单体内核、微内核、混合内核}三类，
+        本质是「性能」与「可靠性/模块化」之间的取舍。
+    \item 硬件提供\textbf{用户态/内核态}双模式，特权指令只能在核心态执行，
+        模式位是保护机制的基石。
+    \item \textbf{系统调用}是用户请求内核服务的受控入口，
+        经 trap 陷入、分发、执行、返回，涉及寄存器/栈/参数块三种传参方式。
+    \item \textbf{中断、异常、陷阱}按同步性区分；中断处理遵循
+        「保存现场 $\to$ 查向量表 $\to$ 处理 $\to$ 恢复返回」的骨架，
+        时钟中断是抢占式调度的基础。
+    \item \textbf{上下文切换}有直接开销与缓存失效的间接开销，
+        其占比随 $T_{\text{context}}/q$ 上升，需与响应速度权衡。
+\end{itemize}
+
+\section{常见误区}
+
+\begin{itemize}
+    \item \textbf{「内核态更快」}：错误。核心态只是权限更高，指令执行速度与用户态相同；
+        其「快」来自能直接操控硬件、免去模式切换，而非运算本身。
+    \item \textbf{「系统调用就是普通函数调用」}：错误。它必然跨越模式边界，
+        包含现场保存、参数校验与结果拷贝，开销远大。
+    \item \textbf{「中断一定是外设引起的」}：不严谨。中断通常指异步外部事件，
+        而系统调用走的是\textbf{陷阱}、除零走的是\textbf{异常}，三者来源不同。
+    \item \textbf{「微内核一定更好」}：不一定。微内核提升可靠性与可扩展性，
+        但频繁 IPC 带来性能损失，需按场景取舍。
+    \item \textbf{「上下文切换越少越省」就一定好}：未必。
+        时间片过大会拖慢交互响应，调度策略应同时考虑效率与响应。
+\end{itemize}

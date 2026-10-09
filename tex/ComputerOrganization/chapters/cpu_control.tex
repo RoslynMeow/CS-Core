@@ -5,106 +5,378 @@
 \clearpage
 
 
-\subsection{控制器的功能}
+\subsection{控制器的作用与模型}
 
-控制器（Control Unit）是 CPU 的"大脑"——根据当前指令的操作码和状态标志，生成所有数据通路组件的控制信号。
+数据通路只提供了“做什么”的硬件（加法器、寄存器堆、存储器、多路选择器），而“何时做、做哪种运算、结果写到哪里”则由\textbf{控制器}（Control Unit）统一指挥。控制器是 CPU 的“大脑”：它按 PC 逐条取出指令，把指令中的操作码（opcode）与功能码（funct）译码，必要时再结合状态标志（如 ALU 的 Zero 标志），在恰当时刻产生一组\textbf{控制信号}，驱动数据通路各部件协同工作。
+
+从抽象层次看，控制器的本质是一个\textbf{有限状态机}（FSM）：输入是指令字段与状态标志，输出是一束控制信号。记控制信号向量为 $\vec{C}$，则
 
 \begin{equation}
-\text{控制信号} = f(\text{opcode}, \text{funct}, \text{状态标志})
+\vec{C} = f(\text{opcode},\ \text{funct},\ \text{状态标志})
+\label{eq:ctrl_function}
 \end{equation}
 
-\subsection{控制信号定义}
-
-每种指令类型需要的控制信号组合：
-
-\begin{table}[H]
-\centering
-\caption{MIPS 主要控制信号}
-\label{tab:control_signals}
-\begin{tabulary}{\textwidth}{CCC}
-\toprule
-\textbf{信号} & \textbf{作用} & \textbf{受影响的指令} \\
-\midrule
-RegDst & 选择写回目标寄存器（rt / rd） & R-type $\to$ 1, I-type $\to$ 0 \\
-RegWrite & 写使能寄存器堆 & R-type, lw \\
-ALUSrc & ALU 第二个操作数来源（寄存器/立即数） & R-type $\to$ 0, I-type $\to$ 1 \\
-MemRead & 读数据存储器 & lw \\
-MemWrite & 写数据存储器 & sw \\
-MemtoReg & 写回数据来源（ALU/存储器） & R-type $\to$ 0, lw $\to$ 1 \\
-Branch & 条件分支使能 & beq \\
-ALUOp & ALU 操作选择 & 00=加, 01=减, 10=funct码决定 \\
-\bottomrule
-\end{tabulary}
-\end{table}
+其中 opcode 决定指令大类（R 型 / \texttt{lw} / \texttt{sw} / \texttt{beq} 等），funct 只在 R 型指令中进一步区分具体运算。图~\ref{fig:control_unit} 给出控制器的黑盒模型。
 
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[
-    b/.style={draw, rounded corners, minimum width=2.6cm, minimum height=1.1cm, font=\small, fill=blue!8, align=center},
-    s/.style={draw, rounded corners, minimum width=3.2cm, minimum height=0.6cm, font=\scriptsize, fill=green!12, align=center},
+    b/.style={draw, rounded corners, minimum width=3.0cm, minimum height=1.5cm, font=\small, fill=blue!8, align=center},
+    s/.style={draw, rounded corners, minimum width=4.8cm, minimum height=0.55cm, font=\scriptsize, fill=green!12, align=center},
     e/.style={->, >=latex, thick},
     lbl/.style={font=\scriptsize}
 ]
-    \node[b] (ctrl) at (0,0) {控制器};
-    \node[s] (d1) at (5.0,1.5) {RegWrite, MemRead, MemWrite, MemToReg};
-    \node[s] (d2) at (5.0,0) {ALUSrc, ALUOp, PCSrc};
-    \node[s] (d3) at (5.0,-1.5) {Branch / Jump};
-    \draw[e] (ctrl) -- (d1);
-    \draw[e] (ctrl) -- (d2);
-    \draw[e] (ctrl) -- (d3);
-    \draw[e] (-1.9,0)--(ctrl) node[lbl,midway,above]{op(6)};
-    \draw[e] (-1.9,-0.7)--(ctrl) node[lbl,midway,below]{funct(6)};
+    \node[b] (ctrl) at (0, 0) {控制器\\（Control Unit）};
+    \node[s] (d1) at (6.6, 2.1) {RegDst, RegWrite, MemRead, MemWrite, MemtoReg};
+    \node[s] (d2) at (6.6, 0.9) {ALUSrc, ALUOp（送 ALU 控制器）};
+    \node[s] (d3) at (6.6, -0.3) {Branch, PCSrc};
+    \draw[e] (ctrl.east) -- (d1.west);
+    \draw[e] (ctrl.east) -- (d2.west);
+    \draw[e] (ctrl.east) -- (d3.west);
+    \draw[e] (-4.4,0.5) -- (ctrl.west) node[lbl,midway,above]{op[5:0]};
+    \draw[e] (-4.4,-0.5) -- (ctrl.west) node[lbl,midway,below]{funct[5:0]（仅 R 型）};
+    \draw[e] (0,-3.0) -- (ctrl.south) node[lbl,midway,right]{Zero（状态标志）};
+    \node[lbl] at (0, -1.2) {输入：指令字段；输出：数据通路控制信号};
 \end{tikzpicture}
-\caption{控制器：由操作码与功能码生成控制信号}
-\label{fig:control_signals}
+\caption{控制器的黑盒模型：opcode/funct 译码后产生一束控制信号}
+\label{fig:control_unit}
 \end{figure}
 
-\subsection{ALU 控制}
+控制信号可按作用对象分为三类：\textbf{写使能类}（RegWrite、MemWrite）、\textbf{读使能类}（MemRead）、\textbf{选择类}（RegDst、ALUSrc、MemtoReg、ALUOp）。理解控制器的关键，就是搞清楚“每种指令需要在哪些位置、什么时刻、给哪个信号赋什么值”。
 
-ALU 控制接收 ALUOp（来自主控制器）和 funct 字段（仅 R 型），产生 ALU 操作选择。
+\subsection{控制信号的语义与取值}
+
+\subsubsection{主要控制信号}
+
+表~\ref{tab:control_signals} 汇总了 MIPS 单周期数据通路中的八个主要控制信号。注意区分三种取值语义：\textbf{1 bit 使能}（1 有效）、\textbf{1 bit 选择}（1 选后者、0 选前者）、\textbf{2 bit 编码}（如 ALUOp）。
 
 \begin{table}[H]
 \centering
-\caption{ALU 操作编码}
-\label{tab:alu_control}
-\begin{tabulary}{\textwidth}{CCCC}
+\caption{MIPS 主要控制信号及其含义}
+\label{tab:control_signals}
+\begin{tabulary}{\textwidth}{LCCL}
 \toprule
-\textbf{ALUOp} & \textbf{funct} & \textbf{ALU 操作} & \textbf{指令} \\
+\textbf{信号} & \textbf{位宽} & \textbf{取值} & \textbf{含义} \\
 \midrule
-00 & — & 加 & lw, sw \\
-01 & — & 减 & beq \\
-10 & 100000 & 加 & add \\
-10 & 100010 & 减 & sub \\
-10 & 100100 & 与 & and \\
-10 & 100101 & 或 & or \\
-10 & 101010 & 小于置位 & slt \\
+RegDst & 1 & 0 / 1 & 写回目标寄存器：$0\to rt$，$1\to rd$ \\
+RegWrite & 1 & 0 / 1 & 寄存器堆写使能（1 写入） \\
+ALUSrc & 1 & 0 / 1 & ALU 第二操作数：$0\to$ 寄存器 $rt$，$1\to$ 符号扩展立即数 \\
+MemtoReg & 1 & 0 / 1 & 写回数据来源：$0\to$ ALU 结果，$1\to$ 存储器读出值 \\
+MemRead & 1 & 0 / 1 & 数据存储器读使能 \\
+MemWrite & 1 & 0 / 1 & 数据存储器写使能 \\
+Branch & 1 & 0 / 1 & 条件分支使能，与 Zero 相与得到 PCSrc \\
+ALUOp & 2 & 00 / 01 / 10 & ALU 粗操作：$00\to$ 加法，$01\to$ 减法，$10\to$ 由 funct 决定 \\
 \bottomrule
 \end{tabulary}
 \end{table}
 
-\subsection{控制器实现方式}
-
-\subsubsection{硬布线控制器（Hardwired Control）}
-
-直接用组合逻辑门实现控制信号的真值表。速度快，但灵活性差——修改指令集需重新设计电路。常用于 RISC 架构。
+其中 \texttt{Branch} 并不直接改变 PC，而是与 ALU 的比较结果 Zero 相与：
 
 \begin{equation}
-\text{各控制信号} = \text{布尔函数（opcode, funct, 状态）}
+\text{PCSrc} = \text{Branch} \cdot \text{Zero}
+\label{eq:pcsrc}
 \end{equation}
 
-\subsubsection{微程序控制器（Microprogrammed Control）}
+只有当“这是分支指令（Branch=1）”且“两个操作数相等（Zero=1）”时，PC 才被写入分支目标地址。
 
-将每条机器指令分解为若干条"微指令"序列，存于控制存储器（ROM）中。每步微指令产生一组控制信号。
+\subsubsection{ALU 控制器：ALUOp 与 funct 到 ALUctr}
+
+主控制器只发出\textbf{粗粒度}的 ALUOp；真正的运算选择由\textbf{ALU 控制器}完成：它在 ALUOp=10 时进一步查看 R 型的 funct 字段，输出细粒度的 3 位 ALUctr。约定 ALUctr 的编码为：$000\to$ AND，$001\to$ OR，$010\to$ ADD，$110\to$ SUB，$111\to$ SLT（set-on-less-than）。
+
+\begin{table}[H]
+\centering
+\caption{ALU 控制真值表（ALUOp 与 funct 到 ALUctr）}
+\label{tab:alu_control}
+\begin{tabulary}{\textwidth}{CCCC}
+\toprule
+\textbf{ALUOp} & \textbf{funct[5:0]} & \textbf{运算} & \textbf{ALUctr[2:0]} \\
+\midrule
+00 & xxxxxx & 加（取地址 / 立即数） & 010 \\
+01 & xxxxxx & 减（比较是否相等） & 110 \\
+10 & 100000 & add & 010 \\
+10 & 100010 & sub & 110 \\
+10 & 100100 & and & 000 \\
+10 & 100101 & or  & 001 \\
+10 & 101010 & slt & 111 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsubsection{ALUctr 的化简}
+
+对表~\ref{tab:alu_control} 做逻辑化简。记 ALUOp 的两位为 $\text{ALUOp}_1\,\text{ALUOp}_0$，funct 的第 $i$ 位为 $f_i$（$f_0$ 为最低位）。观察可提取三个有用的中间量：
 
 \begin{itemize}
-    \item \textbf{优点}：灵活、易于修改、支持复杂指令
-    \item \textbf{缺点}：速度较慢（需从控制存储器读取微指令）
-    \item \textbf{适用}：CISC 架构（如 x86）
+    \item R 型（$\text{ALUOp}_1=1$）中，只有 \texttt{and}/\texttt{or} 的 $f_2=1$，其余 $f_2=0$；
+    \item 需要做减法的指令（\texttt{sub}、\texttt{slt}）恰好 $f_1=1$；
+    \item 需要产生“1”输出位的指令（\texttt{or}、\texttt{slt}）满足 $f_3+f_0=1$。
 \end{itemize}
 
-\subsection{单周期 vs 多周期 CPU}
+于是得到
 
-单周期 CPU 所有指令在一个周期内完成。多周期 CPU 每条指令划分为多个阶段，每阶段占用不同周期，不同指令可用不同周期数。
+\begin{equation}
+\begin{aligned}
+\text{ALUctr}_2 &= \overline{\text{ALUOp}_1} + \overline{f_2} &&\text{（非 R 型恒为 1；R 型看 } f_2\text{）}\\
+\text{ALUctr}_1 &= \overline{\text{ALUOp}_1}\,\text{ALUOp}_0 + \text{ALUOp}_1 f_1 &&\text{（减法/小于置位）}\\
+\text{ALUctr}_0 &= \text{ALUOp}_1 (f_3 + f_0) &&\text{（OR 或 SLT 的最低位置 1）}
+\end{aligned}
+\label{eq:aluctr}
+\end{equation}
+
+例如 R 型 \texttt{or}（funct=100101，$f_3f_2f_1f_0=0101$）代入：$\text{ALUctr}_2=\overline1+\overline1=0$，$\text{ALUctr}_1=0+\underline{1}\cdot f_1=0$，$\text{ALUctr}_0=1\cdot(0+1)=1$，得 001，正是 OR。化简至此只需少量门电路即可实现，体现了“把大真值表压成小逻辑”的思想。
+
+\subsection{典型指令的控制信号组合}
+
+把各类指令横排，把各信号纵排，就得到\textbf{指令--信号对照表}（表~\ref{tab:instr_signals}）。它是设计控制器时最重要的一张“答案表”：控制器要做的事，就是让每一种指令都产生它所在列的那一组值。表中 \texttt{x} 表示该信号对该指令无关（don't care），实际实现中可任取 0 或 1。
+
+\begin{table}[H]
+\centering
+\caption{四类典型指令的控制信号取值}
+\label{tab:instr_signals}
+\begin{tabulary}{\textwidth}{CCCCC}
+\toprule
+\textbf{控制信号} & \textbf{R 型（add/sub/…）} & \textbf{lw} & \textbf{sw} & \textbf{beq} \\
+\midrule
+RegDst   & 1 & 0 & x & x \\
+ALUSrc   & 0 & 1 & 1 & 0 \\
+MemtoReg & 0 & 1 & x & x \\
+RegWrite & 1 & 1 & 0 & 0 \\
+MemRead  & 0 & 1 & 0 & 0 \\
+MemWrite & 0 & 0 & 1 & 0 \\
+Branch   & 0 & 0 & 0 & 1 \\
+ALUOp    & 10 & 00 & 00 & 01 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+逐行验证一遍即可加深理解：R 型要写 \texttt{rd}（RegDst=1），ALU 用两个寄存器（ALUSrc=0），写回 ALU 结果（MemtoReg=0）；\texttt{lw} 要写 \texttt{rt}（RegDst=0），ALU 用立即数算地址（ALUSrc=1），写回存储器数据（MemtoReg=1）；\texttt{sw} 不写寄存器（RegWrite=0）只写存储器（MemWrite=1）；\texttt{beq} 不做任何读写，只把 ALU 的减法结果送 Zero（ALUOp=01）。
+
+\subsection{硬布线控制器}
+
+\subsubsection{从真值表到布尔表达式}
+
+\textbf{硬布线控制器}（Hardwired Control）直接用组合逻辑门实现表~\ref{tab:instr_signals}。做法是：先把 opcode 送译码器产生“最小项”，再用 OR 阵列按布尔式选取需要的项，输出各控制信号。其结构如图~\ref{fig:hardwired}。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    b/.style={draw, rounded corners, minimum width=2.6cm, minimum height=1.2cm, font=\scriptsize, fill=blue!8, align=center},
+    e/.style={->, >=latex, thick},
+    lbl/.style={font=\scriptsize}
+]
+    \node[b] (dec) at (0, 0) {6 $\to$ 64\\指令译码器};
+    \node[b] (or)  at (5.0, 0) {OR 阵列\\（按布尔式连线）};
+    \node[b] (sig) at (10.0, 0) {控制信号\\RegWrite, ALUSrc, $\ldots$};
+    \draw[e] (dec) -- (or) node[lbl,midway,above]{one-hot 最小项};
+    \draw[e] (or) -- (sig);
+    \node[lbl,below=0.55cm of or] {每个信号 = 若干最小项之或（SOP）};
+\end{tikzpicture}
+\caption{硬布线控制器：译码器 + OR 阵列}
+\label{fig:hardwired}
+\end{figure}
+
+记 opcode 的第 $i$ 位为 $\text{op}_i$。四类指令的编码为 R 型 $000000$、\texttt{lw} $100011$、\texttt{sw} $101011$、\texttt{beq} $000100$。由此可直接写出各信号的布尔表达式，见表~\ref{tab:boolean}。
+
+\begin{table}[H]
+\centering
+\caption{控制信号的布尔表达式（未用编码作 don't care）}
+\label{tab:boolean}
+\begin{tabulary}{\textwidth}{LL}
+\toprule
+\textbf{信号} & \textbf{布尔表达式} \\
+\midrule
+RegDst & $\overline{\text{op}_5}\,\overline{\text{op}_4}\,\overline{\text{op}_3}\,\overline{\text{op}_2}\,\overline{\text{op}_1}\,\overline{\text{op}_0}$（R 型） \\
+RegWrite & RegDst $+$（\texttt{lw}$=\text{op}_5\overline{\text{op}_4}\,\overline{\text{op}_3}\,\overline{\text{op}_2}\,\text{op}_1\text{op}_0$） \\
+ALUSrc & $\text{op}_5\,\overline{\text{op}_4}\,\text{op}_1\text{op}_0$ \\
+MemRead & \texttt{lw}$=\text{op}_5\overline{\text{op}_4}\,\overline{\text{op}_3}\,\overline{\text{op}_2}\,\text{op}_1\text{op}_0$ \\
+MemWrite & \texttt{sw}$=\text{op}_5\overline{\text{op}_4}\,\text{op}_3\overline{\text{op}_2}\,\text{op}_1\text{op}_0$ \\
+MemtoReg & MemRead \\
+Branch & \texttt{beq}$=\overline{\text{op}_5}\,\overline{\text{op}_4}\,\overline{\text{op}_3}\,\text{op}_2\overline{\text{op}_1}\,\overline{\text{op}_0}$ \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsubsection{化简例题}
+
+\begin{example}[化简 ALUSrc]
+\texttt{ALUSrc} 只在 \texttt{lw}（100011）与 \texttt{sw}（101011）上为 1。先写成最小项之和：
+\[
+\text{ALUSrc} = \text{op}_5\overline{\text{op}_4}\,\overline{\text{op}_3}\,\overline{\text{op}_2}\,\text{op}_1\text{op}_0
+\;+\;
+\text{op}_5\overline{\text{op}_4}\,\text{op}_3\overline{\text{op}_2}\,\text{op}_1\text{op}_0 .
+\]
+两个最小项仅在 $\text{op}_3$ 上不同（一个取 0、一个取 1），其余位完全相同，故 $\text{op}_3$ 可吸收消去；再把公共因子提出：
+\[
+\text{ALUSrc} = \text{op}_5\,\overline{\text{op}_4}\,\overline{\text{op}_2}\,\text{op}_1\text{op}_0\,(\overline{\text{op}_3}+\text{op}_3)
+= \text{op}_5\,\overline{\text{op}_4}\,\overline{\text{op}_2}\,\text{op}_1\text{op}_0 .
+\]
+若把未使用编码当作 don't care，还可进一步去掉恒为 0 的 $\overline{\text{op}_2}$，得到表~\ref{tab:boolean} 中更简的形式 $\text{op}_5\overline{\text{op}_4}\,\text{op}_1\text{op}_0$。
+\end{example}
+
+\begin{example}[化简 RegWrite]
+\texttt{RegWrite} 在 R 型（000000）与 \texttt{lw}（100011）上为 1，共两个最小项。两者共享因子 $\overline{\text{op}_4}\,\overline{\text{op}_3}\,\overline{\text{op}_2}$，剩下部分对 R 型是 $\overline{\text{op}_5}\,\overline{\text{op}_1}\,\overline{\text{op}_0}$、对 \texttt{lw} 是 $\text{op}_5\,\text{op}_1\text{op}_0$，故
+\[
+\text{RegWrite} = \overline{\text{op}_4}\,\overline{\text{op}_3}\,\overline{\text{op}_2}
+\left(\overline{\text{op}_5}\,\overline{\text{op}_1}\,\overline{\text{op}_0} + \text{op}_5\,\text{op}_1\text{op}_0\right).
+\]
+也可记作“RegWrite = R 型 $+$ \texttt{lw}”，即用 R 型译码线或 \texttt{lw} 译码线直接驱动，这正是\textbf{译码器 $+$ OR 阵列}的直观含义。
+\end{example}
+
+硬布线的\textbf{优点}是速度快（信号在一个门延迟链路内产生），\textbf{缺点}是电路与指令集强耦合：一旦增加或修改指令，就要重新综合整片逻辑，灵活性差、设计周期长。因此它多用于指令规整精简的 RISC 处理器。
+
+\subsection{微程序控制器}
+
+\subsubsection{微指令格式与控制存储器}
+
+\textbf{微程序控制器}（Microprogrammed Control）换一种思路：把每条机器指令的执行过程拆成若干步，每一步对应一条\textbf{微指令}，微指令的每一位直接决定一根控制信号。所有微指令预先存放在\textbf{控制存储器}（Control Memory，通常是 ROM）中，机器指令的动作序列即一段\textbf{微程序}。
+
+一条微指令通常由两部分组成（图~\ref{fig:microformat}）：\textbf{微操作控制字段}（每一位对应一根控制信号，1 表示该信号有效）与\textbf{顺序控制字段}（给出下一条微指令的地址，或指明如何根据条件判别下地址）。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    f/.style={draw, minimum height=1.2cm, font=\scriptsize, fill=cyan!12, align=center},
+    e/.style={->, >=latex, thick},
+    lbl/.style={font=\scriptsize}
+]
+    \node[f, minimum width=1.4cm] (cond) at (0, 0) {条件\\判别};
+    \node[f, minimum width=2.2cm, right=0.06cm of cond] (addr) {下地址字段\\（顺序控制）};
+    \node[f, minimum width=6.6cm, right=0.06cm of addr] (ctrl)
+        {微操作控制字段\\(RegDst, RegWrite, ALUSrc, MemRead, $\ldots$)};
+    \draw[e] (ctrl.south) -- ++(0,-0.8) node[lbl,below]{逐位分解，直接驱动数据通路};
+    \node[lbl,above=0.35cm of ctrl] {控制存储器 ROM 中的一条微指令};
+\end{tikzpicture}
+\caption{微指令格式：控制字段 $+$ 顺序控制字段}
+\label{fig:microformat}
+\end{figure}
+
+\subsubsection{微程序的执行}
+
+微程序执行依赖一个\textbf{微程序计数器}（$\mu$PC）和\textbf{微地址形成逻辑}：
+
+\begin{enumerate}
+    \item 取机器指令，用其 opcode 查一张\textbf{微程序入口表}，得到该指令微程序的首地址，送入 $\mu$PC；
+    \item 从控制存储器取出 $\mu$PC 指向的微指令，其控制字段驱动数据通路完成一步微操作；
+    \item 由顺序控制字段与状态标志计算下一条微指令地址，写回 $\mu$PC；
+    \item 重复步骤 2--3，直到遇到“取指微指令”的结束标志，回到步骤 1。
+\end{enumerate}
+
+表~\ref{tab:microprogram} 给出 \texttt{lw} 指令的一段微程序示意（与多周期的状态划分一致，详见下一节）。
+
+\begin{table}[H]
+\centering
+\caption{\texttt{lw} 指令的微程序片段（示意）}
+\label{tab:microprogram}
+\begin{tabulary}{\textwidth}{CCL}
+\toprule
+\textbf{微地址} & \textbf{阶段} & \textbf{微操作（有效控制信号）} \\
+\midrule
+00 & 取指 & IR $\leftarrow$ M[PC]，PC $\leftarrow$ PC+4（MemRead, IRWrite, PCWrite） \\
+01 & 译码 & A $\leftarrow$ Reg[rs]，B $\leftarrow$ Reg[rt]（读寄存器堆） \\
+10 & 执行 & ALUOut $\leftarrow$ A $+$ SignExt(imm)（ALUSrc=1, ALUOp=00） \\
+11 & 访存 & MDR $\leftarrow$ M[ALUOut]（MemRead） \\
+100 & 写回 & Reg[rt] $\leftarrow$ MDR（RegWrite=1, MemtoReg=1） \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsubsection{与硬布线的对比}
+
+\begin{table}[H]
+\centering
+\caption{硬布线控制器与微程序控制器对比}
+\label{tab:hw_vs_micro}
+\begin{tabulary}{\textwidth}{LCC}
+\toprule
+\textbf{对比项} & \textbf{硬布线} & \textbf{微程序} \\
+\midrule
+实现介质 & 组合逻辑门 & 控制存储器（ROM） \\
+控制信号来源 & 布尔表达式的门输出 & 微指令控制字段的位 \\
+速度 & 快（一个门延迟） & 较慢（需读控制存储器的周期） \\
+灵活性 & 差，改指令即改电路 & 好，改微程序即可 \\
+规整性 & 电路庞杂 & 规整、易调试 \\
+典型架构 & RISC（如 MIPS） & CISC（如 x86） \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+一句话概括：\textbf{硬布线把控制“写死在电路里”，微程序把控制“写进存储器里”}。
+
+\subsection{单周期与多周期 CPU}
+
+\subsubsection{状态划分}
+
+单周期 CPU 把取指、译码、执行、访存、写回全部塞进一个时钟周期；多周期 CPU 则把它们拆成若干状态，每个状态占一个时钟周期。以 MIPS 为例，可划分五个状态：
+
+\begin{itemize}
+    \item \textbf{IF}（取指）：IR $\leftarrow$ M[PC]，PC $\leftarrow$ PC+4；
+    \item \textbf{ID}（译码 / 读寄存器）：读 Reg[rs]、Reg[rt]，并计算分支目标 ALUOut $\leftarrow$ PC $+$ (SignExt(imm) $\ll$ 2)；
+    \item \textbf{EX}（执行 / 地址计算）：R 型做运算，\texttt{lw}/\texttt{sw} 算地址，\texttt{beq} 做比较；
+    \item \textbf{MEM}（访存）：\texttt{lw} 读、\texttt{sw} 写；
+    \item \textbf{WB}（写回）：R 型写 \texttt{rd}，\texttt{lw} 写 \texttt{rt}。
+\end{itemize}
+
+不同指令经过的状态数不同：\texttt{beq} 只需 3 个（IF、ID、EX），R 型需 4 个（IF、ID、EX、WB），\texttt{lw} 需 5 个（IF、ID、EX、MEM、WB），\texttt{sw} 需 4 个（IF、ID、EX、MEM）。状态转移如图~\ref{fig:multicycle_fsm}。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    st/.style={draw, circle, minimum size=1.9cm, font=\scriptsize, align=center, fill=orange!15},
+    e/.style={->, >=latex, thick},
+    lbl/.style={font=\scriptsize, inner sep=2pt, fill=white}
+]
+    \node[st] (if)  at (0, 0)      {取指\\IF};
+    \node[st] (id)  at (3.4, 0)    {译码\\ID};
+    \node[st] (ex)  at (6.8, 0)    {执行\\EX};
+    \node[st] (mem) at (10.2, 0)   {访存\\MEM};
+    \node[st] (wb)  at (6.8, -3.4) {写回\\WB};
+
+    \draw[e] (if) -- (id);
+    \draw[e] (id) -- (ex);
+    \draw[e] (ex) -- (mem) node[lbl,midway,above]{lw / sw};
+    \draw[e] (ex) -- (wb) node[lbl,midway,left]{R 型};
+    \draw[e] (mem) -- (wb) node[lbl,midway,below left]{lw};
+    \draw[e] (ex.north) to[bend left=45] node[lbl,midway,above]{beq} (if.north);
+    \draw[e] (mem.south) to[bend right=20] node[lbl,midway,below]{sw} (if.south east);
+    \draw[e] (wb.west) to[bend right=25] node[lbl,midway,below]{写回后取指} (if.south);
+\end{tikzpicture}
+\caption{多周期控制器的状态机（不同指令走不同长度的路径）}
+\label{fig:multicycle_fsm}
+\end{figure}
+
+\subsubsection{各状态的控制信号}
+
+把每个状态“激活”的控制信号列出，即为多周期控制器的核心设计表（表~\ref{tab:multistate}）。与单周期不同，同一根信号（如 ALUSrc、RegWrite）在不同状态取不同值，\textbf{控制信号随状态推进而变化}。
+
+\begin{table}[H]
+\centering
+\caption{多周期各状态的有效控制信号（简化）}
+\label{tab:multistate}
+\begin{tabulary}{\textwidth}{LL}
+\toprule
+\textbf{状态} & \textbf{主要有效控制信号} \\
+\midrule
+IF  & MemRead=1, IRWrite=1, PCWrite=1, ALUSrcA=0, ALUSrcB=01, ALUOp=00 \\
+ID  & ALUSrcA=0, ALUSrcB=11（立即数左移 2）, ALUOp=00（算分支目标） \\
+EX  & R 型：ALUSrcA=1, ALUSrcB=00, ALUOp=10；\texttt{lw}/\texttt{sw}：ALUSrcB=10, ALUOp=00；\texttt{beq}：ALUOp=01 \\
+MEM & IorD=1，\texttt{lw} 置 MemRead=1 / \texttt{sw} 置 MemWrite=1 \\
+WB  & RegWrite=1；R 型 RegDst=1, MemtoReg=0；\texttt{lw} RegDst=0, MemtoReg=1 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsubsection{为什么多周期的时钟周期更短}
+
+单周期的时钟周期必须容纳\textbf{最慢指令的最长路径}（通常是最长的 \texttt{lw}）：
+
+\begin{equation}
+T_{\text{single}} \approx T_{\text{IF}} + T_{\text{ID}} + T_{\text{EX}} + T_{\text{MEM}} + T_{\text{WB}},
+\qquad
+T_{\text{multi}} \approx \max\{\,T_{\text{IF}}, T_{\text{ID}}, T_{\text{EX}}, T_{\text{MEM}}, T_{\text{WB}}\,\}.
+\label{eq:period}
+\end{equation}
+
+多周期把一个长周期切成若干个短周期，每个周期只走一段路径，\textbf{时钟周期约为最长阶段的耗时}（常为访存或 ALU 阶段），因此周期可以做得短得多。代价是 CPI 从 1 升到 3--5，且需要额外的寄存器（A、B、ALUOut、IR、MDR）保存中间结果。
 
 \begin{table}[H]
 \centering
@@ -114,13 +386,33 @@ ALU 控制接收 ALUOp（来自主控制器）和 funct 字段（仅 R 型），
 \toprule
 \textbf{特征} & \textbf{单周期} & \textbf{多周期} \\
 \midrule
-CPI & 1 & 3–5（视指令而定） \\
-时钟周期 & 由最慢指令决定 & 由最慢阶段决定 \\
+CPI & 1 & 3--5（视指令而定） \\
+时钟周期 & 由最慢指令决定 & 由最慢阶段决定（更短） \\
 硬件重复 & 有（多个加法器等） & 少（组件可复用） \\
-性能 & 差 & 好于单周期 \\
-复杂度 & 低 & 中 \\
+中间寄存器 & 无 & 需要（A、B、ALUOut 等） \\
+控制器复杂度 & 低 & 中 \\
 \bottomrule
 \end{tabulary}
 \end{table}
 
-多周期 CPU 是单周期到流水线的中间过渡设计：组件复用、不同指令不同周期，但仍有功能单元闲置问题。
+多周期是单周期通往流水线的中间形态：它实现了组件复用与短周期，但仍有功能单元在多数周期里闲置。下一章的流水线，正是在“短周期 $+$ 状态重叠”的基础上把吞吐率推到极限。
+
+\subsection{本章小结}
+
+\begin{itemize}
+    \item 控制器的职责：依据 opcode/funct（及状态标志）产生控制信号，是数据通路的“指挥官”。
+    \item 八个主要控制信号（RegDst、ALUSrc、MemtoReg、RegWrite、MemRead、MemWrite、Branch、ALUOp）决定了数据的来源、去向与写使能。
+    \item ALU 控制分两级：主控制器给粗粒度 ALUOp，ALU 控制器结合 funct 产生 ALUctr；可用布尔式化简（式~\ref{eq:aluctr}）。
+    \item 硬布线用组合逻辑实现，快但不灵活；微程序把控制存入 ROM，灵活但较慢。
+    \item 多周期通过拆分状态缩短时钟周期并复用组件，是通向流水线的桥梁。
+\end{itemize}
+
+\subsection{常见误区}
+
+\begin{itemize}
+    \item \textbf{把 RegWrite 当作“写 rd”}：RegWrite 只是写使能，写哪个寄存器由 RegDst 选（\texttt{rt} 还是 \texttt{rd}），二者不能混淆。
+    \item \textbf{认为 Branch 直接改 PC}：Branch 只是使能，必须与 ALU 的 Zero 相与得到 PCSrc（式~\ref{eq:pcsrc}），beq 不相等时 PC 仍取 PC+4。
+    \item \textbf{给 \texttt{sw} 也置 RegWrite}：\texttt{sw} 不写寄存器堆（RegWrite=0），只写存储器（MemWrite=1）。
+    \item \textbf{把 ALUOp 与 ALUctr 混为一谈}：ALUOp 是 2 位粗控制，ALUctr 是 3 位细控制；只有 R 型才需要看 funct。
+    \item \textbf{误以为多周期一定更快}：多周期缩短的是\textbf{时钟周期}，但 CPI 增大；总时间未必优于精心设计的单周期，真正的大幅提升要靠流水线。
+\end{itemize}

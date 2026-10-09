@@ -9,30 +9,339 @@
 \clearpage
 
 
-\section{诞生背景}
+本章是全书的起点。我们首先回答一个根本问题：\textbf{为什么要学习 C 语言}？然后沿着一个程序“从文本到运行”的完整生命周期，建立起对编译过程和程序结构的整体认识，并初步勾勒出 C 程序在内存中的布局，为后续的数据类型、指针、存储类别等章节埋下伏笔。
+
+\section{诞生背景与历史地位}
+
+C 语言诞生于 1972 年，由丹尼斯·里奇（Dennis Ritchie）在美国贝尔实验室（Bell Laboratories）设计。它的前身是肯·汤普逊（Ken Thompson）为 UNIX 系统编写的 B 语言，而 C 语言最初的核心目标非常明确：\textbf{用一种既能表达底层硬件操作、又具备良好可读性与可移植性的语言来重写 UNIX 操作系统}。
 
 \begin{itemize}
     \item \textbf{编程范式}：面向过程的（Procedure-Oriented）编程语言。
     \item \textbf{创始人}：丹尼斯·里奇（Dennis Ritchie）。
     \item \textbf{诞生地点}：美国贝尔实验室（Bell Laboratories）。
-    \item \textbf{诞生时间}：1972年。
+    \item \textbf{诞生时间}：1972 年。
 \end{itemize}
 
-\section{标准与编译器}
+C 语言的标准化历程如下：
 
 \begin{itemize}
-    \item \textbf{ANSI C}：由美国国家标准学会（ANSI）制定的 C语言标准，是经典的国际标准。
-    \item \textbf{GNU C / gcc}：GNU 计划发展的 C语言扩展标准及其配套的编译器（GCC）。
-    \item \textbf{VC}：微软开发的 Visual C++ 编译器（常用于 Windows 平台）。
+    \item \textbf{K\&R C}：1978 年《The C Programming Language》一书定义的非正式规范。
+    \item \textbf{ANSI C / C89}：1989 年由美国国家标准学会（ANSI）制定，1990 年被 ISO 采纳为 C90，是经典的国际标准。
+    \item \textbf{C99 / C11 / C17}：陆续加入变长数组、\texttt{//} 注释、\texttt{inline}、复数类型、多线程支持等特性。
+    \item \textbf{GNU C / gcc}：GNU 计划在标准之外扩展的方言，配套编译器为 GCC（GNU Compiler Collection）。
+    \item \textbf{MSVC}：微软的 Visual C++ 编译器，常用于 Windows 平台。
 \end{itemize}
 
-\section{C语言的编译四步骤详解}
+\section{C 语言的特点}
 
-在 VS Code 中运行 C 程序时，从点击运行到生成 \texttt{.exe}，编译器在底层默默执行了四个步骤：
+C 语言之所以能半个世纪长盛不衰，源于它一系列独特的设计取舍。可以用一句话概括它的哲学：\textbf{贴近硬件、信任程序员、只提供必要的抽象}。
+
+\begin{itemize}
+    \item \textbf{简洁紧凑}：关键字少（C89 仅 32 个），语法规则精炼，没有内建的复杂类型系统。
+    \item \textbf{贴近硬件}：支持指针、位运算和直接内存访问，可精确控制数据在机器上的表示与布局。
+    \item \textbf{可移植}：标准不绑定具体硬件，同一份源码经重新编译即可在不同平台运行。
+    \item \textbf{效率极高}：生成的机器码性能接近汇编，因此长期是操作系统、嵌入式与高性能计算的首选。
+    \item \textbf{结构化}：以函数为基本单位，支持顺序、选择、循环三种基本控制结构。
+    \item \textbf{生态庞大}：几乎所有主流语言（C++、Java、Python、Go、Rust 等）的运行时或解释器都用 C 或 C++ 实现。
+\end{itemize}
+
+\section{为什么学习 C 语言}
+
+学习 C 语言有三重收益，它们层层递进：
 
 \begin{enumerate}
-    \item \textbf{预处理 (Preprocessing)}：处理所有以 \texttt{\#} 开头的指令。展开头文件、替换宏定义、删除注释。生成 \texttt{.i} 文件。
-    \item \textbf{编译 (Compilation)}：将预处理后的文本文件翻译成汇编语言。生成 \texttt{.s} 文件。
-    \item \textbf{汇编 (Assembly)}：将汇编语言翻译成机器能够识别的二进制机器指令。生成 \texttt{.o} 或 \texttt{.obj} 目标文件。
-    \item \textbf{链接 (Linking)}：将多个目标文件以及系统库文件打包合并，最终生成可在操作系统上运行的可执行文件（\texttt{.exe} 或 \texttt{.out}）。
+    \item \textbf{理解程序如何真正运行}：C 暴露了内存、地址、编译、链接等底层机制。掌握 C 之后，其他语言的“黑箱”会变得透明。
+    \item \textbf{获得系统编程能力}：操作系统内核、设备驱动、嵌入式固件、数据库引擎大量使用 C 编写，这是与硬件对话的通用语言。
+    \item \textbf{构建扎实的思维基础}：指针与内存管理训练逻辑严密性，这种思维迁移到任何编程语言都受用。
 \end{enumerate}
+
+\section{从源代码到可执行文件}
+
+初学者常把“写代码”与“运行程序”混为一谈，实际上从一份 \texttt{.c} 源文件到最终的可执行程序，中间要经过四个清晰的阶段。理解这条流水线，是理解 C 语言工程实践的关键。
+
+\subsection{四个阶段}
+
+\begin{enumerate}
+    \item \textbf{预处理 (Preprocessing)}：处理所有以 \texttt{\#} 开头的指令。展开 \texttt{\#include} 头文件、替换宏定义、展开条件编译、删除注释。生成预处理文件 \texttt{.i}。
+    \item \textbf{编译 (Compilation)}：将预处理后的文本翻译成汇编语言，并进行语法分析、语义检查与优化。生成汇编文件 \texttt{.s}。
+    \item \textbf{汇编 (Assembly)}：将汇编语言翻译成机器能够识别的二进制机器指令，生成目标文件 \texttt{.o}（Windows 上为 \texttt{.obj}）。
+    \item \textbf{链接 (Linking)}：将多个目标文件以及系统库文件合并、重定位，最终生成可在操作系统上运行的可执行文件（\texttt{.exe} 或 \texttt{.out}）。
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    stage/.style={draw, rounded corners, minimum width=2.4cm, minimum height=1.1cm,
+                  align=center, font=\small, fill=blue!8},
+    file/.style={draw, minimum width=1.6cm, minimum height=0.7cm,
+                 align=center, font=\ttfamily\small, fill=green!10},
+    arrow/.style={->, >=latex, thick}
+]
+    \node[file] (c) at (0,0) {hello.c};
+    \node[stage] (cpp) at (3.2,0) {预处理\\\footnotesize (gcc -E)};
+    \node[file] (i) at (6.2,0) {hello.i};
+    \node[stage] (cc) at (3.2,-2.2) {编译\\\footnotesize (gcc -S)};
+    \node[file] (s) at (6.2,-2.2) {hello.s};
+    \node[stage] (as) at (3.2,-4.4) {汇编\\\footnotesize (gcc -c)};
+    \node[file] (o) at (6.2,-4.4) {hello.o};
+    \node[stage] (ld) at (3.2,-6.6) {链接\\\footnotesize (gcc)};
+    \node[file] (exe) at (6.2,-6.6) {hello};
+
+    \draw[arrow] (c) -- (cpp);
+    \draw[arrow] (cpp) -- (i);
+    \draw[arrow] (i) -- (cc);
+    \draw[arrow] (cc) -- (s);
+    \draw[arrow] (s) -- (as);
+    \draw[arrow] (as) -- (o);
+    \draw[arrow] (o) -- (ld);
+    \draw[arrow] (ld) -- (exe);
+\end{tikzpicture}
+\caption{从源代码到可执行文件的四个阶段}
+\label{fig:compile_pipeline}
+\end{figure}
+
+\subsection{各阶段对照表}
+
+\begin{table}[H]
+\centering
+\caption{编译四阶段：输入、输出与工具}
+\label{tab:compile_stages}
+\begin{tabularx}{\textwidth}{@{}l l l l X@{}}
+\toprule
+\textbf{阶段} & \textbf{输入} & \textbf{输出} & \textbf{gcc 选项} & \textbf{主要工作} \\
+\midrule
+预处理 & \texttt{.c} & \texttt{.i} & \texttt{-E} & 展开头文件、宏替换、去注释 \\
+编译   & \texttt{.i} & \texttt{.s} & \texttt{-S} & 语法/语义分析、优化、生成汇编 \\
+汇编   & \texttt{.s} & \texttt{.o} & \texttt{-c} & 将汇编翻译为机器指令（可重定位） \\
+链接   & \texttt{.o} & 可执行文件 & （无） & 合并目标文件与库、重定位符号 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{gcc 命令行示例}
+
+GCC 默认只保留最终产物，中间文件会被自动删除。如果希望逐步观察，可以用下列选项“分步执行”：
+
+\begin{lstlisting}[caption={分步编译命令}]
+gcc -E hello.c -o hello.i     # 1. 预处理，生成 hello.i
+gcc -S hello.i -o hello.s     # 2. 编译，生成汇编 hello.s
+gcc -c hello.s -o hello.o     # 3. 汇编，生成目标文件 hello.o
+gcc hello.o -o hello          # 4. 链接，生成可执行文件 hello
+./hello                       # 运行（Windows 上为 .\hello.exe）
+
+# 也可以一步到位（等价于依次执行上面四步）：
+gcc hello.c -o hello
+\end{lstlisting}
+
+\begin{lstlisting}[caption={常用的调试与告警选项}]
+gcc -Wall -Wextra hello.c -o hello   # 打开常用告警，强烈建议
+gcc -g hello.c -o hello              # 生成调试信息，供 gdb 使用
+gcc -O2 hello.c -o hello             # 开启二级优化
+\end{lstlisting}
+
+\section{一个完整的 Hello World}
+
+下面是最经典的程序。虽然只有 5 行代码，却几乎涵盖了 C 程序的所有结构要素。
+
+\begin{lstlisting}[caption={Hello World 完整程序}]
+#include <stdio.h>      // 1. 预处理指令：引入标准输入输出库
+
+int main(void)          // 2. 主函数：程序的唯一入口
+{                       //    函数体开始
+    printf("Hello, World!\n");  // 3. 调用库函数，输出字符串
+    return 0;           // 4. 返回 0 表示程序正常结束
+}                       //    函数体结束
+\end{lstlisting}
+
+\subsection{逐行剖析}
+
+\begin{table}[H]
+\centering
+\caption{Hello World 逐行解析}
+\label{tab:hello_lines}
+\begin{tabularx}{\textwidth}{@{}l X@{}}
+\toprule
+\textbf{代码} & \textbf{含义} \\
+\midrule
+\texttt{\#include <stdio.h>} & 预处理指令。把标准输入输出头文件的内容在编译前插入此处，从而获得 \texttt{printf} 的函数声明。 \\
+\texttt{int main(void)} & 定义一个返回 \texttt{int} 的函数 \texttt{main}，它是程序运行的入口；\texttt{void} 表示不接受参数。 \\
+\texttt{\{} ... \texttt{\}} & 函数体的花括号，界定语句的集合，函数体内部就是一组顺序执行的语句。 \\
+\texttt{printf(...)} & 一条函数调用语句，末尾的分号表示语句结束；\texttt{\textbackslash n} 是换行转义字符。 \\
+\texttt{return 0;} & 从 \texttt{main} 返回整数 0，向操作系统报告“成功退出”。 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{关于 \texttt{return} 的返回值}：\texttt{main} 的返回值会作为进程的退出状态码传递给操作系统。约定 \texttt{0} 表示成功，非 0 表示异常。省略 \texttt{return} 语句时，C99 起会隐式返回 0，但显式写出更清晰。
+
+\section{程序的基本结构}
+
+一个 C 程序在形式上由若干“翻译单元”组成，而每个单元内部则包含下列四种成分：
+
+\begin{itemize}
+    \item \textbf{预处理指令}：以 \texttt{\#} 开头，如 \texttt{\#include}、\texttt{\#define}，在编译前由预处理器处理。
+    \item \textbf{函数}：程序的基本执行单位。\texttt{main} 是必需且唯一的入口，其余函数供其调用。
+    \item \textbf{语句}：函数体内的执行单元，以分号 \texttt{;} 结尾。
+    \item \textbf{注释}：供人阅读的说明文字，编译器会忽略。包括块注释 \texttt{/* ... */} 与行注释 \texttt{// ...}。
+\end{itemize}
+
+\begin{lstlisting}[caption={一个包含多种结构成分的程序}]
+#include <stdio.h>          /* 预处理指令 */
+
+#define PI 3.14159          // 宏定义（也是预处理指令）
+
+double area(double r);      // 函数声明（原型）
+
+int main(void)              // 主函数
+{
+    double a = area(2.0);   // 语句：调用函数
+    printf("area = %f\n", a);
+    return 0;               // 语句
+}
+
+double area(double r)       // 函数定义
+{
+    return PI * r * r;      // 语句：使用宏
+}
+\end{lstlisting}
+
+\subsection{标识符与关键字}
+
+\textbf{标识符}是程序员为变量、函数、类型等起名字所用的符号。其命名规则为：
+
+\begin{itemize}
+    \item 由字母、数字和下划线组成，且\textbf{不能以数字开头}。
+    \item 区分大小写（\texttt{count} 与 \texttt{Count} 是两个不同的标识符）。
+    \item 不能使用关键字，也不建议与标准库函数重名。
+    \item 见名知义：如 \texttt{max\_value} 优于 \texttt{x1}。
+\end{itemize}
+
+\textbf{关键字}是语言保留的、具有特殊含义的标识符，程序员不能将其用作普通名字。C89 共 32 个关键字：
+
+\begin{table}[H]
+\centering
+\caption{C89 的 32 个关键字}
+\label{tab:keywords}
+\begin{tabular}{@{}l l l l@{}}
+\toprule
+\texttt{auto} & \texttt{break} & \texttt{case} & \texttt{char} \\
+\texttt{const} & \texttt{continue} & \texttt{default} & \texttt{do} \\
+\texttt{double} & \texttt{else} & \texttt{enum} & \texttt{extern} \\
+\texttt{float} & \texttt{for} & \texttt{goto} & \texttt{if} \\
+\texttt{int} & \texttt{long} & \texttt{register} & \texttt{return} \\
+\texttt{short} & \texttt{signed} & \texttt{sizeof} & \texttt{static} \\
+\texttt{struct} & \texttt{switch} & \texttt{typedef} & \texttt{union} \\
+\texttt{unsigned} & \texttt{void} & \texttt{volatile} & \texttt{while} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+C99 及后续标准又增加了 \texttt{inline}、\texttt{restrict}、\texttt{\_Bool}、\texttt{\_Complex}、\texttt{\_Generic} 等关键字。
+
+\section{开发流程与常用工具}
+
+编写一个 C 程序通常遵循“编辑 $\to$ 编译 $\to$ 运行 $\to$ 调试”的循环，涉及三类核心工具：
+
+\begin{itemize}
+    \item \textbf{编译器}：如 GCC、Clang、MSVC，完成前面介绍的编译四阶段，把源码翻译为可执行文件。
+    \item \textbf{调试器}：如 GDB、LLDB、Visual Studio Debugger，用于设置断点、单步执行、检查变量与调用栈。
+    \item \textbf{构建工具}：如 \texttt{make}、CMake、Ninja，当工程包含成百上千个源文件时，自动管理编译顺序与依赖，避免重复编译。
+\end{itemize}
+
+\subsection{最小的编译运行示例}
+
+\begin{lstlisting}[caption={\texttt{main.c}：最小可运行程序}]
+int main(void)
+{
+    return 0;
+}
+\end{lstlisting}
+
+在命令行中执行：
+
+\begin{lstlisting}[caption={编译与运行}]
+gcc -Wall main.c -o main    # 编译；-Wall 打开告警
+./main                      # 运行；无输出，退出码为 0
+echo $?                     # 查看上一条命令的退出码（Linux 下）
+\end{lstlisting}
+
+\begin{lstlisting}[caption={使用 GDB 调试}]
+gcc -g main.c -o main       # 带调试信息编译
+gdb ./main                  # 启动调试器
+# (gdb) break main          # 在 main 处设置断点
+# (gdb) run                 # 运行至断点
+# (gdb) next                # 单步执行
+\end{lstlisting}
+
+\section{C 程序的内存模型概览}
+
+一个正在运行的 C 进程，其逻辑地址空间会被划分为若干区域。理解这张“地图”，是后续学习指针、数组越界、动态内存与存储类别的必备基础。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    region/.style={draw, minimum width=6.5cm, minimum height=0.95cm,
+                   align=center, font=\small},
+    arrow/.style={->, >=latex, thick},
+    lbl/.style={font=\small}
+]
+    \node[region, fill=gray!15] (stack)  at (0,0)     {\textbf{栈 Stack}：局部变量、函数调用帧（向下增长）};
+    \node[region, fill=gray!25] (heap)   at (0,-1.1)  {\textbf{堆 Heap}：\texttt{malloc}/\texttt{calloc} 动态分配（向上增长）};
+    \node[region, fill=blue!10] (bss)    at (0,-2.2)  {\textbf{.bss}：未初始化的全局/静态变量（自动清零）};
+    \node[region, fill=blue!15] (data)   at (0,-3.3)  {\textbf{.data}：已初始化的全局/静态变量};
+    \node[region, fill=green!15] (text)  at (0,-4.4)  {\textbf{.text}：程序代码（机器指令，只读）};
+    \node[region, fill=orange!12] (kern) at (0,-5.5)  {\textbf{命令行参数与环境变量}};
+
+    \draw[arrow, red]  ($(stack.north)+(3.6,0)$) -- ($(stack.south)+(3.6,0)$)
+        node[midway, right, lbl, align=left] {栈\\下\\降};
+    \draw[arrow, blue] ($(heap.south)+(-3.6,0)$) -- ($(heap.north)+(-3.6,0)$)
+        node[midway, left, lbl, align=left] {堆\\上\\升};
+
+    \node[lbl, anchor=south] at (stack.north) {高地址};
+    \node[lbl, anchor=north] at (kern.south)  {低地址};
+\end{tikzpicture}
+\caption{典型 C 进程的地址空间布局}
+\label{fig:memory_layout}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{各内存区域对比}
+\label{tab:memory_regions}
+\begin{tabularx}{\textwidth}{@{}l l X@{}}
+\toprule
+\textbf{区域} & \textbf{内容} & \textbf{生命周期与特点} \\
+\midrule
+栈 & 局部变量、参数、返回地址 & 随函数调用自动分配与释放，速度快，空间有限 \\
+堆 & \texttt{malloc} 等分配的内存 & 手动申请、手动 \texttt{free}，容量大但需自行管理 \\
+\texttt{.bss} & 未初始化全局/静态变量 & 程序启动时置零，不占用可执行文件体积 \\
+\texttt{.data} & 已初始化全局/静态变量 & 存储在可执行文件中，程序运行期间一直存在 \\
+\texttt{.text} & 可执行机器指令 & 通常只读，防止程序被意外改写 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{为什么要先看这张图}？因为它解释了 C 语言许多“为什么”：为什么局部变量在函数返回后值会失效（栈帧被回收）？为什么忘记 \texttt{free} 会造成内存泄漏（堆不会自动回收）？为什么修改字符串字面量会崩溃（位于只读段）？后续章节将逐一深入。
+
+\section{本章小结与常见误区}
+
+\subsection{小结}
+
+\begin{itemize}
+    \item C 语言面向过程，1972 年诞生于贝尔实验室，以贴近硬件、可移植、高效著称。
+    \item 源码到可执行文件要经过\textbf{预处理 $\to$ 编译 $\to$ 汇编 $\to$ 链接}四个阶段，产物依次为 \texttt{.i}、\texttt{.s}、\texttt{.o} 与可执行文件。
+    \item 一个 C 程序由预处理指令、函数、语句和注释构成，\texttt{main} 是唯一入口。
+    \item 标识符须遵循命名规则，且不得与 32 个关键字冲突。
+    \item 运行时进程的地址空间分为栈、堆、\texttt{.bss}、\texttt{.data}、\texttt{.text} 等区域，是理解指针与内存管理的基础。
+\end{itemize}
+
+\subsection{常见误区}
+
+\begin{itemize}
+    \item \textbf{忘记分号}：C 要求每条语句以 \texttt{;} 结尾。漏写分号往往报错在下一行，容易误导定位。
+    \item \textbf{把 \texttt{=} 当成比较}：赋值 \texttt{=} 与相等比较 \texttt{==} 不同，混用会导致逻辑错误且编译器未必报错。
+    \item \textbf{\texttt{main} 返回值随意}：应返回 \texttt{int}，成功用 \texttt{0}，异常用非零值；写成 \texttt{void main()} 不具可移植性。
+    \item \textbf{混淆头文件与库}：头文件（\texttt{.h}）只提供\textbf{声明}，供编译阶段检查；真正的函数\textbf{实现}在库文件（\texttt{.a}/\texttt{.lib}/\texttt{.so}/\texttt{.dll}）中，由链接阶段引入。\texttt{\#include} 并不会“引入实现”。
+    \item \textbf{认为 \texttt{\#include} 是“导入模块”}：它只是文本替换，把头文件内容原样插入到 \texttt{\#include} 所在位置。
+    \item \textbf{依赖未定义行为}：例如使用未初始化的变量、访问数组越界。这类代码可能“看起来能跑”，但结果不可预测。
+\end{itemize}

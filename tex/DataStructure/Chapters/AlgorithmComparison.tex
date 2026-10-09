@@ -12,82 +12,388 @@
 \clearpage
 
 
-\section{核心排序算法算子对比}
+\section{为什么要比较算法：多维权衡}
+
+渐近复杂度只是评价算法的第一把尺子。理论上的 $O(f(n))$ 告诉我们在 $n$ 趋于无穷时的
+增长趋势，却忽略了常数因子、输入分布、内存层次与实现细节。真实的工程选型必须同时在
+\textbf{时间}、\textbf{空间}、\textbf{稳定性} 与 \textbf{适用场景} 四个维度上权衡，任何一个维度
+的放松或收紧都可能改变最优解。
+
+\subsection{四个权衡维度}
+
+\begin{itemize}
+    \item \textbf{时间}：需要区分 \emph{最好}、\emph{平均}、\emph{最坏} 三种界。例如快速排序
+          平均为 $O(n\log n)$、最坏退化为 $O(n^2)$，而堆排序最坏仍有 $O(n\log n)$ 保证；
+          只记住一个数字会误导选型。
+    \item \textbf{空间}：原地算法辅助空间为 $O(1)$，归并需要 $O(n)$ 副本，散列需要 $O(n)$
+          桶数组。当内存受限或数据驻留外存时，空间维度可能直接否决某算法。
+    \item \textbf{稳定性}：稳定算法保持相等键的原始相对次序。多关键字排序中，先按次关键字排、
+          再按主关键字稳定排序即可得到等价于复合键排序的结果；不稳定算法会破坏这一性质。
+    \item \textbf{适用场景}：数据规模 $n$、值域宽度 $k$、是否近似有序、是否为整数键、是静态
+          一次查找还是动态频繁更新，都会改变最优选择。
+\end{itemize}
+
+\subsection{渐近界与常数因子}
+
+渐进分析刻意忽略常数：若 $T(n)=O(f(n))$，则存在常数 $c$ 使 $T(n)\le c\,f(n)$。但在有限规模下，
+$O(n\log n)$ 的算法完全可能比 $O(n^2)$ 慢，因为其常数因子更大或访存模式更差。
+
+\begin{equation}
+T(n)=O\bigl(f(n)\bigr)\iff \exists c>0,\ n_0>0,\ \forall n\ge n_0:\ T(n)\le c\,f(n).
+\label{eq:bigo}
+\end{equation}
+
+此外，理论模型假设每次基本操作等代价，而现代 CPU 的缓存命中、分支预测与向量化会显著改变
+真实运行时间。因此本章的对比表是\emph{选型的起点}，不是终点。
+
+\section{排序算法综合对比}
+
+设输入 $A=\langle a_1,\dots,a_n\rangle$ 需重排为 $a'_1\le a'_2\le\cdots\le a'_n$。
+表 \ref{tab:sort_master} 汇总十大排序算法在三个时间界、空间与稳定性上的表现。
 
 \begin{table}[H]
 \centering
 \footnotesize
-\renewcommand{\arraystretch}{1.5}
+\renewcommand{\arraystretch}{1.35}
 \begin{tabulary}{\textwidth}{@{}CCCCCCC@{}}
 \toprule
-\textbf{算法} & \textbf{最好} & \textbf{最坏} & \textbf{平均} & \textbf{空间} & \textbf{稳定性} & \textbf{核心特征} \\
+\textbf{算法} & \textbf{最好} & \textbf{平均} & \textbf{最坏} & \textbf{空间} & \textbf{稳定性} & \textbf{关键特征} \\
 \midrule
-\textbf{冒泡} & $O(n)$ & $O(n^2)$ & $O(n^2)$ & $O(1)$ & 稳定 & 消除逆序对，对有序敏感 \\
-\textbf{选择} & $O(n^2)$ & $O(n^2)$ & $O(n^2)$ & $O(1)$ & 不稳定 & 比较次数固定 $\frac{n(n-1)}{2}$ \\
-\textbf{插入} & $O(n)$ & $O(n^2)$ & $O(n^2)$ & $O(1)$ & 稳定 & 顺移偏置，适合近似有序 \\
-\textbf{希尔} & $O(n\log n)$ & $O(n^2)$ & $O(n^{1.3})$ & $O(1)$ & 不稳定 & 分组插入，步长递减 \\
-\textbf{快速} & $O(n\log n)$ & $O(n^2)$ & $O(n\log n)$ & $O(\log n)$ & 不稳定 & 分治划分，随机基准 \\
-\textbf{归并} & $O(n\log n)$ & $O(n\log n)$ & $O(n\log n)$ & $O(n)$ & 稳定 & 严格分治合并 \\
-\textbf{堆排} & $O(n\log n)$ & $O(n\log n)$ & $O(n\log n)$ & $O(1)$ & 不稳定 & 堆序偏序维护 \\
-\textbf{计数} & $O(n+k)$ & $O(n+k)$ & $O(n+k)$ & $O(k)$ & 稳定 & 前缀和寻址，突破比较下界 \\
-\textbf{桶} & $O(n+k)$ & $O(n^2)$ & $O(n+k)$ & $O(k)$ & 稳定 & 区间分桶，桶内排序 \\
-\textbf{基数} & $O(d(n+k))$ & $O(d(n+k))$ & $O(d(n+k))$ & $O(n+k)$ & 稳定 & 按位稳定排序 \\
+冒泡 & $O(n)$ & $O(n^2)$ & $O(n^2)$ & $O(1)$ & 稳定 & 相邻交换消逆序，已序时提前终止 \\
+选择 & $O(n^2)$ & $O(n^2)$ & $O(n^2)$ & $O(1)$ & 不稳定 & 比较次数固定 $\frac{n(n-1)}{2}$ \\
+插入 & $O(n)$ & $O(n^2)$ & $O(n^2)$ & $O(1)$ & 稳定 & 近似有序时接近线性 \\
+希尔 & $O(n\log n)$ & $O(n^{1.3})$ & $O(n^2)$ & $O(1)$ & 不稳定 & 增量序列决定，分组插入 \\
+归并 & $O(n\log n)$ & $O(n\log n)$ & $O(n\log n)$ & $O(n)$ & 稳定 & 严格分治合并，需辅助数组 \\
+快速 & $O(n\log n)$ & $O(n\log n)$ & $O(n^2)$ & $O(\log n)$ & 不稳定 & 平均最快，随机化基准可避退化 \\
+堆排 & $O(n\log n)$ & $O(n\log n)$ & $O(n\log n)$ & $O(1)$ & 不稳定 & 原地且最坏有保证 \\
+计数 & $O(n+k)$ & $O(n+k)$ & $O(n+k)$ & $O(k)$ & 稳定 & 整数键，突破比较下界 \\
+基数 & $O(d(n+k))$ & $O(d(n+k))$ & $O(d(n+k))$ & $O(n+k)$ & 稳定 & 低位到高位，$d$ 为位数 \\
+桶排 & $O(n+k)$ & $O(n+k)$ & $O(n^2)$ & $O(n+k)$ & 稳定 & 均匀分布近线性，依赖桶内排序 \\
 \bottomrule
 \end{tabulary}
-\caption{核心排序算法算子对比}
-\label{tab:sort_compare}
+\caption{十大排序算法综合对比}
+\label{tab:sort_master}
 \end{table}
 
+\subsection{比较类排序的下界}
 
+任何仅依赖关键字两两比较的排序算法，其判定树是一棵二叉树叶数不少于 $n!$ 的二叉树，
+树高即最坏比较次数，故有
 
-\section{高级图论与检索算子对比}
+\begin{equation}
+T_{\mathrm{cmp}}(n)\ \ge\ \lceil \log_2(n!)\rceil\ =\ \Theta(n\log n).
+\label{eq:cmp_lower}
+\end{equation}
+
+由 $\log_2(n!)=\sum_{i=1}^{n}\log_2 i\ge\sum_{i=\lceil n/2\rceil}^{n}\log_2\frac{n}{2}
+\ge\frac{n}{2}\log_2\frac{n}{2}=\Omega(n\log n)$ 即得。归并、堆排序都达到该下界，
+故是比较类算法的最优阶。
+
+\subsection{分治排序的递推}
+
+以归并排序为例，每次折半递归并线性合并，由主定理第二情形：
+
+\begin{equation}
+T(n)=2\,T\!\left(\frac{n}{2}\right)+\Theta(n)\ \Longrightarrow\ T(n)=\Theta(n\log n).
+\label{eq:merge_rec}
+\end{equation}
+
+\subsection{非比较排序的线性界}
+
+计数排序通过值域寻址绕过比较下界，基数排序对每一位复用计数排序：
+
+\begin{equation}
+T_{\mathrm{count}}(n,k)=\Theta(n+k),\qquad
+T_{\mathrm{radix}}(n,d,k)=\Theta\bigl(d(n+k)\bigr).
+\label{eq:linear_sort}
+\end{equation}
+
+当 $k=O(n)$ 且位数 $d$ 为常数时，两者均为 $O(n)$。代价是必须知道键的整数值域，并对空间
+$O(k)$ 或 $O(n+k)$ 付费。
+
+\section{查找算法对比}
+
+查找问题是在数据集合 $S$ 中定位关键字等于 $x$ 的元素。不同算法的\emph{前提条件}差异极大，
+表 \ref{tab:search_master} 给出对比。
 
 \begin{table}[H]
 \centering
 \footnotesize
-\renewcommand{\arraystretch}{1.5}
-\begin{tabulary}{\textwidth}{@{}CCCCCC@{}}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabulary}{\textwidth}{@{}CCCCC@{}}
 \toprule
-\textbf{算法} & \textbf{目标} & \textbf{时间} & \textbf{空间} & \textbf{核心依赖} & \textbf{限制/判据} \\
+\textbf{算法} & \textbf{前提条件} & \textbf{平均/期望} & \textbf{最坏} & \textbf{适用场景} \\
 \midrule
-\textbf{二分查找} & 有序检索 & $O(\log n)$ & $O(1)$ & 顺序存储对切 & 需连续且绝对有序 \\
-\textbf{并查集} & 集合维护 & $O(\alpha(n))$ 摊还 & $O(n)$ & 路径压缩 & 接近 $O(1)$ \\
-\textbf{Dijkstra} & 单源最短路 & $O(|E|\log|V|)$ & $O(|V|)$ & 优先队列 & 不支持负权 \\
-\textbf{A*} & 单源启发 & $O(|E|)$ 期望 & $O(|V|)$ & $f=g+h$ & $h$ 可采纳则最优 \\
-\textbf{Bellman-Ford} & 单源带权 & $O(|V||E|)$ & $O(|V|)$ & $|V|-1$ 轮松弛 & 负环判据 \\
-\textbf{Floyd-Warshall} & 多源最短路 & $O(|V|^3)$ & $O(|V|^2)$ & 动态规划 & $D[i][i]<0\implies$负环 \\
-\textbf{Prim} & MST & $O(|E|\log|V|)$ & $O(|V|)$ & 割定理 & 稠密优 \\
-\textbf{Kruskal} & MST & $O(|E|\log|E|)$ & $O(|E|)$ & 并查集 & 稀疏优 \\
-\textbf{Kahn} & 拓扑序 & $O(|V|+|E|)$ & $O(|V|)$ & 入度集 & $|\sigma|<|V|\implies$有环 \\
-\textbf{Tarjan} & SCC & $O(|V|+|E|)$ & $O(|V|)$ & $DFN/LOW$ & $LOW=DFN\implies$根 \\
-\textbf{Dinic} & 最大流 & $O(|V|^2|E|)$ & $O(|V|+|E|)$ & 分层+阻塞流 & 残量无 $s\to t$ 即最优 \\
+顺序查找 & 无 & $O(n)$ & $O(n)$ & 无序或小规模，链式存储 \\
+二分查找 & 顺序存储且有序 & $O(\log n)$ & $O(\log n)$ & 静态有序表，随机访问 \\
+插值查找 & 有序且近似均匀分布 & $O(\log\log n)$ & $O(n)$ & 键均匀稠密，值域可比例定位 \\
+分块查找 & 块间有序、块内无序 & $O(\sqrt n)$ & $O(\sqrt n)$ & 顺序与链式的折中，便于动态插入 \\
+散列查找 & 散列函数与冲突处理 & $O(1)$ 期望 & $O(n)$ & 仅等值查询，无需有序 \\
+\bottomrule
+\end{tabulary}
+\caption{查找算法对比}
+\label{tab:search_master}
+\end{table}
+
+\subsection{平均查找长度}
+
+顺序存储在等概率假设下的平均查找长度（ASL）为
+
+\begin{equation}
+\mathrm{ASL}_{\mathrm{seq}}=\frac{n+1}{2},\qquad
+\mathrm{ASL}_{\mathrm{bin}}\approx\log_2(n+1)-1,\qquad
+\mathrm{ASL}_{\mathrm{blk}}=\frac{b+1}{2}+\frac{s+1}{2}\quad(n=bs).
+\label{eq:asl}
+\end{equation}
+
+分块查找在 $s=\sqrt n$ 时取得最小 $\mathrm{ASL}=O(\sqrt n)$。散列表的期望探测次数由装载
+因子 $\alpha=n/m$（$n$ 个元素、$m$ 个槽）决定：
+
+\begin{equation}
+E[\mathrm{probes}]_{\mathrm{chain}}\approx\frac{1}{\alpha}\ln\frac{1}{1-\alpha},\qquad
+E[\mathrm{probes}]_{\mathrm{linear}}\approx\frac{1}{2}\Bigl(1+\frac{1}{1-\alpha}\Bigr).
+\label{eq:hash_probe}
+\end{equation}
+
+可见散列的 $O(1)$ 是\emph{期望}意义下的常数，$\alpha\to1$ 时探测数急剧上升。
+
+\section{增长曲线与计数级差异}
+
+\subsection{增长曲线的可视化}
+
+图 \ref{fig:sort_growth} 采用双对数坐标，将四种典型增长函数放在 $n=10^2\sim10^5$ 区间内比较。
+纵轴为基本操作次数，可直接读出不同算法之间的\emph{数量级}差异。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+    width=15cm, height=9cm,
+    xmode=log, ymode=log,
+    log basis x=10, log basis y=10,
+    xlabel={数据规模 $n$},
+    ylabel={基本操作次数},
+    xmin=100, xmax=100000,
+    ymin=100, ymax=2e10,
+    grid=both, grid style={gray!20},
+    legend pos=north west,
+    legend cell align=left,
+    every axis x label/.style={at={(ticklabel* cs:1)}, anchor=north},
+    every axis y label/.style={at={(ticklabel* cs:1)}, anchor=south},
+]
+    \addplot[very thick, red, domain=100:100000, samples=120] {x^2};
+    \addlegendentry{冒泡/选择/插入：$n^2$}
+    \addplot[very thick, orange, domain=100:100000, samples=120] {x^1.3};
+    \addlegendentry{希尔：$n^{1.3}$}
+    \addplot[very thick, blue, domain=100:100000, samples=120] {x*log2(x)};
+    \addlegendentry{归并/快排/堆排：$n\log_2 n$}
+    \addplot[very thick, green!60!black, domain=100:100000, samples=120] {x};
+    \addlegendentry{计数/基数：线性主项 $n$}
+\end{axis}
+\end{tikzpicture}
+\caption{各排序算法基本操作次数的增长对比（双对数坐标，$n=10^2\sim10^5$）}
+\label{fig:sort_growth}
+\end{figure}
+
+在 $n=10^5$ 处，$n^2=10^{10}$、$n^{1.3}\approx3.2\times10^{6}$、
+$n\log_2 n\approx1.7\times10^{6}$，三者跨越了约四个数量级。
+
+\subsection{计数级差异算例（$n=10^5$）}
+
+设一次关键字比较耗时为常数 $t_c=10^{-9}\,\mathrm{s}$（约每秒 $10^9$ 次比较），针对
+$n=10^5$ 的随机排列数组估算选择排序与归并排序的开销。
+
+选择排序比较次数固定为
+
+\begin{equation}
+T_{\mathrm{sel}}(n)=\frac{n(n-1)}{2}\approx\frac{10^5\times(10^5-1)}{2}\approx 5.0\times10^{9},
+\qquad t_{\mathrm{sel}}\approx 5.0\,\mathrm{s}.
+\label{eq:sel_count}
+\end{equation}
+
+归并排序比较次数约为 $n\log_2 n-n$：
+
+\begin{equation}
+T_{\mathrm{merge}}(n)\approx n\log_2 n-n
+\approx 10^5\times16.6-10^5\approx 1.56\times10^{6},
+\qquad t_{\mathrm{merge}}\approx 1.6\,\mathrm{ms}.
+\label{eq:merge_count}
+\end{equation}
+
+两者时间之比与 $n$ 近似线性增长：
+
+\begin{align}
+\frac{T_{\mathrm{sel}}}{T_{\mathrm{merge}}}
+&=\frac{n(n-1)/2}{n\log_2 n-n}
+\approx\frac{n-1}{2\log_2 n}\notag\\
+&\approx\frac{10^5}{2\times16.6}\approx3.0\times10^{3}.
+\label{eq:ratio}
+\end{align}
+
+即选择排序约慢 $3000$ 倍。若改用基数排序（32 位键、每趟 8 位，$d=4$、$k=256$），
+移动次数 $d(n+k)\approx4.0\times10^{5}$，在同等常数下比归并再快数倍，代价是额外的
+$O(n+k)$ 桶空间。
+
+\section{时间-空间权衡}
+
+空间与时间可以互相转化：多花内存常能少花时间，反之亦然。表 \ref{tab:space_time} 归纳典型策略。
+
+\begin{table}[H]
+\centering
+\footnotesize
+\renewcommand{\arraystretch}{1.35}
+\begin{tabulary}{\textwidth}{@{}CCCC@{}}
+\toprule
+\textbf{策略} & \textbf{代表算法} & \textbf{辅助空间} & \textbf{代价与收益} \\
+\midrule
+原地排序 & 冒泡/选择/插入/希尔/堆排 & $O(1)$ & 省内存，但多不稳定或最坏退化 \\
+递归栈开销 & 快速/归并（自顶向下） & $O(\log n)\sim O(n)$ & 分治简洁，栈深依赖划分平衡度 \\
+线性辅助 & 归并 & $O(n)$ & 换取稳定性与严格 $O(n\log n)$ \\
+空间换时间 & 计数/基数/桶排 & $O(k)$ 或 $O(n+k)$ & 突破 $\Omega(n\log n)$，依赖键值域 \\
+散列换时间 & 散列表 & $O(n)$ & 查找由 $O(n)$ 降至 $O(1)$ 期望，付出冲突代价 \\
+\bottomrule
+\end{tabulary}
+\caption{时间-空间权衡策略}
+\label{tab:space_time}
+\end{table}
+
+\subsection{原地与非原地}
+
+\emph{原地}（in-place）算法仅使用 $O(1)$（或含递归栈 $O(\log n)$）辅助空间，在原数组上直接
+交换；\emph{非原地}算法需要与输入等大的副本。归并排序的非原地性换来稳定与最坏保证；
+快速排序的原地划分带来优秀缓存局部性，但递归栈与最坏退化需要关注。快速排序可通过
+“尾递归消除 + 先递归较短一侧”将栈深压到 $O(\log n)$。
+
+\subsection{以空间换时间的边界}
+
+空间换时间并非无条件成立：计数排序的空间 $O(k)$ 在值域 $k\gg n$ 时不可接受；散列的 $O(n)$
+桶在装载因子趋近 $1$ 时期望探测数发散。选型时须同时检查时空两个约束是否都可满足。
+
+\section{如何选择算法：决策清单}
+
+\subsection{排序算法选择}
+
+\begin{enumerate}
+    \item \textbf{数据规模}：$n\le 50$ 时插入排序常数小、实际最快；大 $n$ 再考虑 $O(n\log n)$。
+    \item \textbf{是否近似有序}：接近有序时插入或希尔接近线性。
+    \item \textbf{稳定性要求}：多关键字场景优先归并、插入、计数与基数。
+    \item \textbf{内存约束}：内存紧张选堆排（原地且最坏有保证）或快排（原地、平均最快）。
+    \item \textbf{键的类型}：整数且值域 $k=O(n)$ 时，计数/基数/桶排可突破比较下界。
+    \item \textbf{最坏时间要求}：实时系统要求最坏有保证，则弃快排取堆排或归并。
+\end{enumerate}
+
+\subsection{查找算法选择}
+
+\begin{enumerate}
+    \item 数据是否有序？无序则顺序查找或先排序（动态场景用散列）。
+    \item 是否需要随机访问与二分？链式存储无法二分，只能顺序或转跳表。
+    \item 键分布是否均匀？均匀且稠密可用插值查找。
+    \item 是否只需等值查询？是则散列最优，但要评估装载因子与冲突处理。
+    \item 是否频繁动态插入删除？分块或平衡树优于静态有序数组。
+\end{enumerate}
+
+图 \ref{fig:sort_decision} 给出排序选型的快速决策路径。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    box/.style={draw, rounded corners, minimum width=3.0cm, minimum height=0.9cm, align=center, font=\small, inner sep=4pt},
+    ar/.style={-latex, thick}
+]
+    \node[box] (q) at (0,0) {键是否为小值域整数？};
+    \node[box] (yes) at (-4.2,-1.8) {计数/基数/桶排\\$O(n)\sim O(d(n+k))$};
+    \node[box] (no) at (4.2,-1.8) {比较类排序\\进入下一问};
+    \node[box] (a) at (2.1,-3.6) {需稳定或最坏保证？};
+    \node[box] (yes2) at (0.0,-5.4) {归并排序\\稳定 $O(n\log n)$};
+    \node[box] (no2) at (4.2,-5.4) {堆排/快排\\原地，$O(n\log n)$};
+    \draw[ar] (q) -- (yes);
+    \draw[ar] (q) -- (no);
+    \draw[ar] (no) -- (a);
+    \draw[ar] (a) -- (yes2);
+    \draw[ar] (a) -- (no2);
+\end{tikzpicture}
+\caption{排序算法选择决策路径}
+\label{fig:sort_decision}
+\end{figure}
+
+\section{其他算子横向对比}
+
+\subsection{高级图论算子}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\renewcommand{\arraystretch}{1.3}
+\begin{tabulary}{\textwidth}{@{}CCCCC@{}}
+\toprule
+\textbf{算法} & \textbf{目标} & \textbf{时间} & \textbf{空间} & \textbf{适用与限制} \\
+\midrule
+并查集 & 集合维护 & $O(\alpha(n))$ 摊还 & $O(n)$ & 近 $O(1)$，支持动态合并 \\
+Dijkstra & 单源最短路 & $O(|E|\log|V|)$ & $O(|V|)$ & 不支持负权边 \\
+A* & 单源启发搜索 & $O(|E|)$ 期望 & $O(|V|)$ & 启发 $h$ 可采纳则最优 \\
+Bellman-Ford & 单源带权最短路 & $O(|V||E|)$ & $O(|V|)$ & 支持负权，可判负环 \\
+Floyd-Warshall & 多源最短路 & $O(|V|^3)$ & $O(|V|^2)$ & 支持负权，$D[i][i]<0$ 判负环 \\
+Prim & 最小生成树 & $O(|E|\log|V|)$ & $O(|V|)$ & 稠密图较优 \\
+Kruskal & 最小生成树 & $O(|E|\log|E|)$ & $O(|E|)$ & 稀疏图较优，依赖并查集 \\
+Kahn & 拓扑排序 & $O(|V|+|E|)$ & $O(|V|)$ & 输出不足 $|V|$ 则有环 \\
+Tarjan & 强连通分量 & $O(|V|+|E|)$ & $O(|V|)$ & 单次 DFS，$LOW=DFN$ 为根 \\
+Dinic & 最大流 & $O(|V|^2|E|)$ & $O(|V|+|E|)$ & 残量网络无增广路即最优 \\
 \bottomrule
 \end{tabulary}
 \caption{高级图论与检索算子对比}
 \label{tab:graph_compare}
 \end{table}
 
-\section{树算子对比}
+\subsection{树算子}
 
 \begin{table}[H]
 \centering
 \footnotesize
-\renewcommand{\arraystretch}{1.5}
-\begin{tabulary}{\textwidth}{@{}CCCCCC@{}}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabulary}{\textwidth}{@{}CCCCC@{}}
 \toprule
-\textbf{算子} & \textbf{目标} & \textbf{时间} & \textbf{空间} & \textbf{核心依赖} & \textbf{限制/判据} \\
+\textbf{算子} & \textbf{目标} & \textbf{时间} & \textbf{空间} & \textbf{核心依赖与限制} \\
 \midrule
-\textbf{二叉遍历} & 全树访问 & $O(n)$ & $O(H)$ & 递归/显式栈 & 线索化可降至 $O(1)$ \\
-\textbf{BST} & 有序检索维护 & $O(H)$ & $O(n)$ & BST 序性质 & 偏斜退化 $O(n)$ \\
-\textbf{AVL} & 平衡检索维护 & $O(\log n)$ & $O(n)$ & 平衡因子+旋转 & 旋转恢复不变式 \\
-\textbf{红黑树} & 近似平衡维护 & $O(\log n)$ & $O(n)$ & 黑高+变色 & 插入至多两次旋转 \\
-\textbf{B/B+ 树} & 外存索引 & $O(\log_m n)$ & $O(n)$ & 分裂/合并 & 叶层等深 \\
-\textbf{Huffman} & 最优前缀码 & $O(n\log n)$ & $O(n)$ & 最小堆贪心 & 需已知频次 \\
-\textbf{堆} & 最值维护 & 建堆 $O(n)$，操作 $O(\log n)$ & $O(n)$ & 上滤/下滤 & 完全二叉树 \\
-\textbf{LCA 倍增} & 树上祖先查询 & $O(\log|V|)$ 查询 & $O(|V|\log|V|)$ & $up[v][j]$ & 仅树 \\
+二叉树遍历 & 全树访问 & $O(n)$ & $O(H)$ & 递归/显式栈，线索化可降 $O(1)$ \\
+BST & 有序维护与检索 & $O(H)$ & $O(n)$ & 偏斜时退化至 $O(n)$ \\
+AVL & 平衡检索维护 & $O(\log n)$ & $O(n)$ & 平衡因子与旋转 \\
+红黑树 & 近似平衡维护 & $O(\log n)$ & $O(n)$ & 黑高与变色，插入至多两次旋转 \\
+B/B+ 树 & 外存索引 & $O(\log_m n)$ & $O(n)$ & 叶层等深，适合磁盘 \\
+Huffman & 最优前缀码 & $O(n\log n)$ & $O(n)$ & 最小堆贪心，需已知频次 \\
+堆 & 最值维护 & 建堆 $O(n)$，操作 $O(\log n)$ & $O(n)$ & 完全二叉树，上滤/下滤 \\
+LCA 倍增 & 树上祖先查询 & $O(\log|V|)$ & $O(|V|\log|V|)$ & 预处理 $up[v][j]$ \\
 \bottomrule
 \end{tabulary}
 \caption{树算子对比}
 \label{tab:tree_compare}
 \end{table}
 
+\section{本章小结}
+
+算法对比的核心结论可以概括为三点：
+
+\begin{itemize}
+    \item 没有“最好”的算法，只有\emph{在给定约束下最合适}的算法。时间、空间、稳定性与
+          适用场景缺一不可。
+    \item 比较类排序存在 $\Omega(n\log n)$ 下界，达到该界的归并、堆排是通用最优；当键为
+          小值域整数时，计数/基数/桶排可用空间换时间降到线性。
+    \item 查找算法高度依赖前提条件：有序支持二分与插值，等值查询优先散列，动态更新则考虑
+          分块与平衡树。
+\end{itemize}
+
+\section{常见误区}
+
+\begin{itemize}
+    \item \textbf{误区一}：认为 $O(n\log n)$ 在任何规模下都快于 $O(n^2)$。小规模时低阶算法
+          常数更小，反而更快；须结合 $n$ 与常数因子判断。
+    \item \textbf{误区二}：把平均复杂度当作最坏复杂度。快排平均 $O(n\log n)$，但对已序数据
+          用固定基准会退化到 $O(n^2)$。
+    \item \textbf{误区三}：认为 $O(1)$ 空间就是“不占额外内存”。它指不随 $n$ 增长，常量级辅助
+          仍存在，递归算法的栈深往往并非 $O(1)$。
+    \item \textbf{误区四}：认为稳定排序一定更优。稳定性以时间或空间为代价，无需保持次序时应
+          优先考虑速度与内存。
+    \item \textbf{误区五}：认为散列查找必然 $O(1)$。当装载因子 $\alpha\to1$ 或散列函数较差时，
+          期望探测数发散，最坏退化为 $O(n)$。
+    \item \textbf{误区六}：忽略缓存与访存局部性。相邻访问的原地快排常胜过理论更优但跳访的算法；
+          渐近界不等于真实墙钟时间。
+\end{itemize}

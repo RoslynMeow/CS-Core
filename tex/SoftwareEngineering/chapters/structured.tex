@@ -11,9 +11,43 @@
 \endgroup
 \clearpage
 
+\section{结构化分析思想}
+
+\subsection{为什么需要结构化}
+
+软件需求往往以自然语言叙述，而自然语言是\textbf{歧义、冗余、含糊}的：同一个词在不同段落可能指不同事物，一个「系统」既可能指整个业务，也可能指其中一段处理。若直接据此编码，需求中的矛盾要到集成测试甚至上线才暴露，返工代价极高。结构化分析（Structured Analysis, SA）的出发点，就是\textbf{用一组受控的抽象（数据流与数据定义）把「做什么」从「怎么做」中剥离出来}，使需求在动手实现之前就能被检查、被确认、被追踪。
+
+与面向对象方法把系统看作「相互协作的对象」不同，结构化方法把系统看作\textbf{对数据的一系列变换}：数据从外部进入系统，被逐步加工，再送回外部或被持久化。这种「以数据为中心」的视角，特别适合\textbf{事务处理类、信息管理类}系统。
+
+\subsection{三条核心原则}
+
+\begin{itemize}
+    \item \textbf{自顶向下（top-down）}：从系统的整体功能出发，先看系统与外界交互的轮廓，再深入内部细节。避免一开始就陷入局部实现而失去全局。
+    \item \textbf{逐层分解（stepwise refinement）}：把复杂问题逐层拆成规模更小、更容易理解与处理的子问题，直到每个子问题都足够简单、可直接实现为止。
+    \item \textbf{数据与处理分离}：分别刻画「数据是什么（数据字典）」与「数据被如何处理（DFD 中的加工）」，两者在图上并列但概念上独立。这样数据定义的变更与处理逻辑的变更可分别管理。
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{结构化方法在生命周期各阶段的产物}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+阶段 & 主要活动 & 核心产物 \\
+\midrule
+需求分析 & 建立功能模型，划分数据与处理 & 数据流图（分层）、数据字典 \\
+总体设计 & 从 DFD 导出模块结构 & 结构图（模块层次 + 调用） \\
+详细设计 & 细化模块内部算法与数据 & 模块说明、伪代码、数据库设计 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{quote}
+\textbf{例}：一个「图书借阅系统」，需求原文可能是「读者可以借书，管理员可以入库新书」。结构化分析首先要回答：借书时数据从哪里来、经哪些加工、写到哪里去；「图书」这个数据项究竟包含哪些字段。这些正是 DFD 与数据字典要固化的内容。
+\end{quote}
+
 \section{数据流图（DFD）}
 
-数据流图（Data Flow Diagram, DFD）从数据流动的角度描述系统「做什么」：只关心数据及其变换，不关心控制时序与实现细节。
+数据流图（Data Flow Diagram, DFD）从数据流动的角度描述系统「做什么」：只关心数据及其变换，不关心控制时序与实现细节。它是一种\textbf{面向数据}的功能模型，图中没有分支、循环、先后次序等控制语义。
 
 \subsection{四种基本元素}
 
@@ -32,23 +66,32 @@
 \end{tabulary}
 \end{table}
 
-\subsection{分层 DFD}
+使用四种元素时有几条约定：\textbf{外部实体之间不直接画数据流}（它们必须经加工交互）；\textbf{数据存储之间也不直接画数据流}（读写只能由加工发起）；每条数据流的名字应是名词短语（如「订单」而不是「提交订单」）。命名若含混，往往意味着对需求的理解还不清楚。
+
+\subsection{0 层与 1 层分解}
+
+\textbf{0 层 DFD（上下文图，context diagram）}：把整个系统看作\textbf{一个}加工，只画该系统与所有外部实体之间的输入 / 输出数据流，用来界定\textbf{系统边界}与外部接口。上下文图不出现数据存储。
 
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[font=\small, >=Stealth,
-    entity/.style={draw, rectangle, minimum width=2.4cm, minimum height=1cm, fill=blue!8, align=center},
-    proc/.style={draw, ellipse, minimum width=3.0cm, minimum height=1.3cm, fill=orange!15, align=center}]
+    entity/.style={draw, rectangle, minimum width=2.6cm, minimum height=1cm, fill=blue!8, align=center},
+    proc/.style={draw, ellipse, minimum width=3.4cm, minimum height=1.6cm, fill=orange!15, align=center}]
     \node[entity] (cust) at (0,0) {客户};
-    \node[proc] (sys) at (6,0) {订单处理系统};
+    \node[proc] (sys) at (6,0) {订单处理\\系统};
     \node[entity] (wh) at (12,0) {仓库};
+    \node[entity] (fin) at (6,-3.2) {财务系统};
     \draw[->] (cust) -- node[above]{订单} (sys);
     \draw[->] (sys) -- node[above]{发货单} (wh);
     \draw[->] (wh) -- node[below]{出库确认} (sys);
     \draw[->] (sys) -- node[below]{发货通知} (cust);
+    \draw[->] (sys) -- node[right]{应收账款} (fin);
+    \draw[->] (fin) -- node[left]{收款确认} (sys);
 \end{tikzpicture}
-\caption{0 层 DFD：上下文图}
+\caption{0 层 DFD：订单处理系统的上下文图（只画系统与外部实体的数据交换）}
 \end{figure}
+
+\textbf{1 层 DFD}：把 0 层那个唯一的加工\textbf{分解}为若干子加工，并画出与之相关的数据存储。下面是订单处理系统的 1 层分解。
 
 \begin{figure}[H]
 \centering
@@ -61,31 +104,43 @@
     \node[proc] (p2) at (8,0) {2\\核对库存};
     \node[proc] (p3) at (12,0) {3\\生成发货单};
     \node[entity] (wh) at (15.8,0) {仓库};
-    \node[store] (d1) at (6,-2.2) {订单表};
+    \node[store] (d1) at (4,-2.6) {订单表};
+    \node[store] (d2) at (8,-2.6) {库存表};
     \draw[->] (cust) -- node[above]{订单} (p1);
     \draw[->] (p1) -- node[above]{有效订单} (p2);
     \draw[->] (p2) -- node[above]{可发货清单} (p3);
     \draw[->] (p3) -- node[above]{发货单} (wh);
-    \draw[->] (p1.south) -- node[left]{写订单} (d1.west);
-    \draw[->] (d1.east) -- node[right]{读订单} (p2.south);
+    \draw[->] (p1) -- node[left]{写} (d1);
+    \draw[->] (d1) -- node[right]{读} (p2);
+    \draw[->] (p2) -- node[left]{读/写} (d2);
+    \draw[->] (p3) -- node[right]{更新} (d1);
 \end{tikzpicture}
-\caption{1 层 DFD：订单处理系统分解}
+\caption{1 层 DFD：订单处理系统分解（加工编号 1、2、3，并引入数据存储）}
 \end{figure}
 
-\subsection{平衡原则}
+对某个子加工再分解，就得到 2 层、3 层 $\cdots$ DFD。层次不宜过深，一般\textbf{到 3 层左右}即可，再细就应交给详细设计。
 
-对加工逐层分解，可得到 0 层、1 层、2 层 $\cdots$ DFD：
+\subsection{父子图平衡原则}
+
+\textbf{平衡（balance）}是 DFD 分层最关键的约束：
 
 \begin{itemize}
-    \item \textbf{0 层（上下文图）}：把整个系统看作一个加工，只画系统与外部实体之间的数据交换。
-    \item \textbf{1 层}：把 0 层的加工分解成若干子加工，并画出与之相关的数据存储。
-    \item \textbf{平衡（父子平衡）}：子图边界上的输入 / 输出数据流，必须与父图中该加工的输入 / 输出一一对应——分解时数据既不凭空产生，也不凭空消失。
-    \item \textbf{编号}：加工编号体现层次，如 1 分解为 1.1、1.2；数据流与数据存储也都要命名。
+    \item \textbf{数据守恒}：子图边界上所有输入数据流，其集合必须与父图中对应加工的输入数据流一致；输出同理。分解时数据既不凭空产生，也不凭空消失。
+    \item \textbf{一一对应}：父图加工的一条输入流，在子图中可拆成多条（细化），但这些细流的\textbf{来源}仍须是被分解加工的外部来源；关键在于「进入 / 离开该加工的数据总量与名称在概念上守恒」。
+    \item \textbf{编号一致}：加工编号体现层次，父加工 1 分解出的子加工编号为 1.1、1.2 $\cdots$；引用的数据存储与数据流名称须在数据字典中有定义。
 \end{itemize}
+
+例如上下文图中「订单处理系统」的输出有「发货单」和「发货通知」，则 1 层子图的输出中必须能找到它们对应的数据流，否则失衡。
+
+\subsection{一个完整的小例子}
+
+以「ATM 取款」为例：外部实体是「储户」和「银行主机」；系统只有 0 层一个加工。1 层分解为「1 验卡、2 验密、3 处理取款、4 记账」。其中「3 处理取款」的输入是「取款金额」，输出是「现金」；父图中 ATM 输出给储户的「现金」必须由子图某加工产生，这就是平衡的应用。
 
 \section{数据字典}
 
-数据字典（Data Dictionary）为 DFD 中的每个数据流、数据存储与数据项给出精确定义，是 DFD 的「词条说明」。常用下列记号：
+数据字典（Data Dictionary, DD）为 DFD 中的每个数据流、数据存储与数据项给出\textbf{精确定义}，是 DFD 的「词条说明」。DFD 与 DD 互补：图给出\textbf{结构与流向}，字典给出\textbf{内容与组成}。
+
+\subsection{记号的语义}
 
 \begin{table}[H]
 \centering
@@ -104,62 +159,198 @@ $(\ )$ & 可选（可有可无） & 电话 = 座机 + (手机) \\
 \end{tabulary}
 \end{table}
 
-例如订单的数据字典：
+\begin{quote}
+\textbf{记忆要点}：$+$ 表示「并且都要」，$[\ ]$ 表示「从里面挑一个」，$\{\ \}$ 表示「重复若干个」，$(\ )$ 表示「可要可不要」。把记号当作一种\textbf{正规文法的缩写}来读，就能写出精确的数据结构。
+\end{quote}
+
+\subsection{一个完整条目示例}
+
+一份订单的数据字典可以写成：
 
 \begin{align*}
-\text{订单} &= \text{订单号} + \text{客户} + \{\text{订单项}\} + \text{下单日期} \\
+\text{订单} &= \text{订单号} + \text{客户} + \{\text{订单项}\} + (\text{备注}) \\
+\text{订单号} &= 10\ \text{位数字} \\
+\text{客户} &= \text{客户号} + \text{姓名} + \text{收货地址} + (\text{联系电话}) \\
 \text{订单项} &= \text{商品号} + \text{数量} + \text{单价} \\
-\text{客户} &= \text{客户号} + \text{姓名} + (\text{联系电话})
+\text{收货地址} &= \text{省} + \text{市} + \text{街道} + \text{门牌号} \\
+\text{数量} &= 1\ \text{到}\ 999\ \text{的整数}
 \end{align*}
 
-数据字典与 DFD 必须保持一致：图里出现的每个名字，都应在字典中有精确的定义。
+读第一条即：一张订单由一个订单号、一个客户、零到多个订单项、以及可选的备注组成。数据存储的条目也可同样定义，例如：
 
-\section{模块化设计：耦合与内聚}
+\begin{align*}
+\text{订单表} &= \{\text{订单}\} \\
+\text{库存表} &= \{\text{商品号} + \text{当前数量} + \text{安全库存}\}
+\end{align*}
 
-模块化把系统划分为相对独立、单一职责的模块。衡量划分优劣的两个指标是\textbf{耦合}（模块之间联系的紧密程度）与\textbf{内聚}（模块内部各成分结合的紧密程度）。设计目标是\textbf{高内聚、低耦合}。
+\textbf{一致性要求}：DFD 中出现的每一个名字（数据流、数据存储），都必须在字典中有且仅有一条定义；反之字典中定义的名词，也应在某张 DFD 中出现。借助字典还能做\textbf{数据平衡检查}：用记号推导出的数据结构，可作为数据库表设计与测试用例设计的依据。
+
+\section{结构化设计：模块、耦合与内聚}
+
+结构化设计（Structured Design, SD）把分析阶段的 DFD 转换成设计阶段的\textbf{模块结构图}（structure chart）。模块化把系统划分为相对独立、单一职责的模块，其质量由\textbf{耦合}（模块之间联系的紧密程度）与\textbf{内聚}（模块内部各成分结合的紧密程度）共同衡量，目标是\textbf{高内聚、低耦合}。
+
+\subsection{模块结构图的量与术语}
+
+\begin{table}[H]
+\centering
+\caption{模块结构图的常用度量}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+术语 & 定义 & 设计倾向 \\
+\midrule
+模块 & 可独立命名、调用、测试的功能单元 & 职责单一 \\
+扇出 (fan-out) & 一个模块直接调用的下层模块个数 & 一般 $3\sim 7$，过大难维护 \\
+扇入 (fan-in) & 直接调用某模块的上层模块个数 & 越大表示复用越好 \\
+深度 (depth) & 模块层次的层数 & 反映控制的层次，过深难理解 \\
+宽度 (width) & 同一层中模块的最大个数 & 反映控制的跨度，过宽难协调 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+扇出过大意味着一个模块管得太多，扇入大说明该模块被多个上层复用，是我们追求的方向。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=Stealth,
+    mod/.style={draw, rectangle, minimum width=2.1cm, minimum height=0.85cm, fill=blue!6, align=center}]
+    \node[mod, fill=orange!18] (root) at (5,0) {订单处理};
+    \node[mod] (a) at (0,-1.8) {接收订单};
+    \node[mod] (b) at (3.3,-1.8) {核对库存};
+    \node[mod] (c) at (6.6,-1.8) {生成发货单};
+    \node[mod] (d) at (9.8,-1.8) {打印凭据};
+    \node[mod] (b1) at (3.3,-3.6) {查询库存};
+    \node[mod] (c1) at (6.6,-3.6) {写订单表};
+
+    \draw[->] (root) -- (a);
+    \draw[->] (root) -- (b);
+    \draw[->] (root) -- (c);
+    \draw[->] (root) -- (d);
+    \draw[->] (b) -- (b1);
+    \draw[->] (c) -- (c1);
+    \draw[->] (a) -- (b1);
+
+    \node[anchor=west, font=\scriptsize] at (10.7,-1.8) {扇入 $=2$};
+    \draw[->, gray] (10.6,-1.8) -- (3.3,-3.6);
+\end{tikzpicture}
+\caption{模块结构图示例：订单处理（根模块扇出为 4，查询库存模块的扇入为 2）}
+\end{figure}
 
 \subsection{耦合（Coupling）}
 
-耦合由低到高依次为：数据耦合、标记耦合、控制耦合、公共耦合、内容耦合（更完整地还包含非直接耦合与外部耦合）。耦合越低越好。
+耦合由低到高依次为：非直接耦合、数据耦合、标记耦合、控制耦合、外部耦合、公共耦合、内容耦合。\textbf{耦合越低越好}。
 
 \begin{table}[H]
 \centering
-\caption{耦合类型（从低到高）}
-\begin{tabulary}{\textwidth}{CCC}
+\caption{耦合类型（从低到高，越靠上越好）}
+\begin{tabulary}{\textwidth}{CCLL}
 \toprule
-类型 & 传递内容 & 说明 \\
+类型 & 传递内容 & 判定 & 说明 \\
 \midrule
-非直接耦合 & 无 & 模块之间无直接联系，最好 \\
-数据耦合 & 简单数据 & 通过参数传值（如传一个数），最常用的良好耦合 \\
-标记耦合 & 数据结构 & 传整个记录 / 结构，对方只用其中一部分 \\
-控制耦合 & 控制信息 & 传开关 / 标志以控制对方逻辑，增加理解难度 \\
-外部耦合 & 外部约束 & 都受同一外部环境 / 数据格式约束 \\
-公共耦合 & 公共数据区 & 多个模块共享全局变量，牵一发动全身 \\
-内容耦合 & 直接访问内部 & 一个模块直接访问另一模块内部数据 / 代码，最差 \\
+非直接耦合 & 无 & 两模块无直接联系 & 最好，模块完全独立 \\
+数据耦合 & 简单数据 & 参数只是基本数据项 & 最常用的良好耦合 \\
+标记耦合 & 数据结构 & 传整个记录，只用到其中一部分 & 造成不必要的数据依赖 \\
+控制耦合 & 控制信息 & 传开关 / 标志控制对方逻辑 & 增加理解与修改难度 \\
+外部耦合 & 外部约束 & 共同受外部格式 / 协议约束 & 如都依赖某文件格式 \\
+公共耦合 & 公共数据区 & 共享全局变量 & 牵一发而动全身 \\
+内容耦合 & 直接访问内部 & 一个模块直接访问另一模块内部数据 / 代码 & 最差，应彻底避免 \\
 \bottomrule
 \end{tabulary}
 \end{table}
+
+示例：模块 $A$ 调用 $B$ 时传「一个整数」——数据耦合；传「一整条记录而 $B$ 只用其中 `name` 字段」——标记耦合；传「布尔开关 `isPrint` 让 $B$ 决定是否打印」——控制耦合；$A$ 与 $B$ 通过全局变量 `gCount` 通信——公共耦合；$A$ 直接 `goto` 到 $B$ 内部标签或读写 $B$ 的私有变量——内容耦合。
 
 \subsection{内聚（Cohesion）}
 
-内聚由高到低依次为：功能内聚、顺序内聚、通信内聚、过程内聚、时间内聚、逻辑内聚、偶然内聚。内聚越高越好。
+内聚由高到低依次为：功能内聚、顺序内聚、通信内聚、过程内聚、时间内聚、逻辑内聚、偶然内聚。\textbf{内聚越高越好}。
 
 \begin{table}[H]
 \centering
-\caption{内聚类型（从高到低）}
-\begin{tabulary}{\textwidth}{CCC}
+\caption{内聚类型（从高到低，越靠上越好）}
+\begin{tabulary}{\textwidth}{CCLL}
 \toprule
-类型 & 结合方式 & 说明 \\
+类型 & 结合方式 & 判定 & 说明 \\
 \midrule
-功能内聚 & 单一功能 & 所有成分共同完成一个明确功能，最好 \\
-顺序内聚 & 数据顺序 & 上一步的输出是下一步的输入，数据顺序流动 \\
-通信内聚 & 同一数据 & 各成分操作同一输入数据或产生同一输出数据 \\
-过程内聚 & 执行顺序 & 各成分按固定流程顺序执行，但数据联系较弱 \\
-时间内聚 & 同一时段 & 各成分因需在同一时间段内执行而聚合（如初始化） \\
-逻辑内聚 & 逻辑相似 & 各成分逻辑上同类，由参数选择执行哪一部分 \\
-偶然内聚 & 无关系 & 各成分之间无明显关系，最差 \\
+功能内聚 & 单一功能 & 所有成分共同完成一个明确功能 & 最好，理想模块 \\
+顺序内聚 & 数据顺序 & 上一步输出即下一步输入 & 数据顺序流动，联系紧密 \\
+通信内聚 & 同一数据 & 各成分操作同一输入 / 输出数据 & 操作同数据但无顺序 \\
+过程内聚 & 执行顺序 & 按固定流程顺序执行，数据联系弱 & 仅靠流程绑定 \\
+时间内聚 & 同一时段 & 因需同时段执行而聚合 & 如初始化全部变量 \\
+逻辑内聚 & 逻辑相似 & 逻辑同类，由参数选择执行分支 & 多功能揉在一起 \\
+偶然内聚 & 无关系 & 各成分之间无明显关系 & 最差，无从命名 \\
 \bottomrule
 \end{tabulary}
 \end{table}
 
-\noindent\textbf{结论}：理想的模块划分是「高内聚、低耦合」——模块内部职责单一且各成分密切相关，模块之间只通过简单数据进行必要的通信。理想组合是「功能内聚 + 数据耦合」，这样模块更易理解、测试、复用与维护。
+示例：一个模块「计算订单总价」只做一件事——功能内聚；「读文件 $\to$ 解析每行」——顺序内聚；「初始化界面、初始化数据库连接」同属启动——时间内聚；把「打印、复制、排序」都塞进一个 `doEverything(type)` 由参数选择——逻辑内聚；毫无关系、只为省事的几行代码凑一起——偶然内聚。
+
+\subsection{高内聚、低耦合}
+
+理想的模块划分是「功能内聚 + 数据耦合」：模块内部只做一件事且各成分紧密协作，模块之间只通过简单数据进行必要的通信。这样的模块\textbf{易理解、易测试、易复用、易维护}——修改一个功能不必担心波及无关模块，替换一个实现也不必改动调用方。判断一个划分是否合理，可以问三个问题：这个模块能用一句话说清职责吗（内聚）？它需要的输入能否只用最简单的数据表达（耦合）？把它拿掉后其它模块还能独立工作吗（独立性）？
+
+\section{变换分析与事务分析}
+
+从 DFD 到结构图，并没有唯一答案，但有两种经典的映射策略。它们都先把 DFD 重新审视，找出\textbf{输入流、变换中心、输出流}的结构。
+
+\subsection{变换分析（Transform Analysis）}
+
+当 DFD 呈「输入 $\to$ 变换 $\to$ 输出」的线性形态时，可用变换分析。步骤如下：
+
+\begin{itemize}
+    \item 找出 DFD 中的\textbf{变换中心}（真正改变数据形态的那部分加工）；
+    \item 沿变换中心划出\textbf{输入流}（把外部数据变换为中心可用的形式）与\textbf{输出流}（把结果变换为外部需要的形态）；
+    \item 为变换中心建一个上层模块，为输入、输出各建一个分支，再逐层细化。
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=Stealth,
+    box/.style={draw, rectangle, minimum width=2.4cm, minimum height=1cm, fill=blue!6, align=center}]
+    \node[box, fill=green!10] (in) at (0,0) {输入流\\获得数据};
+    \node[box, fill=orange!18] (mid) at (4.6,0) {变换中心\\处理数据};
+    \node[box, fill=green!10] (out) at (9.2,0) {输出流\\输出结果};
+    \draw[->] (in) -- node[above, font=\scriptsize]{内部形式} (mid);
+    \draw[->] (mid) -- node[above, font=\scriptsize]{结果} (out);
+\end{tikzpicture}
+\caption{变换分析的 DFD 形态：输入流 $\to$ 变换中心 $\to$ 输出流}
+\end{figure}
+
+\subsection{事务分析（Transaction Analysis）}
+
+当 DFD 中某加工根据\textbf{事务类型}决定走不同处理路径时，用事务分析。它先把事务中心识别出来，再为每一种事务建立一条处理分支，每条分支撑从「输入」到「完成」的完整路径。
+
+示例：一个「单据处理」加工，按单据类型（入库单、出库单、退货单）分别调用不同处理流程，就是典型的事务结构。事务分析适合\textbf{多分支、分支结构相似}的场景。
+
+\begin{quote}
+\textbf{变换 vs.\ 事务}：变换分析处理的是「一条流水线」，事务分析处理的是「一个分发器下挂多条流水线」。实际系统中两者常混合使用：外层是事务分析（按请求类型分发），每条分支内部用变换分析（走输入—处理—输出）。
+\end{quote}
+
+\section{本章小结与常见误区}
+
+\subsection{本章小结}
+
+\begin{itemize}
+    \item 结构化分析的三条原则：\textbf{自顶向下、逐层分解、数据与处理分离}。
+    \item \textbf{DFD} 用外部实体、加工、数据存储、数据流四种元素描述数据处理过程；0 层是上下文图，1 层起逐层分解，必须满足\textbf{父子图平衡}。
+    \item \textbf{数据字典}用 $=,+,\{\ \},[\ ],|,(\ )$ 等记号精确描述数据组成，与 DFD 交叉印证。
+    \item \textbf{结构化设计}从 DFD 导出模块结构图，用\textbf{扇入 / 扇出、深度 / 宽度}度量结构，用\textbf{耦合（越低越好）与内聚（越高越好）}评价模块质量。
+    \item 映射策略有\textbf{变换分析}与\textbf{事务分析}两种，常混合使用。
+\end{itemize}
+
+\subsection{常见误区}
+
+\begin{table}[H]
+\centering
+\caption{结构化分析与设计中的常见误区}
+\begin{tabulary}{\textwidth}{LL}
+\toprule
+误区 & 纠正 \\
+\midrule
+DFD 里画流程箭头表示先后 / 判断分支 & DFD 只表达数据变换，控制时序属于流程图或状态图 \\
+外部实体之间直接连数据流 & 外部实体必须经加工交互，不能直连 \\
+分解后子图数据流凭空出现或消失 & 必须遵守父子图平衡，数据总量守恒 \\
+数据字典与 DFD 各写各的 & 两者名字必须一致，可交叉检查 \\
+只看内聚或只看耦合 & 两者需同时权衡，目标是高内聚 \textbf{且} 低耦合 \\
+扇出越大、模块越细越好 & 扇出过大难维护，独立性与职责单一才是目标 \\
+\bottomrule
+\end{tabulary}
+\end{table}

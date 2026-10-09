@@ -12,85 +12,444 @@
 \clearpage
 
 
-\section{最根本元起点}
+\section{数据、数据元素与数据对象}
+
+数据结构研究的出发点，是把现实世界中的信息抽象为计算机能够处理的形式。为此，
+必须先把几个由粗到细、由整体到局部的术语厘清：\textbf{数据}、\textbf{数据对象}、
+\textbf{数据元素}与\textbf{数据项}。它们共同刻画了“信息”在不同粒度上的组织方式。
 
 \begin{itemize}
-    \item \textbf{基本域}：$\mathbb{B} = \{0, 1\}$。
-    \item \textbf{比特序列空间}：$\mathbb{B}^* = \bigcup_{n=0}^{\infty} \mathbb{B}^n$。所有存储对象均为 $\mathbb{B}^*$ 中的元素。
-    \item \textbf{解释协议}：映射 $\mathcal{I}: \mathbb{B}^n \to \mathcal{D}$ 将比特流解释为数学对象 $\mathcal{D}$（整数、字符、地址等）。同一比特串在不同 $\mathcal{I}$ 下可解释为不同对象。
+    \item \textbf{数据（Data）}：信息的载体，是对客观事物的符号表示。凡能输入计算机
+          并被程序处理的符号集合都称为数据，记作 $\mathcal{D}$。整数、字符、图像、
+          声音均可视为数据。
+    \item \textbf{数据项（Data Item）}：数据不可分割的最小单位，也称字段（field），
+          记作 $f_j$。例如“学号”“姓名”各自就是一个数据项。
+    \item \textbf{数据元素（Data Element）}：数据的基本单位，由若干数据项组成，也称
+          记录（record），记作 $e_i$。它是程序处理时的整体对象。
+    \item \textbf{数据对象（Data Object）}：具有相同性质的数据元素的集合，记作
+          $\mathcal{O}$。它是某一数据元素的子集，是数据的子集。
 \end{itemize}
 
-\section{数字体系 (Number)}
+数据元素与数据项之间的组成关系可形式化地写为
+$$e_i = \langle f_{i1}, f_{i2}, \dots, f_{ik} \rangle, \quad f_{ij} \in \mathcal{F}$$
+而数据对象则是满足共同性质 $P$ 的元素之集：
+$$\mathcal{O} = \{\, e \mid e \text{ 具有性质 } P \,\} \subseteq \mathcal{D}$$
 
-\subsection{\texorpdfstring{自然数 ($\mathbb{N}$)}{自然数 (N)}}
+四者的粒度由大到小依次为：数据 $\supseteq$ 数据对象 $\supseteq$ 数据元素
+$\supseteq$ 数据项。下面用一个“学生表”把抽象概念落地。
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.4}
+\begin{tabulary}{\textwidth}{@{}LCC@{}} 
+\toprule
+\textbf{术语} & \textbf{定义} & \textbf{学生表示例} \\
+\midrule
+数据项（字段） & 不可分割的最小单位 & 学号、姓名、性别、年龄 \\
+数据元素（记录） & 由若干数据项组成的基本单位 & 一行学生记录 $(2021001,$ 张三$,\dots)$ \\
+数据对象 & 相同性质数据元素的集合 & 全体学生构成的学生集合 \\
+数据 & 一切可被计算机处理的符号集合 & 整个数据库中的所有表 \\
+\bottomrule
+\end{tabulary}
+\caption{数据、数据对象、数据元素、数据项的层次对比}
+\label{tab:terms}
+\end{table}
+
+\textbf{示例}：设学生记录 $e_1 = \langle 2021001, \text{张三}, \text{男}, 19 \rangle$，
+则 $2021001$、张三、男、$19$ 均为数据项，$e_1$ 为一个数据元素，而所有学生记录
+$\{e_1, e_2, \dots\}$ 构成一个数据对象。可见，同一个符号既可作数据项，也可在更高
+层次上组合为数据元素。
+
+\section{逻辑结构与存储结构的关系}
+
+仅知道数据元素本身还不够，真正决定数据结构性质的是元素之间的\textbf{关系}。由此
+引入两个既相互独立、又彼此制约的概念。
 
 \begin{itemize}
-    \item \textbf{对象}：$\mathbb{N} = \{0, 1, 2, \dots\}$。
-    \item \textbf{不变式（定长无符号）}：$n$ 位 $b = b_{n-1}\dots b_0 \in \mathbb{B}^n$，解码
-$$\mathcal{I}_{\mathbb{N}}(b) = \sum_{i=0}^{n-1} b_i 2^i, \quad \mathcal{I}_{\mathbb{N}}: \mathbb{B}^n \to [0, 2^n-1]$$
-为双射，值域 $[0,2^n-1]$。
-    \item \textbf{定理}：加法在环 $\mathbb{Z}_{2^n}$ 中封闭，溢出即模 $2^n$ 回绕。
+    \item \textbf{逻辑结构（Logical Structure）}：数据元素之间抽象关系的整体，是对
+          问题的数学描述，与计算机无关。它只回答“谁与谁相邻、谁是谁的前驱”。
+    \item \textbf{存储结构（物理结构，Storage Structure）}：逻辑结构在计算机存储器
+          中的映像，即如何用存储单元与地址实现逻辑关系，是具体的、与机器相关的。
 \end{itemize}
 
-\subsection{\texorpdfstring{整数 ($\mathbb{Z}$)}{整数 (Z)}}
-
-\begin{itemize}
-    \item \textbf{对象}：$\mathbb{Z} = \{\dots, -2, -1, 0, 1, 2, \dots\}$。
-    \item \textbf{原码}：$b = s\,m_{n-2}\dots m_0$，$s$ 为符号位，$\mathcal{I}_{\text{sign}}(b) = (-1)^s \sum_{i=0}^{n-2} m_i 2^i$。值域 $[-(2^{n-1}-1), 2^{n-1}-1]$，$s\,0\dots0$ 与 $s\,0\dots0$ 给出 $+0 \neq -0$ 双零。
-    \item \textbf{反码}：负数按位取反，$\mathcal{I}_{\text{ones}}(b) = \mathcal{I}_{\text{sign}}(b)$ 调整，仍有 $+0 = 0\dots0 \neq 1\dots1 = -0$ 双零；加法需循环进位（末位进位回加）。
-    \item \textbf{不变式（补码）}：$b = b_{n-1}\dots b_0 \in \mathbb{B}^n$，
-$$\mathcal{I}_{\mathbb{Z}}(b) = -b_{n-1}2^{n-1} + \sum_{i=0}^{n-2} b_i2^i$$
-符号位负权消除 $+0/-0$ 二义性。
-    \item \textbf{定理}：$\mathcal{I}_{\mathbb{Z}}: \mathbb{B}^n \to [-2^{n-1}, 2^{n-1}-1]$ 为双射；同一比特加法器对 $\mathcal{I}_{\mathbb{N}}$ 与 $\mathcal{I}_{\mathbb{Z}}$ 均正确（模 $2^n$ 同构），而原码加减需判符号、反码需循环进位。
-\end{itemize}
-
-\subsection{\texorpdfstring{实数/有理数 ($\mathbb{R} \to \mathbb{Q}_{\text{discrete}}$)}{实数/有理数 (R 到 Q discrete)}}
-
-\textbf{物理事实}：离散状态机无法精确表示连续无理数，实数离散化为 $\mathbb{Q}_{\text{discrete}} \subset \mathbb{Q}$。
+两者可分别形式化为二元组与三元组：
+$$\text{逻辑结构} = (D, R), \qquad \text{存储结构} = (D, R, M)$$
+其中 $D$ 为数据元素集合，$R$ 为元素间关系的集合，$M$ 为该关系在存储器中的映像方式
+（顺序、指针、索引、散列等）。二者的关系可概括为三点：
 
 \begin{enumerate}
-    \item \textbf{定点数 (Fixed-Point)}：$x = m \cdot B^{-f}$，$m \in \mathbb{Z}$，$f$ 固定。值域与精度由 $f$ 权衡。
-    \item \textbf{浮点数 (Floating-Point)}：
-    \begin{itemize}
-        \item \textbf{通用形式}：$x = (-1)^s \cdot m \cdot 2^e$，$s \in \mathbb{B}$，$m$ 为尾数，$e$ 为指数。
-        \item \textbf{IEEE 754 结构}：$n$ 位划分为 $[s \mid E \mid F]$，$k$ 为指数位宽，$p$ 为尾数位宽，偏置 $\text{Bias}=2^{k-1}-1$，$E_{\text{raw}} \in [0,2^k-1]$。
-        \begin{itemize}
-            \item $E_{\text{raw}}=0, F=0$：$\pm 0$。
-            \item $E_{\text{raw}}=0, F\neq0$：非规格化 $x=(-1)^s\cdot (F/2^p)\cdot 2^{1-\text{Bias}}$。
-            \item $1\le E_{\text{raw}}\le 2^k-2$：规格化 $x=(-1)^s\cdot (1+F/2^p)\cdot 2^{E_{\text{raw}}-\text{Bias}}$（隐含前导 $1$）。
-            \item $E_{\text{raw}}=2^k-1, F=0$：$\pm\infty$；$F\neq0$：$\text{NaN}$。
-        \end{itemize}
-        \item \textbf{实例参数}：binary32 $k=8,p=23,\text{Bias}=127$；binary64 $k=11,p=52,\text{Bias}=1023$。
-        \item \textbf{等价判定}：引入容差 $\epsilon>0$，$a\equiv_\epsilon b \iff |a-b|<\epsilon$，避免直接判等。
-    \end{itemize}
+    \item \textbf{逻辑结构是“设计”，存储结构是“实现”}。同一逻辑结构可有多种存储
+          映像，例如线性表既可顺序存储，也可链式存储。
+    \item \textbf{逻辑结构决定操作语义，存储结构决定操作效率}。前者规定“插入”意味着
+          什么，后者决定“插入”是 $O(1)$ 还是 $O(n)$。
+    \item \textbf{二者相互制约}。一旦选定存储结构，某些逻辑操作的实现便会受限，反之
+          某些逻辑需求也会排除部分存储方案。
 \end{enumerate}
 
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    n/.style={draw, circle, minimum size=0.5cm, inner sep=0pt, font=\small},
+    blk/.style={draw, minimum width=0.95cm, minimum height=0.55cm, font=\small},
+    a/.style={->, >=latex, thick},
+    lbl/.style={font=\small}
+]
+    \node[n] (r) at (0, 1.2) {$a$};
+    \node[n] (b) at (-0.9, 0) {$b$};
+    \node[n] (c) at (0.9, 0) {$c$};
+    \node[n] (d) at (0, -1.2) {$d$};
+    \draw (r) -- (b); \draw (r) -- (c); \draw (b) -- (d); \draw (c) -- (d);
+    \node[lbl, align=center] at (0, -2.0) {逻辑结构\\$(D,R)$ 抽象关系};
 
+    \draw[a, dashed] (3.0, 0) -- (4.4, 0) node[midway, above, lbl] {映像};
 
-\section{字符体系 (Character)}
+    \node[blk] (b0) at (5.4, 0.9) {$a$};
+    \node[blk] (b1) at (6.55, 0.9) {$b$};
+    \node[blk] (b2) at (5.9, 0.0) {$c$};
+    \node[blk] (b3) at (7.05, 0.0) {$d$};
+    \draw[a] (b0) -- (b2); \draw[a] (b1) -- (b2);
+    \node[lbl, align=center] at (6.2, -2.0) {存储结构\\$(D,R,M)$ 物理实现};
+\end{tikzpicture}
+\caption{同一逻辑结构到存储结构的映像}
+\label{fig:logic_physical}
+\end{figure}
+
+\section{四种基本逻辑结构}
+
+按元素之间前驱/后继关系的数量，逻辑结构可分为四种基本形态：\textbf{集合}、
+\textbf{线性结构}、\textbf{树形结构}与\textbf{图形结构}。
 
 \begin{itemize}
-    \item \textbf{对象}：有限字母表 $\Sigma$，字符串幺半群 $(\Sigma^*,\circ,\varepsilon)$。
+    \item \textbf{集合}：元素之间除“同属一个集合”外别无其他关系，元素彼此平等、无序。
+    \item \textbf{线性结构}：一对一关系。除首元无前驱、尾元无后继外，每个元素恰有一个
+          直接前驱和一个直接后继（如线性表、栈、队列）。
+    \item \textbf{树形结构}：一对多关系。每个元素至多一个直接前驱（双亲），可有多个直接
+          后继（孩子）；无前驱者称为根（如二叉树、堆）。
+    \item \textbf{图形结构}：多对多关系。每个元素的前驱与后继数目均不受限制，图中可含
+          回路（如社交网络、交通网）。
 \end{itemize}
 
-\subsection{ANSI / ASCII}
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    n/.style={draw, circle, minimum size=0.5cm, inner sep=0pt, font=\small},
+    b/.style={draw, rounded corners=2pt, minimum width=0.7cm, minimum height=0.5cm, font=\small},
+    a/.style={->, >=latex, thick},
+    lbl/.style={font=\bfseries\small}
+]
+    \draw[thick] (0, 0) ellipse (1.2 and 0.85);
+    \foreach \p in {(-0.5,0.35),(0.15,0.5),(0.55,0.1),(-0.25,-0.45),(0.4,-0.5),(0.7,-0.35)} {
+        \fill \p circle (2.4pt);
+    }
+    \node[lbl] at (0, -1.3) {集合 (Set)};
+
+    \node[b] (l1) at (5.2, 0) {$d_1$};
+    \node[b, right=0.55cm of l1] (l2) {$d_2$};
+    \node[b, right=0.55cm of l2] (l3) {$d_3$};
+    \node[b, right=0.55cm of l3] (l4) {$d_4$};
+    \draw[a] (l1) -- (l2);
+    \draw[a] (l2) -- (l3);
+    \draw[a] (l3) -- (l4);
+    \node[lbl] at (6.55, -1.3) {线性 (Linear)};
+
+    \node[n] (tr) at (1.4, -3.2) {$r$};
+    \node[n] (t1) at (0.3, -4.3) {};
+    \node[n] (t2) at (2.5, -4.3) {};
+    \node[n] (t3) at (-0.3, -5.4) {};
+    \node[n] (t4) at (0.9, -5.4) {};
+    \node[n] (t5) at (1.9, -5.4) {};
+    \node[n] (t6) at (3.1, -5.4) {};
+    \draw (tr) -- (t1); \draw (tr) -- (t2);
+    \draw (t1) -- (t3); \draw (t1) -- (t4);
+    \draw (t2) -- (t5); \draw (t2) -- (t6);
+    \node[lbl] at (1.4, -6.1) {树形 (Tree)};
+
+    \node[n] (g1) at (4.7, -3.4) {};
+    \node[n] (g2) at (6.4, -3.4) {};
+    \node[n] (g3) at (5.0, -4.9) {};
+    \node[n] (g4) at (6.7, -4.9) {};
+    \draw (g1) -- (g2); \draw (g1) -- (g3);
+    \draw (g2) -- (g4); \draw (g3) -- (g4);
+    \draw (g1) -- (g4);
+    \node[lbl] at (5.7, -6.1) {图形 (Graph)};
+\end{tikzpicture}
+\caption{四种基本逻辑结构}
+\label{fig:logic_structures}
+\end{figure}
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.4}
+\begin{tabulary}{\textwidth}{@{}LCCL@{}}
+\toprule
+\textbf{结构} & \textbf{前驱/后继} & \textbf{关系型} & \textbf{典型实例} \\
+\midrule
+集合 & 无 & 松散 & 并查集、哈希集合 \\
+线性结构 & 一对一 & 线性 & 线性表、栈、队列、串 \\
+树形结构 & 一对多 & 层次 & 二叉树、堆、B 树、字典树 \\
+图形结构 & 多对多 & 网状 & 有向/无向图、网络 \\
+\bottomrule
+\end{tabulary}
+\caption{四种基本逻辑结构对比}
+\label{tab:logic}
+\end{table}
+
+\section{四种存储映像}
+
+逻辑结构必须落到存储器上才能真正运行。常见的存储映像有四种：\textbf{顺序存储}、
+\textbf{链式存储}、\textbf{索引存储}与\textbf{散列存储}。它们各自用不同的手段实现
+“逻辑相邻”到“物理可达”的转换。
+
+\subsection{顺序存储（Sequential Storage）}
+
+用一组\textbf{连续}的存储单元依次存放数据元素，使逻辑上相邻的元素在物理上也相邻。
+设每个元素占用 $L$ 个存储单元，则第 $i$ 个元素的地址为
+$$LOC(a_i) = LOC(a_1) + (i-1)\cdot L, \quad 1 \le i \le n$$
+顺序存储无需附加指针，存储密度高，支持随机访问，这正是地址公式的直接结果。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    cell/.style={draw, minimum width=1.15cm, minimum height=0.7cm, font=\ttfamily},
+    a/.style={->, >=latex, thick},
+    lbl/.style={font=\small}
+]
+    \node[cell] (c0) at (0, 0) {$a_1$};
+    \node[cell] (c1) at (1.25, 0) {$a_2$};
+    \node[cell] (c2) at (2.5, 0) {$a_3$};
+    \node[cell] (c3) at (3.75, 0) {$\dots$};
+    \node[cell] (c4) at (5.0, 0) {$a_n$};
+    \draw[a] (c0.south) -- ++(0,-0.5) node[lbl, below] {$\beta$};
+    \draw[a] (c2.south) -- ++(0,-0.5) node[lbl, below] {$\beta+2L$};
+    \node[lbl, align=center, anchor=west] at (6.35, 0) {逻辑相邻\\即物理相邻};
+\end{tikzpicture}
+\caption{顺序存储映像：逻辑相邻即物理相邻}
+\label{fig:storage_seq}
+\end{figure}
+
+\subsection{链式存储（Linked Storage）}
+
+每个数据元素与若干指针组成一个\textbf{结点}：数据域存放元素值，指针域存放后继
+（或前驱）的地址。逻辑相邻关系由指针给出，因此结点在物理上可以任意离散分布。
+\begin{itemize}
+    \item \textbf{结点}：$n_k = (d_k, p_k)$，其中 $p_k$ 指向下一结点。
+    \item \textbf{不变式}：$p_k = \text{Addr}(n_{k+1})$，末尾结点 $p_{\text{last}} = \emptyset$。
+    \item \textbf{代价}：随机访问退化为 $O(n)$ 的链式遍历，但插入、删除只需改写常数个
+          指针即可完成。
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    lnode/.style={rectangle split, rectangle split horizontal, rectangle split parts=2,
+                  rectangle split part align={center, center},
+                  draw, minimum height=0.7cm, font=\ttfamily, inner sep=5pt},
+    a/.style={->, >=latex, thick},
+    lbl/.style={font=\small},
+    node distance=1.0cm
+]
+    \node[lnode] (d1) {$a_1$ \nodepart{two} $\bullet$};
+    \node[lnode, right=of d1] (d2) {$a_2$ \nodepart{two} $\bullet$};
+    \node[lnode, right=of d2] (d3) {$a_3$ \nodepart{two} $\emptyset$};
+    \draw[a] (d1.east) -- (d2.west);
+    \draw[a] (d2.east) -- (d3.west);
+    \node[lbl, align=center, below=0.45cm of d2] {数据域 $+$ 指针域；\\逻辑相邻由指针给出，物理位置可离散};
+\end{tikzpicture}
+\caption{链式存储映像：结点含指针，物理位置离散}
+\label{fig:storage_link}
+\end{figure}
+
+\subsection{索引存储（Indexed Storage）}
+
+在存储数据元素的同时，另建一张\textbf{索引表}，表项形如 $(k_i, p_i)$：$k_i$ 为
+关键字，$p_i$ 为该元素所在地址。查找时先在索引表中定位关键字，再按其地址取出数据
+元素。索引存储把“检索”与“存放”解耦，代价是额外的索引空间。
+
+\subsection{散列存储（Hash Storage）}
+
+通过\textbf{散列函数} $h: K \to \{0, 1, \dots, m-1\}$ 由关键字直接计算存储地址，
+理想情形下一次计算即可定位，期望查找时间为 $O(1)$。其代价是可能发生 \textbf{冲突}
+（$k_1 \neq k_2$ 而 $h(k_1) = h(k_2)$），需借助开放寻址或链地址法加以解决（详见
+后续“哈希表”一节）。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    cell/.style={draw, minimum width=1.15cm, minimum height=0.6cm, font=\small},
+    a/.style={->, >=latex, thick},
+    lbl/.style={font=\small}
+]
+    \node[lbl, anchor=west] at (-0.2, 2.3) {(a) 索引存储};
+    \node[lbl, anchor=east] at (-0.9, 0.5) {索引表};
+    \node[cell] (i1) at (0.1, 1.3) {$(k_1,p_1)$};
+    \node[cell] (i2) at (0.1, 0.5) {$(k_2,p_2)$};
+    \node[cell] (i3) at (0.1, -0.3) {$(k_3,p_3)$};
+    \node[cell] (r1) at (3.3, 1.3) {$e_1$};
+    \node[cell] (r2) at (3.3, 0.5) {$e_2$};
+    \node[cell] (r3) at (3.3, -0.3) {$e_3$};
+    \draw[a] (i1.east) -- (r1.west);
+    \draw[a] (i2.east) -- (r2.west);
+    \draw[a] (i3.east) -- (r3.west);
+    \node[lbl, anchor=west] at (4.3, 0.5) {数据主表};
+
+    \node[lbl, anchor=west] at (-0.2, -1.6) {(b) 散列存储};
+    \node[cell] (key) at (0.1, -2.4) {键 $k$};
+    \node[cell] (bk) at (2.3, -2.4) {$h(k)\bmod m$};
+    \node[cell] (slot) at (4.7, -2.4) {槽位};
+    \draw[a] (key) -- (bk);
+    \draw[a] (bk) -- (slot);
+    \node[lbl, align=center, anchor=west] at (5.7, -2.4) {散列函数\\直接计算地址};
+\end{tikzpicture}
+\caption{索引存储与散列存储的基本思想}
+\label{fig:storage_index_hash}
+\end{figure}
+
+\subsection{四种映像的对比}
+
+记存储密度 $\rho$（数据元素自身空间与结点总空间之比）：
+$$\rho = \frac{\text{数据元素自身占用空间}}{\text{结点占用总空间}}, \quad 0 < \rho \le 1$$
+链式与索引存储因附加指针或表项而 $\rho < 1$，顺序存储通常 $\rho = 1$。
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.35}
+\begin{tabulary}{\textwidth}{@{}LCCCC@{}}
+\toprule
+\textbf{维度} & \textbf{顺序} & \textbf{链式} & \textbf{索引} & \textbf{散列} \\
+\midrule
+单元是否连续 & 连续 & 不要求 & 数据可离散 & 数据可离散 \\
+随机访问 & $O(1)$ & $O(n)$ & $O(1)$ 经索引 & 期望 $O(1)$ \\
+插入/删除 & $O(n)$ & $O(1)$ & $O(1)+$维护 & 期望 $O(1)$ \\
+额外空间 & 极少 & 指针 & 索引表 & 空槽/链 \\
+典型应用 & 数组、向量 & 链表 & 数据库索引、倒排 & 字典、集合 \\
+\bottomrule
+\end{tabulary}
+\caption{四种存储映像的优缺点对比}
+\label{tab:storage_compare}
+\end{table}
+
+\section{顺序存储的地址计算}
+
+顺序存储的核心价值在于\textbf{随机访问}：只要知道公式，就能在 $O(1)$ 时间内算出任意
+元素的地址，无需从头遍历。
+
+\subsection{一维数组}
+
+设一维数组 $a_1, a_2, \dots, a_n$ 的起始地址为 $LOC(a_1)$，每个元素占 $L$ 个单元，
+则下标从 $1$ 起时
+$$LOC(a_i) = LOC(a_1) + (i-1)\cdot L, \quad 1 \le i \le n$$
+若下标从 $0$ 起，则相应改为 $LOC(a_i) = LOC(a_0) + i\cdot L$。
+
+\subsection{二维数组的行优先与列优先}
+
+设二维数组 $A$ 有 $m$ 行、$n$ 列，起始地址为 $LOC(a_{11})$，每元素占 $L$ 个单元。
+\textbf{行优先}（Row-Major）按行依次压平，元素 $a_{ij}$ 之前的元素数为 $(i-1)n+(j-1)$：
+$$LOC(a_{ij}) = LOC(a_{11}) + \big[(i-1)\cdot n + (j-1)\big]\cdot L$$
+\textbf{列优先}（Column-Major）按列依次压平，$a_{ij}$ 之前的元素数为 $(j-1)m+(i-1)$：
+$$LOC(a_{ij}) = LOC(a_{11}) + \big[(j-1)\cdot m + (i-1)\big]\cdot L$$
+可见两种布局的地址公式仅“行/列”与“$m$/$n$”互换。若下标从 $0$ 起，行优先公式化为
+$$LOC(a_{ij}) = LOC(a_{00}) + (i\cdot n + j)\cdot L$$
+
+\subsection{完整数值例题}
+
+\textbf{题目}：设二维数组 $A[1..4][1..5]$（$m = 4$ 行，$n = 5$ 列），
+$LOC(a_{11}) = 2000$，每个元素占 $L = 4$ 个字节。分别按行优先、列优先求
+$LOC(a_{34})$ 与 $LOC(a_{25})$。
+
+\textbf{行优先求解}：先算 $a_{34}$ 之前的元素数
+$$(3-1)\times 5 + (4-1) = 10 + 3 = 13$$
+于是
+$$LOC(a_{34}) = 2000 + 13 \times 4 = 2000 + 52 = 2052$$
+再算 $a_{25}$，其前元素数为 $(2-1)\times 5 + (5-1) = 5 + 4 = 9$，故
+$$LOC(a_{25}) = 2000 + 9 \times 4 = 2000 + 36 = 2036$$
+
+\textbf{列优先求解}：$a_{34}$ 之前的元素数为
+$$(4-1)\times 4 + (3-1) = 12 + 2 = 14$$
+于是
+$$LOC(a_{34}) = 2000 + 14 \times 4 = 2000 + 56 = 2056$$
+再算 $a_{25}$，其前元素数为 $(5-1)\times 4 + (2-1) = 16 + 1 = 17$，故
+$$LOC(a_{25}) = 2000 + 17 \times 4 = 2000 + 68 = 2068$$
+
+\textbf{结论}：同一元素在两种布局下的地址不同（$2052$ 与 $2056$；$2036$ 与 $2068$）。
+这说明地址计算必须与编译器的实际排列约定一致，否则会取到错误的数据。
+
+\section{索引存储与散列存储的基本思想}
 
 \begin{itemize}
-    \item \textbf{对象}：映射 $\phi: \{0,\dots,127\} \to \Sigma_{\text{ASCII}}$ 为双射，$|\Sigma_{\text{ASCII}}|=128$。
-    \item \textbf{不变式}：$7$ 位码 $\in [0,127]$。
+    \item \textbf{索引存储}：数据主表只负责存放元素，另设索引表 $(k_i, p_i)$ 记录关键字
+          到地址的映射。查找时先查索引表得到 $p_i$，再访问主表取出元素。其本质是把
+          “按关键字检索”转换为“按关键字查表 $+$ 按地址取数”，用额外空间换取检索效率。
+    \item \textbf{散列存储}：直接由关键字经散列函数计算存储地址，
+          $h: K \to \{0, \dots, m-1\}$，使平均查找时间趋近常数。由于关键字空间通常远
+          大于槽位数 $m$，由鸽巢原理知冲突不可避免，须以探测或链地址等策略处理。
 \end{itemize}
 
-\subsection{Unicode 架构}
+索引与散列代表了两种不同的设计哲学：索引是“以空间换时间，保序且可范围查询”，散列
+是“以计算换时间，均值极快但失去顺序”。二者常常并存于数据库与语言运行时之中。
+
+\section{抽象数据类型（ADT）}
+
+\textbf{抽象数据类型（Abstract Data Type, ADT）}是对一类数据的\textbf{数学抽象}，
+它只规定“有哪些数据、满足什么关系、可以施加哪些操作”，而\textbf{隐藏}这些操作在
+计算机内部的具体表示与实现。ADT 可形式化为三元组
+$$ADT = (D, R, P)$$
+其中 $D$ 为数据对象，$R$ 为 $D$ 上的关系集合，$P$ 为作用于 $D$ 的基本操作集合。每个
+操作以“前置条件”与“后置条件”加以刻画，而不涉及实现细节。
+
+ADT 具有两个层次：
 \begin{enumerate}
-    \item \textbf{抽象字符集 (UCS)}：全局空间 $\mathcal{U}$，$c\in\mathcal{U}$ 对应唯一码点 $u\in\mathbb{N}$，记 $\text{U}+XXXX$。
-    \item \textbf{编码方案 (UTF)}：$\psi: \mathcal{U}\to\mathbb{B}^*$ 具前缀可解码性。
-    \begin{itemize}
-        \item \textbf{UTF-8}：变长 $1$--$4$ 字节，
-        \begin{center}
-        \small
-        $U+0000$--$007F$: $0xxxxxxx$; $U+0080$--$07FF$: $110xxxxx\;10xxxxxx$; $U+0800$--$FFFF$: $1110xxxx\;10xxxxxx\;10xxxxxx$; $U+10000$--$10FFFF$: $11110xxx\;10xxxxxx\;10xxxxxx\;10xxxxxx$
-        \end{center}
-        向下兼容 ASCII（首字节 $0$ 判单字节）。
-        \item \textbf{UTF-16/32}：$\psi$ 的另两种实例化，码点到码元的定/变长映射。
-    \end{itemize}
+    \item \textbf{抽象层（对外接口）}：使用者的视角，只关心操作的语义与公理，不关心
+          内部结构。
+    \item \textbf{实现层（对内表示）}：实现者的视角，选择顺序或链式等存储结构完成接口，
+          并可更换而不影响使用者。
 \end{enumerate}
+
+\textbf{示例（ADT 复数）}：以复数为例说明 ADT 的三要素。
+\begin{itemize}
+    \item \textbf{数据对象 $D$}：$D = \{\, (r, i) \mid r, i \in \mathbb{R} \,\}$，即所有
+          复数。
+    \item \textbf{数据关系 $R$}：元素均为实数对的集合，形态固定为 $(r, i)$ 结构。
+    \item \textbf{基本操作 $P$}：
+    \begin{itemize}
+        \item $\text{Init}(c, r, i)$：构造实部为 $r$、虚部为 $i$ 的复数。
+        \item $\text{Add}(c_1, c_2)$、$\text{Sub}(c_1, c_2)$、$\text{Mul}(c_1, c_2)$：
+              复数四则运算。
+        \item $\text{GetReal}(c)$、$\text{GetImag}(c)$：读取实部、虚部，即观测算子。
+    \end{itemize}
+\end{itemize}
+
+\begin{itemize}
+    \item \textbf{实现与抽象分离}：同一个 ADT 复数既可用两个浮点数顺序存储，也可用极
+          坐标表示；只要对外操作语义不变，使用者的代码无需改动。
+    \item \textbf{与数据结构的区别}：ADT 是“接口/规约”，数据结构是“实现/载体”。前者
+          回答“能做什么”，后者回答“怎么做到”。
+\end{itemize}
+
+\section{本章小结与常见误区}
+
+本章沿“数据 $\to$ 逻辑结构 $\to$ 存储映像 $\to$ ADT”的主线梳理了数据结构的基本
+概念：数据由数据项组成数据元素，数据元素汇成数据对象；逻辑结构描述元素间的抽象
+关系，存储结构给出其物理实现；四种逻辑结构可映射为顺序、链式、索引、散列四种存储
+映像；顺序存储的地址公式实现了 $O(1)$ 随机访问，而 ADT 则把接口与实现彻底分离。
+
+\begin{table}[htbp]
+\centering
+\renewcommand{\arraystretch}{1.4}
+\begin{tabulary}{\textwidth}{@{}LL@{}}
+\toprule
+\textbf{常见误区} & \textbf{正确理解} \\
+\midrule
+把“数据元素”等同于“数据项” & 数据元素由若干数据项组成，粒度更粗 \\
+认为逻辑结构就是存储结构 & 逻辑结构抽象、与机器无关；存储结构是其物理映像，同一逻辑结构可有多种映像 \\
+认为顺序存储一定优于链式存储 & 顺序访问快但插入删除慢；链式反之，应按操作特征选择 \\
+把 ADT 等同于某个具体结构 & ADT 是接口规约，可用顺序或链式等多方案实现 \\
+忽略索引/散列的额外空间代价 & 索引表与空槽同样占用空间，需在时间与空间之间权衡 \\
+\bottomrule
+\end{tabulary}
+\caption{本章常见误区与辨析}
+\label{tab:pitfalls}
+\end{table}
+
+\textbf{易错提醒}：二维数组地址计算时务必区分行优先与列优先，并确认下标起点是 $0$ 还是
+$1$；链式存储的“插入删除 $O(1)$”以已知目标位置为前提，若需先查找则仍为 $O(n)$；
+散列存储的平均 $O(1)$ 是期望时间，最坏情形仍可能退化为 $O(n)$。

@@ -5,15 +5,43 @@
 \clearpage
 
 
-\subsection{计算机是什么}
+\subsection{计算机的发展与分类}
 
-计算机（Computer）是由处理器、存储器、输入输出设备组成的通用信息处理系统。它的核心功能可以用冯·诺依曼模型概括：
+计算机（Computer）是按预定程序自动、高速地对信息进行数值计算与逻辑处理的电子设备。自 1946 年 ENIAC 问世以来，其发展大体经历了四个阶段，如表 \ref{tab:generations} 所示。
+
+\begin{table}[H]
+\centering
+\caption{计算机发展的主要分代}
+\label{tab:generations}
+\begin{tabulary}{\textwidth}{CCCC}
+\toprule
+\textbf{分代} & \textbf{时期} & \textbf{核心器件} & \textbf{典型代表} \\
+\midrule
+第一代 & 1946--1957 & 电子管 & ENIAC、EDVAC \\
+第二代 & 1958--1964 & 晶体管 & IBM 7094 \\
+第三代 & 1965--1971 & 中小规模集成电路（SSI/MSI） & IBM System/360 \\
+第四代 & 1971 至今 & 大规模/超大规模集成电路（LSI/VLSI） & 微处理器（Intel 4004 起） \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+按用途可分为\textbf{通用计算机}与\textbf{专用计算机}；按规模与形态可分为巨型机、大型机、小型机、工作站、微型机（PC）与嵌入式系统。分类的边界随技术演进而不断模糊——今天的手机算力已超过昔日的大型机，因此更应关注其\textbf{体系结构共性}而非名义类别。
+
+\subsubsection{摩尔定律}
+
+\begin{definition}[摩尔定律]
+集成电路上可容纳的晶体管数目约每 18--24 个月翻一番，而单位成本基本不变。
+\end{definition}
+
+摩尔定律并非物理定律，而是对产业趋势的经验观察。它解释了为什么在价格不变的前提下算力持续攀升，也预示其终将遭遇物理极限（功耗墙、散热瓶颈、量子隧穿）。对学习组成原理的启示是：硬件的“免费午餐”终有尽头，性能提升必须回到\textbf{体系结构本身}——更聪明的流水线、更深的存储层次、更好的并行。
+
+\subsection{冯·诺依曼体系结构}
 
 \begin{definition}[冯·诺依曼体系结构]
 计算机由五大部件构成：
 \begin{itemize}
     \item 运算器（Arithmetic Logic Unit, ALU）：执行算术与逻辑运算
-    \item 控制器（Control Unit, CU）：取指令、译码、控制数据流向
+    \item 控制器（Control Unit, CU）：取指令、译码、发出控制信号
     \item 存储器（Memory）：存放程序与数据
     \item 输入设备（Input）：键盘、鼠标、传感器等
     \item 输出设备（Output）：显示器、打印机、网络接口等
@@ -22,46 +50,116 @@
 \end{definition}
 
 \begin{equation}
-\text{计算机 = CPU + 存储器 + I/O}
+\text{计算机} = \text{CPU} + \text{存储器} + \text{I/O}
 \end{equation}
 
-\subsection{存储程序原理}
+\subsubsection{五大部件与总线连接}
 
-冯·诺依曼模型的关键在于\textbf{指令和数据存放在同一个存储器中}，CPU 按顺序逐条取出并执行。这一设计使得计算机成为"通用机器"——更换程序即可完成不同任务，无需改动硬件。
+五大部件通过\textbf{系统总线}（数据总线、地址总线、控制总线）互连，如图 \ref{fig:von_neumann} 所示。控制器发出控制信号协调各部件，存储器既是数据仓库也是程序仓库。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    box/.style={draw, rounded corners, align=center, minimum width=2.6cm,
+                minimum height=1.0cm, font=\small, inner sep=4pt},
+    cpu/.style={box, fill=blue!10},
+    mem/.style={box, fill=green!12},
+    io/.style={box, fill=orange!15},
+    ar/.style={->, >=Stealth, thick},
+    bus/.style={draw, very thick}
+]
+    \node[cpu] (cu)  at (0,3)   {控制器\\CU};
+    \node[cpu] (alu) at (5,3)   {运算器\\ALU};
+    \node[mem] (mem) at (2.5,1) {存储器\\Memory};
+    \node[io]  (in)  at (-2.6,-1.4) {输入设备\\Input};
+    \node[io]  (out) at (7.6,-1.4)  {输出设备\\Output};
+
+    \draw[dashed, rounded corners] (-1.7,2.2) rectangle (6.7,3.9);
+    \node[font=\small\bfseries] at (2.5,4.15) {CPU};
+
+    \draw[bus] (-4.0,0) -- (9.0,0);
+    \node[font=\scriptsize, below right] at (-4.0,0) {系统总线（System Bus）};
+
+    \draw[ar] (cu.south)  -- (0,0);
+    \draw[ar] (alu.south) -- (5,0);
+    \draw[ar] (mem.south) -- (2.5,0);
+    \draw[ar] (in.north)  -- (-2.6,0);
+    \draw[ar] (out.north) -- (7.6,0);
+\end{tikzpicture}
+\caption{冯·诺依曼结构的五大部件与系统总线}
+\label{fig:von_neumann}
+\end{figure}
+
+\subsubsection{存储程序思想}
+
+冯·诺依曼模型的关键在于\textbf{指令和数据存放在同一个存储器中}，CPU 按顺序逐条取出并执行。这一设计使得计算机成为“通用机器”——更换程序即可完成不同任务，无需改动硬件。由此引申出三条要点：
+
+\begin{itemize}
+    \item \textbf{程序与数据同构}：二者都是二进制位串，由取用时机和语境区分。
+    \item \textbf{顺序执行}：默认按地址递增取指，除非遇到分支/跳转。
+    \item \textbf{指令驱动}：硬件不做主动决策，一切行为由指令序列决定。
+\end{itemize}
+
+\subsubsection{指令执行周期}
+
+每条指令的执行可分解为四个基本阶段，构成不断循环的“冯·诺依曼循环”，如图 \ref{fig:instruction_cycle} 所示。
 
 \begin{equation}
 \begin{aligned}
-&\text{Fetch} \rightarrow \text{Decode} \rightarrow \text{Execute} \\
-&\text{取指: } \text{PC} \rightarrow \text{MAR}, M[\text{MAR}] \rightarrow \text{MDR} \\
-&\text{译码: } \text{控制器解析操作码与地址码} \\
-&\text{执行: } \text{ALU运算 / 访存 / 跳转}
+\text{Fetch} &\to \text{Decode} \to \text{Execute} \to \text{Write-back} \\
+\text{取指：} & PC \to MAR,\quad M[MAR] \to MDR \\
+\text{译码：} & CU \text{ 解析操作码与地址码} \\
+\text{执行：} & ALU \text{ 运算 / 访存 / 计算跳转地址} \\
+\text{写回：} & \text{结果写回寄存器或存储器}
 \end{aligned}
 \end{equation}
 
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[
-    bx/.style={draw, rounded corners, minimum width=2.5cm, minimum height=0.9cm, font=\small, fill=blue!8},
-    e/.style={->, >=latex, thick},
-    lbl/.style={font=\small}
+    st/.style={draw, rounded corners, align=center, minimum width=2.7cm,
+               minimum height=1.15cm, font=\small, fill=violet!12},
+    e/.style={->, >=Stealth, thick}
 ]
-    \node[bx] (f) at (0,0) {取指 Fetch};
-    \node[bx] (d) at (4,0) {译码 Decode};
-    \node[bx] (x) at (4,-1.8) {执行 Execute};
-    \node[bx] (w) at (0,-1.8) {更新 PC};
-    \draw[e] (f)--(d);
-    \draw[e] (d)--(x);
-    \draw[e] (x)--(w);
-    \draw[e] (w)--(f);
-    \node[lbl] at (2,-2.7) {指令与数据同存，顺序驱动：冯·诺依曼循环};
+    \node[st] (f) at (0,0)    {取指\\Fetch};
+    \node[st] (d) at (3.6,0)  {译码\\Decode};
+    \node[st] (x) at (7.2,0)  {执行\\Execute};
+    \node[st] (w) at (10.8,0) {写回\\Write-back};
+
+    \draw[e] (f) -- (d);
+    \draw[e] (d) -- (x);
+    \draw[e] (x) -- (w);
+    \draw[e] (w.south) -- ++(0,-1.0) -| (f.south);
+    \node[align=center, font=\scriptsize] at (5.4,-1.8)
+        {每完成一条指令，PC 更新为下一条指令地址，循环往复};
 \end{tikzpicture}
-\caption{存储程序原理：取指—译码—执行循环}
-\label{fig:von_neumann_cycle}
+\caption{指令执行周期：取指 $\to$ 译码 $\to$ 执行 $\to$ 写回}
+\label{fig:instruction_cycle}
 \end{figure}
 
-\subsection{计算机层次结构}
+\subsection{计算机层次结构与软硬件接口}
 
-现代计算机是一个层次化系统，每一层对上一层隐藏细节：
+现代计算机是一个层次化系统，每一层对上一层隐藏细节，如图 \ref{fig:hierarchy} 所示。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    layer/.style={draw, minimum width=9.2cm, minimum height=0.82cm,
+                  align=center, font=\small}
+]
+    \node[layer, fill=red!12]     at (0, 4.5) {应用层：高级语言程序（C/Java/Python）};
+    \node[layer, fill=orange!15]  at (0, 3.5) {系统软件层：操作系统 / 编译器};
+    \node[layer, fill=yellow!22]  at (0, 2.5) {指令集层（ISA）：软硬件接口};
+    \node[layer, fill=green!16]   at (0, 1.5) {微体系结构层：流水线 / 缓存 / 乱序执行};
+    \node[layer, fill=blue!12]    at (0, 0.5) {数字逻辑层：门电路 / 寄存器 / 加法器};
+    \node[layer, fill=violet!14]  at (0,-0.5) {物理器件层：晶体管 / 导线 / 集成电路};
+
+    \draw[dashed, thick] (-4.8,2.0) -- (4.8,2.0);
+    \node[font=\scriptsize, right] at (4.9,2.0) {软硬件分界};
+\end{tikzpicture}
+\caption{计算机系统的层次结构：自上而下逐层抽象}
+\label{fig:hierarchy}
+\end{figure}
 
 \begin{itemize}
     \item \textbf{应用层}：高级语言程序（C/Java/Python）
@@ -72,25 +170,167 @@
     \item \textbf{物理器件层}：晶体管、导线、集成电路
 \end{itemize}
 
-"计算机组成原理"关注的是指令集层到数字逻辑层之间的内容——\textbf{硬件如何执行指令}。
+\textbf{指令集体系结构（ISA）}是软硬件之间的契约：它规定程序员可见的指令、寄存器与寻址方式，却不限定内部如何实现。同一 ISA 可以由不同的微体系结构实现（如 x86 由 Intel 与 AMD 分别实现），而上层软件无需改动即可运行。数据在各层之间的“翻译”链条为：
 
-\subsection{性能评价指标}
+\begin{equation}
+\text{高级语言} \to \text{机器指令（ISA）} \to \text{微体系结构} \to \text{逻辑门} \to \text{物理器件}
+\end{equation}
+
+“计算机组成原理”关注的是\textbf{指令集层到数字逻辑层之间}的内容——硬件如何执行指令、如何在速度、成本与功耗之间权衡。
+
+\subsection{性能评价}
+
+评价计算机性能时，最客观的指标是\textbf{运行某段程序的 CPU 时间}，而非单一部件指标。设程序执行的指令条数为 $IC$（Instruction Count），平均每条指令的时钟周期数为 $CPI$（Cycles Per Instruction），时钟周期为 $T_{\text{clk}}$，主频为 $f = 1/T_{\text{clk}}$，则：
+
+\begin{equation}
+T_{\text{CPU}} = IC \times CPI \times T_{\text{clk}} = \frac{IC \times CPI}{f}
+\end{equation}
+
+由该式可见，提升性能只有三条路径：\textbf{减少指令数}（更好的 ISA/编译器）、\textbf{降低 CPI}（更好的微体系结构）、\textbf{提高主频}（更好的电路与工艺）。吞吐量指标 \textbf{MIPS}（Million Instructions Per Second）定义为：
+
+\begin{equation}
+\text{MIPS} = \frac{f}{CPI \times 10^6}
+\end{equation}
 
 \begin{table}[H]
 \centering
-\caption{计算机性能核心公式}
-\label{tab:perf_formula}
+\caption{性能评价核心指标}
+\label{tab:perf}
 \begin{tabulary}{\textwidth}{CCC}
 \toprule
-\textbf{指标} & \textbf{公式} & \textbf{含义} \\
+\textbf{指标} & \textbf{公式} & \textbf{说明} \\
 \midrule
-CPU执行时间 & $T = \text{指令数} \times \text{CPI} \times \text{时钟周期}$ & 运行一段程序的总时间 \\
-CPI & 每条指令平均时钟周期数 & 效率指标 \\
-MIPS & 百万指令/秒 & 吞吐量指标 \\
-时钟频率 & $f = 1 / T_{\text{clk}}$ & CPU主频 \\
-Amdahl定律 & $S = \frac{1}{(1-f) + f/n}$ & 并行加速上限 \\
+时钟周期 & $T_{\text{clk}} = 1/f$ & 主频的倒数，基本时间粒度 \\
+CPU 时间 & $T_{\text{CPU}} = IC \times CPI \times T_{\text{clk}}$ & 程序运行总时间（越低越好） \\
+MIPS & $\text{MIPS} = \dfrac{f}{CPI \times 10^6}$ & 每秒百万条指令（越高越好） \\
+Amdahl 加速比 & $S = \dfrac{1}{(1-p)+p/n}$ & 并行/局部优化的加速上限 \\
 \bottomrule
 \end{tabulary}
 \end{table}
 
-% §1.5 已删除
+\begin{example}[由 IC、CPI、f 求 CPU 时间与 MIPS]
+某程序共执行 $IC = 1 \times 10^9$ 条指令，平均 $CPI = 2.5$，处理器主频 $f = 2\,\text{GHz}$。求该程序的 CPU 时间与 MIPS。
+
+\textbf{解：} 时钟周期为
+\begin{equation}
+T_{\text{clk}} = \frac{1}{f} = \frac{1}{2 \times 10^9} = 0.5\,\text{ns}
+\end{equation}
+CPU 时间为
+\begin{equation}
+T_{\text{CPU}} = IC \times CPI \times T_{\text{clk}}
+= 1 \times 10^9 \times 2.5 \times 0.5 \times 10^{-9} = 1.25\,\text{s}
+\end{equation}
+用频率形式验算：$T_{\text{CPU}} = \dfrac{IC \times CPI}{f} = \dfrac{10^9 \times 2.5}{2 \times 10^9} = 1.25\,\text{s}$，结果一致。MIPS 为
+\begin{equation}
+\text{MIPS} = \frac{f}{CPI \times 10^6} = \frac{2 \times 10^9}{2.5 \times 10^6} = 800
+\end{equation}
+即该处理器每秒执行约 8 亿条指令。
+\end{example}
+
+\subsection{Amdahl 定律}
+
+对系统做局部优化时，整体加速受\textbf{不可优化部分}的制约，这就是 Amdahl 定律。
+
+设优化前程序总时间为 $T$，其中可优化部分占比为 $p$，不可优化部分占比为 $1-p$。优化后该部分加速 $n$ 倍，则新时间为
+
+\begin{equation}
+T_{\text{new}} = (1-p)\,T + \frac{p}{n}\,T
+= T\left[(1-p) + \frac{p}{n}\right]
+\end{equation}
+
+故整体加速比为
+
+\begin{equation}
+S = \frac{T}{T_{\text{new}}} = \frac{1}{(1-p) + \dfrac{p}{n}}
+\end{equation}
+
+当 $n \to \infty$ 时 $p/n \to 0$，得到\textbf{加速上限}
+
+\begin{equation}
+S_{\max} = \lim_{n \to \infty} S = \frac{1}{1-p}
+\end{equation}
+
+换言之，无论怎样加速可优化部分，整体加速比都无法突破 $1/(1-p)$——“串行部分是并行加速的天花板”。
+
+\begin{example}[Amdahl 定律的加速比与上限]
+某程序中可并行化部分占 $p = 80\%$，用 $n = 4$ 个处理器加速该部分。求整体加速比与理论加速上限。
+
+\textbf{解：} 代入公式
+\begin{equation}
+S = \frac{1}{(1-p) + p/n}
+= \frac{1}{(1-0.8) + 0.8/4}
+= \frac{1}{0.2 + 0.2} = 2.5
+\end{equation}
+即 4 个处理器仅带来 $2.5$ 倍整体加速（远小于 4）。当处理器数趋于无穷时
+\begin{equation}
+S_{\max} = \frac{1}{1-p} = \frac{1}{0.2} = 5
+\end{equation}
+即便使用无穷多个处理器，整体最多也只能加速 $5$ 倍。可见把 $p$ 从 $80\%$ 提升到 $90\%$ 比堆叠更多处理器更有效。
+\end{example}
+
+\subsection{基本概念：字长、主频、时钟周期与 CPI}
+
+\begin{definition}[机器字长]
+CPU 中通用寄存器（或数据通路）的位数，通常等于一次能并行处理、运算的二进制位数。字长决定机器的寻址空间、运算精度与数据表示范围（如 32 位机、64 位机）。
+\end{definition}
+
+\begin{itemize}
+    \item \textbf{主频 $f$}：CPU 时钟每秒振荡的次数，单位 Hz。$f$ 越高，单位时间内的时钟节拍越多。
+    \item \textbf{时钟周期 $T_{\text{clk}}$}：一个时钟节拍的时间，$T_{\text{clk}} = 1/f$，是 CPU 工作的最小时间单位。
+    \item \textbf{CPI}：执行一条指令平均所需的时钟周期数，$\text{CPI} = \dfrac{\text{总时钟周期数}}{IC}$；它取决于指令混合与微体系结构，并非常数。
+\end{itemize}
+
+三者与指令数共同决定 CPU 时间，关系可归纳为：
+
+\begin{equation}
+T_{\text{CPU}} = \frac{IC \times CPI}{f}
+\quad\Longleftrightarrow\quad
+CPI = \frac{T_{\text{CPU}} \times f}{IC}
+\end{equation}
+
+\begin{table}[H]
+\centering
+\caption{基本概念一览}
+\label{tab:concepts}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+\textbf{概念} & \textbf{符号} & \textbf{关系/含义} \\
+\midrule
+机器字长 & $W$ & 一次并行处理的位数，决定精度与寻址 \\
+主频 & $f$ & 每秒时钟次数，单位 Hz \\
+时钟周期 & $T_{\text{clk}}$ & $T_{\text{clk}} = 1/f$，最小时间单位 \\
+每条指令周期数 & $CPI$ & 总周期数 / 指令数，随程序变化 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{本章小结与常见误区}
+
+本章从冯·诺依曼体系出发，勾勒了计算机的部件构成、层次结构与性能评价方法，核心结论如下：
+
+\begin{itemize}
+    \item 冯·诺依曼体系 = 五大部件 + \textbf{存储程序}，程序与数据同存于内存。
+    \item 指令执行周期为 \textbf{取指 $\to$ 译码 $\to$ 执行 $\to$ 写回}，由 PC 驱动循环。
+    \item 计算机是分层的，\textbf{ISA 是软硬件的接口}，微体系结构负责实现 ISA。
+    \item 性能的核心指标是 CPU 时间 $T_{\text{CPU}} = IC \times CPI / f$，MIPS 是吞吐量指标。
+    \item Amdahl 定律表明局部优化的整体收益受串行部分限制，上限为 $1/(1-p)$。
+\end{itemize}
+
+初学者常犯的错误汇总于表 \ref{tab:pitfalls}。
+
+\begin{table}[H]
+\centering
+\caption{常见误区与正解}
+\label{tab:pitfalls}
+\begin{tabulary}{\textwidth}{CC}
+\toprule
+\textbf{误区} & \textbf{正解} \\
+\midrule
+主频越高，程序一定越快 & 还取决于 CPI 与指令数；不同 ISA 之间不能直接比主频 \\
+MIPS 越大性能越好 & MIPS 只在同一 ISA、同一程序下才可比较 \\
+增加处理器/核数可无限加速 & 受 Amdahl 上限 $1/(1-p)$ 约束，串行部分决定天花板 \\
+CPI 是处理器固定常数 & 随指令混合与微体系结构而变，是平均值 \\
+指令和数据是两种不同的存储 & 二者同存于内存，仅由使用方式区分（存储程序思想） \\
+\bottomrule
+\end{tabulary}
+\end{table}
