@@ -595,7 +595,7 @@ export const ieee754Module: ModuleDef<Scene, Cfg> = {
     "十进制 ↔ $S|E|M$，32 位 $Bias127$ / 64 位 $Bias1023$，特殊值同理。",
     "Decimal ↔ $S|E|M$, 32/64-bit.",
   ),
-  tags: ["data-structures", "computer-organization"],
+  tags: ["data-structures"],
   defaultConfig: DEFAULT_CFG,
   randomize(c) {
     if (c.mode === "encode") {

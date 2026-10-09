@@ -1,0 +1,271 @@
+\clearpage
+\begingroup
+\let\clearpage\relax
+\let\cleardoublepage\relax
+\vspace*{\fill}
+\chapter{同步与并发}
+\begin{center}
+多个进程或线程并发访问共享资源时会产生竞态，同步机制用于保证结果的可再现与正确性。本章从临界区问题的三个必要条件出发，依次介绍 Peterson 算法、信号量（P/V）与生产者-消费者、读者-写者问题、管程与条件变量，最后讨论死锁的四个必要条件、资源分配图与银行家算法。
+\end{center}
+\vspace*{\fill}
+\endgroup
+\clearpage
+
+\section{临界区问题}
+
+多个进程并发访问共享数据，执行的相对顺序不确定，其最终结果依赖于调度时序，这种现象称为\textbf{竞态条件 (race condition)}。把访问共享资源的代码称为\textbf{临界区 (critical section)}。
+
+\subsection{三个必要条件}
+
+任何正确的临界区解决方案必须同时满足以下三个条件。
+
+\begin{table}[H]
+\centering
+\caption{临界区问题的三个必要条件}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+条件 & 含义 & 反例 \\
+\midrule
+互斥 (Mutual Exclusion) & 任一时刻至多一个进程处于临界区 & 两进程同时写同一变量 \\
+前进 (Progress) & 临界区空闲且有进程想进入时，能及时选出进入者，不被无关进程无限阻塞 & 只剩空闲却无人能进 \\
+有限等待 (Bounded Waiting) & 一个进程发出进入请求后，在它之前允许其他进程进入的次数有上界 & 某进程被无限插队饿死 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{equation}
+    \text{互斥} \ \wedge\ \text{前进} \ \wedge\ \text{有限等待} \;\Longrightarrow\; \text{正确同步}
+\end{equation}
+
+仅靠「标志数组」或「轮转」单独使用都无法同时满足三条件：纯标志会互相礼让导致死锁，纯轮转虽保证互斥却违反前进。
+
+\subsection{Peterson 算法}
+
+Peterson 算法是满足三条件的经典软件方案，适用于两个进程。它组合了「意愿标志 \texttt{flag}」与「轮转变量 \texttt{turn}」，其中 \texttt{turn} 用于打破对称僵局。
+
+\begin{lstlisting}[language=C, caption={Peterson 算法（进程 $i$，对方为 $j = 1-i$）}]
+flag[i] = true;          // 声明我想进入临界区
+turn = j;                // 但先把机会让给对方
+while (flag[j] && turn == j) { /* 忙等待 */ }
+
+/* ----- 临界区 ----- */
+
+flag[i] = false;         // 退出后撤销意愿
+/* ----- 剩余区 ----- */
+\end{lstlisting}
+
+\begin{enumerate}
+    \item 置 \texttt{flag[i]=true}，表明进程 $i$ 有进入意图。
+    \item 置 \texttt{turn=j}，把优先权交给对方。当两者同时竞争时，\texttt{turn} 的最后一次写入决定了谁等待。
+    \item 循环等待：只要对方也想进入且 \texttt{turn} 指向对方，就让其先进入。
+    \item 进入临界区，执行完后置 \texttt{flag[i]=false}，允许对方进入。
+\end{enumerate}
+
+\textbf{正确性}：若两进程同时进入 while，则 \texttt{turn} 只能取一个值，其中一方必然满足 \texttt{turn != j} 而跳出，保证\textbf{互斥}；退出者一旦置 \texttt{flag=false}，等待者即可进入，满足\textbf{前进}；对方至多进入一次后 \texttt{turn} 被改写，满足\textbf{有限等待}。但 Peterson 依赖顺序一致的内存模型，在多核弱一致内存上需内存屏障。
+
+\section{信号量}
+
+\subsection{P/V 操作}
+
+信号量 $S$ 是一个受保护的整型变量，只能通过两个\emph{原子}操作访问：
+
+\begin{lstlisting}[language=C, caption={信号量的 wait (P) 与 signal (V)}]
+wait(S):            // P 操作 / 申请资源，可能阻塞
+    S.value--;      // 也可写为 while (S.value <= 0) ;
+    if (S.value < 0)
+        block();    // 无资源则入等待队列
+
+signal(S):          // V 操作 / 释放资源，可唤醒等待者
+    S.value++;
+    if (S.value <= 0)
+        wakeup();   // 尚有等待者，唤醒其一
+\end{lstlisting}
+
+\begin{itemize}
+    \item \textbf{二元信号量 (binary semaphore)}：取值仅 $\{0,1\}$，退化为互斥锁，用于临界区互斥。
+    \item \textbf{计数信号量 (counting semaphore)}：取值为非负整数 $n$，表示可用资源数量，初值即资源总数。
+\end{itemize}
+
+P、V 必须成对出现；P 阻塞调用者，V 唤醒一个等待者。若把 P/V 原子性破坏，互斥就会失效。
+
+\subsection{生产者-消费者问题}
+
+设缓冲区容量为 $n$，信号量 \texttt{mutex} 保护缓冲区本身的互斥访问，\texttt{empty}、\texttt{full} 分别表示空槽与满槽数量。
+
+\begin{lstlisting}[language=C, caption={生产者-消费者（有限缓冲区）}]
+semaphore mutex = 1;   // 缓冲区互斥
+semaphore empty = n;   // 空槽数
+semaphore full  = 0;   // 满槽数
+
+producer():                       consumer():
+    while (true) {                    while (true) {
+        item = produce();                 wait(full);    // 等待有产品
+        wait(empty);    // 等空槽          wait(mutex);   // 进入临界区
+        wait(mutex);    // 进入临界区      item = take();  // 取走并腾出
+        put(item);                        signal(mutex);
+        signal(mutex);                    signal(empty); // 空槽 +1
+        signal(full);   // 产品数 +1      consume(item);
+    }                                 }
+\end{lstlisting}
+
+\textbf{顺序要点}：必须先 \texttt{wait(empty)} 再 \texttt{wait(mutex)}。若颠倒，生产者可能持有 \texttt{mutex} 却在 \texttt{empty} 上阻塞，消费者无法进入而永久等待，形成死锁。
+
+\subsection{读者-写者问题}
+
+允许多个读者同时读，但写者必须独占。第一类（读者优先）可能使写者饥饿；第二类（写者优先）可能使读者饥饿。
+
+\begin{lstlisting}[language=C, caption={读者-写者（读者优先）}]
+semaphore rw_mutex = 1;  // 读写的互斥锁
+semaphore mutex    = 1;  // 保护 read_count
+int read_count = 0;
+
+reader():                              writer():
+    wait(mutex);                           wait(rw_mutex);
+    read_count++;                          /* 写操作 */
+    if (read_count == 1) wait(rw_mutex);   signal(rw_mutex);
+    signal(mutex);
+    /* 读操作 */
+    wait(mutex);
+    read_count--;
+    if (read_count == 0) signal(rw_mutex);
+    signal(mutex);
+\end{lstlisting}
+
+\section{管程与条件变量}
+
+管程 (monitor) 是把共享变量和操作它们的过程封装在一起的高级同步抽象：任一时刻只允许一个进程在管程内活动，互斥由编译器/运行库隐式保证，无需手工加锁。管程内用\textbf{条件变量}实现等待与唤醒。
+
+\begin{table}[H]
+\centering
+\caption{管程内条件变量的操作}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+操作 & 语义 & 说明 \\
+\midrule
+\texttt{c.wait()} & 释放管程锁并阻塞于条件 $c$ & 被唤醒后须重新获得管程锁才返回 \\
+\texttt{c.signal()} & 唤醒一个等待 $c$ 的进程 & 若无等待者则该调用无效果 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{lstlisting}[language=C, caption={管程实现生产者-消费者}]
+monitor BoundedBuffer {
+    item buf[n]; int count = 0;
+    condition notFull, notEmpty;   // 条件变量
+
+    void produce(item x) {
+        if (count == n) notFull.wait();   // 满则等待
+        buf[in] = x; in = (in + 1) % n; count++;
+        notEmpty.signal();                // 唤醒等待的消费者
+    }
+    item consume() {
+        if (count == 0) notEmpty.wait();  // 空则等待
+        item x = buf[out]; out = (out + 1) % n; count--;
+        notFull.signal();                 // 唤醒等待的生产者
+        return x;
+    }
+}
+\end{lstlisting}
+
+条件变量与信号量不同：信号量有计数值并可跨进程传递状态，而 \texttt{signal} 只在已有等待者时才生效，且不保存「许可」。因此需用 \texttt{while} 而非 \texttt{if} 重新检查条件（Mesa 语义下可能虚假唤醒）。
+
+\section{死锁}
+
+\subsection{四个必要条件}
+
+死锁 (deadlock) 指一组进程因互相等待对方持有的资源而永久阻塞。四个条件必须\emph{同时}成立才可能死锁；破坏任一条件即可预防。
+
+\begin{table}[H]
+\centering
+\caption{死锁的四个必要条件}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+条件 & 含义 & 破坏策略 \\
+\midrule
+互斥 (Mutual Exclusion) & 资源一次只能被一个进程占用 & 尽量共享（如只读文件） \\
+占有并等待 (Hold and Wait) & 持有资源的同时等待新资源 & 一次性申请全部资源 \\
+不可抢占 (No Preemption) & 资源只能被持有者主动释放 & 允许抢占、回滚 \\
+循环等待 (Circular Wait) & 存在进程-资源的环形等待链 & 给资源编号，按序申请 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{资源分配图}
+
+资源分配图用有向图描述时刻状态：圆形表示进程 $P$，方形表示资源 $R$（内部黑点表示实例数）。$P \to R$ 为\textbf{请求边}，$R \to P$ 为\textbf{分配边}。图中出现\emph{环}是死锁的必要条件：单实例时环即死锁；多实例时环只是可能死锁，还需结合可用实例判断。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=stealth, node distance=1.5cm]
+    % 资源
+    \node[draw, rectangle, fill=orange!12, minimum size=1cm] (r1) {$R_1$};
+    \node[draw, rectangle, fill=orange!12, minimum size=1cm, right=3cm of r1] (r2) {$R_2$};
+    \fill (r1.center) ++(-0.18,0) circle (2pt);
+    \fill (r2.center) ++(0,0) circle (2pt);
+    \fill (r2.center) ++(0.22,0) circle (2pt);
+    % 进程
+    \node[draw, circle, fill=blue!8] (p1) at ($(r1)+(0,-3)$) {$P_1$};
+    \node[draw, circle, fill=blue!8] (p2) at ($(r2)+(0,-3)$) {$P_2$};
+    % 分配: R1 -> P1 ; R2 -> P2
+    \draw[->] (r1) -- (p1);
+    \draw[->] (r2) -- (p2);
+    % 请求: P1 -> R2 ; P2 -> R1
+    \draw[->] (p1) to[bend left=15] (r2);
+    \draw[->] (p2) to[bend left=15] (r1);
+    \node[font=\footnotesize, below=0.2cm of p1] {持有 $R_1$、请求 $R_2$};
+    \node[font=\footnotesize, below=0.2cm of p2] {持有 $R_2$、请求 $R_1$};
+\end{tikzpicture}
+\caption{资源分配图：$P_1$ 与 $P_2$ 互相请求对方持有的资源，形成环}
+\end{figure}
+
+\subsection{银行家算法}
+
+银行家算法在进程提出资源请求时进行\textbf{安全性检查}：若分配后系统仍处于安全状态则满足请求，否则推迟，从而避免死锁。
+
+\begin{align}
+    Need[i] &= Max[i] - Allocation[i] \\
+    Available' &= Available + Allocation[i] \quad (\text{当 } Need[i] \le Available)
+\end{align}
+
+\begin{algorithm}[H]
+\caption{银行家算法：安全性检查}
+\begin{algorithmic}[1]
+\State 令 $Work = Available$，$Finish[i] = \text{false}\ (i=1,\dots,n)$
+\While{存在 $i$ 使 $Finish[i]=\text{false}$ 且 $Need[i] \le Work$}
+    \State $Work \gets Work + Allocation[i]$
+    \State $Finish[i] \gets \text{true}$
+    \State \textbf{输出} $i$（加入安全序列）
+\EndWhile
+\If{所有 $Finish[i]=\text{true}$}
+    \State \Return \textbf{安全}，安全序列即输出顺序
+\Else
+    \State \Return \textbf{不安全}（可能死锁）
+\EndIf
+\end{algorithmic}
+\end{algorithm}
+
+\noindent 以经典例子 $Available=(3,3,2)$ 说明：
+
+\begin{table}[H]
+\centering
+\caption{银行家算法示例（资源类型 $A,B,C$）}
+\begin{tabulary}{\textwidth}{CCCCC}
+\toprule
+进程 & $Max$ & $Allocation$ & $Need$ & 完成顺序 \\
+\midrule
+$P_0$ & (7,5,3) & (0,1,0) & (7,4,3) & 4 \\
+$P_1$ & (3,2,2) & (2,0,0) & (1,2,2) & 1 \\
+$P_2$ & (9,0,2) & (3,0,2) & (6,0,0) & 5 \\
+$P_3$ & (2,2,2) & (2,1,1) & (0,1,1) & 2 \\
+$P_4$ & (4,3,3) & (0,0,2) & (4,3,1) & 3 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+检查过程：$Need[P_1]=(1,2,2)\le(3,3,2)$，完成后 $Work=(5,3,2)$；$Need[P_3]=(0,1,1)\le Work$，$Work=(7,4,3)$；$Need[P_4]=(4,3,1)\le Work$，$Work=(7,4,5)$；$Need[P_0]=(7,4,3)\le Work$，$Work=(7,5,5)$；最后 $Need[P_2]=(6,0,0)\le Work$ 完成。
+
+\begin{equation}
+    \text{安全序列：}\ P_1 \to P_3 \to P_4 \to P_0 \to P_2
+\end{equation}
+
+存在安全序列说明系统当前安全，即使各进程按此顺序依次申请，也能全部完成；否则系统进入不安全状态，应采用资源预分配、避免或恢复（抢占、回滚、终止进程）等策略。

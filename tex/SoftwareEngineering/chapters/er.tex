@@ -1,0 +1,171 @@
+\clearpage
+\begingroup
+\let\clearpage\relax
+\let\cleardoublepage\relax
+\vspace*{\fill}
+\chapter{数据建模与 ER}
+\begin{center}
+数据建模把现实世界抽象为「实体--联系--属性」，再用 ER 图与关系模式两种语言描述同一份语义。本章从 ER 的基本构件出发，给出到关系模式的转换规则，并用函数依赖与范式刻画「好」的模式。
+\end{center}
+\vspace*{\fill}
+\endgroup
+\clearpage
+
+\tikzset{
+  entity/.style={draw, rectangle, thick, minimum width=2.4cm, minimum height=1.0cm, align=center, fill=blue!6},
+  weakentity/.style={draw, rectangle, double, double distance=1.5pt, thick, minimum width=2.4cm, minimum height=1.0cm, align=center, fill=blue!6},
+  rel/.style={draw, diamond, thick, aspect=1.8, minimum width=2.0cm, minimum height=1.2cm, align=center, fill=orange!15},
+  weakrel/.style={draw, diamond, double, double distance=1.5pt, thick, aspect=1.8, minimum width=2.0cm, minimum height=1.2cm, align=center, fill=orange!15},
+  attr/.style={draw, ellipse, minimum width=1.5cm, minimum height=0.65cm, align=center, font=\scriptsize, fill=green!6},
+  keyattr/.style={draw, ellipse, minimum width=1.5cm, minimum height=0.65cm, align=center, font=\scriptsize, fill=green!18},
+  pkeyattr/.style={draw, ellipse, dashed, minimum width=1.5cm, minimum height=0.65cm, align=center, font=\scriptsize, fill=green!6},
+}
+
+\section{实体、属性与键}
+
+\begin{itemize}
+    \item \textbf{实体（Entity）}：客观存在且可相互区分的事物；同类实体的集合称为\textbf{实体集}。
+    \item \textbf{属性（Attribute）}：实体具有的特征。可分为简单/复合、单值/多值、存储/派生属性。
+    \item \textbf{键（Key）}：能唯一标识实体的属性或属性组，是实体集与其属性的核心约束。
+    \item \textbf{弱实体（Weak Entity）}：自身没有完整主键，必须依附于某个\textbf{强实体}（标识实体）而存在；它的\textbf{部分键}只在本实体内唯一。
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{键的分类}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+键 & 含义 & 示例 \\
+\midrule
+超键 (Superkey) & 能唯一标识元组的属性组（可含冗余属性） & \{学号, 姓名\} \\
+候选键 (Candidate Key) & 最小的超键，去掉任一属性都不能唯一标识 & \{学号\}、\{身份证号\} \\
+主键 (Primary Key) & 从候选键中指定的一个，非空、唯一 & 学号 \\
+外键 (Foreign Key) & 引用另一关系主键的属性（组），可为空 & 选课.学号 \\
+部分键 (Partial Key) & 弱实体内用于区分同类实体的属性 & 订单项的「行号」 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small]
+  \node[entity] (e) at (0,0) {实体集};
+  \node[rel] (r) at (3.4,0) {联系集};
+  \node[attr] (a) at (7.0,0) {属性};
+  \node[keyattr] (k) at (10.2,0) {\underline{主键}};
+  \node[weakentity] (w) at (0,-2.0) {弱实体};
+  \node[weakrel] (wr) at (3.4,-2.0) {标识联系};
+  \node[attr, dashed] (m) at (7.0,-2.0) {多值属性};
+  \node[pkeyattr] (p) at (10.2,-2.0) {\underline{部分键}};
+\end{tikzpicture}
+\caption{ER 图的基本符号：矩形=实体集，菱形=联系集，椭圆=属性，下划线=主键，双线=弱实体/标识联系，虚线=多值或部分键}
+\end{figure}
+
+\section{联系与基数}
+
+联系（Relationship）刻画实体之间的语义关联。其\textbf{基数}（一对一、一对多、多对多）由参与实体集的映射基数决定；\textbf{参与约束}则规定实体是否必须参与联系。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, node distance=1.0cm and 1.4cm]
+  \node[entity] (stu) at (0,0) {学生};
+  \node[rel] (sc) at (4.0,0) {选修};
+  \node[entity] (course) at (8.0,0) {课程};
+  \node[rel] (tc) at (8.0,-1.9) {讲授};
+  \node[entity] (tea) at (8.0,-3.8) {教师};
+
+  \draw (stu) -- (sc) node[midway,above]{M};
+  \draw (sc) -- (course) node[midway,above]{N};
+  \draw (course) -- (tc) node[midway,right]{N};
+  \draw (tc) -- (tea) node[midway,right]{1};
+
+  \node[keyattr] (sid) at (-2.4,1.4) {\underline{学号}};
+  \node[attr] (sname) at (-2.4,-1.4) {姓名};
+  \draw (sid) -- (stu);
+  \draw (sname) -- (stu);
+
+  \node[keyattr] (cid) at (10.4,1.4) {\underline{课程号}};
+  \node[attr] (cname) at (10.4,-0.2) {课程名};
+  \draw (cid) -- (course);
+  \draw (cname) -- (course);
+
+  \node[attr] (grade) at (4.0,-1.6) {成绩};
+  \draw (grade) -- (sc);
+
+  \node[keyattr] (tid) at (10.4,-3.8) {\underline{教师号}};
+  \draw (tid) -- (tea);
+\end{tikzpicture}
+\caption{一个 ER 示例：学生与课程为 $M{:}N$ 的「选修」（含属性「成绩」），教师与课程为 $1{:}N$ 的「讲授」}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{基数与到关系模式的转换}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+基数 & 语义 & 转换规则 \\
+\midrule
+$1{:}1$ & 两侧各至多一个对方 & 外键放在任一侧（加 UNIQUE），或合并为一张表 \\
+$1{:}N$ & 一侧一个、另一侧多个 & 把外键放在 $N$ 端，指向 $1$ 端的主键 \\
+$M{:}N$ & 两侧均可多个 & 新建中间表，主键为双方主键的组合，联系属性也放入 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\noindent\textbf{参与约束}：若某实体集中每个实体都必须参与联系，称\textbf{全参与}（图中用双线，也称存在依赖）；否则为\textbf{部分参与}（单线）。例如「每个学生必须选修至少一门课」即学生侧全参与。
+
+\noindent\textbf{属性化联系}：联系自身也可带属性。例如「选修」带有「成绩」。当联系为 $M{:}N$ 时，这些属性恰好随中间表保存；若为 $1{:}N$，则应放到 $N$ 端的关系中。
+
+\section{ER 到关系模式的转换}
+
+把 ER 图转换为关系模式（一组带主键、外键的表）遵循下列规则：
+
+\begin{enumerate}
+    \item \textbf{强实体集} $\to$ 一张表，取其主键作为该表主键。
+    \item \textbf{弱实体集} $\to$ 一张表，主键 $=$ 标识实体的主键 $+$ 自身部分键。
+    \item \textbf{$1{:}1$ 联系}：把一方主键作为外键放入另一方（唯一约束）。
+    \item \textbf{$1{:}N$ 联系}：把 $1$ 端主键作为外键放入 $N$ 端。
+    \item \textbf{$M{:}N$ 联系}：新建\textbf{联系表}，主键为参与双方主键的组合，并加入联系属性。
+    \item \textbf{多值属性}：为其单独建表，主键 $=$ 所属实体主键 $+$ 该属性。
+\end{enumerate}
+
+\noindent 以图中的例子为例，转换结果为：
+\begin{equation}
+\begin{aligned}
+\text{学生}(\underline{\text{学号}},\ \text{姓名}),\quad & \text{课程}(\underline{\text{课程号}},\ \text{课程名}),\\
+\text{教师}(\underline{\text{教师号}}),\quad & \text{选修}(\underline{\text{学号},\text{课程号}},\ \text{成绩}),\\
+\text{讲授}(\underline{\text{教师号},\text{课程号}}) &
+\end{aligned}
+\end{equation}
+
+\section{函数依赖与范式}
+
+\textbf{函数依赖}（Functional Dependency, FD）$X\to Y$ 表示：在任何合法关系中，只要两个元组在 $X$ 上相等，它们在 $Y$ 上也必相等。
+\begin{equation}
+\forall\,t_1,t_2:\quad t_1[X]=t_2[X]\ \Longrightarrow\ t_1[Y]=t_2[Y]
+\end{equation}
+在候选键 $K$ 下，$K\to$ 所有属性；若 $X\to Y$ 且 $Y\to Z$，则 $X\to Z$（传递）。
+
+\begin{table}[H]
+\centering
+\caption{范式的定义与所消除的异常}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+范式 & 条件 & 消除的问题 \\
+\midrule
+1NF & 所有属性都是原子的（不可再分） & 多值属性、重复组 \\
+2NF & 1NF，且每个非主属性完全依赖于候选键 & 非主属性对候选键的部分依赖 \\
+3NF & 2NF，且非主属性不传递依赖于候选键 & 非主属性对候选键的传递依赖 \\
+BCNF & 每个非平凡 $X\to A$ 的决定因素 $X$ 都是超键 & 主属性之间的依赖 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{equation}
+\text{3NF}:\quad \forall X\to A\in F^+,\quad X\ \text{是超键}\ \ \lor\ \ A\ \text{是主属性}
+\end{equation}
+\begin{equation}
+\text{BCNF}:\quad \forall X\to A\in F^+,\ A\notin X,\quad X\ \text{是超键}
+\end{equation}
+
+\noindent 规范化通过\textbf{分解}逐步消除冗余与更新异常：1NF 拆分多值单元格，2NF 按完全依赖分解，3NF 消除传递依赖。BCNF 比 3NF 更严格，可能损失函数依赖保持性；反之 3NF 总能做到无损且保持依赖。

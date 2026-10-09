@@ -109,7 +109,7 @@ export const unsignedIntModule: ModuleDef<Scene, Cfg> = {
   id: 'unsigned-int',
   title: T('无符号整数', 'Unsigned Integer'),
   desc: T('定长 $n$ 位 $b_{n-1}\\dots b_0$ 解释 $U(b)=\\sum b_i2^i$，$y\\in[0,2^n-1]$。', 'Fixed $n$ bits $U(b)=\\sum b_i2^i$, $y\\in[0,2^n-1]$.'),
-  tags: ['data-structures', 'computer-organization'],
+  tags: ['data-structures'],
   defaultConfig: DEFAULT_CFG,
   randomize(c) {
     return { ...c, bits: randBits(c.width) };

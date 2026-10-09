@@ -1,0 +1,546 @@
+\clearpage
+\begingroup
+\let\clearpage\relax
+\let\cleardoublepage\relax
+\vspace*{\fill}
+\chapter{应用层}
+\begin{center}
+应用层是「离人最近」的一层，也是网络价值的最终体现。本章以应用体系结构、HTTP、DNS、电子邮件、FTP、CDN 与 Socket 编程为线索，系统说明「应用如何组织进程」「协议如何定义报文语法与时序」以及「如何用套接字把协议写成程序」。
+\end{center}
+\vspace*{\fill}
+\endgroup
+\clearpage
+
+\section{应用体系结构}
+
+\subsection{动机与定义}
+
+网络存在的意义，是为了支撑运行在端系统上的\textbf{网络应用}。应用层协议 (application-layer protocol) 规定了两类进程之间如何通信，其定义包含五个要素：
+
+\begin{itemize}
+    \item \textbf{交换的报文类型}：如请求报文与响应报文；
+    \item \textbf{报文的语法}：字段有哪些、各占多少字节、如何分隔；
+    \item \textbf{字段的语义}：每个字段中信息的含义；
+    \item \textbf{时序}：进程何时发送报文、何时响应；
+    \item \textbf{体系结构}：进程在不同端系统上如何分布与协作。
+\end{itemize}
+
+其中「体系结构」是设计的起点，它决定可扩展性与运维成本。常见有三类：客户机/服务器 (C/S)、对等 (P2P) 与混合式。
+
+\subsection{客户机/服务器 (C/S) 体系结构}
+
+\textbf{定义}：存在一个或多个始终在线的\textbf{服务器}进程，拥有固定、已知的 IP 地址与端口；\textbf{客户机}进程主动发起请求，服务器被动响应。
+
+\begin{itemize}
+    \item \textbf{机制}：客户机地址可以是动态的、间歇连接的；客户机之间不直接通信；服务器常部署在数据中心，以多机集群支撑规模。
+    \item \textbf{可扩展性}：请求量增长时必须靠「加机器、加带宽、加负载均衡」来横向扩展，成本随规模近似线性上升。
+    \item \textbf{管理}：集中管理，易于运维、审计与安全加固。
+    \item \textbf{单点故障}：所有客户机都依赖少数服务器，一旦服务器（或入口）失效，服务整体不可用；因此需冗余与故障转移。
+\end{itemize}
+
+\subsection{对等 (P2P) 体系结构}
+
+\textbf{定义}：没有始终在线的服务器，任意一对\textbf{对等方 (peer)} 直接通信；每个节点既是消费者也是提供者。
+
+\begin{itemize}
+    \item \textbf{机制}：节点间歇接入、IP 动态变化；典型代表是 BitTorrent，把文件切成分块 (chunk)，节点互相交换分块。
+    \item \textbf{可扩展性（自扩展）}：新节点既带来下载需求，也带来上传能力，因此系统容量随节点数增长，这是 P2P 相对于 C/S 的根本优势。
+    \item \textbf{管理}：无中心，难以集中计费、审计、内容治理；节点行为不可信。
+    \item \textbf{单点故障}：无中心服务器故无经典单点故障，但存在引导 (bootstrap) 与检索难题。
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{三类应用体系结构的对比}
+\begin{tabulary}{\textwidth}{@{}LCCC@{}}
+\toprule
+\textbf{维度} & \textbf{C/S} & \textbf{P2P} & \textbf{混合式} \\
+\midrule
+服务提供者 & 固定服务器 & 所有对等方 & 索引集中、传输分散 \\
+可扩展性 & 差（线性扩容） & 好（自扩展） & 较好 \\
+管理/运维 & 易（集中） & 难（分散） & 中（索引可控） \\
+单点故障 & 有（服务器） & 基本无 & 有（索引服务器） \\
+典型代表 & Web、DNS & BitTorrent & Napster、早期 Skype \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{进程通信与套接字}
+
+\textbf{定义}：运行在端系统上的程序实例称为\textbf{进程 (process)}。同一主机内的进程可用操作系统提供的进程间通信 (IPC) 交换数据；不同主机上的进程则通过交换\textbf{报文}通信。
+
+进程要通信，必须能标识对方。标识一个进程需要两样东西：
+
+\begin{equation}
+    \underbrace{\text{IP 地址}}_{\text{定位主机}} \;+\; \underbrace{\text{端口号 (16 bit)}}_{\text{定位主机上的进程}}
+\end{equation}
+
+其中端口 $0\sim1023$ 为\textbf{周知端口}（如 HTTP 80、HTTPS 443、DNS 53、SMTP 25），由 IANA 分配。
+
+\textbf{套接字 (socket)} 是应用进程与运输层之间的接口：进程把报文交给 socket，由运输层向下封装；收到的报文也经 socket 交给进程。它是「应用层协议」与「运输层服务」的边界。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    box/.style={draw, rounded corners, minimum width=2.6cm, minimum height=0.8cm, font=\small, align=center},
+    sc/.style={draw, fill=yellow!20, minimum width=2.6cm, minimum height=0.8cm, font=\ttfamily\small, align=center},
+    arrow/.style={->, >=latex, thick}
+]
+    \node[box] (app1) at (0,2.6) {客户机进程};
+    \node[sc]  (s1)   at (0,1.4) {socket};
+    \node[box] (t1)   at (0,0.2) {运输层 (TCP/UDP)};
+
+    \node[box] (app2) at (6,2.6) {服务器进程};
+    \node[sc]  (s2)   at (6,1.4) {socket};
+    \node[box] (t2)   at (6,0.2) {运输层 (TCP/UDP)};
+
+    \draw[arrow] (app1) -- (s1);
+    \draw[arrow] (s1) -- (t1);
+    \draw[arrow] (app2) -- (s2);
+    \draw[arrow] (s2) -- (t2);
+    \draw[arrow, <->] (t1) -- node[above, font=\small, align=center]{逻辑通信\\(经网络层/链路层)} (t2);
+    \draw[arrow, dashed, <->] (app1) -- node[above, font=\small]{应用层协议} (app2);
+\end{tikzpicture}
+\caption{进程通过 socket 与运输层交互，应用层协议定义对等进程间的报文与时序}
+\label{fig:socket_api}
+\end{figure}
+
+\noindent\textbf{算例}：浏览器访问 \texttt{http://www.example.com/index.html}。解析得服务器 IP 为 \texttt{203.0.113.5}，HTTP 周知端口为 $80$。故目标套接字地址为 $(203.0.113.5,\;80)$。若服务器上同时运行邮件与 Web 服务，则正是端口号把到达同一 IP 的报文分用给不同进程。
+
+\noindent\textbf{易错点}：端口标识的是「进程的通信端点」，不是进程本身；一个进程可有多个 socket，也可用多线程服务多个连接；客户端端口由操作系统临时分配（临时端口 $49152\sim65535$）。
+
+\section{HTTP：超文本传输协议}
+
+\subsection{定义与无状态特性}
+
+\textbf{Web 页面}由一个基文件（HTML）与若干\textbf{对象 (object)} 组成，每个对象由 URL 寻址。\textbf{HTTP (超文本传输协议)} 定义了浏览器（客户机）与 Web 服务器之间交换报文的格式与时序，默认运行在 TCP 之上，端口 $80$（HTTPS 为 $443$，并在 TLS 之上）。
+
+\textbf{无状态 (stateless)}：服务器不保存任何关于客户机过去请求的信息。这带来两大好处——设计与实现简单、服务器无需维护大量会话状态因而易于扩展；代价是「需要记住用户」的功能（登录、购物车）必须借助 Cookie 等外部机制。
+
+\subsection{非持久连接与持久连接}
+
+\textbf{非持久连接 (HTTP/1.0)}：每个对象都新建一个 TCP 连接，对象传完即关闭。\textbf{持久连接 (HTTP/1.1 默认)}：多个对象复用同一条 TCP 连接。
+
+定义\textbf{往返时间 RTT (round-trip time)} 为一个短分组从客户机到服务器再返回所需的时间。设对象长度 $L$，链路速率 $R$，则传输时延为 $L/R$。忽略处理与排队时延：
+
+\begin{align}
+    T_{\text{非持久,串行}} &= n\left(2\,\text{RTT} + \frac{L}{R}\right) \\
+    T_{\text{非持久,}m\,\text{并行}} &= \left\lceil \frac{n}{m} \right\rceil \left(2\,\text{RTT} + \frac{L}{R}\right) \\
+    T_{\text{持久,非流水}} &= (n+1)\,\text{RTT} + n\frac{L}{R} \\
+    T_{\text{持久,流水线}} &\approx 2\,\text{RTT} + n\frac{L}{R}
+\end{align}
+
+推导要点：非持久连接每个对象先花 $1$ RTT 完成 TCP 三次握手，再花 $1$ RTT 发送请求并收到首字节，合计 $2$ RTT，另加传输时延；持久连接只需一次握手，非流水时每个对象再花 $1$ RTT，流水线时所有请求几乎同时发出，只花 $1$ RTT。
+
+\begin{table}[H]
+\centering
+\caption{HTTP 时延算例：$n=10$ 个对象，$\text{RTT}=50$ ms，$L/R=10$ ms，并行度 $m=5$}
+\begin{tabulary}{\textwidth}{@{}LCC@{}}
+\toprule
+\textbf{连接方式} & \textbf{公式} & \textbf{总时延} \\
+\midrule
+非持久、串行 & $n(2\text{RTT}+L/R)$ & $10\times110=1100$ ms \\
+非持久、$5$ 条并行 & $\lceil n/m\rceil(2\text{RTT}+L/R)$ & $2\times110=220$ ms \\
+持久、非流水 & $(n+1)\text{RTT}+nL/R$ & $11\times50+100=650$ ms \\
+持久、流水线 & $2\text{RTT}+nL/R$ & $100+100=200$ ms \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small]
+    \draw (0,0) -- (0,-6.2) node[below] {客户机};
+    \draw (7,0) -- (7,-6.2) node[below] {服务器};
+    \foreach \y/\lab in {-0.4/{\texttt{SYN}}, -1.0/{\texttt{ACK}}, -1.6/{\texttt{GET obj1}}, -2.6/{\texttt{resp1}}, -3.0/{\texttt{GET obj2}}, -4.0/{\texttt{resp2}}, -4.4/{\texttt{GET obj3}}, -5.4/{\texttt{resp3}}} {
+        \draw[->, >=latex] (0,\y) -- (7,\y);
+        \node[above, font=\scriptsize] at (3.5,\y) {\lab};
+    }
+    \draw[decorate, decoration={brace, amplitude=4pt, mirror}] (7.15,-0.4) -- (7.15,-1.6) node[midway, right=6pt, font=\scriptsize, align=left] {握手 + 请求\\($2$ RTT)};
+    \draw[decorate, decoration={brace, amplitude=4pt, mirror}] (7.15,-1.6) -- (7.15,-5.4) node[midway, right=6pt, font=\scriptsize, align=left] {持久连接\\(复用同一条 TCP)};
+\end{tikzpicture}
+\caption{首次请求需 $2$ RTT，之后持久连接复用通道}
+\label{fig:http_timing}
+\end{figure}
+
+\subsection{HTTP 报文格式}
+
+\textbf{请求报文}：第一行是\textbf{请求行}，随后若干\textbf{首部行}，以一个 CRLF 空行结束首部，之后是可选的\textbf{实体主体}。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\ttfamily\small]
+    \draw (0,0) rectangle (11,0.55) node[midway]{请求行: 方法 SP URL SP 版本};
+    \draw (0,-1.15) rectangle (11,0) node[midway, align=center]{首部行: 字段名: 字段值 CRLF \dots\\（Host、User-Agent、Connection \dots）};
+    \draw (0,-1.7) rectangle (11,-1.15) node[midway]{空行 (CRLF)};
+    \draw (0,-2.7) rectangle (11,-1.7) node[midway, align=center]{实体主体（GET 常为空；\\POST 时携带表单数据）};
+\end{tikzpicture}
+\caption{HTTP 请求报文的结构}
+\label{fig:http_request}
+\end{figure}
+
+\noindent\textbf{响应报文}：第一行是\textbf{状态行}（版本、状态码、短语），随后首部行、空行与实体主体。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\ttfamily\small]
+    \draw (0,0) rectangle (11,0.55) node[midway]{状态行: 版本 SP 状态码 SP 短语};
+    \draw (0,-1.15) rectangle (11,0) node[midway, align=center]{首部行: Date、Server、Last-Modified、\\Content-Length、Content-Type、Set-Cookie \dots};
+    \draw (0,-1.7) rectangle (11,-1.15) node[midway]{空行 (CRLF)};
+    \draw (0,-2.7) rectangle (11,-1.7) node[midway, align=center]{实体主体（被请求的对象\\或错误说明）};
+\end{tikzpicture}
+\caption{HTTP 响应报文的结构}
+\label{fig:http_response}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{常见请求/响应首部字段}
+\begin{tabulary}{\textwidth}{@{}LL@{}}
+\toprule
+\textbf{字段} & \textbf{含义} \\
+\midrule
+\texttt{Host} & 目标主机名与端口，支持同一 IP 上的虚拟主机 \\
+\texttt{User-Agent} & 客户机程序标识（浏览器、版本） \\
+\texttt{Accept} / \texttt{Accept-Language} & 期望的媒体类型 / 语言 \\
+\texttt{Connection} & \texttt{keep-alive} 或 \texttt{close}，控制持久连接 \\
+\texttt{Content-Length} & 实体主体的字节数 \\
+\texttt{Content-Type} & 实体主体的 MIME 类型 \\
+\texttt{Set-Cookie} / \texttt{Cookie} & 服务器种 Cookie / 客户机回送 Cookie \\
+\texttt{If-Modified-Since} & 条件 GET：仅当对象在此时刻后修改才返回 \\
+\texttt{If-None-Match} & 条件 GET：携带 ETag 进行实体标签比对 \\
+\texttt{Cache-Control} & 缓存指令（\texttt{max-age}、\texttt{no-cache}） \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{请求方法与状态码}
+
+\begin{table}[H]
+\centering
+\caption{HTTP 请求方法}
+\begin{tabulary}{\textwidth}{@{}LL@{}}
+\toprule
+\textbf{方法} & \textbf{语义} \\
+\midrule
+\texttt{GET} & 请求读取资源；参数置于 URL，实体主体为空，可被缓存 \\
+\texttt{POST} & 提交数据（如表单），数据置于实体主体，通常不可缓存 \\
+\texttt{PUT} & 上传/整体替换指定 URL 的资源（幂等） \\
+\texttt{DELETE} & 删除指定 URL 的资源 \\
+\texttt{HEAD} & 只取响应首部、丢弃主体，用于探测存在性/元信息 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\textbf{状态码分类}：$1xx$ 信息、$2xx$ 成功、$3xx$ 重定向、$4xx$ 客户机错误、$5xx$ 服务器错误。常见码：
+
+\begin{itemize}
+    \item \texttt{200 OK}：请求成功，主体在响应中；
+    \item \texttt{301 Moved Permanently}：资源永久迁移，客户机应记住新 URL；
+    \item \texttt{304 Not Modified}：条件 GET 命中缓存，主体为空；
+    \item \texttt{400 Bad Request}：请求语法错误；\texttt{403 Forbidden}：无权限；
+    \item \texttt{404 Not Found}：资源不存在；\texttt{505 HTTP Version Not Supported}。
+\end{itemize}
+
+\subsection{Cookie：在无状态协议上建立会话}
+
+由于 HTTP 无状态，服务器用 \textbf{Cookie} 在客户机侧保存会话状态，机制分四步：
+
+\begin{enumerate}
+    \item 服务器在响应中加首部 \texttt{Set-Cookie: id=1678}；
+    \item 客户机浏览器把 Cookie 文件存在本地，并绑定到该服务器的域；
+    \item 后续对同一服务器的每个请求，客户机自动加首部 \texttt{Cookie: id=1678}；
+    \item 服务器据此在\textbf{后端数据库}中查询该用户的状态（购物车、登录态）。
+\end{enumerate}
+
+\noindent\textbf{易错点}：Cookie 保存在客户机，状态保存在服务器数据库；Cookie 只提供「标识」，本身不提供安全保证，明文传输与应用跟踪带来隐私风险。
+
+\subsection{Web 缓存与条件 GET}
+
+\textbf{Web 缓存（代理服务器）}是代表源服务器满足请求的网络实体，可部署在客户机与源服务器之间。
+
+\begin{itemize}
+    \item \textbf{收益}：缩短响应时间（就近命中）；减少机构出口带宽与骨干流量；即使源服务器故障也可能继续提供缓存副本。
+    \item \textbf{条件 GET}：缓存先问源服务器「副本是否已过期」，避免传输完整对象。两种验证方式：
+    \begin{itemize}
+        \item \texttt{If-Modified-Since: <日期>}：若对象在该日期后未修改，返回 \texttt{304 Not Modified}（无主体）；
+        \item \texttt{If-None-Match: <ETag>}：用实体标签（内容摘要）比对，比时间戳更可靠。
+    \end{itemize}
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, node distance=2.6cm]
+    \node[draw, rounded corners] (c) {客户机};
+    \node[draw, rounded corners, right=of c] (cache) {Web 缓存};
+    \node[draw, rounded corners, right=of cache] (s) {源服务器};
+    \draw[->, >=latex] (c) -- node[above, font=\scriptsize]{GET obj} (cache);
+    \draw[->, >=latex] (cache) -- node[above, font=\scriptsize, align=center]{GET obj\\If-Modified-Since} (s);
+    \draw[->, >=latex] (s) -- node[below, font=\scriptsize]{304 Not Modified} (cache);
+    \draw[->, >=latex] (cache) -- node[below, font=\scriptsize]{obj (本地副本)} (c);
+\end{tikzpicture}
+\caption{条件 GET：缓存与源服务器验证副本新鲜度，命中时只回 304}
+\label{fig:conditional_get}
+\end{figure}
+
+\subsection{HTTP/2 与 HTTP/3}
+
+\textbf{HTTP/1.1} 的流水线仍受\textbf{队头阻塞 (head-of-line blocking)} 影响：同一连接上前一个响应未完成，会挡住后续响应。
+
+\begin{itemize}
+    \item \textbf{HTTP/2}：在单条 TCP 连接上引入\textbf{二进制分帧}与\textbf{多路复用 (multiplexing)}，把请求/响应拆成帧并交错传输，互不阻塞（应用层）；用 \textbf{HPACK} 压缩首部；支持\textbf{服务器推送 (server push)}。但底层仍是 TCP，一旦丢包，TCP 层重传仍会造成跨流阻塞。
+    \item \textbf{HTTP/3}：运行在基于 UDP 的 \textbf{QUIC} 之上，不同流独立可靠，从根本上消除 TCP 层的队头阻塞，并支持 $0$-RTT 连接建立与连接迁移。
+\end{itemize}
+
+\section{DNS：域名系统}
+
+\subsection{定义与层次结构}
+
+\textbf{DNS (域名系统)} 是把主机名映射为 IP 地址的\textbf{分布式、层次化数据库}，同时是一个\textbf{应用层协议}，默认运行在 UDP 端口 $53$。它提供三类服务：主机别名、邮件服务器别名、负载分布。
+
+\begin{itemize}
+    \item \textbf{根域名服务器}：全球 $13$ 组逻辑根，返回 TLD 服务器的地址；
+    \item \textbf{顶级域 (TLD) 服务器}：负责 \texttt{.com}、\texttt{.org}、\texttt{.cn} 等，返回权威服务器地址；
+    \item \textbf{权威 (authoritative) 服务器}：持有某组织内部的域名到 IP 映射；
+    \item \textbf{本地 (local) DNS 服务器}：不严格属于层次，通常由 ISP 或机构提供，是客户机的「代理」，并有缓存。
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    every node/.style={draw, rounded corners, font=\small, align=center, minimum width=2.2cm, minimum height=0.7cm},
+    edge from parent/.style={draw, ->, >=latex}
+]
+    \node (root) at (0,0) {根};
+    \node (com) at (-3,-1.4) {TLD: \texttt{.com}};
+    \node (org) at (3,-1.4) {TLD: \texttt{.org}};
+    \node (a1) at (-4.2,-2.8) {权威\\(example.com)};
+    \node (a2) at (-1.8,-2.8) {权威\\(google.com)};
+    \node (a3) at (3,-2.8) {权威\\(wikipedia.org)};
+    \draw[->, >=latex] (root) -- (com);
+    \draw[->, >=latex] (root) -- (org);
+    \draw[->, >=latex] (com) -- (a1);
+    \draw[->, >=latex] (com) -- (a2);
+    \draw[->, >=latex] (org) -- (a3);
+\end{tikzpicture}
+\caption{DNS 服务器层次：根 $\to$ TLD $\to$ 权威}
+\label{fig:dns_hierarchy}
+\end{figure}
+
+\subsection{递归查询与迭代查询}
+
+\textbf{递归查询}：被查询者替你查到底并把最终答案返回（负担落在被查询服务器）。\textbf{迭代查询}：被查询者只返回「下一步该问谁」，由发起者继续追问。实践中常见组合为：客户机到本地 DNS 用递归，本地 DNS 到根/TLD/权威用迭代。
+
+\noindent\textbf{逐步流程}（以解析 \texttt{www.example.com} 为例）：
+
+\begin{enumerate}
+    \item 客户机向本地 DNS 发出\textbf{递归}查询；
+    \item 本地 DNS 向根服务器发出\textbf{迭代}查询，根返回 \texttt{.com} 的 TLD 地址；
+    \item 本地 DNS 向 TLD 服务器迭代查询，TLD 返回 \texttt{example.com} 的权威服务器地址；
+    \item 本地 DNS 向权威服务器迭代查询，权威返回 \texttt{www.example.com} 的 IP；
+    \item 本地 DNS 把结果返回客户机，并按 TTL 缓存。
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small]
+    \foreach \x/\n in {0/{客户机}, 2.6/{本地 DNS}, 5.2/{根}, 7.2/{TLD}, 9.2/{权威}} {
+        \draw (\x,0) -- (\x,-5.4);
+        \node[align=center] at (\x,0.35) {\n};
+    }
+    \draw[->, >=latex] (0,-0.5) -- (2.6,-0.5) node[midway, above, font=\scriptsize]{递归: www.example.com?};
+    \draw[->, >=latex] (2.6,-1.3) -- (5.2,-1.3) node[midway, above, font=\scriptsize]{迭代: ?};
+    \draw[->, >=latex] (5.2,-1.9) -- (2.6,-1.9) node[midway, above, font=\scriptsize]{\texttt{.com} TLD 地址};
+    \draw[->, >=latex] (2.6,-2.7) -- (7.2,-2.7) node[midway, above, font=\scriptsize]{迭代: ?};
+    \draw[->, >=latex] (7.2,-3.3) -- (2.6,-3.3) node[midway, above, font=\scriptsize]{example.com 权威地址};
+    \draw[->, >=latex] (2.6,-4.1) -- (9.2,-4.1) node[midway, above, font=\scriptsize]{迭代: ?};
+    \draw[->, >=latex] (9.2,-4.7) -- (2.6,-4.7) node[midway, above, font=\scriptsize]{A = 203.0.113.5};
+    \draw[->, >=latex] (2.6,-5.1) -- (0,-5.1) node[midway, above, font=\scriptsize]{203.0.113.5};
+\end{tikzpicture}
+\caption{递归（客户机 $\to$ 本地 DNS）与迭代（本地 DNS $\to$ 根/TLD/权威）组合查询时序}
+\label{fig:dns_query}
+\end{figure}
+
+\subsection{资源记录}
+
+DNS 存储的是\textbf{资源记录 (RR)}，形式为四元组 $(\text{Name}, \text{Value}, \text{Type}, \text{TTL})$。
+
+\begin{table}[H]
+\centering
+\caption{常见 DNS 资源记录类型}
+\begin{tabulary}{\textwidth}{@{}CLL@{}}
+\toprule
+\textbf{Type} & \textbf{Name} & \textbf{Value 含义} \\
+\midrule
+\texttt{A} & 主机名 & IPv4 地址（如 \texttt{203.0.113.5}） \\
+\texttt{AAAA} & 主机名 & IPv6 地址（如 \texttt{2001:db8::1}） \\
+\texttt{CNAME} & 别名 & 规范主机名（被查名称的真实名字） \\
+\texttt{MX} & 域 & 该域邮件服务器的规范名（含优先级） \\
+\texttt{NS} & 域 & 该域的权威名字服务器主机名 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{缓存与 TTL}
+
+为降低根与 TLD 服务器的负载和查询时延，DNS 广泛使用\textbf{缓存}。当某服务器收到一条 RR 时，会在本地缓存中保存，\textbf{存活时间 TTL (time-to-live)} 到期后丢弃。本地 DNS 常缓存 TLD 地址，因此多数查询根本不会到达根服务器。TTL 是「一致性」与「负载」之间的折中：TTL 短则更新及时但查询压力大，TTL 长则压力小但变更传播慢。
+
+\subsection{DNS 安全：DNSSEC 简介}
+
+原始 DNS 无认证，易受\textbf{缓存投毒}与欺骗。\textbf{DNSSEC} 用数字签名给 RR 提供来源认证与完整性校验：权威服务器用私钥对记录集签名生成 \texttt{RRSIG}，公钥以 \texttt{DNSKEY} 发布，并通过父区用 \texttt{DS} 记录对子区公钥做摘要，形成自根向下的\textbf{信任链}。此外，\textbf{DNS over HTTPS (DoH)} 与 \textbf{DNS over TLS (DoT)} 通过加密传输保护查询隐私。
+
+\section{电子邮件、FTP 与 CDN}
+
+\subsection{电子邮件：SMTP、POP3/IMAP 与 MIME}
+
+电子邮件系统由\textbf{用户代理 (UA)}、\textbf{邮件服务器}与协议组成。发送是\textbf{推 (push)}，接收是\textbf{拉 (pull)}。
+
+\begin{itemize}
+    \item \textbf{SMTP}：发送方邮件服务器把邮件\textbf{推}给接收方邮件服务器，默认 TCP 端口 $25$，命令/应答式、使用持久连接；只支持 $7$ 位 ASCII。
+    \item \textbf{POP3}（端口 $110$）/ \textbf{IMAP}（端口 $143$）：用户代理从邮件服务器\textbf{拉}取邮件。POP3 简单，通常下载后删除；IMAP 在服务器端保留并管理文件夹，支持多设备同步。
+    \item \textbf{MIME}：为在 SMTP 上传输非 ASCII 文本与二进制附件，用 base64 等编码扩展报文主体，并通过首部声明内容类型。
+\end{itemize}
+
+\noindent\textbf{邮件报文格式}：首部（\texttt{From}、\texttt{To}、\texttt{Subject}）加空行加主体。注意 SMTP 的「命令」与邮件本身的「首部」是两回事。
+
+\subsection{FTP：控制连接与数据连接}
+
+\textbf{FTP} 使用两条 TCP 连接，是\textbf{带外控制 (out-of-band control)} 的典型：
+
+\begin{itemize}
+    \item \textbf{控制连接}：端口 $21$，整个会话期间保持，传输命令与应答；
+    \item \textbf{数据连接}：端口 $20$，每个文件传输时新建并关闭；
+    \item \textbf{状态}：服务器在会话期间维护用户状态（当前目录、认证），因此 FTP 是\textbf{有状态}的，限制了并发连接数。
+\end{itemize}
+
+\subsection{内容分发网络 CDN}
+
+\textbf{CDN} 通过在全球部署大量\textbf{边缘副本}，把内容放到离用户更近的位置，以降低时延、减轻骨干与源站负载。其核心机制是\textbf{DNS 重定向 + 就近副本}：用户请求被 CDN 的 DNS 解析到地理/网络距离最近的边缘服务器，由该服务器提供缓存副本或回源获取。
+
+\begin{itemize}
+    \item \textbf{部署策略}：\textit{enter deep}（深入接入网，节点多、覆盖近）与 \textit{bring home}（部署在少量 IXP，节点少、易维护）。
+    \item \textbf{与缓存协同}：边缘节点未命中时回源，并可用条件 GET 验证新鲜度。
+\end{itemize}
+
+\section{Socket 编程}
+
+套接字编程把前述协议变成可运行程序。核心区分：\textbf{UDP socket} 无连接、报文边界保留；\textbf{TCP socket} 面向连接、可靠字节流。
+
+\subsection{UDP 套接字}
+
+UDP 服务器不需要握手，直接在已知端口上 \texttt{recvfrom} 等待；客户机用 \texttt{sendto} 指定目的地址，服务器从报文中获得源地址以便回送。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\ttfamily\small]
+    \draw (0,0) -- (0,-5.2) node[below]{服务器};
+    \draw (7,0) -- (7,-5.2) node[below]{客户机};
+    \node[align=center, font=\small] at (0,-0.4) {\texttt{socket()}\\ \texttt{bind()}};
+    \node[align=center, font=\small] at (7,-0.4) {\texttt{socket()}};
+    \draw[->, >=latex] (0,-1.4) -- (7,-1.4) node[midway, above, font=\scriptsize]{阻塞于 \texttt{recvfrom()}};
+    \draw[->, >=latex] (7,-2.4) -- (0,-2.4) node[midway, above, font=\scriptsize]{\texttt{sendto(host,port)}};
+    \draw[->, >=latex] (0,-3.4) -- (7,-3.4) node[midway, above, font=\scriptsize]{\texttt{recvfrom()} 得到源地址};
+    \draw[->, >=latex] (7,-4.4) -- (0,-4.4) node[midway, above, font=\scriptsize]{\texttt{sendto()}};
+\end{tikzpicture}
+\caption{UDP 套接字：无连接，用 \texttt{sendto}/\texttt{recvfrom} 显式指定或获取地址}
+\label{fig:socket_udp}
+\end{figure}
+
+\noindent\textbf{清单：UDP 回显服务器（伪代码）}
+\begin{lstlisting}
+sock = socket(AF_INET, SOCK_DGRAM)
+sock.bind(('', 9876))
+while True:
+    data, addr = sock.recvfrom(1024)   # 阻塞等待报文
+    sock.sendto(data.upper(), addr)    # 回送到来源地址
+\end{lstlisting}
+
+\noindent\textbf{清单：UDP 客户机（伪代码）}
+\begin{lstlisting}
+sock = socket(AF_INET, SOCK_DGRAM)
+sock.sendto(b'hello', ('localhost', 9876))
+data, addr = sock.recvfrom(1024)
+print(data)
+\end{lstlisting}
+
+\subsection{TCP 套接字}
+
+TCP 服务器先 \texttt{listen}，再 \texttt{accept} 阻塞等待客户机；客户机 \texttt{connect} 触发三次握手。连接建立后，服务器 \texttt{accept} 返回一个\textbf{新的连接套接字}，用于与该客户机通信，而监听套接字继续接受后续连接——这正是并发服务器的关键。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\ttfamily\small]
+    \draw (0,0) -- (0,-5.6) node[below]{服务器};
+    \draw (7,0) -- (7,-5.6) node[below]{客户机};
+    \node[align=center, font=\small] at (0,-0.6) {\texttt{socket()}\\ \texttt{bind()}\\ \texttt{listen()}};
+    \node[align=center, font=\small] at (7,-0.6) {\texttt{socket()}};
+    \draw[->, >=latex] (7,-1.6) -- (0,-1.6) node[midway, above, font=\scriptsize]{\texttt{connect()} / 三次握手};
+    \node[align=center, font=\small] at (0,-2.3) {\texttt{accept()} 返回连接套接字};
+    \draw[->, >=latex] (0,-3.2) -- (7,-3.2) node[midway, above, font=\scriptsize]{数据 (字节流)};
+    \draw[->, >=latex] (7,-4.2) -- (0,-4.2) node[midway, above, font=\scriptsize]{数据 (字节流)};
+    \node[align=center, font=\small] at (0,-5.0) {\texttt{close()}};
+    \node[align=center, font=\small] at (7,-5.0) {\texttt{close()}};
+\end{tikzpicture}
+\caption{TCP 套接字：服务器 \texttt{socket}$\to$\texttt{bind}$\to$\texttt{listen}$\to$\texttt{accept}，客户机 \texttt{socket}$\to$\texttt{connect}}
+\label{fig:socket_tcp}
+\end{figure}
+
+\noindent\textbf{清单：TCP 回显服务器（每连接一线程）}
+\begin{lstlisting}
+listen_sock = socket(AF_INET, SOCK_STREAM)
+listen_sock.bind(('', 9876))
+listen_sock.listen(5)
+while True:
+    conn, addr = listen_sock.accept()    # 阻塞等待新连接
+    thread = Thread(target=handle, args=(conn,))
+    thread.start()                       # 每连接一个线程
+
+def handle(conn):
+    data = conn.recv(1024)
+    while data:
+        conn.send(data)                  # 回显
+        data = conn.recv(1024)
+    conn.close()
+\end{lstlisting}
+
+\noindent\textbf{清单：TCP 客户机}
+\begin{lstlisting}
+sock = socket(AF_INET, SOCK_STREAM)
+sock.connect(('localhost', 9876))        # 触发三次握手
+sock.send(b'hello')
+data = sock.recv(1024)
+sock.close()
+\end{lstlisting}
+
+\subsection{阻塞、并发与常见陷阱}
+
+\begin{itemize}
+    \item \textbf{阻塞调用}：\texttt{accept}、\texttt{recv}、\texttt{recvfrom} 默认阻塞，会挂起线程直至数据/连接到达。这使「单线程迭代服务器」一次只能服务一个请求。
+    \item \textbf{并发方式}：\textbf{每连接一线程/进程}（简单，但连接数大时线程/内存开销高）；\textbf{事件驱动 (I/O 多路复用)}（用 \texttt{select}/\texttt{poll}/\texttt{epoll} 单线程管理海量连接）；\textbf{协程}（用同步写法实现事件驱动）。
+    \item \textbf{易错点}：TCP 是\textbf{字节流}，\texttt{recv} 一次不保证取到一个完整「报文」，应用层必须自行定义定长、分隔符或长度前缀来分帧；UDP 则保留报文边界，但可能乱序、丢失。
+    \item \textbf{易错点}：\texttt{bind} 时地址用空字符串表示「绑定本机所有网卡」；服务器与客户机端口分配不同，客户机通常不显式 \texttt{bind}。
+\end{itemize}
+
+\section{本章小结与常见误区}
+
+\textbf{小结}：
+
+\begin{itemize}
+    \item 应用体系结构决定可扩展性与运维成本：C/S 易管理但有单点故障，P2P 自扩展但难管理，混合式折中；
+    \item 进程通过 socket 通信，用「IP + 端口」寻址；应用层协议定义报文类型、语法、语义与时序；
+    \item HTTP 无状态，支持非持久/持久/流水线/并行多种连接方式，时延可精确推导；用方法、状态码、Cookie、条件 GET 完成请求、控制与会话；
+    \item DNS 是分布式层次数据库，递归与迭代查询配合缓存与 TTL 工作，A/AAAA/CNAME/MX/NS 为常用记录；
+    \item SMTP 推送、POP3/IMAP 拉取、MIME 编码；FTP 双连接；CDN 以 DNS 重定向加就近副本加速；
+    \item Socket 编程中 UDP 用 \texttt{sendto}/\texttt{recvfrom}，TCP 用 \texttt{socket}$\to$\texttt{bind}$\to$\texttt{listen}$\to$\texttt{accept} 与 \texttt{connect}。
+\end{itemize}
+
+\textbf{常见误区}：
+
+\begin{enumerate}
+    \item 把「无状态」误当成「无会话」——HTTP 仍可用 Cookie 建立有状态的应用层会话；
+    \item 认为持久连接一定比并行非持久快——是否更快取决于 $n$、RTT、对象大小与并行度，需代入公式比较；
+    \item 混淆递归与迭代查询的方向与负担归属；
+    \item 认为端口号标识进程本体——端口标识的是通信端点；
+    \item 在 TCP 上假设「一次 \texttt{recv} 就是一条消息」，忽视字节流无边界；
+    \item 把 HTTP/2 的「无队头阻塞」绝对化——它只解决应用层，TCP 层丢包仍会阻塞所有流，HTTP/3 才彻底解决。
+\end{enumerate}

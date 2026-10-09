@@ -111,7 +111,7 @@ function toHex(b: number) { return b.toString(16).padStart(2, '0').toUpperCase()
 export const linkedListModule: ModuleDef<Scene, Cfg> = {
   id: 'linked-list', title: T('链表', 'Linked List'),
   desc: T('节点由 $malloc$ 在堆上离散分配的真实地址 $0x...$ 串联，$next$ 即地址；知识点仅示逻辑链，物理细节点“查看内存”。', 'Real malloc scattered.'),
-  tags: ['data-structures', 'computer-organization'],
+  tags: ['data-structures'],
   defaultConfig: { elemType: 'i32', endian: 'little', valuesStr: '', scattered: true, ptrSize: 4, op: 'idle', pos: 0, insVal: 99, execTick: 0 },
   randomize(c) { return { ...c, valuesStr: '', op: 'idle', execTick: 0 } as Cfg; },
   Controls({ config, onChange, t, onPlay }: any) {

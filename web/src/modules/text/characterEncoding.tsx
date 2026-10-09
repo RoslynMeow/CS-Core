@@ -135,7 +135,7 @@ export const characterEncodingModule: ModuleDef<Scene, Cfg> = {
   id: 'character-encoding',
   title: T('字符编码', 'Character Encoding'),
   desc: T('ASCII 7 位 $0xxxxxxx$ / Unicode $U+XXXX$ / UTF-8 变长 $1$-$4$ 字节。', 'ASCII / Unicode / UTF-8 1-4 bytes.'),
-  tags: ['data-structures', 'computer-organization'],
+  tags: ['data-structures'],
   defaultConfig: DEFAULT_CFG,
   randomize(c) {
     const pool = ['A', 'a', '0', '好', '中', '€', '𝄞', 'é', 'ß'];

@@ -10,7 +10,7 @@ import { MathText } from "../../lib/tex";
 //   / cycles(单周期 vs 多周期)
 // =====================================================================
 
-type SubMode = "signals" | "alucontrol" | "hardwired" | "cycles";
+type SubMode = "signals" | "alucontrol";
 
 type CtlVal = "0" | "1" | "x";
 type SigKey = "RegDst" | "RegWrite" | "ALUSrc" | "MemRead" | "MemWrite" | "MemtoReg" | "Branch";
@@ -195,61 +195,6 @@ function AluRender({ config, t }: any) {
   );
 }
 
-// ---------------------------------------------------------------------
-// hardwired: 硬布线 vs 微程序
-// ---------------------------------------------------------------------
-function HardwiredRender({ t }: any) {
-  const isZh = t(T("中文", "en")) !== "en";
-  const rows: (string | number)[][] = isZh
-    ? [
-      ["实现", "组合逻辑门直接译码 opcode/funct", "微指令序列存于控制存储器 ROM"],
-      ["速度", "快 (信号延迟 = 门延迟)", "慢 (每步访控制存储器)"],
-      ["灵活性", "差, 改指令集要改电路", "好, 改微程序即可"],
-      ["适用", "RISC (定长/简单指令)", "CISC (复杂指令, 如 x86)"],
-    ]
-    : [
-      ["Impl", "combinational logic on opcode/funct", "microinstructions in control ROM"],
-      ["Speed", "fast (gate delay)", "slower (fetch microcode)"],
-      ["Flexibility", "poor (redesign for new ISA)", "good (edit microcode)"],
-      ["Fit", "RISC", "CISC (x86)"],
-    ];
-  return (
-    <Panel>
-      <div style={{ padding: "10px 14px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe", fontSize: 13, color: "#3730a3", textAlign: "center" }}>
-        <MathText text={`$\\text{控制信号} = f(\\text{opcode},\\ \\text{funct},\\ \\text{状态标志})$`} />
-      </div>
-      <Table head={isZh ? ["特征", "硬布线控制器", "微程序控制器"] : ["Aspect", "Hardwired", "Microprogrammed"]} rows={rows} />
-    </Panel>
-  );
-}
-
-// ---------------------------------------------------------------------
-// cycles: 单周期 vs 多周期
-// ---------------------------------------------------------------------
-function CyclesRender({ t }: any) {
-  const isZh = t(T("中文", "en")) !== "en";
-  const rows: (string | number)[][] = isZh
-    ? [
-      ["CPI", "1", "3–5 (视指令而定)"],
-      ["时钟周期", "由最慢指令(lw)决定", "由最慢阶段决定"],
-      ["硬件重复", "有 (多个加法器等)", "少 (组件可复用)"],
-      ["性能", "差", "好于单周期"],
-      ["复杂度", "低", "中"],
-    ]
-    : [
-      ["CPI", "1", "3–5 (per instr)"],
-      ["Cycle", "set by slowest instr (lw)", "set by slowest stage"],
-      ["HW duplication", "yes (multiple adders)", "little (reuse)"],
-      ["Performance", "poor", "better than single"],
-      ["Complexity", "low", "medium"],
-    ];
-  return (
-    <Panel>
-      <Table head={isZh ? ["特征", "单周期", "多周期"] : ["Aspect", "Single-cycle", "Multi-cycle"]} rows={rows} />
-    </Panel>
-  );
-}
-
 // =====================================================================
 // 聚合
 // =====================================================================
@@ -260,8 +205,6 @@ const aluDefault = { aluOp: "10", funct: "100000" };
 const SUB: Record<SubMode, ModuleDef> = {
   signals: { id: "signals", title: T("控制信号", "Control Signals"), defaultConfig: sigDefault, Controls: SignalsControls as never, generate: () => [{ caption: T("指令 → 控制信号", "Instruction → control signals"), scene: {} }] as never, Render: SignalsRender as never } as unknown as ModuleDef,
   alucontrol: { id: "alucontrol", title: T("ALU 控制", "ALU Control"), defaultConfig: aluDefault, Controls: AluControls as never, generate: () => [{ caption: T("ALUOp + funct → ALU 操作", "ALUOp + funct → ALU op"), scene: {} }] as never, Render: AluRender as never } as unknown as ModuleDef,
-  hardwired: { id: "hardwired", title: T("硬布线 vs 微程序", "Hardwired vs Micro"), defaultConfig: {}, generate: () => [{ caption: T("控制器实现方式", "Control implementation"), scene: {} }] as never, Render: HardwiredRender as never } as unknown as ModuleDef,
-  cycles: { id: "cycles", title: T("单周期 vs 多周期", "Single vs Multi"), defaultConfig: {}, generate: () => [{ caption: T("单周期 vs 多周期", "Single vs multi-cycle"), scene: {} }] as never, Render: CyclesRender as never } as unknown as ModuleDef,
 };
 
 const MAP: Record<SubMode, ModuleDef> = SUB;
@@ -269,10 +212,6 @@ export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string
   { label: "控制", opts: [
     { v: "signals", zh: "控制信号", en: "Signals" },
     { v: "alucontrol", zh: "ALU 控制", en: "ALU Control" },
-  ]},
-  { label: "实现", opts: [
-    { v: "hardwired", zh: "硬布线 vs 微程序", en: "Hardwired/Micro" },
-    { v: "cycles", zh: "单周期 vs 多周期", en: "Single/Multi" },
   ]},
 ];
 

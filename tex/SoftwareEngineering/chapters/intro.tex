@@ -1,0 +1,83 @@
+\clearpage
+\begingroup
+\let\clearpage\relax
+\let\cleardoublepage\relax
+\vspace*{\fill}
+\chapter{软件工程概述与过程模型}
+\begin{center}
+软件工程用「工程化」的方法控制软件的成本、进度与质量。本章建立「软件危机--过程模型--生命周期--敏捷」四块基石。
+\end{center}
+\vspace*{\fill}
+\endgroup
+\clearpage
+
+\section{软件与软件危机}
+
+\begin{itemize}
+    \item \textbf{软件}：程序 + 数据 + 文档。它是逻辑产品，无物理磨损，但会因变更而「退化」。
+    \item \textbf{软件危机}：需求不清、进度失控、成本超支、质量低、维护难。
+    \item \textbf{软件工程}：将系统化、规范化、可度量的工程方法应用于软件的开发、运行与维护。
+\end{itemize}
+
+\section{软件过程模型}
+
+\begin{table}[H]
+\centering
+\caption{常见过程模型对比}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+模型 & 特点 & 适用 \\
+\midrule
+瀑布 (Waterfall) & 阶段线性、文档驱动 & 需求稳定、合同型 \\
+迭代/增量 & 分轮交付，逐步完善 & 中大型、需求渐进 \\
+螺旋 (Spiral) & 迭代 + 风险分析 & 高风险大型项目 \\
+原型 (Prototype) & 先做可运行原型澄清需求 & 需求模糊 \\
+敏捷 (Agile) & 短迭代、响应变化、可工作软件 & 需求多变、小团队 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\section{软件生命周期}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, node distance=1.3cm]
+    \node[draw, rounded corners] (req) {需求};
+    \node[draw, rounded corners, right=of req] (design) {设计};
+    \node[draw, rounded corners, right=of design] (impl) {实现};
+    \node[draw, rounded corners, right=of impl] (test) {测试};
+    \node[draw, rounded corners, right=of test] (maint) {维护};
+    \draw[->] (req) -- (design);
+    \draw[->] (design) -- (impl);
+    \draw[->] (impl) -- (test);
+    \draw[->] (test) -- (maint);
+\end{tikzpicture}
+\caption{软件生命周期的主要阶段}
+\end{figure}
+
+\noindent 维护成本常占生命周期总成本的 $60\%\sim80\%$；需求与设计缺陷的修复代价随阶段指数增长：
+\begin{equation}
+    C_{\text{fix}}(\text{阶段}) \propto e^{\,k\cdot \text{阶段序号}}
+\end{equation}
+
+\section{敏捷与 Scrum}
+
+\begin{itemize}
+    \item \textbf{敏捷宣言}：个体与互动、可工作软件、客户合作、响应变化 高于 流程与工具、详尽文档、合同谈判、遵循计划。
+    \item \textbf{Scrum}：Sprint（1--4 周）、产品待办列表 (Product Backlog)、冲刺待办列表、每日站会、评审与回顾。
+    \item \textbf{XP}：结对编程、测试驱动开发 (TDD)、持续集成、小步发布。
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{Scrum 三种角色与三类工件}
+\begin{tabulary}{\textwidth}{CC}
+\toprule
+角色 & 工件 \\
+\midrule
+产品负责人 (PO) & 产品待办列表 \\
+Scrum Master & 冲刺待办列表 \\
+开发团队 & 增量 (Increment) \\
+\bottomrule
+\end{tabulary}
+\end{table}

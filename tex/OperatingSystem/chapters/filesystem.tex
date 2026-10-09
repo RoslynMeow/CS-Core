@@ -1,0 +1,216 @@
+\clearpage
+\begingroup
+\let\clearpage\relax
+\let\cleardoublepage\relax
+\vspace*{\fill}
+\chapter{文件系统}
+\begin{center}
+文件系统把磁盘抽象为「命名空间--文件--目录」的层次结构，统一管理块的分配、元数据与崩溃恢复。本章围绕磁盘布局、inode 多级索引、分配方式、空闲空间管理与日志一致性展开。
+\end{center}
+\vspace*{\fill}
+\endgroup
+\clearpage
+
+\section{文件系统布局}
+
+磁盘上的文件系统通常划分为若干连续区域。以类 UNIX 的 \texttt{ext} 系列为例，自低地址起依次为引导块、超级块、inode 位图、数据位图、inode 表与数据块区。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small]
+    \draw[fill=gray!10] (0,0) rectangle (1.2,1.2) node[midway,align=center,font=\scriptsize]{引导\\块};
+    \draw[fill=blue!12] (1.2,0) rectangle (3.6,1.2) node[midway]{超级块};
+    \draw[fill=green!12] (3.6,0) rectangle (5.2,1.2) node[midway,align=center,font=\scriptsize]{inode\\位图};
+    \draw[fill=orange!15] (5.2,0) rectangle (6.8,1.2) node[midway,align=center,font=\scriptsize]{数据\\位图};
+    \draw[fill=purple!12] (6.8,0) rectangle (9.2,1.2) node[midway,align=center,font=\scriptsize]{inode\\表};
+    \draw[fill=cyan!12] (9.2,0) rectangle (13,1.2) node[midway]{数据块区};
+    \node[font=\scriptsize,align=center] at (2.4,-0.55){超级块：卷级\\全局元信息};
+    \node[font=\scriptsize,align=center] at (5.2,-0.55){位图：块 /\\inode 占用};
+    \node[font=\scriptsize,align=center] at (8.0,-0.55){inode 表：每个\\文件一条};
+    \node[font=\scriptsize,align=center] at (11.1,-0.55){数据块：文件\\内容};
+\end{tikzpicture}
+\caption{文件系统的磁盘布局示意}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{主要区域的职责}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+区域 & 内容 & 作用 \\
+\midrule
+超级块 (superblock) & 块数、块大小、空闲块数、inode 总数、magic & 挂载时读取，描述整个卷 \\
+inode 区 (inode table) & 每文件一条 inode（权限、大小、时间、块指针） & 文件元数据与数据定位 \\
+数据块区 (data blocks) & 文件内容本身 & 真正存放用户数据 \\
+位图 (bitmap) & 每块 / 每 inode 一位 & 记录分配与占用状态 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+超级块是卷的「身份证」：挂载时内核读取它即可获知块大小、空闲块总数与 inode 数量。若超级块损坏，整个卷将无法正确解析，因此实际系统会保存多份副本。
+
+\begin{equation}
+    \text{磁盘地址} = \text{块号} \times \text{块大小} + \text{块内偏移}
+\end{equation}
+
+\section{inode 与多级索引}
+
+inode（index node）是文件元数据的集合。它\emph{不包含文件名}（文件名保存在目录项中），而是记录文件属性与\textbf{指向数据块的指针}。为在固定大小的 inode 中支持大文件，采用\textbf{多级索引}：
+
+\begin{itemize}
+    \item \textbf{直接指针 (direct)}：inode 内含若干直接块号，直接指向数据块，命中时只需一次读盘。
+    \item \textbf{一级间接 (single indirect)}：指向一个指针块，块内每项再指向一个数据块。
+    \item \textbf{二级间接 (double indirect)}：指针块 $\to$ 指针块 $\to$ 数据块，容量为 $p^{2}$。
+    \item \textbf{三级间接 (triple indirect)}：再增一层，容量为 $p^{3}$，支持超大文件。
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=stealth, node distance=0.7cm]
+    \node[draw, rounded corners, fill=blue!8, minimum width=1.7cm, minimum height=3.0cm, align=center] (inode)
+        {inode\\[2pt] \scriptsize 直接 $\times 12$\\ \scriptsize 一级间接\\ \scriptsize 二级间接\\ \scriptsize 三级间接};
+    \node[draw, fill=green!15, right=3.4cm of inode] (d1) {数据块};
+    \node[draw, fill=yellow!25, right=2.2cm of inode, yshift=0.9cm] (p1) {指针块};
+    \node[draw, fill=yellow!25, right=2.2cm of inode, yshift=0.05cm] (p2) {指针块};
+    \node[draw, fill=yellow!25, right=2.2cm of inode, yshift=-0.8cm] (p3) {指针块};
+    \node[font=\scriptsize, right=0.1cm of d1] {$\cdots$};
+    \draw[->] (inode) -- (d1);
+    \draw[->] (inode.east) -- (p1.west);
+    \draw[->] (inode.east) -- (p2.west);
+    \draw[->] (inode.east) -- (p3.west);
+    \draw[->] (p1) -- +(1.1,0) node[right,font=\scriptsize]{数据块};
+    \draw[->] (p2) -- +(1.1,0) node[right,font=\scriptsize]{$\to$ 指针块 $\to$ 数据块};
+    \draw[->] (p3) -- +(1.1,0) node[right,font=\scriptsize]{$\to$ 指针块 $\to$ 指针块 $\to$ 数据块};
+\end{tikzpicture}
+\caption{inode 的直接与多级间接指针}
+\end{figure}
+
+设块大小为 $b$、指针大小为 $s$，则每块可容纳指针数 $p=\lfloor b/s\rfloor$；inode 含 $d$ 个直接指针。文件的最大长度由各层容量求和得到：
+
+\begin{equation}
+    B_{\max} = \left(d + p + p^{2} + p^{3}\right)\cdot b, \qquad p = \left\lfloor \frac{b}{s} \right\rfloor
+\end{equation}
+
+\begin{table}[H]
+\centering
+\caption{多级索引容量分解（$b=4096$ B，$s=4$ B，则 $p=1024$，$d=12$）}
+\begin{tabulary}{\textwidth}{CCCC}
+\toprule
+层次 & 块数 & 容量 & 说明 \\
+\midrule
+直接 & $d = 12$ & $\approx 48$ KB & 小文件快速访问 \\
+一级间接 & $p = 1024$ & $\approx 4$ MB & 一次额外读盘 \\
+二级间接 & $p^{2} = 1048576$ & $\approx 4$ GB & 中大型文件 \\
+三级间接 & $p^{3} = 1073741824$ & $\approx 4$ TB & 超大文件 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+将各层相加，$b=4096$ B、$s=4$ B、$d=12$ 时最大文件约为 $4.0$ TB。可见 $p$ 越大，间接层带来的容量增长越显著。
+
+\section{分配方式}
+
+文件数据块在磁盘上的组织方式，直接决定随机访问与顺序访问的成本。
+
+\begin{table}[H]
+\centering
+\caption{连续、链式、索引分配对比}
+\begin{tabulary}{\textwidth}{LLLC}
+\toprule
+方式 & 元数据 & 随机访问 & 特点 \\
+\midrule
+连续分配 & 起始块 + 长度 & $O(1)$ 直接计算 & 顺序/随机访问都快、实现简单；外部碎片、扩展难、需预分配 \\
+链式分配 & 首块 + 末块 & $O(n)$ 沿链遍历 & 无外部碎片、易扩展；随机访问慢、指针占块、链一断即丢 \\
+索引分配 & 索引块 & $O(1)$ 查索引后定位 & 支持随机访问、无外部碎片；索引块有开销，大文件需多级/混合索引 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{equation}
+    T_{\text{random}}:\quad \text{连续} = O(1),\qquad \text{链式} = O(n),\qquad \text{索引} = O(1)
+\end{equation}
+
+FAT 文件系统把链式分配的「下一块号」集中存放在\textbf{文件分配表}中，目录项只需记录首块号，缓解了链断问题，但随机访问仍需沿表遍历。现代文件系统多以索引（inode 多级）为主，并辅以\textbf{区段 (extent)} 连续分配，兼顾顺序吞吐与随机访问。
+
+\subsection{三种方式的取舍}
+
+\begin{itemize}
+    \item \textbf{连续}：适合只读、顺序访问、大小已知的文件；需处理外部碎片与「洞」。
+    \item \textbf{链式}：适合顺序追加、大小易变的文件；不适合频繁随机定位。
+    \item \textbf{索引}：适合通用场景；代价是索引块本身占用空间与一次额外寻道。
+\end{itemize}
+
+\section{空闲空间管理}
+
+文件系统必须高效地记录哪些块空闲。常用两类方法：\textbf{位示图}与\textbf{空闲链表}。
+
+\begin{itemize}
+    \item \textbf{位示图 (bitmap)}：每块用一位表示，$0$ 空闲、$1$ 占用。分配时按字号 + 位号定位，可用位运算快速找到连续空闲块。
+    \item \textbf{空闲链表 (free list)}：把所有空闲块链成链表，每块头部存放下一空闲块号；头插分配与回收均为 $O(1)$。
+    \item \textbf{成组链接 (grouping)}：把空闲块分组，每组第一块记录本组数量与下一组首块号，UNIX 采用此法，兼顾空间开销与批量分配。
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{空闲空间管理方法对比}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+方法 & 优点 & 缺点 \\
+\midrule
+位示图 & 简单、可随机查找、易找连续空闲块 & 空间随磁盘线性增长；找首块可能需扫描 \\
+空闲链表 & 几乎零额外空间；头部分配 / 回收 $O(1)$ & 难找连续块；遍历慢；依赖数据块，可靠性差 \\
+成组链接 & 空间与效率折中，可一次分配/回收一批 & 实现较复杂，需维护组栈 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+位示图的开销可以精确计算。设磁盘共 $N$ 块、每块 $b$ 字节，则位示图占用
+
+\begin{equation}
+    S_{\text{bitmap}} = \frac{N}{8}\ \text{字节} = \frac{\text{磁盘容量}}{8b}\ \text{字节}
+\end{equation}
+
+例如 $1$ TB 磁盘、$4$ KB 块：块数 $N = 2^{40}/2^{12} = 2^{28}$，位示图仅 $2^{28}/8 = 2^{25}$ 字节 $\approx 32$ MB。开销约为磁盘容量的 $1/(8b)$，通常可以接受。
+
+\section{日志与崩溃一致性}
+
+若在更新元数据的中途掉电，文件系统可能处于不一致状态。\textbf{日志 (journaling)} 通过「先写日志」保证可恢复。
+
+\begin{enumerate}
+    \item \textbf{写日志}：把事务的元数据旧值 / 新值追加写入日志区。
+    \item \textbf{提交 (commit)}：日志落盘后写入 \texttt{commit} 记录，事务被标记为「已提交」。
+    \item \textbf{检查点 (checkpoint)}：把日志中的修改写回数据区的最终位置。
+    \item \textbf{清理}：检查点完成后回收日志空间。
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=stealth, node distance=2.0cm]
+    \node[draw, rounded corners, fill=blue!10] (j) {写日志};
+    \node[draw, rounded corners, fill=yellow!18, right=of j] (c) {提交 commit};
+    \node[draw, rounded corners, fill=green!12, right=of c] (k) {检查点};
+    \node[draw, rounded corners, fill=gray!12, right=of k] (d) {写回数据区};
+    \draw[->] (j) -- (c);
+    \draw[->] (c) -- (k);
+    \draw[->] (k) -- (d);
+\end{tikzpicture}
+\caption{日志的先写后提交流程}
+\end{figure}
+
+崩溃恢复的依据是「日志中是否存在提交记录」：
+
+\begin{table}[H]
+\centering
+\caption{不同崩溃时机的恢复动作}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+崩溃时机 & 日志状态 & 恢复动作 \\
+\midrule
+提交前 & 有记录、无 commit & 回滚 / 丢弃该事务，保持旧的、一致状态 \\
+提交后、检查点前 & 已含 commit & 重放 (redo) 已提交事务，恢复到新的一致状态 \\
+检查点后 & 修改已写入数据区 & 无需重放，直接使用已落盘数据 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+日志可分为：\textbf{完全日志}（数据与元数据都记录，恢复最简单，写放大约 $2$ 倍）、\textbf{元数据日志}（只记元数据，数据另行有序写，常用折中）以及 \textbf{有序写 / WAL} 原则——日志必须先于对应数据落盘，这是恢复正确性的前提。

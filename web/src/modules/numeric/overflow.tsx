@@ -66,7 +66,7 @@ export const overflowModule: ModuleDef<Scene, Cfg> = {
   id: 'overflow',
   title: T('溢出检测', 'Overflow'),
   desc: T('补码加法溢出: 最高位进位 $C_{in}\\!\\oplus\\! C_{out}=1$, 或同号相加结果异号。', 'Signed overflow: Cin xor Cout, or same-sign operands giving opposite sign.'),
-  tags: ['data-structures', 'computer-organization'],
+  tags: ['data-structures'],
   defaultConfig: DEFAULT_CFG,
   randomize(c) { return { ...c, a: randInt(c.width), b: randInt(c.width) }; },
   Controls({ config, onChange, t }) {

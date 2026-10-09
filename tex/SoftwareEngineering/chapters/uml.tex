@@ -1,0 +1,395 @@
+\clearpage
+\begingroup
+\let\clearpage\relax
+\let\cleardoublepage\relax
+\vspace*{\fill}
+\chapter{面向对象与 UML}
+\begin{center}
+面向对象方法以「对象」为核心组织软件，UML 用一组标准图从\textbf{结构}（类图、用例图）与\textbf{行为}（时序图、状态图、活动图）两个视角刻画系统。本章建立「类--关系--交互--状态」的建模主线。
+\end{center}
+\vspace*{\fill}
+\endgroup
+\clearpage
+
+\section{类图}
+
+类图是 UML 中最核心的\textbf{结构图}，描述系统的静态结构：类、接口以及它们之间的关系。一个类通常画成\textbf{三格矩形}：类名、属性、方法。
+
+\subsection{类与成员}
+
+\begin{table}[H]
+\centering
+\caption{成员的可见性修饰符}
+\begin{tabulary}{\textwidth}{CCLL}
+\toprule
+符号 & 可见性 & 含义 & 示例 \\
+\midrule
+\texttt{+} & public（公有） & 任何类都可访问 & \texttt{+ getName(): String} \\
+\texttt{-} & private（私有） & 仅本类可访问 & \texttt{- balance: Money} \\
+\texttt{\#} & protected（受保护） & 本类及子类可访问 & \texttt{\# id: String} \\
+\texttt{\textasciitilde} & package（包） & 同包内可访问 & \texttt{\textasciitilde cache: Map} \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+成员书写的通用格式为「\textbf{可见性 名称: 类型 [多重性] = 默认值}」；方法为「\textbf{可见性 名称(参数): 返回类型}」。静态成员加\textbf{下划线}，抽象成员用\textbf{斜体}（或类名用 \texttt{\{abstract\}} 标注）。
+
+\subsection{类之间的关系}
+
+\begin{table}[H]
+\centering
+\caption{六种类关系的符号与语义}
+\begin{tabulary}{\textwidth}{LLLC}
+\toprule
+关系 & 符号 & 语义 & 耦合 \\
+\midrule
+关联 (Association) & 实线（可带方向箭头） & 类之间的一般连接，如「教师—课程」 & 弱 \\
+聚合 (Aggregation) & 空心菱形 + 实线（菱形在整体端） & 整体--部分，部分可独立存在（has-a） & 中 \\
+组合 (Composition) & 实心菱形 + 实线（菱形在整体端） & 整体--部分，部分随整体消亡（owns-a） & 强 \\
+泛化 (Generalization) & 空心三角 + 实线（三角指向父类） & 继承关系 is-a，子类复用父类 & 强 \\
+依赖 (Dependency) & 虚线 + 开放箭头 & 临时使用，如参数、局部变量、返回值 & 弱 \\
+实现 (Realization) & 虚线 + 空心三角（指向接口） & 类实现接口所定义的契约 & 中 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=Stealth]
+    \tikzset{
+        ebox/.style={draw, minimum width=1.2cm, minimum height=0.65cm, fill=blue!4},
+        rlabel/.style={font=\small, anchor=east, text=black!75},
+    }
+    \node[ebox] (d1) at (0,0) {A};
+    \node[ebox] (d2) at (4,0) {B};
+    \node[rlabel] at (-0.5,0) {依赖};
+    \draw[dashed, -{Stealth[open]}] (d1) -- (d2);
+
+    \node[ebox] (a1) at (0,-1.2) {A};
+    \node[ebox] (a2) at (4,-1.2) {B};
+    \node[rlabel] at (-0.5,-1.2) {关联};
+    \draw[-] (a1) -- (a2);
+
+    \node[ebox] (g1) at (0,-2.4) {A};
+    \node[ebox] (g2) at (4,-2.4) {B};
+    \node[rlabel] at (-0.5,-2.4) {聚合};
+    \draw[{Diamond[open]}-] (g1) -- (g2);
+
+    \node[ebox] (c1) at (0,-3.6) {A};
+    \node[ebox] (c2) at (4,-3.6) {B};
+    \node[rlabel] at (-0.5,-3.6) {组合};
+    \draw[{Diamond}-] (c1) -- (c2);
+
+    \node[ebox] (i1) at (0,-4.8) {A};
+    \node[ebox] (i2) at (4,-4.8) {B};
+    \node[rlabel] at (-0.5,-4.8) {泛化};
+    \draw[-{Triangle[open]}] (i1) -- (i2);
+
+    \node[ebox] (r1) at (0,-6.0) {A};
+    \node[ebox] (r2) at (4,-6.0) {B};
+    \node[rlabel] at (-0.5,-6.0) {实现};
+    \draw[dashed, -{Triangle[open]}] (r1) -- (r2);
+\end{tikzpicture}
+\caption{六种类关系的图形符号（关联/聚合/组合以 A 为整体端；泛化/实现以 B 为父类或接口端）}
+\end{figure}
+
+\subsection{多重性}
+
+多重性 (multiplicity) 标注在关联线的两端，表示一个对象在给定时刻可与多少个对端对象相关联。
+
+\begin{table}[H]
+\centering
+\caption{常用的多重性标注}
+\begin{tabulary}{\textwidth}{CCL}
+\toprule
+标注 & 读法 & 示例 \\
+\midrule
+\texttt{1} & 恰好一个 & 一张订单只属于一个客户 \\
+\texttt{0..1} & 零或一个 & 可选引用 \\
+\texttt{*} & 零或多个 & 一个客户可有任意多张订单 \\
+\texttt{1..*} & 至少一个 & 订单至少包含一个订单项 \\
+\texttt{n..m} & 区间 & 例如 \texttt{2..4} 个玩家 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{类图示例}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=Stealth]
+    \tikzset{
+        cls/.style={draw, rectangle split, rectangle split parts=3,
+            rectangle split part align={center,left,left},
+            text width=3.0cm, inner sep=4pt, fill=blue!4},
+        assoc/.style={draw},
+        gen/.style={draw, -{Triangle[open]}},
+    }
+    \node[cls] (person) at (0,0) {
+        \textbf{Person}
+        \nodepart{second} \# name: String\\ \# email: String
+        \nodepart{third} + getName(): String};
+    \node[cls] (book) at (6,0) {
+        \textbf{Book}
+        \nodepart{second} - isbn: String\\ - title: String
+        \nodepart{third} + isAvailable(): bool};
+    \node[cls] (member) at (0,-4.4) {
+        \textbf{Member}
+        \nodepart{second} - memberId: String\\ - joinDate: Date
+        \nodepart{third} + borrow(b: Book): Loan};
+    \node[cls] (loan) at (6,-4.4) {
+        \textbf{Loan}
+        \nodepart{second} - loanDate: Date\\ - dueDate: Date
+        \nodepart{third} + isOverdue(): bool};
+
+    \draw[gen] (member.north) -- (person.south)
+        node[midway, right, font=\scriptsize]{泛化};
+    \draw[assoc] (member.east) -- (loan.west)
+        node[near start, above, font=\scriptsize]{1}
+        node[near end, above, font=\scriptsize]{0..*}
+        node[midway, above, font=\scriptsize]{借阅};
+    \draw[assoc] (loan.north) -- (book.south)
+        node[near start, right, font=\scriptsize]{1..*}
+        node[near end, right, font=\scriptsize]{1}
+        node[midway, right, font=\scriptsize]{涉及};
+\end{tikzpicture}
+\caption{类图示例：图书馆借阅系统（Member 继承 Person，借阅记录 Loan 关联 Member 与 Book）}
+\end{figure}
+
+\begin{itemize}
+    \item \textbf{泛化}：\texttt{Member} 是 \texttt{Person} 的子类，继承 \texttt{name}、\texttt{email} 等成员。
+    \item \textbf{关联 + 多重性}：一个 \texttt{Member} 可产生 \texttt{0..*} 条 \texttt{Loan}；每条 \texttt{Loan} 恰好对应 \texttt{1} 个 \texttt{Member}。
+    \item \textbf{属性/方法的类型}：\texttt{String}、\texttt{Date}、\texttt{bool} 为数据类型，不参与对象间关联。
+\end{itemize}
+
+\section{用例图}
+
+用例图从\textbf{外部视角}描述系统「为谁提供什么服务」，是需求分析阶段与用户沟通的主要工具。
+
+\subsection{要素与关系}
+
+\begin{table}[H]
+\centering
+\caption{用例图的主要要素}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+要素 & 图形 & 说明 \\
+\midrule
+参与者 (Actor) & 火柴人 & 系统外部的用户或外部系统 \\
+用例 (Use Case) & 椭圆 & 系统提供的一项完整功能 \\
+系统边界 (Boundary) & 矩形框 & 框内是用例，框外是参与者 \\
+关联 (Association) & 实线 & 参与者与用例的通信 \\
+包含 (include) & 虚线箭头 + \textit{include} & 被包含用例是必选的公共步骤 \\
+扩展 (extend) & 虚线箭头 + \textit{extend} & 扩展用例在特定条件下才插入 \\
+泛化 (Generalization) & 空心三角 & 参与者或用例的继承 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\newcommand{\umlactor}[2]{%
+    \coordinate (#1) at #2;
+    \draw[thick] (#1) ++(0,0.34) circle (0.11);
+    \draw[thick] (#1) ++(0,0.23) -- ++(0,-0.35);
+    \draw[thick] (#1) ++(-0.16,0.06) -- ++(0.32,0);
+    \draw[thick] (#1) ++(0,-0.12) -- ++(-0.14,-0.30);
+    \draw[thick] (#1) ++(0,-0.12) -- ++(0.14,-0.30);
+}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=Stealth]
+    \draw[rounded corners, thick, fill=blue!3] (2.4,-2.6) rectangle (8.8,2.2);
+    \node[font=\small\bfseries] at (5.6,1.9) {图书借阅系统};
+
+    \umlactor{member}{(-0.8,0.6)}
+    \node[font=\small] at (-0.8,-0.7) {读者};
+    \umlactor{librarian}{(-0.8,-2.4)}
+    \node[font=\small] at (-0.8,-3.7) {管理员};
+
+    \node[draw, ellipse, fill=green!8, minimum width=2.4cm, minimum height=0.85cm] (login) at (4.2,1.2) {登录};
+    \node[draw, ellipse, fill=green!8, minimum width=2.4cm, minimum height=0.85cm] (search) at (4.2,-0.3) {检索图书};
+    \node[draw, ellipse, fill=green!8, minimum width=2.4cm, minimum height=0.85cm] (borrow) at (4.2,-1.8) {借书};
+    \node[draw, ellipse, fill=green!8, minimum width=2.4cm, minimum height=0.85cm] (manage) at (7.4,-1.0) {管理图书};
+
+    \draw (member) -- (login);
+    \draw (member) -- (search);
+    \draw (member) -- (borrow);
+    \draw (librarian) -- (manage);
+
+    \draw[dashed, ->] (borrow) -- (login) node[midway, left, font=\scriptsize]{\textit{include}};
+    \draw[dashed, ->] (manage) -- (login) node[midway, right, font=\scriptsize]{\textit{include}};
+    \draw[dashed, ->] (search) -- (borrow) node[midway, right, font=\scriptsize]{\textit{extend}};
+\end{tikzpicture}
+\caption{用例图示例：读者与管理员使用图书借阅系统}
+\end{figure}
+
+\textbf{include 与 extend 的区别}：include 是把多个用例共有的步骤抽成公共用例（\textbf{必然执行}）；extend 是给基础用例附加可选行为（\textbf{条件触发}）。箭头方向也不同：include 由基础用例指向被包含用例，extend 由扩展用例指向基础用例。
+
+\section{时序图}
+
+时序图（顺序图）是\textbf{交互图}，强调消息在时间上的先后顺序，用于描述一个用例内部对象之间的协作。
+
+\subsection{要素}
+
+\begin{table}[H]
+\centering
+\caption{时序图的主要要素}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+要素 & 图形 & 说明 \\
+\midrule
+生命线 (Lifeline) & 参与者下方的虚线 & 对象在时间轴上的存在 \\
+激活条 (Activation) & 生命线上的窄矩形 & 对象正在执行（控制焦点） \\
+同步消息 (Synchronous) & 实线 + 实心箭头 & 调用后等待返回，阻塞 \\
+异步消息 (Asynchronous) & 实线 + 开放箭头 & 发送后不等待，继续执行 \\
+返回消息 (Return) & 虚线 + 开放箭头 & 把结果返回给调用者 \\
+自消息 (Self) & 折返箭头 & 对象调用自身方法 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=Stealth]
+    \node[draw, fill=blue!6, minimum width=2.4cm, minimum height=0.8cm] (u) at (0,0) {用户};
+    \node[draw, fill=blue!6, minimum width=2.4cm, minimum height=0.8cm] (s) at (4.5,0) {控制器};
+    \node[draw, fill=blue!6, minimum width=2.4cm, minimum height=0.8cm] (d) at (9,0) {数据库};
+
+    \draw[dashed, gray] (0,-0.4) -- (0,-9);
+    \draw[dashed, gray] (4.5,-0.4) -- (4.5,-9);
+    \draw[dashed, gray] (9,-0.4) -- (9,-9);
+
+    \draw[fill=white] (4.35,-2) rectangle (4.65,-8);
+    \draw[fill=white] (8.85,-4) rectangle (9.15,-6);
+
+    \draw[->] (0,-2) -- (4.35,-2) node[midway, above, font=\scriptsize]{1: 提交请求};
+    \draw[->] (4.65,-4) -- (8.85,-4) node[midway, above, font=\scriptsize]{2: 查询数据};
+    \draw[->, dashed] (8.85,-6) -- (4.65,-6) node[midway, above, font=\scriptsize]{3: 返回结果};
+    \draw[->, dashed] (4.35,-8) -- (0,-8) node[midway, above, font=\scriptsize]{4: 响应};
+
+    \node[font=\scriptsize, anchor=west] at (9.4,-5) {激活条};
+    \draw[->, gray] (9.35,-5) -- (9.15,-5);
+\end{tikzpicture}
+\caption{时序图示例：一次查询交互（实线为同步消息，虚线为返回消息）}
+\end{figure}
+
+\textbf{同步与异步}：同步消息的发送者在收到返回前被阻塞，通常配套一个返回消息；异步消息发送后立即继续，不等待返回，常用于事件通知。激活条的高度反映对象执行该操作的时长。
+
+\section{状态图与活动图}
+
+\subsection{状态图}
+
+状态图描述\textbf{单个对象}在其生命周期内状态的变化，转移的通用语法为：
+\begin{equation}
+    \text{事件}\,[\text{守卫}]\,/\,\text{动作}
+\end{equation}
+即「发生某事件，在守卫条件成立时，执行某动作并迁移到目标状态」。
+
+\begin{table}[H]
+\centering
+\caption{状态图的主要要素}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+要素 & 图形 & 说明 \\
+\midrule
+状态 (State) & 圆角矩形 & 对象所处的条件或状况 \\
+初始状态 & 实心圆 & 唯一的入口 \\
+终止状态 & 牛眼（圆内实心圆） & 生命周期结束 \\
+转移 (Transition) & 带箭头实线 & 状态之间的迁移 \\
+事件 (Event) & 转移上的触发名 & 触发转移的信号 \\
+守卫 (Guard) & \texttt{[条件]} & 转移能否发生的布尔条件 \\
+动作 (Action) & \texttt{/动作} & 转移发生时执行的行为 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=Stealth, node distance=3.4cm,
+    state/.style={draw, rounded corners, fill=blue!5, minimum width=2.0cm, minimum height=0.9cm}]
+    \node[circle, fill=black, inner sep=1.8pt] (start) at (0,0) {};
+    \node[state, right=1.4cm of start] (created) {新建};
+    \node[state, right=of created] (paid) {已支付};
+    \node[state, right=of paid] (shipped) {已发货};
+    \node[state, below=1.8cm of shipped] (done) {已完成};
+    \node[state, below=1.8cm of paid] (cancel) {已取消};
+    \node[circle, draw, thick, inner sep=2.2pt] (fin) at (6.8,-4.6) {};
+    \node[circle, fill=black, inner sep=1pt] at (fin) {};
+
+    \draw[->] (start) -- (created);
+    \draw[->] (created) -- node[above, font=\scriptsize]{支付[金额>0]/扣款} (paid);
+    \draw[->] (paid) -- node[above, font=\scriptsize]{发货} (shipped);
+    \draw[->] (shipped) -- node[right, font=\scriptsize]{确认收货} (done);
+    \draw[->] (paid) -- node[right, font=\scriptsize]{取消[未发货]/退款} (cancel);
+    \draw[->] (done) -- (fin);
+    \draw[->] (cancel) -- (fin);
+\end{tikzpicture}
+\caption{订单状态图：事件[守卫]/动作}
+\end{figure}
+
+\subsection{活动图}
+
+活动图描述\textbf{工作流或算法流程}，与流程图相近，但支持并发、泳道等语义。
+
+\begin{table}[H]
+\centering
+\caption{活动图的主要要素}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+要素 & 图形 & 说明 \\
+\midrule
+开始 (Initial) & 实心圆 & 流程入口 \\
+活动 (Action) & 圆角矩形 & 一个可执行的步骤 \\
+判断 (Decision) & 菱形 & 依据条件选择分支 \\
+合并 (Merge) & 菱形 & 多条分支汇合 \\
+分叉/汇合 (Fork/Join) & 粗黑线 & 并发流的开始与同步 \\
+泳道 (Swimlane) & 分区 & 按负责对象划分活动 \\
+结束 (Final) & 牛眼 & 流程终止 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=Stealth,
+    act/.style={draw, rounded corners, fill=blue!5, minimum width=2.6cm, minimum height=0.8cm, align=center},
+    dec/.style={draw, diamond, aspect=2.2, fill=yellow!12, inner sep=1pt, align=center}]
+    \node[circle, fill=black, inner sep=2pt] (s) at (0,0) {};
+    \node[act, below=0.7cm of s] (recv) {接收订单};
+    \node[dec, below=0.9cm of recv] (chk) {库存充足?};
+    \node[act, below left=1.3cm and 1.8cm of chk, fill=green!6] (ok) {扣减库存\\生成发货单};
+    \node[act, below right=1.3cm and 1.8cm of chk, fill=red!6] (no) {通知缺货};
+    \node[circle, draw, thick, inner sep=2.2pt, below=1.4cm of ok] (f1) {};
+    \node[circle, fill=black, inner sep=1pt] at (f1) {};
+    \node[circle, draw, thick, inner sep=2.2pt, below=1.4cm of no] (f2) {};
+    \node[circle, fill=black, inner sep=1pt] at (f2) {};
+
+    \draw[->] (s) -- (recv);
+    \draw[->] (recv) -- (chk);
+    \draw[->] (chk) -- node[above left, font=\scriptsize]{[是]} (ok);
+    \draw[->] (chk) -- node[above right, font=\scriptsize]{[否]} (no);
+    \draw[->] (ok) -- (f1);
+    \draw[->] (no) -- (f2);
+\end{tikzpicture}
+\caption{活动图示例：订单处理流程（含判断分支）}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=Stealth]
+    \draw (0,0) rectangle (10,-4.5);
+    \draw (0,-1.5) -- (10,-1.5);
+    \node[anchor=west, font=\small\bfseries] at (0.3,-0.75) {用户};
+    \node[anchor=west, font=\small\bfseries] at (0.3,-2.25) {系统};
+
+    \node[draw, rounded corners, fill=blue!5, minimum width=2.2cm] (n1) at (3.2,-0.75) {提交申请};
+    \node[draw, rounded corners, fill=green!6, minimum width=2.2cm] (n2) at (6.0,-2.25) {校验资料};
+    \node[draw, rounded corners, fill=blue!5, minimum width=2.2cm] (n3) at (8.6,-0.75) {确认结果};
+
+    \draw[->] (n1) -- (n2);
+    \draw[->] (n2) -- (n3);
+\end{tikzpicture}
+\caption{泳道活动图：按「用户/系统」分区，箭头跨泳道表示职责交接}
+\end{figure}
+
+\noindent\textbf{状态图 vs.\ 活动图}：状态图刻画\textbf{一个对象}因事件驱动的状态变迁（关注「对象处于什么状态」）；活动图刻画\textbf{一个流程}中动作与控制的流转（关注「下一步做什么」）。二者都可建模行为，但抽象对象与关注点不同。

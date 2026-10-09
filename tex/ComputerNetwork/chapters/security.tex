@@ -1,0 +1,684 @@
+\clearpage
+\begingroup
+\let\clearpage\relax
+\let\cleardoublepage\relax
+\vspace*{\fill}
+\chapter{网络安全}
+\begin{center}
+安全的目标是\textbf{机密性、完整性、鉴别、不可否认}。本章从密码学原语出发，
+依次讲清对称加密（DES/3DES/AES、CBC）、公钥密码（RSA 的完整推导与算例、Diffie--Hellman）、
+报文完整性与数字签名、证书与 PKI，最后落到 TLS/HTTPS 与防火墙、IDS/IPS。
+\end{center}
+\vspace*{\fill}
+\endgroup
+\clearpage
+
+\section{安全目标与威胁模型}
+
+网络通信面临的根本困难是：信道是\textbf{开放}的，攻击者可以读取、修改、延迟、伪造
+或阻断在链路上流动的比特。因此，「安全」不是一个功能，而是一组需要同时满足的\textbf{目标}，
+每一个目标都对应一类具体的攻击。理解本章所有机制的关键，是把每个密码工具与它所要达成的
+目标、所对抗的攻击对应起来。
+
+\subsection{四大安全目标}
+
+\begin{itemize}
+    \item \textbf{机密性 (confidentiality)}：只有收发双方能读懂报文内容。对应的攻击是
+    \textbf{窃听 (eavesdropping)}。达成手段主要是加密（对称与公钥）。
+    \item \textbf{报文完整性 (message integrity)}：接收方能检测报文是否被改动。对应的攻击是
+    \textbf{篡改 (tampering)}。达成手段是散列、MAC 与数字签名。
+    \item \textbf{鉴别 (authentication)}：确认通信对端确实是它声称的那个实体，而不是冒名者。
+    对应的攻击是\textbf{冒充 (spoofing)} 与\textbf{重放 (replay)}。
+    \item \textbf{不可否认 (non-repudiation)}：发送方事后不能否认自己发过的报文。这一目标
+    只能由\textbf{数字签名}实现，因为对称密钥双方都知道，无法向第三方举证。
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.4}
+\begin{tabulary}{\textwidth}{@{}L L L L@{}}
+\toprule
+\textbf{安全目标} & \textbf{对抗的攻击} & \textbf{典型机制} & \textbf{密钥类型} \\
+\midrule
+机密性 & 窃听 & 对称加密、公钥加密 & 密钥/公私钥对 \\
+完整性 & 篡改 & 散列、MAC、数字签名 & 共享密钥/公私钥对 \\
+鉴别 & 冒充、重放 & 挑战--应答、MAC、签名、证书 & 共享密钥/公私钥对 \\
+不可否认 & 事后抵赖 & 数字签名 & 私钥 \\
+\bottomrule
+\end{tabulary}
+\caption{四大安全目标与对应机制}
+\label{tab:goals}
+\end{table}
+
+\subsection{被动攻击与主动攻击}
+
+按攻击者是否改变信道内容，可把攻击分成两类。
+
+\textbf{被动攻击}只监听、不改变数据，因此极难被察觉，防御重点在于\textbf{预防}（加密）：
+\begin{itemize}
+    \item \textbf{窃听 / 流量分析}：截获报文；即使内容加密，也可从流量模式推断信息。
+\end{itemize}
+
+\textbf{主动攻击}会修改、伪造或阻断数据，可能被检测到，防御重点在于\textbf{检测与恢复}：
+\begin{itemize}
+    \item \textbf{篡改 (modification)}：修改、插入、删除报文内容。
+    \item \textbf{重放 (replay)}：把先前截获的合法报文原样重发，欺骗接收方重复执行操作。
+    对抗手段是\textbf{序号、时间戳、随机数 (nonce)}，使旧报文不可用。
+    \item \textbf{中间人 (man-in-the-middle, MITM)}：攻击者插入到双方之间，各自与两端
+    建立独立连接并转发/改写数据。它是加密与鉴别都失效的最危险场景。
+    \item \textbf{拒绝服务 (denial of service, DoS)}：用海量请求耗尽目标资源，使其无法
+    为正常用户服务；分布式版本 (DDoS) 从大量被控主机发起。
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, node distance=1.0cm,
+    box/.style={draw, rounded corners, minimum width=2.0cm, minimum height=1.0cm, align=center},
+    arrow/.style={->, >=latex, thick}]
+    \node[box] (alice) {Alice\\发送方};
+    \node[box, right=5.2cm of alice] (bob) {Bob\\接收方};
+    \node[box, draw=red, right=1.9cm of alice] (mallory) {Mallory\\攻击者};
+
+    \draw[arrow] (alice.east) -- node[above, font=\scriptsize] {数据} (mallory.west);
+    \draw[arrow] (mallory.east) -- node[above, font=\scriptsize] {数据} (bob.west);
+    \draw[arrow, dashed, red] (mallory.north) -- ++(0,0.8) node[above, align=center, font=\scriptsize] {窃听：复制};
+    \draw[arrow, dashed, red] (mallory.south) -- ++(0,-0.8) node[below, align=center, font=\scriptsize] {篡改 / 重放 / 丢弃};
+    \node[font=\scriptsize, align=center] at ($(alice)!.5!(mallory)+(0,-2.2)$) {被动：读};
+    \node[font=\scriptsize, align=center] at ($(mallory)!.5!(bob)+(0,-2.2)$) {主动：改 / 造 / 断};
+\end{tikzpicture}
+\caption{中间人 (MITM) 攻击者同时实施被动与主动攻击}
+\label{fig:mitm}
+\end{figure}
+
+\subsection{密码体制的分类}
+
+现代密码学用两类互补的工具构建安全信道，它们解决的问题不同，必须配合使用：
+
+\begin{itemize}
+    \item \textbf{对称密钥加密}：加解密用同一密钥 $K_S$，速度快，适合加密\textbf{大量数据}，
+    但需要事先安全地共享密钥。
+    \item \textbf{公钥加密}：每人一对密钥 $(K^+, K^-)$，公钥公开、私钥保密，无需预先共享，
+    但速度慢，主要用于\textbf{密钥分发与数字签名}。
+\end{itemize}
+
+实际协议（如 TLS）总是「公钥做握手、对称做数据传输」的\textbf{混合体制}。
+
+\section{对称密钥加密}
+
+对称加密的基本模型是：明文 $m$ 经密钥 $K_S$ 加密成密文 $c$，接收方用同一密钥解密还原：
+\begin{equation}
+    c = E_{K_S}(m), \qquad m = D_{K_S}(c) = E_{K_S}^{-1}(c).
+    \label{eq:sym}
+\end{equation}
+这里 $E$ 与 $D$ 是公开的算法，唯一保密的是密钥 $K_S$。这正是 Kerckhoffs 原则：
+\textbf{安全性应完全依赖密钥的保密，而非算法的保密}。
+
+\subsection{分组密码：DES、3DES、AES}
+
+\textbf{分组密码 (block cipher)}把定长的明文分组映射为等长密文分组。主流算法如下：
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.4}
+\begin{tabulary}{\textwidth}{@{}L C C L@{}}
+\toprule
+\textbf{算法} & \textbf{分组长度} & \textbf{密钥长度} & \textbf{说明 / 状态} \\
+\midrule
+DES & 64 位 & 56 位 & 16 轮 Feistel 结构；56 位密钥已可用穷举攻破，\textbf{不安全} \\
+3DES & 64 位 & 112/168 位 & 对同一数据做 DES 三次 $E$--$D$--$E$；慢，已逐步淘汰 \\
+AES & 128 位 & 128/192/256 位 & 字节代换 + 行移位 + 列混合 + 轮密钥加；\textbf{当前标准} \\
+\bottomrule
+\end{tabulary}
+\caption{主流对称分组密码对比}
+\label{tab:blockcipher}
+\end{table}
+
+DES 的 56 位密钥空间只有 $2^{56}\approx 7.2\times10^{16}$，用专用硬件可在数小时至数天内穷举，
+因此早已被弃用。3DES 通过三次加密把有效密钥空间扩大到约 $2^{112}$，但分组只有 64 位且效率低。
+AES 分组 128 位、密钥可达 256 位，既有软件高速实现又有硬件指令加速，是当今默认选择。
+
+\subsection{分组密码工作模式：为什么需要 CBC}
+
+分组密码只能加密\textbf{定长}分组，而报文长度任意。若对每个分组独立加密（ECB 模式），
+相同的明文分组会产生相同的密文分组，攻击者无需解密即可看出明文的重复结构。因此需要
+\textbf{工作模式}把分组密码扩展为可加密任意长度数据的方案。最常见的三种：
+
+\begin{itemize}
+    \item \textbf{ECB（电子密码本）}：$c_i = E_K(m_i)$，各分组独立。相同明文 $\to$ 相同密文，
+    \textbf{不推荐}。
+    \item \textbf{CBC（密码分组链接）}：把前一个密文分组与当前明文分组异或后再加密，
+    使相同明文在不同位置产生不同密文。
+    \item \textbf{CTR（计数器）}：把分组密码当作流密码，用递增计数器生成密钥流再异或，
+    可并行、可随机访问，常用于高速场景。
+\end{itemize}
+
+\subsection{CBC 的 IV 与串行性}
+
+CBC 的加密递推关系为
+\begin{equation}
+    c_0 = IV, \qquad c_i = E_K\bigl(m_i \oplus c_{i-1}\bigr),\quad i = 1,2,\dots
+    \label{eq:cbc-enc}
+\end{equation}
+解密为
+\begin{equation}
+    m_i = D_K(c_i) \oplus c_{i-1}.
+    \label{eq:cbc-dec}
+\end{equation}
+其中 $IV$ 是初始向量。
+
+\begin{itemize}
+    \item \textbf{IV 的作用}：它让相同明文每次加密得到不同密文，避免「确定性加密」的
+    模式泄露。IV 必须\textbf{随机且不可预测}，但\textbf{无需保密}，通常随密文一起明文传输。
+    若 IV 被攻击者预测或重复使用，CBC 的安全性会显著下降（历史上 BEAST 攻击即利用可预测 IV）。
+    \item \textbf{串行性}：由式~\eqref{eq:cbc-enc} 可见 $c_i$ 依赖 $c_{i-1}$，因此
+    \textbf{加密必须串行}，无法并行；而解密时 $m_i = D_K(c_i)\oplus c_{i-1}$ 只依赖当前
+    密文分组，\textbf{解密可以并行}。这是 CBC 的一个重要工程特性。
+    \item \textbf{错误传播}：$c_i$ 的一个比特错误会影响 $m_i$ 的对应比特以及 $m_{i+1}$
+    的整块（因为 $c_i$ 参与下一块解密），但不会影响更后面的分组。
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, node distance=0.9cm,
+    op/.style={draw, circle, inner sep=1pt, minimum size=5mm},
+    blk/.style={draw, minimum width=1.5cm, minimum height=0.7cm, align=center, font=\small},
+    arrow/.style={->, >=latex, thick}]
+    \node[blk] (iv) {$IV$};
+    \node[blk, right=of iv] (m1) {$m_1$};
+    \node[blk, right=of m1] (m2) {$m_2$};
+    \node[blk, right=of m2] (m3) {$\cdots$};
+
+    \node[op, below=0.8cm of m1] (x1) {$\oplus$};
+    \node[op, below=0.8cm of m2] (x2) {$\oplus$};
+    \node[op, below=0.8cm of m3] (x3) {$\oplus$};
+
+    \node[blk, below=0.8cm of x1] (e1) {$E_K$};
+    \node[blk, below=0.8cm of x2] (e2) {$E_K$};
+    \node[blk, below=0.8cm of x3] (e3) {$E_K$};
+
+    \draw[arrow] (m1) -- (x1);
+    \draw[arrow] (m2) -- (x2);
+    \draw[arrow] (m3) -- (x3);
+    \draw[arrow] (iv.south) |- (x1.west);
+    \draw[arrow] (x1) -- (e1);
+    \draw[arrow] (x2) -- (e2);
+    \draw[arrow] (x3) -- (e3);
+    \draw[arrow] (e1.south) -- ++(0,-0.45) coordinate (c1) -| (x2.west);
+    \node[font=\scriptsize, right=0.05cm of c1] {$c_1$};
+    \draw[arrow] (e2.south) -- ++(0,-0.45) coordinate (c2) -| (x3.west);
+    \node[font=\scriptsize, right=0.05cm of c2] {$c_2$};
+    \draw[arrow] (e3.south) -- ++(0,-0.45) node[below, font=\scriptsize] {$c_3$};
+    \node[align=center, font=\scriptsize, anchor=west] at ($(m3.east)+(1.4,0)$)
+        {$c_i = E_K(m_i \oplus c_{i-1})$,\\加密链式依赖，串行};
+\end{tikzpicture}
+\caption{CBC 模式：每块先与前一密文异或再加密}
+\label{fig:cbc}
+\end{figure}
+
+\subsection{密钥分发难题}
+
+对称加密最大的软肋是\textbf{密钥分发}。若 $n$ 个用户希望两两安全通信，则每对都需要一个
+独立的密钥，所需密钥总数为
+\begin{equation}
+    \binom{n}{2} = \frac{n(n-1)}{2} = O(n^2).
+    \label{eq:keycount}
+\end{equation}
+例如 $n=1000$ 时需要约 50 万个密钥。更严重的是，每对用户必须通过一个\textbf{安全信道}
+预先交换密钥；而在一个开放网络里，这样的安全信道恰恰不存在。此外，密钥无法在事后
+向第三方证明「这条消息是谁发的」，因而对称加密\textbf{不能提供不可否认}。这两个难题
+（$O(n^2)$ 的密钥量和安全分发需求）正是公钥密码学要解决的核心问题。
+
+\section{公钥加密}
+
+\subsection{单向陷门函数}
+
+公钥密码建立在\textbf{单向陷门函数 (one-way trapdoor function)}之上：
+\begin{itemize}
+    \item \textbf{单向}：正向计算 $y=f(x)$ 容易，反向由 $y$ 求 $x$ 在计算上不可行。
+    \item \textbf{陷门}：存在一个额外信息（私钥）使反向计算变得容易。
+\end{itemize}
+每人持有一对密钥：公钥 $K^+$ 可公开，私钥 $K^-$ 严格保密，并满足
+\begin{equation}
+    K^-\bigl(K^+(m)\bigr) = m, \qquad K^+\bigl(K^-(m)\bigr) = m.
+    \label{eq:rsakeys}
+\end{equation}
+第一式用于\textbf{加密}（任何人用公钥加密，只有私钥持有者能解）；第二式用于\textbf{签名}
+（私钥持有者签名，任何人用公钥验证）。这两式看似对称，但用途语义完全不同，切勿混淆。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, node distance=1.6cm,
+    blk/.style={draw, minimum height=0.8cm, align=center},
+    arrow/.style={->, >=latex, thick}]
+    \node (m) {$m$};
+    \node[blk, right=of m] (kp) {$K_B^+$\\公钥};
+    \node[blk, right=of kp] (c) {$c = m^e \bmod n$};
+    \node[blk, right=of c] (km) {$K_B^-$\\私钥};
+    \node[right=of km] (m2) {$m$};
+    \draw[arrow] (m) -- (kp);
+    \draw[arrow] (kp) -- (c);
+    \draw[arrow] (c) -- (km);
+    \draw[arrow] (km) -- (m2);
+    \node[below=0.15cm of kp, font=\scriptsize, align=center] {加密};
+    \node[below=0.15cm of km, font=\scriptsize, align=center] {解密};
+\end{tikzpicture}
+\caption{公钥加密：任何人都能加密，只有私钥持有者能解密}
+\label{fig:pubkey}
+\end{figure}
+
+\subsection{RSA 的数学基础与推导}
+
+RSA 的安全性源于\textbf{大整数分解困难}。其正确性依赖欧拉定理。
+
+\textbf{欧拉函数 $\phi(n)$}：$\phi(n)$ 是不超过 $n$ 且与 $n$ 互素的自然数个数。若
+$n=pq$ 且 $p,q$ 为不同素数，则
+\begin{equation}
+    \phi(n) = (p-1)(q-1).
+    \label{eq:phi}
+\end{equation}
+\textbf{欧拉定理}：若 $\gcd(a,n)=1$，则
+\begin{equation}
+    a^{\phi(n)} \equiv 1 \pmod{n}.
+    \label{eq:euler}
+\end{equation}
+
+RSA 的构造如下：
+\begin{enumerate}
+    \item 选两个大素数 $p,q$，令 $n=pq$，计算 $\phi(n)=(p-1)(q-1)$。
+    \item 选加密指数 $e$，使其满足 $\gcd\bigl(e,\phi(n)\bigr)=1$，通常取 $e=65537$。
+    \item 求解密指数 $d$，使其为 $e$ 在模 $\phi(n)$ 下的乘法逆元：
+    \begin{equation}
+        ed \equiv 1 \pmod{\phi(n)}, \qquad\text{即}\qquad
+        d = e^{-1} \bmod \phi(n).
+        \label{eq:ed}
+    \end{equation}
+    由式~\eqref{eq:ed} 存在整数 $k$ 使 $ed = 1 + k\,\phi(n)$。
+    \item 公钥为 $(n,e)$，私钥为 $(n,d)$；加密 $c=m^e \bmod n$，解密 $m=c^d \bmod n$。
+\end{enumerate}
+
+\textbf{正确性证明}：对 $m<n$ 且 $\gcd(m,n)=1$，
+\begin{equation}
+    c^{d} = (m^{e})^{d} = m^{ed} = m^{\,1+k\phi(n)}
+          = m \cdot \bigl(m^{\phi(n)}\bigr)^{k} \equiv m \cdot 1^{k} = m \pmod{n},
+\end{equation}
+其中最后一步用了欧拉定理~\eqref{eq:euler}。（当 $\gcd(m,n)\neq1$ 时结论仍成立，
+可用中国剩余定理分别模 $p,q$ 讨论。）
+
+\subsection{RSA 完整数值算例}
+
+为便于手算，取极小素数。\textbf{注意：真实系统绝不能用这么小的数}。
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.35}
+\begin{tabulary}{\textwidth}{@{}L L L@{}}
+\toprule
+\textbf{步骤} & \textbf{公式} & \textbf{本算例数值} \\
+\midrule
+选素数 & $p,q$ & $p=3,\; q=11$ \\
+模数 & $n=pq$ & $n = 3\times 11 = 33$ \\
+欧拉函数 & $\phi(n)=(p-1)(q-1)$ & $\phi = 2\times 10 = 20$ \\
+选加密指数 & $\gcd(e,\phi)=1$ & $e=3$（$\gcd(3,20)=1$）\\
+求解密指数 & $d\equiv e^{-1}\pmod{\phi}$ & $d=7$（因 $3\times 7=21\equiv 1 \pmod{20}$）\\
+公钥 & $(n,e)$ & $(33,\,3)$ \\
+私钥 & $(n,d)$ & $(33,\,7)$ \\
+\bottomrule
+\end{tabulary}
+\caption{RSA 小数值算例：密钥生成}
+\label{tab:rsa-keygen}
+\end{table}
+
+求 $d$ 可用扩展欧几里得算法：$20 = 3\times6 + 2$，$3 = 2\times1 + 1$，回代得
+$1 = 3 - (20 - 3\times6) = 7\times3 - 20$，故 $7\times3\equiv1\pmod{20}$，$d=7$。
+
+\textbf{加密}：取明文 $m=5$（要求 $0\le m<n$）。
+\begin{equation}
+    c = m^{e} \bmod n = 5^{3} \bmod 33 = 125 \bmod 33 = 26.
+\end{equation}
+因为 $33\times3=99$，$125-99=26$，所以密文 $c=26$。
+
+\textbf{解密}：用私钥 $d=7$ 还原。
+\begin{equation}
+    m = c^{d} \bmod n = 26^{7} \bmod 33.
+\end{equation}
+用平方--乘法加速：$26\equiv-7\pmod{33}$，故
+\begin{equation}
+    (-7)^{2}=49\equiv16,\quad (-7)^{4}\equiv16^{2}=256\equiv25,\quad
+    (-7)^{7}=(-7)^{4}\cdot(-7)^{2}\cdot(-7)\equiv25\times16\times(-7).
+\end{equation}
+$25\times16=400\equiv 400-33\times12=400-396=4$，$4\times(-7)=-28\equiv33-28=5\pmod{33}$。
+于是 $m=5$，与原明文一致，\textbf{解密还原成功}。
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\begin{tabulary}{\textwidth}{@{}L C C C@{}}
+\toprule
+\textbf{操作} & \textbf{输入} & \textbf{计算式} & \textbf{输出} \\
+\midrule
+加密 & $m=5$ & $5^{3}\bmod 33$ & $c=26$ \\
+解密 & $c=26$ & $26^{7}\bmod 33$ & $m=5$ \\
+\bottomrule
+\end{tabulary}
+\caption{RSA 小数值算例：加密与解密}
+\label{tab:rsa-enc}
+\end{table}
+
+\subsection{模幂运算与安全性}
+
+RSA 的实际指数非常大（$d$ 可能有上千位比特），直接计算 $c^d$ 会产生天文数字。实际使用
+\textbf{反复平方--乘法 (square-and-multiply)}：把指数写成二进制，逐位平方并在该位为 1 时
+乘上底数，每步都取模。这样计算 $c^d \bmod n$ 只需 $O(\log d)$ 次模乘。
+
+RSA 的安全性并非无条件的，必须注意以下几点：
+
+\begin{itemize}
+    \item \textbf{分解困难假设}：攻击者若能把 $n$ 分解为 $p,q$，即可算出 $\phi(n)$ 并求
+    $d$，从而彻底破解。目前分解 $1024$ 位模数已接近可行，因此\textbf{模数 $n$ 至少应取
+    2048 位}，高安全场景取 3072 或 4096 位。
+    \item \textbf{确定性 RSA 不安全，必须填充}：直接加密 $c=m^e\bmod n$ 是确定性的，
+    相同明文得到相同密文，且小指数下可被「小消息攻击」和「选择密文攻击」击破。
+    标准做法是先用 \textbf{OAEP}（最优非对称加密填充）随机化并加冗余，再做 RSA。
+    \item \textbf{不要用 RSA 直接加密大块数据}：RSA 慢且受模数长度限制，实际只用于加密一个
+    对称会话密钥（混合体制），这也正是 TLS 的做法。
+    \item \textbf{相同模数不同用户}：应保证每个用户 $n$ 不同，否则存在共模攻击。
+\end{itemize}
+
+\subsection{Diffie--Hellman 密钥交换}
+
+RSA 解决「安全分发密钥」，Diffie--Hellman（DH）则让双方在\textbf{公开信道}上协商出
+一个共享密钥，而窃听者无法算出它。双方事先公开大素数 $p$ 与本原根 $g$。
+
+\begin{enumerate}
+    \item Alice 选私密随机数 $a$，计算 $A = g^{a} \bmod p$，把 $A$ 发给 Bob。
+    \item Bob 选私密随机数 $b$，计算 $B = g^{b} \bmod p$，把 $B$ 发给 Alice。
+    \item Alice 计算 $K = B^{a} \bmod p$，Bob 计算 $K = A^{b} \bmod p$。两者相等，因为
+    \begin{equation}
+        B^{a} = (g^{b})^{a} = g^{ab} = (g^{a})^{b} = A^{b} \pmod{p}.
+        \label{eq:dh}
+    \end{equation}
+\end{enumerate}
+窃听者只知道 $p,g,A,B$，要从 $A=g^{a}\bmod p$ 反推 $a$ 需要解\textbf{离散对数问题}，
+在足够大的参数下是困难的。
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.3}
+\begin{tabulary}{\textwidth}{@{}L L L L@{}}
+\toprule
+\textbf{量} & \textbf{Alice} & \textbf{Bob} & \textbf{公开?} \\
+\midrule
+公共参数 & $p=23,\;g=5$ & $p=23,\;g=5$ & 是 \\
+私有随机数 & $a=6$ & $b=15$ & 否 \\
+公开值 & $A=5^{6}\bmod23=8$ & $B=5^{15}\bmod23=19$ & 是 \\
+共享密钥 & $B^{a}=19^{6}\bmod23=2$ & $A^{b}=8^{15}\bmod23=2$ & 否 \\
+\bottomrule
+\end{tabulary}
+\caption{Diffie--Hellman 小数值算例（双方得到相同密钥 2）}
+\label{tab:dh}
+\end{table}
+
+\textbf{中间人风险}：DH 本身\textbf{不鉴别身份}。攻击者 Mallory 可分别与 Alice、Bob
+各做一次 DH：对 Alice 冒充 Bob，对 Bob 冒充 Alice，于是 Alice 与 Mallory 共享 $K_1$，
+Bob 与 Mallory 共享 $K_2$。Mallory 解密、查看、改写后再加密转发，双方却都以为在和对方
+通信。这就是经典的\textbf{中间人攻击}。防御方法是让 DH 的公钥值经过\textbf{数字签名或
+证书}认证（如 TLS 中的签名 DH / ECDHE），使攻击者无法伪造。
+
+\section{报文完整性与数字签名}
+
+加密保护机密性，但\textbf{不能保证完整性}：某些攻击（如比特翻转）可在不知道密钥的情况下
+破坏密文。因此需要独立于加密的完整性机制。
+
+\subsection{密码散列函数}
+
+\textbf{密码散列函数} $H$ 把任意长报文映射为定长摘要 $H(m)$，需满足：
+\begin{itemize}
+    \item \textbf{单向性 (one-way)}：由摘要无法反推出原报文。
+    \item \textbf{抗弱碰撞}：给定 $m$，难以找到 $m'\neq m$ 使 $H(m')=H(m)$。
+    \item \textbf{抗强碰撞}：难以找到任意 $m\neq m'$ 使 $H(m)=H(m')$。
+    \item \textbf{雪崩效应}：输入改变一位，输出约一半比特改变。
+\end{itemize}
+MD5（128 位）与 SHA-1（160 位）已被发现实用碰撞，\textbf{不应再用}；当前标准是
+\textbf{SHA-256}（256 位）。抗碰撞性由生日攻击给出上界：$n$ 位摘要找到碰撞约需
+$2^{n/2}$ 次尝试，故 256 位摘要的安全强度约为 128 位。
+
+\subsection{报文鉴别码 MAC}
+
+仅对报文做散列并不能防篡改：攻击者可以连同散列一起改。要提供\textbf{完整性 + 鉴别}，
+双方需共享一个密钥 $s$，发送 \textbf{MAC}：
+\begin{equation}
+    \text{MAC} = H(m+s) \quad\text{（或更安全的 HMAC）}.
+    \label{eq:mac}
+\end{equation}
+接收方用同样方式重算并比对。攻击者没有 $s$，无法为新报文生成正确的 MAC。
+注意 MAC 只依赖\textbf{共享}密钥，因此双方都能生成，\textbf{不提供不可否认}。
+
+\subsection{数字签名}
+
+数字签名用\textbf{私钥}对报文的摘要签名，任何人用公钥验证：
+\begin{equation}
+    \text{签名} = K_A^-\bigl(H(m)\bigr), \qquad
+    \text{验证}:\ K_A^+\bigl(K_A^-(H(m))\bigr) = H(m).
+    \label{eq:sign}
+\end{equation}
+其性质：
+\begin{itemize}
+    \item \textbf{鉴别}：只有持有 $K_A^-$ 的人能生成签名，验证通过即证明来自 A。
+    \item \textbf{完整性}：签名绑定摘要，报文被改则摘要不匹配。
+    \item \textbf{不可否认}：私钥只有 A 拥有，A 事后无法否认，因为第三者也能验证。
+\end{itemize}
+\textbf{先散列再签名}（而非直接对整篇报文做公钥运算）既大幅提升效率，又规避了报文
+长度限制。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, node distance=0.9cm,
+    blk/.style={draw, minimum height=0.7cm, align=center},
+    arrow/.style={->, >=latex, thick}]
+    \node (m) {$m$};
+    \node[blk, right=of m] (h) {$H$};
+    \node[blk, right=of h] (s) {$K_A^-$};
+    \node[blk, right=of s] (sig) {签名};
+    \draw[arrow] (m) -- (h);
+    \draw[arrow] (h) -- node[above, font=\scriptsize] {$H(m)$} (s);
+    \draw[arrow] (s) -- (sig);
+    \node[below=0.6cm of sig, align=center, font=\scriptsize] {发送 $(m,\ \text{签名})$};
+    \node[blk, right=2.0cm of sig] (h2) {$H$};
+    \node[blk, below=1.0cm of h2] (v) {$K_A^+$};
+    \draw[arrow] (sig) -- (h2);
+    \draw[arrow] (v) -- node[right, font=\scriptsize, align=center] {比对摘要\\是否一致} (h2);
+\end{tikzpicture}
+\caption{数字签名：私钥签摘要，公钥验证}
+\label{fig:signature}
+\end{figure}
+
+\subsection{证书与 PKI}
+
+公钥体制有一个「先有鸡还是先有蛋」的问题：要验证签名，你必须先拥有对方\textbf{可信的公钥}。
+若公钥在分发途中被替换，整个信任链崩溃。解决之道是\textbf{证书 (certificate)}与
+\textbf{公钥基础设施 (public key infrastructure, PKI)}。
+
+\textbf{CA（证书颁发机构）}是大家共同信任的第三方。它对「身份 $\leftrightarrow$ 公钥」的绑定
+用自己的\textbf{私钥}签名，生成证书：
+\begin{equation}
+    \text{cert}_A = \bigl(\text{身份}_A,\ K_A^+\bigr)\ \text{经}\ K_{CA}^-\ \text{签名}.
+    \label{eq:cert}
+\end{equation}
+任何人只要预先安全地持有 CA 的公钥 $K_{CA}^+$（浏览器/操作系统内置的根证书），就能验证
+证书、信任其中的公钥。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, node distance=1.2cm,
+    ca/.style={draw, rounded corners, minimum width=2.6cm, minimum height=0.9cm, align=center},
+    box/.style={draw, minimum width=2.8cm, minimum height=0.9cm, align=center},
+    arrow/.style={->, >=latex, thick}]
+    \node[ca] (root) {根 CA\\$K_{root}^-$};
+    \node[ca, below left=1.1cm and 0.6cm of root] (inter) {中间 CA\\$K_{inter}^-$};
+    \node[ca, below right=1.1cm and 0.6cm of root] (inter2) {其它 CA};
+    \node[box, below=1.1cm of inter] (server) {服务器\\$(K_B^+)$};
+    \draw[arrow] (root) -- node[left, font=\scriptsize] {签} (inter);
+    \draw[arrow] (root) -- (inter2);
+    \draw[arrow] (inter) -- node[left, font=\scriptsize] {签} (server);
+    \node[right=0.4cm of server, align=left, font=\scriptsize] {证书链：\\服务器 $\to$ 中间 CA $\to$ 根 CA};
+\end{tikzpicture}
+\caption{PKI 信任链：根 CA 签发中间 CA，中间 CA 签发服务器证书}
+\label{fig:pki}
+\end{figure}
+
+\textbf{验证链}：浏览器拿到服务器证书后，用其签发者（中间 CA）的公钥验证，再用根 CA
+的公钥验证中间 CA 证书，一直回溯到内置的受信任根。任何一环无法验证，连接即被拒绝。
+证书还包含\textbf{有效期}与\textbf{吊销列表 (CRL/OCSP)}，用于处理私钥泄露等情况。
+
+\section{TLS 与 HTTPS}
+
+\textbf{HTTPS} 就是 HTTP over TLS。TLS 位于 TCP 之上、应用协议之下，为任意应用提供一个
+\textbf{机密、完整、可鉴别}的安全信道。它把本章所有原语组合起来，是混合体制的范例。
+
+\subsection{握手过程逐步}
+
+TLS 握手在正式传输数据前完成\textbf{算法协商、身份鉴别、密钥协商}：
+
+\begin{enumerate}
+    \item \textbf{ClientHello}：客户端发送支持的 TLS 版本、密码套件列表、以及随机数
+    $R_c$（nonce）。随机数用于保证每次会话密钥不同，抵御重放。
+    \item \textbf{ServerHello}：服务器选定密码套件与版本，回复自己的随机数 $R_s$。
+    \item \textbf{证书}：服务器发送证书链，客户端用根 CA 公钥验证，从而得到服务器可信公钥。
+    \item \textbf{密钥交换}：在使用 \textbf{ECDHE} 时，服务器发送经\textbf{签名}的临时
+    椭圆曲线 DH 公钥；客户端回送自己的 ECDHE 公钥。双方据 $R_c,R_s$ 与 ECDHE 共享秘密
+    导出一组\textbf{会话密钥}。服务器签名这一步同时起到身份鉴别作用，抵御中间人。
+    \item \textbf{Finished}：双方各发送一段用会话密钥加密并做 MAC 的 \emph{Finished} 消息，
+    其内容是对整个握手记录的摘要。因为前面交换的所有握手消息都已包含在内，任何被篡改的
+    握手参数都会导致校验失败，从而确认握手未被中间人破坏。
+    \item \textbf{应用数据}：握手完成后，双方用会话密钥（对称加密 + MAC/AEAD）保护
+    HTTP 数据，进入高效的数据传输阶段。
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, node distance=0.4cm,
+    msg/.style={draw, minimum height=0.6cm, align=center, font=\scriptsize},
+    arrow/.style={->, >=latex, thick}]
+    \node (c) at (0,0) {客户端};
+    \node (s) at (7,0) {服务器};
+    \draw (c) -- ++(0,-7.2);
+    \draw (s) -- ++(0,-7.2);
+
+    \draw[arrow] ($(c)+(0,-0.8)$) -- node[above, font=\scriptsize]{ClientHello: 版本, 套件, $R_c$} ($(s)+(0,-0.8)$);
+    \draw[arrow] ($(s)+(0,-1.6)$) -- node[above, font=\scriptsize]{ServerHello: 套件, $R_s$} ($(c)+(0,-1.6)$);
+    \draw[arrow] ($(s)+(0,-2.4)$) -- node[above, font=\scriptsize]{证书 (证书链)} ($(c)+(0,-2.4)$);
+    \draw[arrow] ($(s)+(0,-3.2)$) -- node[above, font=\scriptsize]{ECDHE 公钥 + 签名} ($(c)+(0,-3.2)$);
+    \draw[arrow] ($(c)+(0,-4.0)$) -- node[above, font=\scriptsize]{ECDHE 公钥} ($(s)+(0,-4.0)$);
+    \draw[arrow] ($(c)+(0,-4.8)$) -- node[above, font=\scriptsize]{Finished (加密+MAC)} ($(s)+(0,-4.8)$);
+    \draw[arrow] ($(s)+(0,-5.6)$) -- node[above, font=\scriptsize]{Finished (加密+MAC)} ($(c)+(0,-5.6)$);
+    \node[msg, minimum width=7cm] at (3.5,-6.6) {应用数据：对称加密 + 完整性保护};
+\end{tikzpicture}
+\caption{TLS 握手（ECDHE）与后续应用数据}
+\label{fig:tls}
+\end{figure}
+
+\subsection{前向保密}
+
+若会话密钥直接用服务器长期公钥加密得到，那么一旦服务器私钥泄露，攻击者只要事先录下了
+密文，就能事后解密\textbf{所有历史会话}。这称为缺乏前向保密。
+
+\textbf{前向保密 (forward secrecy)} 通过每次会话使用\textbf{临时}（ephemeral）密钥对
+实现：\textbf{ECDHE} 的私钥随会话产生、用完即弃。即使服务器长期私钥日后泄露，也无法
+恢复过去某次会话的临时私钥，因此历史流量仍安全。这也是现代 TLS（1.3 强制、1.2 推荐）
+普遍要求 ECDHE 的原因。
+
+\begin{itemize}
+    \item TLS 1.2：握手较慢，两轮往返；支持 RSA 密钥交换（\textbf{无}前向保密）与 ECDHE（有）。
+    \item TLS 1.3：默认只用 ECDHE，砍掉 RSA 密钥交换与弱算法，握手一轮往返（1-RTT），
+    并支持 0-RTT 会话恢复，\textbf{默认前向保密}。
+\end{itemize}
+
+\section{防火墙与入侵检测}
+
+密码学保护的是\textbf{内容}，而防火墙与入侵检测系统在\textbf{网络边界}上过滤流量，
+是纵深防御的外层。
+
+\subsection{包过滤防火墙}
+
+\textbf{无状态包过滤}逐个检查数据包的头部字段——源/目的 IP、源/目的端口、协议类型、
+TCP 标志位（如 SYN、ACK）——并依据规则表决定\textbf{放行或丢弃}。
+
+\begin{itemize}
+    \item 优点：简单、快速、对应用透明。
+    \item 局限：逐包独立判断，无法理解连接上下文；易被伪造源地址或分片绕过；难以处理
+    动态端口。
+\end{itemize}
+
+\subsection{有状态防火墙}
+
+\textbf{有状态防火墙}维护一张\textbf{连接状态表 (connection table)}，记录每条已建立
+连接的 5 元组与状态。当一个外部包声称属于某条内部发起的连接时，只有表中存在对应状态
+才放行。这使「允许内部主机访问外网、但外部不能主动连入」成为可能，并天然抵御许多
+伪造握手与扫描。
+
+\subsection{IDS / IPS}
+
+\begin{table}[H]
+\centering
+\renewcommand{\arraystretch}{1.4}
+\begin{tabulary}{\textwidth}{@{}L L L@{}}
+\toprule
+\textbf{系统} & \textbf{行为} & \textbf{特点} \\
+\midrule
+IDS（入侵检测） & 旁路监听，发现可疑流量后\textbf{告警} & 不阻断，误报代价低 \\
+IPS（入侵防御） & 串接在线，发现攻击\textbf{直接阻断} & 能拦截，但误报会中断正常流量 \\
+\bottomrule
+\end{tabulary}
+\caption{IDS 与 IPS 的对比}
+\label{tab:ids}
+\end{table}
+
+检测方法主要有两类：
+\begin{itemize}
+    \item \textbf{基于特征 (signature-based)}：匹配已知攻击的特征串，准确但对未知攻击无效。
+    \item \textbf{基于异常 (anomaly-based)}：建立正常流量基线，偏离基线即告警，可发现
+    未知攻击但误报率较高。
+\end{itemize}
+
+\section{本章小结}
+
+本章围绕「用密码学在开放信道上构造可信通信」这一主线，建立了如下知识链条：
+
+\begin{enumerate}
+    \item \textbf{目标与威胁}：机密性、完整性、鉴别、不可否认，分别对抗窃听、篡改、
+    冒充与抵赖；主动攻击还包括重放、中间人、DoS。
+    \item \textbf{对称加密}：DES/3DES/AES 是分组密码；CBC 用 IV 与链式异或把分组扩展为
+    任意长度，加密串行、解密可并行；对称体制的瓶颈是密钥分发（$O(n^2)$ 密钥量）。
+    \item \textbf{公钥加密}：单向陷门函数；RSA 通过 $ed\equiv1\pmod{\phi(n)}$ 与欧拉定理
+    保证正确性，安全性依赖大整数分解困难，必须配合 OAEP 填充且 $n\ge2048$ 位；
+    Diffie--Hellman 在公开信道上协商共享密钥，但需认证以抵御中间人。
+    \item \textbf{完整性与签名}：散列提供单向与抗碰撞；MAC 用共享密钥提供完整性 + 鉴别；
+    数字签名用私钥提供鉴别 + 完整性 + 不可否认。PKI/证书用 CA 的签名绑定身份与公钥，
+    形成可验证的信任链。
+    \item \textbf{TLS/HTTPS}：握手完成协商、验证书、ECDHE 密钥交换与 Finished 校验，
+    随后以会话密钥传输应用数据；ECDHE 提供前向保密。
+    \item \textbf{边界防御}：包过滤与有状态防火墙过滤流量，IDS 告警、IPS 阻断，构成
+    纵深防御。
+\end{enumerate}
+
+\section{常见误区}
+
+\begin{itemize}
+    \item \textbf{「加密了就安全」}：加密只给机密性。若不做完整性校验，攻击者仍可篡改
+    密文并实施重放，而无需破解密钥。机密性、完整性、鉴别必须配套。
+    \item \textbf{「对称加密也能做数字签名」}：不能。MAC 双方都会算，无法向第三方证明
+    是谁发的，因此\textbf{不提供不可否认}。只有私钥签名才具备该性质。
+    \item \textbf{「RSA 直接加密大数据」}：错误。RSA 慢且有长度限制，只用于加密对称
+    会话密钥；直接加密还会失去随机性，必须使用 OAEP 填充。
+    \item \textbf{「$n$ 越大越安全，所以填充无所谓」}：即使 $n$ 很大，无填充的确定性 RSA
+    仍可被小消息攻击和选择密文攻击击败，填充不可省略。
+    \item \textbf{「DH 本身能防中间人」}：不能。未认证的 DH 可被中间人各自建链，
+    必须依赖签名或证书认证公钥。
+    \item \textbf{「MD5/SHA-1 够用」}：两者均已存在实用碰撞，应改用 SHA-256 等。
+    \item \textbf{「有 HTTPS 就绝对安全」}：HTTPS 只保护传输中的机密性与完整性，
+    对服务器被攻陷、应用漏洞、钓鱼证书等无能为力。
+    \item \textbf{「IV 需要保密」}：CBC 的 IV 必须随机且不可预测，但\textbf{无需保密}，
+    可随密文明文传输。
+    \item \textbf{「防火墙能挡住一切」}：防火墙主要看头部字段，对应用层攻击与加密流量
+    内的威胁作用有限，需要配合 IDS/IPS 与主机安全形成纵深防御。
+\end{itemize}

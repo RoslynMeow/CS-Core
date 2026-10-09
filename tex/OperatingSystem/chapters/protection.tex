@@ -1,0 +1,240 @@
+\clearpage
+\begingroup
+\let\clearpage\relax
+\let\cleardoublepage\relax
+\vspace*{\fill}
+\chapter{保护与安全}
+\begin{center}
+保护解决「谁（主体）能对什么（客体）做何种操作」的问题：以域为中心建立访问控制，用权限位刻画具体授权，再以保护环、沙箱与虚拟化实现强隔离。
+\end{center}
+\vspace*{\fill}
+\endgroup
+\clearpage
+
+\section{保护目标与域}
+
+\textbf{保护 (protection)} 是操作系统的一种内部机制，用于控制进程与用户对系统资源的访问；\textbf{安全 (security)} 则关心系统对来自外部攻击的抵御能力。保护是安全的基础，它回答三个问题：
+
+\begin{itemize}
+    \item \textbf{主体 (subject)}：主动发起访问的实体，如进程、线程、用户。
+    \item \textbf{客体 (object)}：被访问的资源，如文件、内存段、设备、目录。
+    \item \textbf{权限 (right)}：主体可对客体执行的操作，如读、写、执行、追加、删除。
+\end{itemize}
+
+\textbf{保护域 (protection domain)} 是「一组权限」的集合：进程在某一时刻位于某个域中，域规定了它此刻能访问的客体及相应操作。进程可以在运行中\textbf{域切换 (domain switching)}，例如通过系统调用以提升或降低权限。
+
+\begin{equation}
+    \text{域} = \{\,(\text{客体},\ \text{权限集合})\,\}
+\end{equation}
+
+\noindent 根据主体能力是否可在运行中改变，进程与域的关系有三种模型：
+
+\begin{table}[H]
+\centering
+\caption{进程与域的关联模型}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+模型 & 含义 & 例子 \\
+\midrule
+静态关联 & 进程创建到终止始终处于同一域 & 简单批处理系统 \\
+域切换 & 进程可在多个域间切换（受控） & UNIX 用户态/内核态 \\
+动态关联 & 域的权限集合可被修改 & 支持最小权限的系统 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\section{访问矩阵、ACL 与能力表}
+
+\subsection{访问矩阵}
+
+\textbf{访问矩阵 (access matrix)} 是最一般的保护模型：行是主体，列是客体，矩阵元素 $M[i][j]$ 给出主体 $i$ 对客体 $j$ 的权限集合。
+
+\begin{table}[H]
+\centering
+\caption{访问矩阵示例}
+\begin{tabulary}{\textwidth}{LLCC}
+\toprule
+主体 $\backslash$ 客体 & 文件 $F_1$ & 文件 $F_2$ & 打印机 $P$ \\
+\midrule
+用户 A & 读、写 & 读 & --- \\
+用户 B & 读 & --- & 打印 \\
+管理员 & 读、写、执行 & 读、写、执行 & 打印、配置 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+访问矩阵通常\textbf{稀疏}（大多数元素为空），直接按二维数组存储浪费空间，实际系统按行或按列分解实现。
+
+\subsection{ACL 与能力表}
+
+\begin{itemize}
+    \item \textbf{访问控制表 (ACL)}：\textbf{按列}分解，每个客体附带一张「哪些主体、有何权限」的列表。检查时先定位客体，再查主体。
+    \item \textbf{能力表 (capability list)}：\textbf{按行}分解，每个主体持有一组「可访问的客体及其权限」的能力（票证）。能力是\textbf{不可伪造}的令牌，可直接验证。
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{ACL 与能力表对比}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+维度 & ACL（按列） & 能力表（按行） \\
+\midrule
+组织方式 & 每个客体一张主体列表 & 每个主体一组能力令牌 \\
+查询视角 & 「谁能访问该客体」 & 「该主体能访问什么」 \\
+撤销权限 & 容易（改客体列表即可） & 困难（需回收散落的能力） \\
+权限转移 & 不直接支持 & 天然支持（传递能力即可） \\
+典型实现 & UNIX 文件权限位、Windows ACL & 文件描述符、Kerberos 票据 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, node distance=1.4cm]
+    \node[draw, rounded corners, fill=blue!8] (mat) {访问矩阵};
+    \node[draw, rounded corners, fill=green!10, align=center, below left=1.3cm and 1.8cm of mat] (acl) {按列 $\to$ ACL\\（客体视角）};
+    \node[draw, rounded corners, fill=orange!15, align=center, below right=1.3cm and 1.8cm of mat] (cap) {按行 $\to$ 能力表\\（主体视角）};
+    \draw[->] (mat) -- (acl);
+    \draw[->] (mat) -- (cap);
+\end{tikzpicture}
+\caption{访问矩阵的行列分解}
+\end{figure}
+
+\section{UNIX 权限模型}
+
+UNIX 把访问矩阵的一行（文件权限）压缩为\textbf{所有者/组/其他}三类主体的 $3$ 个权限位，即经典的 $9$ 位 $rwx$ 模型。
+
+\subsection{rwx 与八进制表示}
+
+每个文件记录 $9$ 个权限位，分成三组：所有者 (owner, $u$)、同组用户 (group, $g$)、其他用户 (other, $o$)。每组三位分别表示读 $r$、写 $w$、执行 $x$。
+
+\begin{table}[H]
+\centering
+\caption{权限位与八进制权重}
+\begin{tabulary}{\textwidth}{CCLL}
+\toprule
+符号 & 八进制 & 含义 & 适用对象 \\
+\midrule
+$r$ & 4 & 读：查看文件内容 / 列出目录 & 文件与目录 \\
+$w$ & 2 & 写：修改文件 / 在目录增删条目 & 文件与目录 \\
+$x$ & 1 & 执行：运行程序 / 进入目录 & 文件与目录 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\noindent 每组的八进制值是该组三位权重之和（$r{=}4,\ w{=}2,\ x{=}1$），于是 $rwxr\text{-}xr\text{-}\text{-}$ 记为 $754$：
+
+\begin{equation}
+    \underbrace{rwx}_{7}\ \underbrace{r\text{-}x}_{5}\ \underbrace{r\text{-}\text{-}}_{4}
+    \quad\Longleftrightarrow\quad 7 = 4+2+1,\quad 5 = 4+1,\quad 4 = 4
+\end{equation}
+
+\noindent \texttt{chmod} 既可用符号模式（\texttt{chmod u+x\,f}），也可用八进制模式（\texttt{chmod 754\,f}）。
+
+\subsection{目录权限的特殊性}
+
+\begin{itemize}
+    \item $r$：允许列出目录中的文件名（\texttt{ls}）。
+    \item $w$：允许在目录中创建、删除、重命名条目。
+    \item $x$：允许进入目录（\texttt{cd}）并按路径访问其中文件；\textbf{即使文件本身可读，缺少目录的 $x$ 也无法访问}。
+\end{itemize}
+
+\subsection{setuid、setgid 与 sticky}
+
+在三位权限之前还可加一位\textbf{特殊位}，形成四位八进制表示（如 $4755$）：
+
+\begin{table}[H]
+\centering
+\caption{特殊权限位}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+位 & 八进制 & 作用 \\
+\midrule
+SUID (setuid) & 4 & 执行时以文件\textbf{所有者}的身份运行（如 \texttt{/usr/bin/passwd}） \\
+SGID (setgid) & 2 & 文件：以文件\textbf{属组}身份运行；目录：新建文件继承该目录的组 \\
+Sticky & 1 & 目录中只有文件所有者或 root 才能删除自己的文件（如 \texttt{/tmp}） \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\noindent 特殊位在符号表示中为 $s$（可执行位存在）或 $S$（可执行位缺失），例如 $4755$ 显示为 \texttt{rwsr-xr-x}。
+
+\begin{quote}
+\textbf{权限判定示例}：文件 $F$ 权限为 $754$，属主为 A。用户 B 属于 $F$ 的组。B 尝试\textbf{写入} $F$：组权限为 $5 = r\text{-}x$，不含 $w$，故被拒绝，内核返回 \texttt{Permission denied}（\texttt{EACCES}）。
+\end{quote}
+
+\section{隔离与虚拟化}
+
+\subsection{保护环}
+
+CPU 用\textbf{保护环 (protection ring)} 划分特权级，内核位于最内层最高特权环，用户程序位于最外层最低特权环。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small]
+    \fill[blue!6]  (0,0) circle (2.7);
+    \fill[blue!12] (0,0) circle (2.05);
+    \fill[blue!20] (0,0) circle (1.4);
+    \fill[blue!32] (0,0) circle (0.75);
+    \draw (0,0) circle (2.7);
+    \draw (0,0) circle (2.05);
+    \draw (0,0) circle (1.4);
+    \draw (0,0) circle (0.75);
+    \node[align=center] at (0,0) {Ring 0\\内核};
+    \node at (0,1.05) {Ring 1};
+    \node at (0,1.72) {Ring 2};
+    \node at (0,2.4) {Ring 3 用户};
+\end{tikzpicture}
+\caption{保护环：特权由内向外递减}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{保护环层级}
+\begin{tabulary}{\textwidth}{CCL}
+\toprule
+环 & 权限 & 典型内容 \\
+\midrule
+Ring 0 & 最高，可执行特权指令 & 内核、驱动核心 \\
+Ring 1 & 高 & 部分设备驱动（很少使用） \\
+Ring 2 & 中 & 部分驱动（很少使用） \\
+Ring 3 & 最低 & 用户应用程序 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\noindent 系统调用是用户态向内核态受控跨越保护环的唯一入口：CPU 通过 trap 切换特权级，验证参数后再执行特权操作。
+
+\subsection{沙箱}
+
+\textbf{沙箱 (sandbox)} 为不可信代码提供受限执行环境，即使代码有恶意也无法突破边界。常见手段：
+
+\begin{itemize}
+    \item \textbf{系统调用过滤}（\texttt{seccomp}）：限制进程可用的系统调用集合。
+    \item \textbf{命名空间}（namespace）：隔离进程可见的 PID、网络、文件系统挂载等视图。
+    \item \textbf{资源限制}（cgroups、rlimit）：限制 CPU、内存、I/O 用量。
+    \item \textbf{文件系统重定向}（\texttt{chroot}、jail）：限制根目录或可见路径。
+\end{itemize}
+
+\subsection{虚拟化与容器}
+
+\textbf{虚拟机 (VM)} 通过 \textbf{Hypervisor} 在硬件层抽象出多台虚拟机器，每台运行独立内核；\textbf{容器 (container)} 则共享宿主机内核，靠命名空间与 cgroups 隔离进程视图。
+
+\begin{table}[H]
+\centering
+\caption{虚拟化与容器对比}
+\begin{tabulary}{\textwidth}{LLLL}
+\toprule
+维度 & 虚拟机 & 容器 & 沙箱 \\
+\midrule
+隔离层次 & 硬件级（Hypervisor） & 内核级（namespace/cgroup） & 进程级（syscall 过滤） \\
+内核 & 每台独立 Guest 内核 & 共享宿主内核 & 共享宿主内核 \\
+启动速度 & 慢（秒级） & 快（毫秒至秒级） & 快 \\
+资源开销 & 大（完整 OS） & 小 & 最小 \\
+隔离强度 & 强 & 中 & 相对弱 \\
+典型实现 & KVM、Xen、VMware & Docker、containerd & seccomp、jail \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\noindent 归纳：ACL/能力表决定「授权」；$rwx$ 位决定「具体到文件的操作」；保护环、沙箱与虚拟化决定「越权者能走多远」。三者层层递进，共同构成操作系统的保护与安全体系。

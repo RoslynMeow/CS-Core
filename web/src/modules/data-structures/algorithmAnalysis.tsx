@@ -1,15 +1,16 @@
 import { createElement } from "react";
 import { T } from "../../i18n/lang";
-import type { ModuleDef } from "../../engine/types";
+import type { Frame, ModuleDef } from "../../engine/types";
 import { MathText } from "../../lib/tex";
 
 // =====================================================================
-// 算法定义与渐近分析 · 单模块聚合 · 交互式
+// 算法定义与渐近分析 · 单模块聚合
 //   对应 tex/DataStructure/Chapters/AlgorithmAnalysis.tex
-//   definition(定义与特征) / notation(渐进记号) / growth(阶数) / master(主定理) / space(空间)
+//   notation(渐进记号) / growth(阶数) / master(主定理)
+//   definition / space 为纯文字定义, 已按规则移除
 // =====================================================================
 
-type SubMode = "definition" | "notation" | "growth" | "master" | "space";
+type SubMode = "notation" | "growth" | "master";
 
 function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
   return (
@@ -32,73 +33,89 @@ function Panel({ children }: { children: React.ReactNode }) {
 }
 
 // ---------------------------------------------------------------------
-// definition / notation / space
+// notation: 渐进记号 O/Ω/Θ —— 两条增长曲线的上下界夹逼动画
 // ---------------------------------------------------------------------
-function DefinitionRender({ t }: any) {
+const NOTATION_N = 12;
+const notationT = (n: number) => 3 * n * n + 2 * n + 1; // T(n) = 3n²+2n+1
+const notationG = (n: number) => n * n; // g(n) = n²
+
+const NOTATION_CODE = [
+  T("$T(n)=3n^2+2n+1,\\quad g(n)=n^2$", "$T(n)=3n^2+2n+1,\\quad g(n)=n^2$"),
+  T("大 $O$: $\\exists c,n_0,\\ \\forall n\\ge n_0:\\ T(n)\\le c\\,g(n)$", "Big-O: $\\exists c,n_0,\\ \\forall n\\ge n_0:\\ T(n)\\le c\\,g(n)$"),
+  T("$\\Omega$: $\\exists c,n_0,\\ \\forall n\\ge n_0:\\ T(n)\\ge c\\,g(n)$", "$\\Omega$: $\\exists c,n_0,\\ \\forall n\\ge n_0:\\ T(n)\\ge c\\,g(n)$"),
+  T("$\\Theta$: $T=O(g)\\ \\land\\ T=\\Omega(g)$", "$\\Theta$: $T=O(g)\\ \\land\\ T=\\Omega(g)$"),
+];
+
+type NotationScene = { kind: "intro" | "O" | "Omega" | "Theta"; cLo?: number; cHi?: number; n0Lo?: number; n0Hi?: number };
+
+function notationFrames(): Frame<NotationScene>[] {
+  return [
+    { line: 0, caption: T("两条增长曲线 $T(n)=3n^2+2n+1$ 与 $g(n)=n^2$", "Two growth curves $T(n)=3n^2+2n+1$ and $g(n)=n^2$"), scene: { kind: "intro" } },
+    { line: 1, caption: T("大 $O$（上界）：取 $c=4$，$n\\ge n_0=3$ 时 $T(n)\\le c\\,g(n)$", "Big-O (upper): $c=4$, $T(n)\\le c\\,g(n)$ for $n\\ge n_0=3$"), scene: { kind: "O", cHi: 4, n0Hi: 3 } },
+    { line: 2, caption: T("$\\Omega$（下界）：取 $c=3$，$n\\ge n_0=1$ 时 $T(n)\\ge c\\,g(n)$", "$\\Omega$ (lower): $c=3$, $T(n)\\ge c\\,g(n)$ for $n\\ge n_0=1$"), scene: { kind: "Omega", cLo: 3, n0Lo: 1 } },
+    { line: 3, caption: T("$\\Theta$（紧界）：两侧夹逼，$T(n)=\\Theta(n^2)$", "$\\Theta$ (tight): squeezed on both sides, $T(n)=\\Theta(n^2)$"), scene: { kind: "Theta", cLo: 3, cHi: 4, n0Lo: 1, n0Hi: 3 } },
+  ];
+}
+
+function NotationRender({ scene, t }: any) {
   const isZh = t(T("中文", "en")) !== "en";
-  const features: [string, string][] = isZh
-    ? [["有穷性", "执行步数有上界 B, 每步在有限时间内完成"], ["确定性", "同一状态下, 下一步唯一"], ["可行性", "每个基本操作都可实现"], ["输入/输出", "满足后置条件 Post(I, O)"]]
-    : [["Finiteness", "bounded steps, each in finite time"], ["Definiteness", "unique next step per state"], ["Effectiveness", "every basic op is realizable"], ["I/O", "satisfies Post(I, O)"]];
-  const layers: [string, string][] = isZh
-    ? [["规约层", "用谓词逻辑描述前置 Pre / 后置 Post"], ["细化层", "伪代码 + 控制算子, 语言无关 (本书)"], ["实现层", "高级语言实现, 语义等价"]]
-    : [["Specification", "Pre/Post predicates"], ["Refinement", "pseudocode, language-independent"], ["Implementation", "realization, semantics-preserving"]];
+  const s = (scene ?? { kind: "intro" }) as NotationScene;
+  const showHi = s.cHi !== undefined;
+  const showLo = s.cLo !== undefined;
+  const W = 720, H = 350;
+  const pad = { l: 54, r: 20, t: 22, b: 40 };
+  const yMax = 600;
+  const X = (n: number) => pad.l + (n / NOTATION_N) * (W - pad.l - pad.r);
+  const Y = (v: number) => H - pad.b - (v / yMax) * (H - pad.t - pad.b);
+  const poly = (f: (n: number) => number) =>
+    Array.from({ length: NOTATION_N + 1 }, (_, n) => `${X(n).toFixed(1)},${Y(f(n)).toFixed(1)}`).join(" ");
+  const ticks = [0, 2, 4, 6, 8, 10, 12];
+  const legend: [string, string, boolean][] = [
+    ["$T(n)=3n^2+2n+1$", "#4f46e5", false],
+    ["$g(n)=n^2$", "#0ea5e9", true],
+  ];
+  if (showHi) legend.push([`$c\\,g(n)$, $c=${s.cHi}$`, "#f59e0b", false]);
+  if (showLo) legend.push([`$c\\,g(n)$, $c=${s.cLo}$`, "#16a34a", false]);
   return (
     <Panel>
-      <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
-        {features.map(([n, d]) => (
-          <div key={n} style={{ flex: "1 1 190px", minWidth: 180, padding: "12px 14px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe" }}>
-            <div style={{ fontWeight: 900, color: "#4338ca", fontSize: 13 }}>{n}</div>
-            <div style={{ fontSize: 12, color: "#475569", marginTop: 4 }}>{d}</div>
-          </div>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12 }}>
+        {ticks.map((n) => (
+          <line key={`gx${n}`} x1={X(n)} y1={pad.t} x2={X(n)} y2={H - pad.b} stroke="#f1f5f9" strokeWidth={1} />
+        ))}
+        {s.n0Hi !== undefined && <rect x={X(s.n0Hi)} y={pad.t} width={X(NOTATION_N) - X(s.n0Hi)} height={H - pad.b - pad.t} fill="#f59e0b" opacity={0.08} />}
+        {s.n0Lo !== undefined && <rect x={X(s.n0Lo)} y={pad.t} width={X(NOTATION_N) - X(s.n0Lo)} height={H - pad.b - pad.t} fill="#16a34a" opacity={0.06} />}
+        <line x1={pad.l} y1={H - pad.b} x2={W - pad.r} y2={H - pad.b} stroke="#94a3b8" strokeWidth={1.5} />
+        <line x1={pad.l} y1={pad.t} x2={pad.l} y2={H - pad.b} stroke="#94a3b8" strokeWidth={1.5} />
+        {ticks.map((n) => <text key={`tx${n}`} x={X(n)} y={H - pad.b + 16} textAnchor="middle" fontSize={10} fill="#64748b">{n}</text>)}
+        <text x={W - pad.r} y={H - pad.b + 32} textAnchor="end" fontSize={12} fill="#475569">n</text>
+        <text x={pad.l - 8} y={pad.t + 4} textAnchor="end" fontSize={10} fill="#64748b">{yMax}</text>
+        <text x={pad.l - 8} y={H - pad.b} textAnchor="end" fontSize={10} fill="#64748b">0</text>
+        <polyline points={poly(notationG)} fill="none" stroke="#0ea5e9" strokeWidth={2} strokeDasharray="5 3" />
+        {showHi && <polyline points={poly((n) => s.cHi! * notationG(n))} fill="none" stroke="#f59e0b" strokeWidth={2.5} />}
+        {showLo && <polyline points={poly((n) => s.cLo! * notationG(n))} fill="none" stroke="#16a34a" strokeWidth={2.5} />}
+        <polyline points={poly(notationT)} fill="none" stroke="#4f46e5" strokeWidth={3} />
+        {s.n0Hi !== undefined && <line x1={X(s.n0Hi)} y1={pad.t} x2={X(s.n0Hi)} y2={H - pad.b} stroke="#f59e0b" strokeDasharray="4 3" />}
+        {s.n0Lo !== undefined && <line x1={X(s.n0Lo)} y1={pad.t} x2={X(s.n0Lo)} y2={H - pad.b} stroke="#16a34a" strokeDasharray="4 3" />}
+        {ticks.map((n) => <circle key={`pt${n}`} cx={X(n)} cy={Y(notationT(n))} r={2.6} fill="#4f46e5" />)}
+      </svg>
+      <div style={{ display: "flex", gap: 16, flexWrap: "wrap", justifyContent: "center", fontSize: 12 }}>
+        {legend.map(([label, color, dash], i) => (
+          <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 22, height: 0, borderTop: `${dash ? "2px dashed" : "3px solid"} ${color}` }} />
+            <MathText text={label} />
+          </span>
         ))}
       </div>
-      <div style={{ fontWeight: 800, color: "#334155", fontSize: 13 }}>{isZh ? "描述层级" : "Description levels"}</div>
-      <Table head={isZh ? ["层级", "说明"] : ["Level", "Note"]} rows={layers} />
-      <div style={{ textAlign: "center", fontSize: 13 }}>
-        <MathText text={isZh ? "$\\{Pre\\}\\ A\\ \\{Post\\}$ — 从伪代码到实现的翻译保持 $Pre/Post$, 仅常数因子变化" : "$\\{Pre\\}\\ A\\ \\{Post\\}$ — translation preserves Pre/Post up to constants"} />
+      <div style={{ textAlign: "center", fontSize: 14, color: "#4338ca", fontWeight: 700 }}>
+        {s.kind === "intro" && <MathText text={isZh ? "观察 $T$ 与 $g$ 的相对增长" : "Compare the growth of $T$ and $g$"} />}
+        {s.kind === "O" && <MathText text={"$T(n)\\in O(n^2)$"} />}
+        {s.kind === "Omega" && <MathText text={"$T(n)\\in \\Omega(n^2)$"} />}
+        {s.kind === "Theta" && <MathText text={"$T(n)\\in \\Theta(n^2)$"} />}
       </div>
-    </Panel>
-  );
-}
-
-function NotationRender({ t }: any) {
-  const isZh = t(T("中文", "en")) !== "en";
-  const rows: React.ReactNode[][] = isZh
-    ? [
-      ["大 O (上界)", "$T(n)=O(f)$", "$\\exists c,n_0,\\ \\forall n\\ge n_0: T(n)\\le c\\,f(n)$"],
-      ["Ω (下界)", "$T(n)=\\Omega(f)$", "$\\exists c,n_0,\\ \\forall n\\ge n_0: T(n)\\ge c\\,f(n)$"],
-      ["Θ (紧界)", "$T(n)=\\Theta(f)$", "$O(f)\\ \\land\\ \\Omega(f)$"],
-    ]
-    : [
-      ["Big-O (upper)", "$T(n)=O(f)$", "$\\exists c,n_0: T(n)\\le c f(n)$"],
-      ["Omega (lower)", "$T(n)=\\Omega(f)$", "$\\exists c,n_0: T(n)\\ge c f(n)$"],
-      ["Theta (tight)", "$T(n)=\\Theta(f)$", "$O(f)\\ \\land\\ \\Omega(f)$"],
-    ];
-  return (
-    <Panel>
-      <Table head={isZh ? ["记号", "写法", "含义"] : ["Notation", "Form", "Meaning"]} rows={rows.map((r) => [r[0], <MathText key={String(r[1])} text={`$${r[1]}$`} />, <MathText key={String(r[2])} text={String(r[2])} />])} />
-    </Panel>
-  );
-}
-
-function SpaceRender({ t }: any) {
-  const isZh = t(T("中文", "en")) !== "en";
-  const rows: React.ReactNode[][] = isZh
-    ? [
-      ["$O(1)$", "原地 (in-place): 仅常数辅助槽位 τ 中转", "交换 / 就地排序"],
-      ["$O(\\log n)$", "递归栈深度 H, 平衡分治 H=O(log n)", "快排期望 / 二分"],
-      ["$O(n)$", "需与输入等大的副本或表", "归并 / 哈希 / 计数排序"],
-    ]
-    : [
-      ["$O(1)$", "in-place, constant aux", "swap / in-place sort"],
-      ["$O(\\log n)$", "recursion stack H", "quicksort avg / binary search"],
-      ["$O(n)$", "copy as large as input", "merge / hash / counting sort"],
-    ];
-  return (
-    <Panel>
-      <Table head={isZh ? ["辅助空间", "含义", "典型"] : ["Aux space", "Meaning", "Typical"]} rows={rows.map((r) => [<MathText key="0" text={String(r[0])} />, r[1], r[2]])} />
       <div style={{ fontSize: 12, color: "#64748b", textAlign: "center" }}>
-        {isZh ? "递归的栈空间计入辅助空间; 并查集的 O(α(n)) 为摊还界。" : "Recursion stack counts; union-find is amortized O(α(n))."}
+        {isZh
+          ? "$O$ 给上界（$c\\,g$ 在某 $n_0$ 之后恒在 $T$ 上方），$\\Omega$ 给下界，二者同时成立即 $\\Theta$。"
+          : "$O$ upper-bounds ($c\\,g$ stays above $T$ past $n_0$), $\\Omega$ lower-bounds; both ⇒ $\\Theta$."}
       </div>
     </Panel>
   );
@@ -222,33 +239,29 @@ function MasterRender({ config, t }: any) {
 type Cfg = { subMode: SubMode; [k: string]: any };
 
 const SUB: Record<SubMode, ModuleDef> = {
-  definition: { id: "definition", title: T("定义与特征", "Definition"), defaultConfig: {}, generate: () => [{ caption: T("算法定义", "Algorithm definition"), scene: {} }] as never, Render: DefinitionRender as never } as unknown as ModuleDef,
-  notation: { id: "notation", title: T("渐进记号", "Notation"), defaultConfig: {}, generate: () => [{ caption: T("渐进记号", "Asymptotic notation"), scene: {} }] as never, Render: NotationRender as never } as unknown as ModuleDef,
+  notation: { id: "notation", title: T("渐进记号", "Notation"), defaultConfig: {}, generate: () => notationFrames() as never, code: NOTATION_CODE as never, Render: NotationRender as never } as unknown as ModuleDef,
   growth: { id: "growth", title: T("阶数增长", "Growth"), defaultConfig: { n: 16 }, Controls: GrowthControls as never, generate: () => [{ caption: T("复杂度阶数", "Complexity orders"), scene: {} }] as never, Render: GrowthRender as never } as unknown as ModuleDef,
   master: { id: "master", title: T("主定理", "Master Theorem"), defaultConfig: MASTER_DEFAULT, Controls: MasterControls as never, generate: () => [{ caption: T("主定理", "Master theorem"), scene: {} }] as never, Render: MasterRender as never } as unknown as ModuleDef,
-  space: { id: "space", title: T("空间复杂度", "Space"), defaultConfig: {}, generate: () => [{ caption: T("空间复杂度", "Space complexity"), scene: {} }] as never, Render: SpaceRender as never } as unknown as ModuleDef,
 };
 
 const MAP: Record<SubMode, ModuleDef> = SUB;
 export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
   { label: "基础", opts: [
-    { v: "definition", zh: "定义与特征", en: "Definition" },
     { v: "notation", zh: "渐进记号", en: "Notation" },
   ]},
   { label: "度量", opts: [
     { v: "growth", zh: "阶数增长", en: "Growth" },
     { v: "master", zh: "主定理", en: "Master" },
-    { v: "space", zh: "空间复杂度", en: "Space" },
   ]},
 ];
 
-const DEFAULT: Cfg = { subMode: "definition", ...(SUB.definition as any).defaultConfig };
+const DEFAULT: Cfg = { subMode: "notation", ...(SUB.notation as any).defaultConfig };
 
 function activeOf(sub: unknown): ModuleDef {
-  return (MAP as Record<string, ModuleDef>)[sub as string] ?? SUB.definition;
+  return (MAP as Record<string, ModuleDef>)[sub as string] ?? SUB.notation;
 }
 function subKeyOf(sub: unknown): SubMode {
-  return (MAP as Record<string, ModuleDef>)[sub as string] ? (sub as SubMode) : "definition";
+  return (MAP as Record<string, ModuleDef>)[sub as string] ? (sub as SubMode) : "notation";
 }
 function safeCfg(sub: unknown, config: Cfg): Cfg {
   const m = activeOf(sub) as any;
@@ -259,9 +272,9 @@ function safeCfg(sub: unknown, config: Cfg): Cfg {
 export const algorithmAnalysisModule: ModuleDef<any, Cfg> = {
   id: "algorithm-analysis",
   title: T("算法分析", "Algorithm Analysis"),
-  desc: T("算法定义 / 渐进记号 O·Ω·Θ / 阶数增长 / 主定理 / 空间复杂度。", "Definition / asymptotics / growth / master theorem / space."),
+  desc: T("渐进记号 O·Ω·Θ（增长曲线夹逼）/ 阶数增长 / 主定理。", "Asymptotics O·Ω·Θ (growth curves) / growth / master theorem."),
   tags: ["data-structures", "algorithms"],
-  interactive: true,
+  interactive: false,
   defaultConfig: DEFAULT,
   Controls({ config, onChange, t, embedded }: any) {
     const isZh = t(T("中文", "en")) !== "en";
@@ -291,6 +304,11 @@ export const algorithmAnalysisModule: ModuleDef<any, Cfg> = {
     const res: any = m.generate(safe);
     const frames: any[] = Array.isArray(res) ? res : res?.frames ?? [];
     return frames.length ? frames : [{ caption: T("算法分析", "Algorithm Analysis"), scene: safe }];
+  },
+  codeFor(config) {
+    const safe = safeCfg((config as Cfg).subMode, config as Cfg);
+    const m = activeOf((config as Cfg).subMode) as any;
+    return (m.codeFor ? m.codeFor(safe) : m.code) ?? [];
   },
   Render(props) {
     const safe = safeCfg((props.config as Cfg).subMode, props.config as Cfg);

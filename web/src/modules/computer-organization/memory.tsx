@@ -1,66 +1,117 @@
 import { createElement } from "react";
 import { T } from "../../i18n/lang";
-import type { ModuleDef } from "../../engine/types";
+import type { ModuleDef, Frame } from "../../engine/types";
 
 // =====================================================================
-// 存储层次与缓存 · 单模块聚合 · 交互式
+// 存储层次与缓存 · 单模块聚合
 //   对应 tex/ComputerOrganization/chapters/memory.tex
-//   levels(层次) / locality(局部性) / cache(映射·地址划分·命中) / virtual(虚拟内存)
-//   / dram(DRAM) / design(设计原则)
+//   levels(层次·逐层访问动画) / locality(局部性) / cache(映射·地址划分·命中) / virtual(虚拟内存)
 // =====================================================================
 
-type SubMode = "levels" | "locality" | "cache" | "virtual" | "dram" | "design";
+type SubMode = "levels" | "locality" | "cache" | "virtual";
 
-function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
-  return (
-    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, fontFamily: "ui-monospace, monospace", background: "#fff" }}>
-      <thead>
-        <tr>{head.map((h, i) => <th key={i} style={{ padding: "6px 10px", textAlign: "left", color: "#475569", borderBottom: "2px solid #e2e8f0", fontSize: 12 }}>{h}</th>)}</tr>
-      </thead>
-      <tbody>
-        {rows.map((r, k) => (
-          <tr key={k} style={{ background: k % 2 ? "#f8fafc" : "#fff" }}>
-            {r.map((c, i) => <td key={i} style={{ padding: "5px 10px", borderBottom: "1px solid #f1f5f9", color: i === 0 ? "#0f172a" : "#475569", fontWeight: i === 0 ? 700 : 400 }}>{c}</td>)}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
 function Panel({ children }: { children: React.ReactNode }) {
   return <div style={{ maxWidth: "100%", margin: "0 auto", display: "grid", gap: 12 }}>{children}</div>;
+}
+function Note({ children }: { children: React.ReactNode }) {
+  return <div style={{ padding: "10px 14px", borderRadius: 10, background: "#eef2ff", border: "1px solid #c7d2fe", fontSize: 13, color: "#4338ca", lineHeight: 1.7 }}>{children}</div>;
 }
 const hx = (n: number, w = 8) => `0x${(n >>> 0).toString(16).toUpperCase().padStart(w, "0")}`;
 const bits = (n: number, w: number) => (n >>> 0).toString(2).padStart(w, "0");
 const log2 = (n: number) => Math.round(Math.log2(n));
 
 // ---------------------------------------------------------------------
-// levels: 存储层次
+// levels: 存储层次 (逐层访问延迟动画)
 // ---------------------------------------------------------------------
-function LevelsRender({ t }: any) {
+type MemLevel = { k: string; cap: string; lat: number };
+const MEM_LEVELS: MemLevel[] = [
+  { k: "L1", cap: "32 KB", lat: 1 },
+  { k: "L2", cap: "256 KB", lat: 4 },
+  { k: "L3", cap: "8 MB", lat: 12 },
+  { k: "DRAM", cap: "16 GB", lat: 60 },
+];
+const LEVELS_CODE = [
+  T("访问地址送入 L1", "send address to L1"),
+  T("未命中 → 向下层探测", "miss → probe next level down"),
+  T("命中 → 读入并逐层填充", "hit → read and fill back up"),
+  T("累计延迟 = 各级访问之和", "latency = sum of level latencies"),
+];
+type LevelsScene = { hit: number; probe: number; phase: "probe" | "hit" | "fill" | "done"; latency: number; req: string };
+
+function LevelsControls({ config, onChange, t }: any) {
   const isZh = t(T("中文", "en")) !== "en";
-  const rows: React.ReactNode[][] = isZh
-    ? [
-      ["寄存器", "~1 KB", "< 1 ns", "CPU 内部"],
-      ["L1 Cache", "32–64 KB", "~1 ns", "SRAM, 每核"],
-      ["L2 Cache", "256 KB–1 MB", "~4 ns", "SRAM, 每核"],
-      ["L3 Cache", "8–32 MB", "~12 ns", "SRAM, 多核共享"],
-      ["主存 DRAM", "8–64 GB", "~60–100 ns", "DRAM"],
-      ["SSD / 磁盘", "TB 级", "µs–ms", "闪存 / 磁介质"],
-    ]
-    : [
-      ["Registers", "~1 KB", "< 1 ns", "in CPU"],
-      ["L1 Cache", "32–64 KB", "~1 ns", "SRAM, per-core"],
-      ["L2 Cache", "256 KB–1 MB", "~4 ns", "SRAM, per-core"],
-      ["L3 Cache", "8–32 MB", "~12 ns", "SRAM, shared"],
-      ["Main DRAM", "8–64 GB", "~60–100 ns", "DRAM"],
-      ["SSD / Disk", "TB", "µs–ms", "flash / magnetic"],
-    ];
+  return (
+    <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "8px 10px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+      <span style={{ fontSize: 13 }}>{isZh ? "命中层次" : "Hit level"}</span>
+      <select className="txt" value={config.hit} onChange={(e) => onChange({ ...config, hit: Number(e.target.value) })} style={{ fontWeight: 700 }}>
+        {MEM_LEVELS.map((l, i) => <option key={l.k} value={i}>{l.k} ({l.cap}, {l.lat} ns)</option>)}
+      </select>
+    </div>
+  );
+}
+function LevelsRender({ scene, t }: any) {
+  const isZh = t(T("中文", "en")) !== "en";
+  const s = (scene ?? {}) as LevelsScene;
+  const hit = Math.max(0, Math.min(3, s.hit ?? 0));
+  const probe = Math.max(0, Math.min(3, s.probe ?? 0));
+  const total = MEM_LEVELS.slice(0, hit + 1).reduce((a, l) => a + l.lat, 0);
+  const widths = [44, 58, 74, 90];
   return (
     <Panel>
-      <Table head={isZh ? ["层次", "典型容量", "延迟", "实现"] : ["Level", "Size", "Latency", "Tech"]} rows={rows} />
+      <div style={{ textAlign: "center", fontFamily: "ui-monospace, monospace", fontSize: 13, color: "#334155" }}>
+        {isZh ? "访问请求" : "access"} <b>{s.req ?? "0x8048"}</b>
+      </div>
+      <div style={{ display: "grid", gap: 6, justifyItems: "center" }}>
+        {MEM_LEVELS.map((l, i) => {
+          const probing = i === probe;
+          const isHit = probing && (s.phase === "hit" || s.phase === "done");
+          const filling = probing && s.phase === "fill";
+          const bg = probing ? (isHit ? "#dcfce7" : filling ? "#dbeafe" : "#fee2e2") : "#f8fafc";
+          const bd = probing ? (isHit ? "#16a34a" : filling ? "#2563eb" : "#ef4444") : "#e2e8f0";
+          return (
+            <div key={l.k} style={{ width: `${widths[i]}%`, minWidth: 170, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 14px", borderRadius: 10, border: `2px solid ${bd}`, background: bg, transition: "all .2s" }}>
+              <span style={{ fontWeight: 900, fontSize: 14, color: probing ? "#1e293b" : "#334155" }}>{l.k}</span>
+              <span style={{ fontSize: 11, color: "#64748b" }}>{l.cap} · {l.lat} ns</span>
+              <span style={{ fontSize: 11, fontWeight: 800, minWidth: 40, textAlign: "right", color: probing ? bd : "#cbd5e1" }}>
+                {probing ? (isHit ? (isZh ? "命中" : "HIT") : filling ? (isZh ? "填充" : "FILL") : (isZh ? "缺失" : "MISS")) : "—"}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap", fontSize: 13 }}>
+        <span>{isZh ? "命中层" : "hit at"} = <b>{MEM_LEVELS[hit].k}</b></span>
+        <span>{isZh ? "累计延迟" : "latency"} = <b style={{ color: "#4338ca", fontFamily: "ui-monospace, monospace" }}>{s.latency ?? 0} ns</b></span>
+      </div>
+      <div style={{ height: 8, borderRadius: 4, background: "#f1f5f9", overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${total > 0 ? Math.min(100, ((s.latency ?? 0) / total) * 100) : 0}%`, background: "#4338ca", transition: "width .2s" }} />
+      </div>
+      <Note>{isZh ? "层次结构利用局部性：绝大多数访问在 L1/L2 命中, 只有少数穿透到 DRAM, 从而把平均访问时间拉近最快层。" : "The hierarchy exploits locality: most accesses hit L1/L2; only a few reach DRAM, pulling average latency near the fastest level."}</Note>
     </Panel>
   );
+}
+function levelsGenerate(config: any): Frame<LevelsScene>[] {
+  const hit = Math.max(0, Math.min(3, (config?.hit | 0)));
+  const req = "0x8048";
+  const frames: Frame<LevelsScene>[] = [];
+  frames.push({ line: 0, caption: T("CPU 发出访问请求, 先查 L1", "CPU issues access, check L1 first"), scene: { hit, probe: 0, phase: "probe", latency: 0, req } });
+  let acc = 0;
+  for (let i = 0; i <= hit; i++) {
+    acc += MEM_LEVELS[i].lat;
+    const isHit = i === hit;
+    frames.push({
+      line: 1,
+      caption: isHit
+        ? T(`${MEM_LEVELS[i].k} 命中, 累计延迟 ${acc} ns`, `hit in ${MEM_LEVELS[i].k}, latency ${acc} ns`)
+        : T(`${MEM_LEVELS[i].k} 缺失 → 向下一层探测`, `${MEM_LEVELS[i].k} miss → probe next level`),
+      scene: { hit, probe: i, phase: isHit ? "hit" : "probe", latency: acc, req },
+    });
+  }
+  for (let i = hit - 1; i >= 0; i--) {
+    frames.push({ line: 2, caption: T(`数据块填入 ${MEM_LEVELS[i].k}`, `fill block into ${MEM_LEVELS[i].k}`), scene: { hit, probe: i, phase: "fill", latency: acc, req } });
+  }
+  frames.push({ line: 3, caption: T(`访问完成, 总延迟约 ${acc} ns`, `done, total latency ≈ ${acc} ns`), scene: { hit, probe: 0, phase: "done", latency: acc, req } });
+  return frames;
 }
 
 // ---------------------------------------------------------------------
@@ -366,62 +417,16 @@ function VmRender({ config, t }: any) {
   );
 }
 
-// ---------------------------------------------------------------------
-// dram / design
-// ---------------------------------------------------------------------
-function DramRender({ t }: any) {
-  const isZh = t(T("中文", "en")) !== "en";
-  const items: [string, string][] = isZh
-    ? [
-      ["DRAM 单元", "电容存 1 位, 会漏电 → 需周期性刷新"],
-      ["地址复用", "行地址(RAS) + 列地址(CAS) 分两次送, 减少引脚"],
-      ["SDRAM / DDR", "与时钟同步; DDR 上升沿+下降沿都传 → 双倍速率"],
-      ["突发传输", "一次命令连续传多个字, 摊薄地址开销"],
-      ["多 Bank 交错", "不同 bank 并行, 提升有效带宽"],
-    ]
-    : [
-      ["Cell", "capacitor, leaks → periodic refresh"],
-      ["Address mux", "row (RAS) + column (CAS), fewer pins"],
-      ["SDRAM / DDR", "clocked; both edges → double data rate"],
-      ["Burst", "one command, many words"],
-      ["Bank interleave", "parallel banks → more bandwidth"],
-    ];
-  return <Panel><Table head={isZh ? ["要点", "说明"] : ["Point", "Note"]} rows={items} /></Panel>;
-}
-function DesignRender({ t }: any) {
-  const isZh = t(T("中文", "en")) !== "en";
-  const rows: React.ReactNode[][] = isZh
-    ? [
-      ["局部性", "时间/空间局部性决定缓存整体收益"],
-      ["块大小", "大块→空间局部性好, 但缺失代价/污染增大"],
-      ["相联度", "越高冲突缺失越少, 但命中时间/成本上升"],
-      ["写策略", "写回(减少写流量) vs 写直达(简单一致)"],
-      ["包含性", "inclusive 简化一致; exclusive 省容量"],
-      ["物理 vs 虚拟索引", "虚拟索引省 TLB 转换, 但需处理同义/别名"],
-    ]
-    : [
-      ["Locality", "temporal/spatial drives benefit"],
-      ["Block size", "large → spatial, but cost/pollution up"],
-      ["Associativity", "fewer conflict misses, higher hit time"],
-      ["Write policy", "write-back vs write-through"],
-      ["Inclusion", "inclusive (coherence) vs exclusive (capacity)"],
-      ["Virt/phys index", "VIPT trades synonym handling"],
-    ];
-  return <Panel><Table head={isZh ? ["设计点", "权衡"] : ["Design point", "Trade-off"]} rows={rows} /></Panel>;
-}
-
 // =====================================================================
 // 聚合
 // =====================================================================
 type Cfg = { subMode: SubMode; [k: string]: any };
 
 const SUB: Record<SubMode, ModuleDef> = {
-  levels: { id: "levels", title: T("存储层次", "Levels"), defaultConfig: {}, generate: () => [{ caption: T("存储层次概述", "Memory hierarchy"), scene: {} }] as never, Render: LevelsRender as never } as unknown as ModuleDef,
+  levels: { id: "levels", title: T("存储层次", "Levels"), defaultConfig: { hit: 3 }, Controls: LevelsControls as never, generate: levelsGenerate as never, code: LEVELS_CODE, Render: LevelsRender as never } as unknown as ModuleDef,
   locality: { id: "locality", title: T("局部性", "Locality"), defaultConfig: { stride: 1 }, Controls: LocalityControls as never, generate: () => [{ caption: T("局部性原理", "Locality"), scene: {} }] as never, Render: LocalityRender as never } as unknown as ModuleDef,
   cache: { id: "cache", title: T("缓存", "Cache"), defaultConfig: CACHE_DEFAULT, Controls: CacheControls as never, generate: () => [{ caption: T("缓存映射与地址划分", "Cache mapping"), scene: {} }] as never, Render: CacheRender as never } as unknown as ModuleDef,
   virtual: { id: "virtual", title: T("虚拟内存", "Virtual Memory"), defaultConfig: VM_DEFAULT, Controls: VmControls as never, generate: () => [{ caption: T("虚拟内存地址翻译", "VA translation"), scene: {} }] as never, Render: VmRender as never } as unknown as ModuleDef,
-  dram: { id: "dram", title: T("DRAM", "DRAM"), defaultConfig: {}, generate: () => [{ caption: T("SDRAM 与 DRAM", "DRAM"), scene: {} }] as never, Render: DramRender as never } as unknown as ModuleDef,
-  design: { id: "design", title: T("设计原则", "Design"), defaultConfig: {}, generate: () => [{ caption: T("存储层次设计", "Design"), scene: {} }] as never, Render: DesignRender as never } as unknown as ModuleDef,
 };
 
 const MAP: Record<SubMode, ModuleDef> = SUB;
@@ -429,11 +434,9 @@ export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string
   { label: "层次", opts: [
     { v: "levels", zh: "存储层次", en: "Levels" },
     { v: "locality", zh: "局部性", en: "Locality" },
-    { v: "dram", zh: "DRAM", en: "DRAM" },
   ]},
   { label: "缓存", opts: [
     { v: "cache", zh: "缓存映射", en: "Cache" },
-    { v: "design", zh: "设计原则", en: "Design" },
   ]},
   { label: "虚拟内存", opts: [
     { v: "virtual", zh: "地址翻译", en: "Virtual" },
@@ -457,9 +460,9 @@ function safeCfg(sub: unknown, config: Cfg): Cfg {
 export const memoryHierarchyModule: ModuleDef<any, Cfg> = {
   id: "memory-hierarchy",
   title: T("存储层次", "Memory Hierarchy"),
-  desc: T("层次 / 局部性 / 缓存映射与地址划分 / 虚拟内存与 TLB / DRAM / 设计原则。", "Hierarchy / locality / cache mapping & address split / virtual memory & TLB / DRAM / design."),
+  desc: T("层次 / 局部性 / 缓存映射与地址划分 / 虚拟内存与 TLB。", "Hierarchy / locality / cache mapping & address split / virtual memory & TLB."),
   tags: ["computer-organization", "memory"],
-  interactive: true,
+  interactive: false,
   defaultConfig: DEFAULT,
   Controls({ config, onChange, t, embedded }: any) {
     const isZh = t(T("中文", "en")) !== "en";
@@ -489,6 +492,9 @@ export const memoryHierarchyModule: ModuleDef<any, Cfg> = {
     const res: any = m.generate(safe);
     const frames: any[] = Array.isArray(res) ? res : res?.frames ?? [];
     return frames.length ? frames : [{ caption: T("存储层次", "Memory Hierarchy"), scene: safe }];
+  },
+  codeFor(config) {
+    return (activeOf((config as Cfg).subMode).code ?? []) as never;
   },
   Render(props) {
     const safe = safeCfg((props.config as Cfg).subMode, props.config as Cfg);

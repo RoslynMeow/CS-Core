@@ -242,7 +242,7 @@ export const baseConversionModule: ModuleDef<Scene, Cfg> = {
   id: 'base-conversion',
   title: T('进制转换', 'Base Conversion'),
   desc: T('值守恒 $y=\\sum P_i n^i = \\sum Q_j m^j$，整数除基取余 $y_{k+1}=\\lfloor y_k/m\\rfloor$、小数乘基取整 $y_{j-1}=y_j m-Q_j$。', 'Conserved $y=\\sum P_i n^i = \\sum Q_j m^j$, int $y_{k+1}=\\lfloor y_k/m\\rfloor$, frac $y_{j-1}=y_j m-Q_j$.'),
-  tags: ['data-structures', 'computer-organization'],
+  tags: ['data-structures'],
   defaultConfig: DEFAULT_CFG,
   randomize(c) { return { ...c, numeral: randNumeral(c.fromBase, c.mode) }; },
   Controls({ config, onChange, t }) {

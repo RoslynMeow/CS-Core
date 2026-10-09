@@ -6,10 +6,10 @@ import { MathText } from "../../lib/tex";
 // =====================================================================
 // 经典算法 · 单模块聚合 · 交互式
 //   对应 tex/DataStructure/Chapters/ClassicAlgorithms.tex
-//   paradigms(分治/贪心/DP + 斐波那契) / unionfind(并查集) / coverage(与其它模块的对应)
+//   paradigms(分治/贪心/DP + 斐波那契) / unionfind(并查集) / huffman(Huffman 编码)
 // =====================================================================
 
-type SubMode = "paradigms" | "unionfind" | "huffman" | "coverage";
+type SubMode = "paradigms" | "unionfind" | "huffman";
 
 function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
   return (
@@ -156,35 +156,6 @@ function UfRender({ config, t }: any) {
   );
 }
 
-// ---------------------------------------------------------------------
-// coverage
-// ---------------------------------------------------------------------
-function CoverageRender({ t }: any) {
-  const isZh = t(T("中文", "en")) !== "en";
-  const rows: React.ReactNode[][] = isZh
-    ? [
-      ["排序 / 查找", "数组算法", "10 排序 + 4 查找, 含复杂度与 PK"],
-      ["树 (BST/AVL/RB/堆/B/B+)", "树", "插入/删除/旋转/遍历动画"],
-      ["图 (遍历/最短路/MST/拓扑/A*/SCC/流)", "图", "12 个图算法逐步高亮"],
-      ["哈希 / 栈 / 队列 / 链表", "存储结构", "ADT 与实现"],
-      ["并查集", "本章", "按秩合并 + 路径压缩"],
-      ["分治 / 贪心 / DP", "本章", "范式与斐波那契 DP"],
-    ]
-    : [
-      ["Sort / Search", "Array Algorithms", "10 sorts + 4 searches"],
-      ["Trees (BST/AVL/RB/heap/B/B+)", "Tree", "insert/delete/rotate/traverse"],
-      ["Graphs (traversal/shortest/MST/topo/A*/SCC/flow)", "Graph", "12 algorithms"],
-      ["Hash / Stack / Queue / List", "Storage", "ADTs & implementations"],
-      ["Union-Find", "This chapter", "rank + path compression"],
-      ["D&C / Greedy / DP", "This chapter", "paradigms + fib DP"],
-    ];
-  return (
-    <Panel>
-      <Table head={isZh ? ["算法族", "所在模块", "说明"] : ["Family", "Module", "Note"]} rows={rows} />
-    </Panel>
-  );
-}
-
 // =====================================================================
 // 聚合
 // =====================================================================
@@ -269,7 +240,6 @@ const SUB: Record<SubMode, ModuleDef> = {
   paradigms: { id: "paradigms", title: T("算法范式", "Paradigms"), defaultConfig: DP_DEFAULT, Controls: ParadigmControls as never, generate: () => [{ caption: T("分治 / 贪心 / DP", "D&C / Greedy / DP"), scene: {} }] as never, Render: ParadigmRender as never } as unknown as ModuleDef,
   unionfind: { id: "unionfind", title: T("并查集", "Union-Find"), defaultConfig: UF_DEFAULT, Controls: UfControls as never, generate: () => [{ caption: T("并查集", "Union-Find"), scene: {} }] as never, Render: UfRender as never } as unknown as ModuleDef,
   huffman: { id: "huffman", title: T("Huffman 编码", "Huffman"), defaultConfig: HUFF_DEFAULT, Controls: HuffmanControls as never, generate: () => [{ caption: T("Huffman 编码", "Huffman coding"), scene: {} }] as never, Render: HuffmanRender as never } as unknown as ModuleDef,
-  coverage: { id: "coverage", title: T("覆盖映射", "Coverage"), defaultConfig: {}, generate: () => [{ caption: T("算法覆盖", "Algorithm coverage"), scene: {} }] as never, Render: CoverageRender as never } as unknown as ModuleDef,
 };
 
 const MAP: Record<SubMode, ModuleDef> = SUB;
@@ -278,7 +248,6 @@ export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string
     { v: "paradigms", zh: "分治/贪心/DP", en: "Paradigms" },
     { v: "unionfind", zh: "并查集", en: "Union-Find" },
     { v: "huffman", zh: "Huffman 编码", en: "Huffman" },
-    { v: "coverage", zh: "覆盖映射", en: "Coverage" },
   ]},
 ];
 
@@ -299,7 +268,7 @@ function safeCfg(sub: unknown, config: Cfg): Cfg {
 export const classicAlgorithmsModule: ModuleDef<any, Cfg> = {
   id: "classic-algorithms",
   title: T("经典算法", "Classic Algorithms"),
-  desc: T("分治/贪心/DP 范式, 斐波那契 DP, 并查集(按秩合并+路径压缩), 算法覆盖映射。", "D&C/Greedy/DP paradigms, fib DP, union-find, coverage map."),
+  desc: T("分治/贪心/DP 范式, 斐波那契 DP, 并查集(按秩合并+路径压缩), Huffman 编码。", "D&C/Greedy/DP paradigms, fib DP, union-find, Huffman coding."),
   tags: ["data-structures", "algorithms"],
   interactive: true,
   defaultConfig: DEFAULT,

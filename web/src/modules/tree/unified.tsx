@@ -81,6 +81,26 @@ const DEFAULT: Cfg = {
   pick: "u",
 };
 
+// ---- 线索二叉树：中序线索化逐帧动画 -------------------------------
+type ThreadLink = { from: number; to: number; side: "L" | "R" };
+type ThreadedScene = GraphCanvasScene & {
+  tLeft?: (number | null)[];
+  tRight?: (number | null)[];
+  tIno?: number[];
+  tVisited?: number[];
+  tActive?: number | null;
+  tThreads?: ThreadLink[];
+  tDone?: boolean;
+};
+
+const THREADED_CODE = [
+  T("中序线索化：空指针改指向前驱/后继", "Inorder threading: null pointers → pred/succ"),
+  T("访问 $p$：加入中序序列", "visit $p$: append to inorder"),
+  T("$p$ 无左子 → $p.lchild$ 指向前驱", "$p$ has no left → $p.lchild$ threads to pred"),
+  T("$p$ 无右子 → $p.rchild$ 指向后继", "$p$ has no right → $p.rchild$ threads to succ"),
+  T("线索化完成：中序遍历无需栈", "done: inorder needs no stack"),
+];
+
 const CODE_MAP: Record<SubMode, any> = {
   traverse: LEVEL_CODE,
   lca: LCA_CODE,
@@ -89,7 +109,7 @@ const CODE_MAP: Record<SubMode, any> = {
   heap: HEAP_BUILD_CODE as any,
   rb: RB_INSERT_CODE as any,
   splay: SPLAY_INSERT_CODE as any,
-  threaded: [] as any,
+  threaded: THREADED_CODE as any,
   btree: BTREE_INSERT_CODE as any,
   bplus: BTREE_INSERT_CODE as any,
 };
@@ -187,7 +207,37 @@ function buildFrames(cfg: Cfg): Frame<GraphCanvasScene>[] {
   switch (cfg.subMode) {
     case "threaded": {
       if (!isBinaryRooted(g, 0)) return [{ line: 0, caption: T("线索二叉树需二叉树（每个节点至多两个子节点）", "Threaded needs a binary tree"), scene: graphScene(g, {}, { root: 0, layout: "tree" }) as GraphCanvasScene }];
-      return [{ line: 0, caption: T("中序线索化：空指针指向中序前驱/后继", "Inorder threading: null pointers → pred/succ"), scene: graphScene(g, {}, { root: 0, layout: "tree" }) as GraphCanvasScene }];
+      const { parent, order } = g.bfs(0);
+      const children: number[][] = Array.from({ length: g.n }, () => []);
+      for (const v of order) if (v !== 0 && parent[v] !== -1) children[parent[v]].push(v);
+      const left: (number | null)[] = children.map((c) => (c[0] ?? null));
+      const right: (number | null)[] = children.map((c) => (c[1] ?? null));
+      const ino: number[] = [];
+      const rec = (u: number | null) => { if (u === null) return; rec(left[u]); ino.push(u); rec(right[u]); };
+      rec(0);
+      const makeScene = (extra: Partial<ThreadedScene>): ThreadedScene => {
+        const sc = graphScene(g, {}, { root: 0, layout: "tree" }) as ThreadedScene;
+        sc.tLeft = left; sc.tRight = right; sc.tIno = ino;
+        return Object.assign(sc, extra);
+      };
+      const frames: Frame<ThreadedScene>[] = [];
+      frames.push({ line: 0, caption: T("开始中序线索化：沿左子树下探到最左节点", "Start inorder threading: descend to the leftmost node"), scene: makeScene({ tVisited: [], tActive: null, tThreads: [], tDone: false }) });
+      const threads: ThreadLink[] = [];
+      const visited: number[] = [];
+      ino.forEach((u, i) => {
+        visited.push(u);
+        frames.push({ line: 1, caption: T(`访问 ${g.labels[u]}：加入中序序列`, `visit ${g.labels[u]}: append to inorder`), scene: makeScene({ tVisited: [...visited], tActive: u, tThreads: [...threads], tDone: false }) });
+        if (left[u] === null && i - 1 >= 0) {
+          threads.push({ from: u, to: ino[i - 1], side: "L" });
+          frames.push({ line: 2, caption: T(`${g.labels[u]} 无左子 → 左线索指向中序前驱 ${g.labels[ino[i - 1]]}`, `${g.labels[u]} no left → thread to pred ${g.labels[ino[i - 1]]}`), scene: makeScene({ tVisited: [...visited], tActive: u, tThreads: [...threads], tDone: false }) });
+        }
+        if (right[u] === null && i + 1 < ino.length) {
+          threads.push({ from: u, to: ino[i + 1], side: "R" });
+          frames.push({ line: 3, caption: T(`${g.labels[u]} 无右子 → 右线索指向中序后继 ${g.labels[ino[i + 1]]}`, `${g.labels[u]} no right → thread to succ ${g.labels[ino[i + 1]]}`), scene: makeScene({ tVisited: [...visited], tActive: u, tThreads: [...threads], tDone: false }) });
+        }
+      });
+      frames.push({ line: 4, caption: T("线索化完成：用线索可 $O(1)$ 找前驱/后继，中序遍历无需栈", "Done: threads give $O(1)$ pred/succ; inorder needs no stack"), scene: makeScene({ tVisited: [...visited], tActive: null, tThreads: [...threads], tDone: true }) });
+      return frames;
     }
     case "traverse": {
       if (!isBinaryRooted(g, 0)) return [{ line: 0, caption: T("二叉遍历需二叉树：存在节点超过两个子节点（或不连通）", "Traverse needs a binary tree"), scene: graphScene(g, {}, { root: 0, layout: "tree" }) as GraphCanvasScene }];
@@ -690,7 +740,7 @@ export const treeUnifiedModule: ModuleDef<GraphCanvasScene, Cfg> = {
       )}
     </>);
     const body = cfg.subMode === "threaded" ? (
-      <ThreadedView g={gForMem} isZh={isZh} />
+      <ThreadedRender scene={scene as unknown as ThreadedScene} isZh={isZh} />
     ) : useCanvas ? (
       <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0, position: "relative" }}>
         <div style={{ flex: memOpen ? "0 0 50%" : "1", minHeight: 0, border: "1px solid #c7d2fe", borderRadius: 12, overflow: "hidden", background: "#fff", display: "flex", flexDirection: "column" }}>
@@ -843,56 +893,130 @@ function LeftMemoryPanel({ g, isZh }: { g: Graph | null; isZh: boolean }) {
   );
 }
 
-function clampV(v: number, n: number) { return Math.min(Math.max(0, v), Math.max(0, n - 1)); }
+/** 线索二叉树：读取帧场景，逐步绘制中序线索（空指针 → 前驱/后继） */
+function ThreadedRender({ scene, isZh }: { scene: ThreadedScene; isZh: boolean }) {
+  const s = (scene ?? {}) as ThreadedScene;
+  const nodes = (s.nodes ?? []) as GraphCanvasScene["nodes"];
+  if (!nodes.length) return <div style={{ color: "#94a3b8", textAlign: "center", padding: 20 }}>{isZh ? "空" : "empty"}</div> as unknown as never;
+  const left = s.tLeft ?? [];
+  const right = s.tRight ?? [];
+  const ino = s.tIno ?? [];
+  const visited = s.tVisited ?? [];
+  const threads = s.tThreads ?? [];
+  const active = s.tActive ?? null;
+  const done = !!s.tDone;
+  const pos = new Map(nodes.map((n) => [n.id, n]));
+  const labelOf = (u: number) => pos.get(u)?.label ?? String(u);
+  const threadOf = new Map<number, { pred?: number; succ?: number }>();
+  for (const th of threads) {
+    const e = threadOf.get(th.from) ?? {};
+    if (th.side === "R") e.succ = th.to;
+    else e.pred = th.to;
+    threadOf.set(th.from, e);
+  }
+  const W = 760, H = 440, R = 17;
+  const hasMeta = left.length > 0;
 
-/** 线索二叉树：中序序列 + 空指针改为前驱/后继线索 */
-function ThreadedView({ g, isZh }: { g: any; isZh: boolean }) {
-  if (!g || g.n === 0) return <div style={{ color: '#94a3b8', textAlign: 'center', padding: 20 }}>{isZh ? '空' : 'empty'}</div> as unknown as never;
-  const { parent, order } = g.bfs(0);
-  const children: number[][] = Array.from({ length: g.n }, () => []);
-  for (const v of order) if (v !== 0 && parent[v] !== -1) children[parent[v]].push(v);
-  const left = children.map((c) => (c[0] ?? null));
-  const right = children.map((c) => (c[1] ?? null));
-  const ino: number[] = [];
-  const rec = (u: number | null) => { if (u === null) return; rec(left[u]); ino.push(u); rec(right[u]); };
-  rec(0);
-  const rows = ino.map((u, i) => ({
-    u,
-    label: g.labels[u],
-    l: left[u],
-    r: right[u],
-    pred: left[u] === null && i - 1 >= 0 ? ino[i - 1] : null,
-    succ: right[u] === null && i + 1 < ino.length ? ino[i + 1] : null,
-  }));
+  const treeEdges: React.ReactNode[] = hasMeta
+    ? nodes.flatMap((n) => {
+        const out: React.ReactNode[] = [];
+        const a = pos.get(n.id);
+        if (!a) return out;
+        const lu = left[n.id], ru = right[n.id];
+        if (lu !== null && lu !== undefined) { const b = pos.get(lu); if (b) out.push(<line key={`l${n.id}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#94a3b8" strokeWidth={1.8} />); }
+        if (ru !== null && ru !== undefined) { const b = pos.get(ru); if (b) out.push(<line key={`r${n.id}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#94a3b8" strokeWidth={1.8} />); }
+        return out;
+      })
+    : (s.edges ?? []).map((e, i) => {
+        const a = pos.get(e.u), b = pos.get(e.v);
+        return a && b ? <line key={`e${i}`} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#94a3b8" strokeWidth={1.8} /> : null;
+      });
+
+  const threadCurves = threads.map((th, i) => {
+    const a = pos.get(th.from), b = pos.get(th.to);
+    if (!a || !b) return null;
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const nx = -dy / len, ny = dx / len;
+    const dir = th.side === "R" ? 1 : -1;
+    const cx = mx + nx * 34 * dir, cy = my + ny * 34 * dir;
+    const gx = b.x - cx, gy = b.y - cy;
+    const gl = Math.hypot(gx, gy) || 1;
+    const ex = b.x - (gx / gl) * (R + 4), ey = b.y - (gy / gl) * (R + 4);
+    return <path key={`th${i}`} d={`M ${a.x} ${a.y} Q ${cx} ${cy} ${ex} ${ey}`} fill="none" stroke="#f59e0b" strokeWidth={2.4} strokeDasharray="6 4" markerEnd="url(#thread-arrow)" />;
+  });
+
+  const isVisited = new Set(visited);
+  const orderIdx = new Map(visited.map((u, i) => [u, i]));
+  const tableIds = hasMeta ? ino : nodes.map((n) => n.id);
+
   return (
-    <div style={{ display: 'grid', gap: 10, height: '100%', overflow: 'auto', padding: 4 }}>
-      <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap', alignItems: 'center' }}>
-        {ino.map((u, i) => (
-          <div key={u} style={{ display: 'flex', alignItems: 'center' }}>
-            <div className="digit" style={{ width: 46, height: 46, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><strong>{g.labels[u]}</strong></div>
-            {i < ino.length - 1 && <span style={{ color: right[u] === null ? '#f59e0b' : '#cbd5e1', padding: '0 3px', fontWeight: 800 }}>{right[u] === null ? '⇢' : '→'}</span>}
-          </div>
-        ))}
+    <div style={{ display: "grid", gap: 10, height: "100%", overflow: "auto", padding: 4 }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block", background: "#fff", border: "1px solid #e2e8f0", borderRadius: 12 }}>
+        <defs>
+          <marker id="thread-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="#f59e0b" />
+          </marker>
+        </defs>
+        {treeEdges}
+        {threadCurves}
+        {nodes.map((n) => {
+          const on = active === n.id;
+          const vis = isVisited.has(n.id);
+          const fill = on ? "#4f46e5" : vis ? "#dcfce7" : "#fff";
+          const stroke = on ? "#312e81" : vis ? "#16a34a" : "#6366f1";
+          const oi = orderIdx.get(n.id);
+          return (
+            <g key={n.id}>
+              <circle cx={n.x} cy={n.y} r={R} fill={fill} stroke={stroke} strokeWidth={on ? 3 : 1.8} />
+              <text x={n.x} y={n.y + 4} textAnchor="middle" fontSize={11} fontWeight={700} fill={on ? "#fff" : "#1e293b"}>{n.label}</text>
+              {oi !== undefined && <text x={n.x + R - 2} y={n.y - R + 2} fontSize={9} fontWeight={800} fill={on ? "#e0e7ff" : "#475569"}>{oi + 1}</text>}
+            </g>
+          );
+        })}
+      </svg>
+      <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap", alignItems: "center", minHeight: 46 }}>
+        <span style={{ fontSize: 11, fontWeight: 800, color: "#64748b" }}>{isZh ? "中序：" : "inorder:"}</span>
+        {visited.length === 0 && <span style={{ fontSize: 12, color: "#cbd5e1" }}>—</span>}
+        {visited.map((u, i) => {
+          const nxt = visited[i + 1];
+          const threaded = nxt !== undefined && threadOf.get(u)?.succ === nxt;
+          return (
+            <div key={u} style={{ display: "flex", alignItems: "center" }}>
+              <div className="digit" style={{ width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", background: active === u ? "#eef2ff" : "#fff" }}><strong>{labelOf(u)}</strong></div>
+              {nxt !== undefined && <span style={{ color: threaded ? "#f59e0b" : "#cbd5e1", padding: "0 3px", fontWeight: 800 }}>{threaded ? "⇢" : "→"}</span>}
+            </div>
+          );
+        })}
       </div>
-      <table style={{ margin: '0 auto', borderCollapse: 'collapse', fontSize: 12, fontFamily: 'ui-monospace, monospace', background: '#fff', border: '1px solid #e2e8f0' }}>
-        <thead><tr style={{ background: '#f8fafc', color: '#64748b' }}>
-          <th style={{ padding: '4px 10px' }}>{isZh ? '中序' : '#'}</th><th style={{ padding: '4px 10px' }}>node</th><th style={{ padding: '4px 10px' }}>left</th><th style={{ padding: '4px 10px' }}>right</th><th style={{ padding: '4px 10px' }}>pred</th><th style={{ padding: '4px 10px' }}>succ</th>
+      <table style={{ margin: "0 auto", borderCollapse: "collapse", fontSize: 12, fontFamily: "ui-monospace, monospace", background: "#fff", border: "1px solid #e2e8f0" }}>
+        <thead><tr style={{ background: "#f8fafc", color: "#64748b" }}>
+          <th style={{ padding: "4px 10px" }}>{isZh ? "中序" : "#"}</th><th style={{ padding: "4px 10px" }}>node</th><th style={{ padding: "4px 10px" }}>left</th><th style={{ padding: "4px 10px" }}>right</th><th style={{ padding: "4px 10px" }}>pred</th><th style={{ padding: "4px 10px" }}>succ</th>
         </tr></thead>
         <tbody>
-          {rows.map((r, i) => (
-            <tr key={r.u}>
-              <td style={{ padding: '3px 10px', color: '#94a3b8' }}>{i + 1}</td>
-              <td style={{ padding: '3px 10px', fontWeight: 800 }}>{r.label}</td>
-              <td style={{ padding: '3px 10px', color: '#475569' }}>{r.l === null ? 'null' : g.labels[r.l]}</td>
-              <td style={{ padding: '3px 10px', color: '#475569' }}>{r.r === null ? 'null' : g.labels[r.r]}</td>
-              <td style={{ padding: '3px 10px', color: r.pred !== null ? '#f59e0b' : '#cbd5e1' }}>{r.pred !== null ? g.labels[r.pred] : '-'}</td>
-              <td style={{ padding: '3px 10px', color: r.succ !== null ? '#f59e0b' : '#cbd5e1' }}>{r.succ !== null ? g.labels[r.succ] : '-'}</td>
-            </tr>
-          ))}
+          {tableIds.map((u, i) => {
+            const th = threadOf.get(u);
+            const lval = left[u] === null ? (th?.pred !== undefined ? `⇢${labelOf(th.pred)}` : "null") : (left[u] !== undefined ? labelOf(left[u]) : "null");
+            const rval = right[u] === null ? (th?.succ !== undefined ? `⇢${labelOf(th.succ)}` : "null") : (right[u] !== undefined ? labelOf(right[u]) : "null");
+            const on = active === u;
+            return (
+              <tr key={u} style={{ background: on ? "#eef2ff" : undefined, opacity: isVisited.has(u) ? 1 : 0.45 }}>
+                <td style={{ padding: "3px 10px", color: "#94a3b8" }}>{i + 1}</td>
+                <td style={{ padding: "3px 10px", fontWeight: 800, color: on ? "#4338ca" : undefined }}>{labelOf(u)}</td>
+                <td style={{ padding: "3px 10px", color: th?.pred !== undefined ? "#f59e0b" : "#475569" }}>{lval}</td>
+                <td style={{ padding: "3px 10px", color: th?.succ !== undefined ? "#f59e0b" : "#475569" }}>{rval}</td>
+                <td style={{ padding: "3px 10px", color: th?.pred !== undefined ? "#f59e0b" : "#cbd5e1" }}>{th?.pred !== undefined ? labelOf(th.pred) : "-"}</td>
+                <td style={{ padding: "3px 10px", color: th?.succ !== undefined ? "#f59e0b" : "#cbd5e1" }}>{th?.succ !== undefined ? labelOf(th.succ) : "-"}</td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
-      <div style={{ fontSize: 12, color: '#64748b', textAlign: 'center' }}>
-        {isZh ? '橙色 ⇢ / pred·succ 列 = 空指针改为指向中序前驱/后继（线索）。线索化后中序遍历无需栈。' : 'Orange = null pointers become pred/succ threads (inorder).'}
+      <div style={{ fontSize: 12, color: "#64748b", textAlign: "center" }}>
+        {done
+          ? (isZh ? "橙色 ⇢ = 线索：空指针指向中序前驱/后继；线索化后中序遍历无需栈。" : "Orange ⇢ = threads: null pointers point to inorder pred/succ; traversal needs no stack.")
+          : (isZh ? "橙色虚线 = 已建立的中序线索（空指针改指向前驱/后继）。" : "Orange dashed = threads built so far (null pointers → pred/succ).")}
       </div>
     </div>
   ) as unknown as never;

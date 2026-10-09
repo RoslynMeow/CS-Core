@@ -1,0 +1,119 @@
+\clearpage
+\begingroup
+\let\clearpage\relax
+\let\cleardoublepage\relax
+\vspace*{\fill}
+\chapter{需求工程}
+\begin{center}
+需求工程把「用户想要什么」转化为「可验证、可追溯、可管理的规格」，是决定项目成败的第一道关口。
+\end{center}
+\vspace*{\fill}
+\endgroup
+\clearpage
+
+\section{需求获取方法}
+
+\begin{itemize}
+    \item \textbf{需求}：用户对目标系统的期望与约束，分为功能需求与非功能需求；它是设计、实现与验收的共同基准。
+    \item \textbf{需求工程}：获取 (elicitation) $\to$ 分析 (analysis) $\to$ 规格说明 (specification) $\to$ 验证 (validation) $\to$ 管理 (management) 的迭代过程。
+    \item \textbf{干系人 (Stakeholder)}：所有受系统影响或能影响系统的人与组织，是需求获取的信息来源。
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{常用需求获取方法}
+\begin{tabulary}{\textwidth}{CCL}
+\toprule
+方法 & 做法 & 适用与要点 \\
+\midrule
+访谈 (Interview) & 与干系人一对一或小组交流 & 深入挖掘隐含需求；成本高、依赖访谈技巧 \\
+问卷 (Questionnaire) & 结构化问题批量收集 & 覆盖广、易统计；难以追问细节 \\
+观察 (Observation) & 到现场观察真实工作流 & 发现用户未说出口的需求；耗时、可能干扰 \\
+原型 (Prototype) & 用可运行或低保真原型试错 & 澄清模糊需求；易被误当成最终产品 \\
+文档分析 (Document Analysis) & 分析现有表单、手册、旧系统 & 快速获取业务规则；文档可能已过时 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\section{需求管理}
+
+\begin{itemize}
+    \item \textbf{基线 (Baseline)}：需求通过评审后冻结，作为后续变更与验收的基准。
+    \item \textbf{变更控制 (Change Control)}：变更申请 (CR) $\to$ 影响分析 $\to$ 批准或拒绝 $\to$ 更新基线，避免需求无序蔓延 (scope creep)。
+    \item \textbf{追溯矩阵 (Traceability Matrix)}：在需求、设计、代码与测试用例之间建立双向链接，保证覆盖与影响分析。
+\end{itemize}
+
+\section{需求分类与规格说明}
+
+\begin{table}[H]
+\centering
+\caption{功能需求与非功能需求对比}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+维度 & 功能需求 & 非功能需求 \\
+\midrule
+关注点 & 系统「做什么」 & 系统「做得怎样」 \\
+表述 & 输入 $\to$ 处理 $\to$ 输出 & 可度量的质量指标 \\
+示例 & 用户可下单、支付 & 响应 $<2$\,s、并发 $1000$ \\
+验证方式 & 功能测试、验收测试 & 性能/安全/压力测试 \\
+失败后果 & 功能缺失或错误 & 系统不可用或不达标 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{itemize}
+    \item \textbf{性能 (Performance)}：响应时间、吞吐量、并发用户数、资源占用。
+    \item \textbf{安全 (Security)}：认证、授权、加密、审计、抗攻击能力。
+    \item \textbf{可用性 (Usability)}：易学习、易操作、可访问、出错可恢复（注意与 availability「可靠性/可用性」区分）。
+    \item \textbf{可维护性 (Maintainability)}：可修改、可测试、可复用、低耦合高内聚。
+\end{itemize}
+
+\noindent 需求规格说明 (SRS) 应满足以下特征：
+\begin{itemize}
+    \item 正确 (Correct)：真实反映干系人的需求。
+    \item 无歧义 (Unambiguous)：只有一种解释。
+    \item 完整 (Complete)：涵盖所有功能、约束与边界。
+    \item 一致 (Consistent)：条目之间无冲突、无矛盾。
+    \item 可验证 (Verifiable)：能用测试或度量客观判定是否满足。
+\end{itemize}
+
+\section{用例建模}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, node distance=1.8cm]
+    \node[draw, ellipse, minimum width=3cm, minimum height=1cm] (login) {登录系统};
+    \node[draw, ellipse, minimum width=3cm, minimum height=1cm, below=of login] (verify) {验证身份};
+    \node[draw, ellipse, minimum width=3cm, minimum height=1cm, right=3.2cm of login] (register) {注册账户};
+    \node[left=1.4cm of login] (user) {\textbf{用户}};
+    \draw (user) -- (login);
+    \draw[->, dashed] (login) -- node[right, font=\scriptsize]{\texttt{<<include>>}} (verify);
+    \draw[->, dashed] (register) -- node[above, font=\scriptsize]{\texttt{<<extend>>}} (login);
+\end{tikzpicture}
+\caption{用例图要素：参与者、用例、include 与 extend 关系}
+\end{figure}
+
+\begin{itemize}
+    \item \textbf{参与者 (Actor)}：与系统交互的角色，可以是人或外部系统。
+    \item \textbf{用例 (Use Case)}：系统向参与者提供的一个完整、有价值的功能单元。
+    \item \textbf{include}：基础用例必然执行被包含用例（公共步骤抽取），箭头由基础用例指向被包含用例。
+    \item \textbf{extend}：扩展用例在特定条件下插入基础用例，基础用例不依赖扩展。
+    \item \textbf{泛化 (Generalization)}：参与者或用例之间的继承 (is-a) 关系。
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{用例描述模板}
+\begin{tabulary}{\textwidth}{CL}
+\toprule
+条目 & 内容 \\
+\midrule
+用例名称 & 动词短语，如「提交订单」 \\
+参与者 & 触发该用例的主参与者与次参与者 \\
+前置条件 & 用例开始前系统必须满足的状态 \\
+主流程 & 正常路径的编号步骤序列 \\
+备选流程 & 异常或分支路径的处理 \\
+后置条件 & 用例结束后系统的状态与产出 \\
+\bottomrule
+\end{tabulary}
+\end{table}

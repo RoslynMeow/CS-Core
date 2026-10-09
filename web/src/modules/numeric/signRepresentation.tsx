@@ -48,7 +48,7 @@ export const signRepresentationModule: ModuleDef<Scene, Cfg> = {
   id: 'sign-representation',
   title: T('原码/反码/移码', 'Sign Codes'),
   desc: T('同一 $n$ 位模式在原码 / 反码 / 补码 / 移码下的真值对比; 双零与单调序。', 'Same bit pattern under sign-magnitude / one\'s / two\'s / biased.'),
-  tags: ['data-structures', 'computer-organization'],
+  tags: ['data-structures'],
   defaultConfig: DEFAULT_CFG,
   randomize(c) { return { ...c, bits: randBits(c.width) }; },
   Controls({ config, onChange, t }) {

@@ -105,7 +105,7 @@ export const twosComplementModule: ModuleDef<Scene, Cfg> = {
   id: 'twos-complement',
   title: T('补码', 'Two\'s Complement'),
   desc: T('有符号 $T(b)=-b_{n-1}2^{n-1}+\\sum_{i=0}^{n-2}b_i2^i$，$y\\in[-2^{n-1},2^{n-1}-1]$，消双零。', 'Signed $T(b)=-b_{n-1}2^{n-1}+\\sum b_i2^i$, $y\\in[-2^{n-1},2^{n-1}-1]$.'),
-  tags: ['data-structures', 'computer-organization'],
+  tags: ['data-structures'],
   defaultConfig: DEFAULT_CFG,
   randomize(c) { return { ...c, bits: randBits(c.width) }; },
   Controls({ config, onChange, t }) {

@@ -1,0 +1,440 @@
+\clearpage
+\begingroup
+\let\clearpage\relax
+\let\cleardoublepage\relax
+\vspace*{\fill}
+\chapter{计算机网络概述与体系结构}
+\begin{center}
+网络是一张把「主机」用「链路」与「交换设备」连起来的图；协议是通信双方对「时序 + 格式 + 语义」的约定。本章先建立「边缘--核心--性能--分层」四块基石。
+\end{center}
+\vspace*{\fill}
+\endgroup
+\clearpage
+
+\section{网络的组成：边缘、接入与核心}
+
+\subsection{动机}
+为什么要先谈「组成」？因为一个网络系统的所有问题——带宽够不够、时延大不大、故障如何隔离、安全边界在哪里——都可以归结为「谁处在网络的哪个位置」。只有先把庞杂的互联网抽象成\textbf{端系统}、\textbf{接入网}与\textbf{网络核心}三块，后续的协议设计才有讨论的坐标系。
+
+\subsection{形式化定义}
+把网络建模为一个图 $G=(V,E)$：顶点集合 $V$ 包含\textbf{端系统 (end system / host)}与\textbf{分组交换机 (packet switch)}，边集合 $E$ 为通信\textbf{链路 (link)}。每条链路带有两个属性：速率 $R$（bit/s）与传播时延 $d_{\text{prop}}$。端系统之间的一条「路径」就是图中的一条路 (path)：
+
+\begin{equation}
+    \text{path} = \langle v_0, e_1, v_1, e_2, \dots, e_k, v_k \rangle, \qquad v_0, v_k \in \text{Hosts}.
+\end{equation}
+
+据此，网络可划分为三个逻辑区域：
+
+\begin{itemize}
+    \item \textbf{网络边缘 (Network Edge)}：端系统 (host)，包括主机、服务器、手机、传感器、物联网设备。它们运行应用程序，是「产生与消费」数据的地方，一般不参与转发。
+    \item \textbf{接入网 (Access Network)}：把边缘连接到核心的\textbf{第一跳}，如 DSL、HFC、FTTH、以太网、Wi-Fi、蜂窝 (4G/5G)。它决定用户「入口速率」。
+    \item \textbf{网络核心 (Network Core)}：由分组交换机、路由器及高速链路组成的网状骨干，负责把分组从一条链路转发到另一条链路。
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    host/.style={draw, rounded corners, minimum width=1.5cm, minimum height=0.7cm, font=\small, align=center},
+    cloud/.style={draw, ellipse, minimum width=2.4cm, minimum height=1.3cm, font=\small, align=center},
+    link/.style={draw, thick, -{Latex[length=2mm]}}
+]
+    \node[host] (h1) at (0,1.2) {主机};
+    \node[host] (h2) at (0,-1.2) {手机};
+    \node[cloud] (acc) at (3,0) {接入网};
+    \node[cloud] (core) at (6.8,0) {网络核心};
+    \node[host] (srv) at (10,0) {服务器};
+
+    \draw[link] (h1) -- (acc);
+    \draw[link] (h2) -- (acc);
+    \draw[link] (acc) -- (core);
+    \draw[link] (core) -- (srv);
+
+    \node[font=\scriptsize, below] at (0,-1.9) {边缘};
+    \node[font=\scriptsize, below] at (3,-1.1) {接入};
+    \node[font=\scriptsize, below] at (6.8,-1.1) {核心};
+\end{tikzpicture}
+\caption{边缘--接入--核心的三段式结构}
+\label{fig:edge_access_core}
+\end{figure}
+
+\subsection{接入技术详细对比}
+接入技术可沿四个维度区分：\textbf{介质}、\textbf{标称速率}、\textbf{共享方式}（独享还是争用）、\textbf{双工方式}（全双工/半双工）。
+
+\begin{table}[H]
+\centering
+\caption{常见接入技术对比（速率、介质、共享方式、双工）}
+\begin{tabulary}{\textwidth}{CCCCC}
+\toprule
+技术 & 介质 & 典型速率 & 共享方式 & 双工 \\
+\midrule
+DSL & 电话双绞线 & 24--52 Mbps 下行 & 用户独享（局端汇聚共享） & 全双工（FDD） \\
+HFC & 同轴电缆 + 光纤 & 数十--数百 Mbps & 上行为用户争用 & 频分上下行 \\
+FTTH & 光纤 & 1 Gbps 以上 & PON 上行为共享/时分 & 全双工 \\
+Wi-Fi & 2.4/5/6 GHz 无线 & 数百 Mbps--Gbps & 共享介质、CSMA/CA & 半双工 \\
+蜂窝 4G/5G & 授权频段无线 & 数十 Mbps--Gbps & 小区内共享调度 & 全双工（FDD/TDD） \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\textbf{要点解读：}「共享方式」直接决定\textbf{有效速率随用户数下降}的方式。HFC 上行与 Wi-Fi 属于\textbf{争用型}，用户越多碰撞与排队越严重；FTTH 在无源分光器后下行是广播、上行按时分复用 (TDMA) 共享。蜂窝则在基站内\textbf{集中调度}，按信道质量动态分配。
+
+\subsection{ISP 层次结构与拓扑}
+
+\textbf{动机：}互联网不是一张对等的图，而是由商业关系与流量交换点组织成的\textbf{层次化结构}。理解它才能理解路由为何「向上汇聚、向下分发」。
+
+\textbf{层次：}
+\begin{itemize}
+    \item \textbf{Tier-1 ISP}：全球骨干，无需向他人付费即可到达全网（如 Level-3、NTT）。
+    \item \textbf{Tier-2 ISP}：区域型，向 Tier-1 付费购得转接 (transit)，也与其他 Tier-2 对等 (peering)。
+    \item \textbf{Tier-3 / 接入 ISP}：本地运营商，直接服务端系统。
+    \item \textbf{IXP (Internet Exchange Point)}：多个 ISP 在此对等互联，降低转接成本。
+    \item \textbf{内容提供商网络 (CDN)}：如大型视频网站自建骨干，与各级 ISP 就近互联、部署缓存。
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    box/.style={draw, rounded corners, minimum width=2.0cm, minimum height=0.7cm, font=\small, align=center},
+    ix/.style={draw, circle, minimum size=0.7cm, font=\scriptsize},
+    conn/.style={draw, thick}
+]
+    \node[box] (t1a) at (0,3) {Tier-1 A};
+    \node[box] (t1b) at (5,3) {Tier-1 B};
+    \node[ix]  (ix)  at (2.5,2) {IXP};
+    \node[box] (t2)  at (1,1) {Tier-2};
+    \node[box] (t3)  at (4,1) {接入 ISP};
+    \node[box] (cdn) at (6.5,1.6) {内容网络};
+
+    \draw[conn] (t1a) -- (t1b);
+    \draw[conn] (t1a) -- (ix);
+    \draw[conn] (t1b) -- (ix);
+    \draw[conn] (ix) -- (t2);
+    \draw[conn] (ix) -- (t3);
+    \draw[conn, dashed] (t2) -- (t3);
+    \draw[conn, dashed] (cdn) -- (t1b);
+    \draw[conn] (cdn) -- (t3);
+\end{tikzpicture}
+\caption{ISP 层次与 IXP 对等互联}
+\label{fig:isp_hier}
+\end{figure}
+
+\textbf{物理拓扑形态}决定链路冗余与故障域。常见拓扑如下表；现实中骨干普遍采用\textbf{部分网状 (partial mesh)}，以兼顾冗余与成本。
+
+\begin{table}[H]
+\centering
+\caption{常见网络拓扑对比}
+\begin{tabulary}{\textwidth}{CCCC}
+\toprule
+拓扑 & 结构 & 优点 & 缺点 \\
+\midrule
+总线 & 单一共享介质 & 布线简单 & 冲突严重、单点失效 \\
+星型 & 中心节点汇聚 & 易管理、故障隔离好 & 中心成瓶颈/单点 \\
+环型 & 首尾相接 & 可双向保护 & 断链影响大 \\
+网状 & 多路互联 & 高冗余、高吞吐 & 成本高、路由复杂 \\
+树型 & 层次汇聚 & 扩展性好 & 上层失效影响大 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\section{交换方式：电路交换 vs 分组交换}
+
+\subsection{动机}
+端系统之间的数据要跨越许多链路，核心必须决定\textbf{如何为数据分配链路资源}。两种根本不同的答案——预留资源与按需复用——构成了网络设计的第一组对立统一。
+
+\subsection{电路交换 (Circuit Switching)}
+通信前在路径上\textbf{预留一条独占电路}，分三阶段：
+
+\begin{enumerate}
+    \item \textbf{建立 (setup)}：沿路径逐跳预留链路带宽/时隙，信令往返产生建立时延。
+    \item \textbf{传输 (transfer)}：数据以恒定速率连续通过，\textbf{无排队}。
+    \item \textbf{拆除 (teardown)}：释放资源。
+\end{enumerate}
+
+\textbf{优点：}时延稳定、抖动小、无需首部寻址开销。\textbf{缺点：}空闲期资源浪费；突发业务利用率低。
+
+\subsection{分组交换 (Packet Switching)}
+数据被切成\textbf{分组 (packet)}，每个分组携带首部，独立经过交换机，采用\textbf{存储转发 (store-and-forward)}：交换机必须收完整个分组才转发。核心机制是\textbf{统计多路复用}——按需占用带宽，天然适配突发流量。代价是\textbf{排队时延}与\textbf{丢包}。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, xscale=1.05]
+    % 电路交换时间线
+    \draw[->] (0,2.0) -- (11,2.0) node[right] {$t$};
+    \node[anchor=east] at (-0.2,2.0) {电路};
+    \draw[fill=blue!15] (0.3,1.75) rectangle (2.0,2.25);
+    \node[font=\scriptsize] at (1.15,2.0) {建立};
+    \draw[fill=green!20] (2.0,1.75) rectangle (8.0,2.25);
+    \node[font=\scriptsize] at (5.0,2.0) {数据（独占速率）};
+    \draw[fill=red!15] (8.0,1.75) rectangle (9.0,2.25);
+    \node[font=\scriptsize] at (8.5,2.0) {拆};
+    % 分组交换时间线
+    \draw[->] (0,0.6) -- (11,0.6) node[right] {$t$};
+    \node[anchor=east] at (-0.2,0.6) {分组};
+    \foreach \x in {0.3,0.9,1.5,2.1,2.7,3.3}{
+        \draw[fill=orange!30] (\x,0.35) rectangle (\x+0.5,0.85);
+    }
+    \node[anchor=west,font=\scriptsize] at (3.9,0.6) {按需占用，其余用户可复用带宽};
+\end{tikzpicture}
+\caption{电路交换（预留）与分组交换（按需）的时间线对比}
+\label{fig:circuit_vs_packet}
+\end{figure}
+
+\subsection{存储转发时延推导}
+设分组长度 $L$ bit，链路速率为 $R$ bit/s。单跳\textbf{传输时延}为 $L/R$。经过 $N$ 条链路（$N-1$ 个中间交换机），且各跳速率相同，则端到端时延为：
+
+\begin{equation}
+    d_{\text{end-to-end}} = \sum_{i=1}^{N} \frac{L}{R_i} \;\overset{R_i=R}{=}\; N \cdot \frac{L}{R}.
+\end{equation}
+
+若 $N$ 条链路速率不同，则应逐跳相加，\textbf{不能}简单取平均或最小值。
+
+\subsubsection{多跳数值示例}
+取分组长度 $L = 1500$ B $= 12000$ bit。
+
+\textbf{情形 A（等速率 3 跳，$N=3$）：}
+$R = 1$ Mbps $= 10^6$ bit/s，则单跳 $L/R = 12000/10^6 = 12$ ms，端到端
+\[
+d = 3 \times 12\ \text{ms} = 36\ \text{ms}.
+\]
+
+\textbf{情形 B（异速率 3 跳）：}\ $R_1 = 1$ Mbps，$R_2 = 2$ Mbps，$R_3 = 4$ Mbps。
+\[
+d = \frac{12000}{10^6} + \frac{12000}{2\times10^6} + \frac{12000}{4\times10^6}
+  = 12 + 6 + 3 = 21\ \text{ms}.
+\]
+可见端到端时延由\textbf{每跳各自}贡献，慢链路的贡献被直接叠加。
+
+\textbf{情形 C（流水线效应）：}若发送一个含 $P$ 个分组的大报文，采用流水线后最后一个分组到达的时间为
+\[
+d = \frac{(N+P-1)L}{R},
+\]
+相比逐分组串行的 $P\cdot N L/R$，流水线显著缩短了整体完成时间。
+
+\subsection{统计多路复用、排队与丢包}
+设平均分组到达率为 $a$（分组/秒），则平均输入速率 $= aL$，\textbf{流量强度 (traffic intensity)} 定义为
+\begin{equation}
+    \rho = \frac{L a}{R}.
+\end{equation}
+当 $\rho \to 1^{-}$ 时排队时延急剧上升；当 $\rho \ge 1$ 且持续时间足够，队列持续增长直至\textbf{缓冲区溢出丢包}。由 Little 定律，平均队长与排队时延满足
+\begin{equation}
+    N_{\text{queue}} = a \cdot d_{\text{queue}}.
+\end{equation}
+
+\subsection{电路交换与分组交换的选择}
+\begin{table}[H]
+\centering
+\caption{两种交换方式的适用场景}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+维度 & 电路交换 & 分组交换 \\
+\midrule
+资源分配 & 预先预留、独占 & 按需、统计复用 \\
+时延特性 & 恒定、抖动小 & 随负载变化，可能排队 \\
+利用率 & 低（突发业务） & 高 \\
+典型业务 & 传统电话、专线 & 互联网数据、VoIP、视频 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\textbf{经典算例（资源用户数）：}一条 1 Mbps 链路，每个用户活跃时需 100 kbps，活跃概率 10\%。
+\begin{itemize}
+    \item \textbf{电路交换：}每条电路独占 100 kbps，最多支持 $10^6/10^5 = 10$ 个用户。
+    \item \textbf{分组交换：}让 $N=35$ 个用户共享，若同时活跃数 $X \le 10$ 则几乎不排队。$X\sim B(35,0.1)$，可算得
+    \[
+    P(X \ge 11) = \sum_{k=11}^{35}\binom{35}{k}(0.1)^k(0.9)^{35-k} \approx 0.0004,
+    \]
+    即以极小概率拥塞为代价，把可服务用户数从 10 提升到 35。
+\end{itemize}
+
+\section{性能指标}
+
+\subsection{动机}
+「网络快不快」是用户最直观的感受，但「快」至少包含\textbf{时延、吞吐、可靠性}三个可度量的维度。本节把它们逐一量化，并给出计算范例。
+
+\subsection{时延的四个分量}
+分组经过一个节点（路由器/交换机）的总时延为
+\begin{equation}
+    d_{\text{nodal}} = d_{\text{proc}} + d_{\text{queue}} + d_{\text{trans}} + d_{\text{prop}}.
+\end{equation}
+
+\begin{table}[H]
+\centering
+\caption{四个时延分量的符号、量纲与典型值}
+\begin{tabulary}{\textwidth}{CCCC}
+\toprule
+分量 & 定义 & 量纲 & 典型值 \\
+\midrule
+处理 $d_{\text{proc}}$ & 查表、校验首部 & s & 微秒--毫秒 \\
+排队 $d_{\text{queue}}$ & 等待输出链路 & s & 0--数十毫秒（随负载） \\
+传输 $d_{\text{trans}}=L/R$ & 把比特推上链路 & s & 微秒--毫秒 \\
+传播 $d_{\text{prop}}=d/s$ & 信号在介质中跑 & s & 微秒--数十毫秒 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small,
+    blk/.style={draw, minimum height=0.9cm, minimum width=1.7cm, align=center},
+    link/.style={draw, thick, -{Latex[length=2mm]}}
+]
+    \draw[link] (-4.2,0) -- (-2.2,0);
+    \node[blk] (in) at (-1.2,0) {处理\\$d_{\text{proc}}$};
+    \node[blk] (q)  at (1.0,0) {排队\\$d_{\text{queue}}$};
+    \node[blk] (tr) at (3.2,0) {传输\\$d_{\text{trans}}$};
+    \node[blk] (pp) at (5.4,0) {传播\\$d_{\text{prop}}$};
+    \draw[link] (in.east) -- (q.west);
+    \draw[link] (q.east) -- (tr.west);
+    \draw[link] (tr.east) -- (pp.west);
+    \node[font=\scriptsize] at (0.6,-1.0) {路由器内部};
+    \node[font=\scriptsize] at (5.4,-1.0) {链路上};
+\end{tikzpicture}
+\caption{单个节点的四个时延分量}
+\label{fig:four_delays}
+\end{figure}
+
+\subsection{完整例题一：传输 + 传播}
+\textbf{题：}分组长度 $L = 1000$ B $= 8000$ bit，链路速率 $R = 1$ Mbps，链路长度 $d = 2500$ km，信号速度 $s = 2.5\times10^{8}$ m/s，忽略处理与排队。
+
+\textbf{解：}
+\begin{align}
+    d_{\text{trans}} &= \frac{L}{R} = \frac{8000}{10^{6}} = 8\ \text{ms},\\
+    d_{\text{prop}}  &= \frac{d}{s} = \frac{2.5\times10^{6}}{2.5\times10^{8}} = 10\ \text{ms},\\
+    d_{\text{nodal}} &= 8 + 10 = 18\ \text{ms}.
+\end{align}
+\textbf{结论：}本例中传播时延（10 ms）甚至大于传输时延（8 ms）。这提醒我们：\textbf{并非带宽越大时延越小}——把 $R$ 提到 10 Mbps 只会让 $d_{\text{trans}}$ 降到 0.8 ms，而 $d_{\text{prop}}$ 纹丝不动。
+
+\subsection{完整例题二：含排队的多跳时延}
+\textbf{题：}一条路径有 $N=3$ 跳，各跳速率 $R=1$ Mbps，分组 $L=1000$ B $=8000$ bit。首跳后的两台路由器平均排队时延各为 $d_{\text{queue}}=2$ ms，处理时延各 $0.1$ ms，传播时延忽略。
+
+\textbf{解：}每跳传输 $L/R = 8$ ms，共 $3\times 8 = 24$ ms；排队 $2\times 2 = 4$ ms；处理 $3\times0.1 = 0.3$ ms。故
+\[
+d = 24 + 4 + 0.3 = 28.3\ \text{ms}.
+\]
+若负载上升使排队时延增至 $20$ ms/跳，则 $d = 24 + 40 + 0.3 = 64.3$ ms——\textbf{排队时延是四者中最不稳定的一项}。
+
+\subsection{吞吐量与瓶颈链路}
+端到端\textbf{吞吐量 (throughput)} 受路径上最慢链路限制，即\textbf{瓶颈速率}：
+\begin{equation}
+    \text{throughput} = \min\{R_1, R_2, \dots, R_N\}.
+\end{equation}
+若服务器侧速率 $R_s=100$ Mbps，客户端侧 $R_c=10$ Mbps，则吞吐量为 $10$ Mbps。若 $M$ 个并发流共享瓶颈速率 $R$，每个流的平均吞吐约为 $R/M$。
+
+\subsection{时延带宽积：管道中的比特数}
+\textbf{直觉：}把链路想象成一根「管道」，信号以速度 $s$ 在管内前进。某一瞬间\textbf{正在管道中飞行、尚未到达}的比特数，就是
+\begin{equation}
+    \text{DBP} = d_{\text{prop}} \cdot R \quad(\text{unit: bit}).
+\end{equation}
+
+\textbf{算例：}链路速率 $R = 100$ Mbps，单程传播时延 $d_{\text{prop}} = 10$ ms，则
+\[
+\text{DBP} = 10^{8} \times 0.01 = 10^{6}\ \text{bit} = 1\ \text{Mbit} = 125\ \text{KB}.
+\]
+即这条「管道」里最多同时容纳 125 KB 的数据在途。对往返 RTT 而言，$R\times\text{RTT}$ 决定了「带宽时延积」——这正是 TCP 窗口至少要多大才能填满带宽的原因。
+
+\subsection{丢包率}
+\textbf{丢包率 (loss rate)} 定义为
+\begin{equation}
+    p_{\text{loss}} = \frac{\text{lost packets}}{\text{sent packets}}.
+\end{equation}
+\textbf{算例：}发送 10000 个分组，因缓冲区溢出丢失 200 个，则 $p_{\text{loss}} = 200/10000 = 2\%$。丢失通常由\textbf{队列溢出}引起；在无线链路上还可能由\textbf{信道误码}导致。
+
+\section{协议分层：OSI 与 TCP/IP}
+
+\subsection{动机}
+网络功能极其复杂，唯一可行的工程手段是\textbf{分层 (layering)}：把大问题拆成若干可独立演化的子问题，每层只依赖下层提供的服务，只向上层提供接口。
+
+\subsection{OSI 七层 vs TCP/IP 五层}
+OSI 参考模型的会话层与表示层在实际协议栈中大多由应用层承担，因此本教程采用 \textbf{TCP/IP 五层模型}。
+
+\begin{table}[H]
+\centering
+\caption{OSI 七层与 TCP/IP 五层对照及职责}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+OSI 七层 & TCP/IP 五层 & 核心职责 \\
+\midrule
+应用层 / 表示层 / 会话层 & 应用层 & 面向应用的协议：HTTP、DNS、SMTP \\
+运输层 & 运输层 & 进程到进程、复用分用、可靠/拥塞控制 \\
+网络层 & 网络层 & 主机到主机、路由与转发、逻辑寻址 (IP) \\
+数据链路层 & 链路层 & 相邻节点成帧、差错检测、介质访问 \\
+物理层 & 物理层 & 比特在介质上的传输与编码 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{封装过程}
+每层向下传递时\textbf{添加本层首部}（链路层还加尾部校验），形成协议数据单元 (PDU)：
+\begin{equation}
+    M \;\to\; [H_4\,|\,M] \;\to\; [H_3\,|\,H_4\,|\,M] \;\to\; [H_2\,|\,H_3\,|\,H_4\,|\,M\,|\,T_2].
+\end{equation}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, xscale=0.95]
+    \def\w{3.2}
+    % 应用层消息
+    \draw (0,0) rectangle (\w,0.6); \node at ({\w/2},0.3) {$M$};
+    \node[anchor=east] at (-0.2,0.3) {应用};
+    % 段
+    \draw (0,-1.0) rectangle (0.9,-0.4); \node at (0.45,-0.7) {$H_4$};
+    \draw (0.9,-1.0) rectangle (\w,-0.4); \node at ({(\w+0.9)/2},-0.7) {$M$};
+    \node[anchor=east] at (-0.2,-0.7) {运输};
+    % 数据报
+    \draw (0,-2.0) rectangle (0.9,-1.4); \node at (0.45,-1.7) {$H_3$};
+    \draw (0.9,-2.0) rectangle (1.8,-1.4); \node at (1.35,-1.7) {$H_4$};
+    \draw (1.8,-2.0) rectangle (\w,-1.4); \node at ({(\w+1.8)/2},-1.7) {$M$};
+    \node[anchor=east] at (-0.2,-1.7) {网络};
+    % 帧
+    \draw (0,-3.0) rectangle (0.9,-2.4); \node at (0.45,-2.7) {$H_2$};
+    \draw (0.9,-3.0) rectangle (1.8,-2.4); \node at (1.35,-2.7) {$H_3$};
+    \draw (1.8,-3.0) rectangle (2.7,-2.4); \node at (2.25,-2.7) {$H_4$};
+    \draw (2.7,-3.0) rectangle (\w,-2.4); \node at ({(\w+2.7)/2},-2.7) {$M$};
+    \draw (\w,-3.0) rectangle ({\w+0.6},-2.4); \node at ({\w+0.3},-2.7) {$T_2$};
+    \node[anchor=east] at (-0.2,-2.7) {链路};
+    % bits
+    \node[anchor=west,font=\scriptsize] at (0,-3.45) {物理层：把帧编码为比特流上介质};
+    \draw[-{Latex[length=2mm]}] ({(\w+0.6)/2},-3.05) -- ({(\w+0.6)/2},-3.35);
+\end{tikzpicture}
+\caption{逐层封装：消息、段、数据报、帧与比特}
+\label{fig:encapsulation}
+\end{figure}
+
+\subsection{服务模型：连接与可靠性}
+两个正交的维度描述服务模型：
+\begin{itemize}
+    \item \textbf{面向连接 vs 无连接：}面向连接需先握手建立状态再传数据（如 TCP、虚电路）；无连接直接发送每个分组（如 UDP、IP 数据报）。
+    \item \textbf{可靠 vs 尽力而为：}可靠服务通过确认、重传、序号保证交付（TCP）；尽力而为不保证到达、不保证顺序（IP、UDP）。
+\end{itemize}
+\textbf{组合示例：}TCP $=$ 面向连接 $+$ 可靠；UDP $=$ 无连接 $+$ 尽力而为；IP $=$ 无连接 $+$ 尽力而为。
+
+\subsection{协议三要素}
+\textbf{协议 (protocol)} 是通信双方必须共同遵守的规则，由三要素构成：
+\begin{itemize}
+    \item \textbf{语法 (syntax)：}报文的\textbf{格式}与字段布局（如首部各字段的位数）。
+    \item \textbf{语义 (semantics)：}各字段的\textbf{含义}与收到报文后应执行的动作。
+    \item \textbf{时序 (timing)：}报文发送的\textbf{顺序与时机}（如握手、重传超时）。
+\end{itemize}
+\textbf{反例：}只知道 HTTP 报文格式（语法）却不知道何时发送 GET、何时等待响应（时序），通信依然无法完成。
+
+\section{本章小结与常见误区}
+
+\subsection{本章小结}
+\begin{itemize}
+    \item \textbf{组成：}网络 $=$ 边缘 $+$ 接入 $+$ 核心；接入技术可按介质、速率、共享方式、双工四维刻画；ISP 呈 Tier-1/2/3 层次并借 IXP 对等互联。
+    \item \textbf{交换：}电路交换预留资源、时延稳定；分组交换统计复用、利用率高，代价是排队与丢包；等速率 $N$ 跳存储转发时延为 $N\cdot L/R$。
+    \item \textbf{性能：}$d_{\text{nodal}} = d_{\text{proc}} + d_{\text{queue}} + d_{\text{trans}} + d_{\text{prop}}$；吞吐量取瓶颈速率；时延带宽积 $=d_{\text{prop}}R$ 表示「管道中的比特数」。
+    \item \textbf{分层：}TCP/IP 五层各司其职；数据逐层封装；服务模型由「连接性」与「可靠性」两维刻画；协议 $=$ 语法 $+$ 语义 $+$ 时序。
+\end{itemize}
+
+\subsection{常见误区}
+\begin{enumerate}
+    \item \textbf{把带宽当时延：}带宽（bit/s）与时延（s）量纲不同。卫星链路带宽可达数百 Mbps，但单程传播时延仍有约 250 ms。
+    \item \textbf{混淆传输时延与传播时延：}$d_{\text{trans}}=L/R$ 随分组大小与速率变化；$d_{\text{prop}}=d/s$ 只与距离和介质有关，\textbf{与分组大小无关}。
+    \item \textbf{误以为分组交换总是更快：}低负载时分组交换有优势，但 $\rho\to1$ 时排队时延会急剧增大，可能远超电路交换的稳定时延。
+    \item \textbf{把「Hz」与「bit/s」等同：}带宽在频域是频率宽度 (Hz)，在数据传输中是速率 (bit/s)，不可混用。
+    \item \textbf{误以为可靠 $=$ 实时：}TCP 保证字节流的可靠有序交付，但不保证时延上限，不适用于强实时场景。
+    \item \textbf{把吞吐量当标称带宽：}实际吞吐量受瓶颈链路与并发流数制约，常显著低于接口标称速率。
+    \item \textbf{把时延带宽积当作时延：}$d_{\text{prop}}R$ 的量纲是 bit，是「在途数据量」，而非时间。
+    \item \textbf{认为 OSI 七层与 TCP/IP 一一对应：}OSI 的表示层与会话层在 TCP/IP 中并入应用层，二者并非逐层映射。
+\end{enumerate}

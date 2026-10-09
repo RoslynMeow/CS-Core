@@ -1,0 +1,370 @@
+\clearpage
+\begingroup
+\let\clearpage\relax
+\let\cleardoublepage\relax
+\vspace*{\fill}
+\chapter{无线与移动网络}
+\begin{center}
+无线链路是「共享、时变、易受干扰」的广播介质，需要与有线网络不同的接入与移动性管理机制。本章先刻画无线信道的物理约束，再讲解 CDMA、Wi-Fi (IEEE 802.11) 与蜂窝网络 (4G/5G) 的三类主流技术，最后讨论无线安全与常见误区。
+\end{center}
+\vspace*{\fill}
+\endgroup
+\clearpage
+
+\section{无线链路的特征}
+
+\subsection{路径损耗与信噪比}
+
+与有线链路不同，无线信号在开放空间中传播，能量向四周扩散并被障碍物吸收，接收功率随距离下降，称为\textbf{路径损耗 (path loss)}。自由空间中可用 Friis 公式刻画：
+\begin{equation}
+    P_r \;=\; P_t\,G_t\,G_r\left(\frac{\lambda}{4\pi d}\right)^{2},
+    \label{eq:friis}
+\end{equation}
+其中 $P_t$ 为发射功率，$G_t,G_r$ 为收发天线增益，$\lambda$ 为波长，$d$ 为距离。对数距离模型更贴近实测：
+\begin{equation}
+    P_r(d)\,[\mathrm{dBm}] \;=\; P_r(d_0)\,[\mathrm{dBm}] \;-\; 10\,n\,\log_{10}\!\frac{d}{d_0},
+    \label{eq:logdistance}
+\end{equation}
+$n$ 为路径损耗指数（自由空间 $n\approx2$，室内遮挡可达 $3\sim4$）。
+
+链路能否可靠解码，取决于\textbf{信噪比 (SNR)} $= P_r / N$（$N$ 为噪声功率）。SNR 越高，误码率 (BER) 越低。香农容量给出理论上限：
+\begin{equation}
+    C \;=\; B\,\log_2\!\left(1+\mathrm{SNR}\right).
+    \label{eq:shannon}
+\end{equation}
+式 \eqref{eq:shannon} 表明：带宽 $B$ 与 SNR 共同决定可达速率，这正是后面「速率自适应」的理论依据。
+
+\subsection{多径衰落与干扰}
+
+\textbf{多径衰落 (multipath fading)} 源于信号经不同路径反射后叠加：同一时刻到达的多个副本相位不同，相消时接收功率骤降。当不存在直视 (LOS) 路径时，包络近似服从\textbf{瑞利分布}，故又称瑞利衰落；存在主导直视分量时服从\textbf{莱斯分布}。衰落使接收功率即使在固定距离上也快速起伏，因此无线链路必须预留\textbf{衰落余量}。
+
+\textbf{干扰} 来自两类源：同频段的其它系统（微波炉、蓝牙、相邻 AP）造成\textbf{外部干扰}；本小区内多个节点争用同一介质造成\textbf{内部干扰}。此外还有\textbf{噪声} 与\textbf{移动性}（多普勒频移）。这些因素共同使无线信道成为「时变、不可预测」的介质。
+
+\subsection{隐藏终端与暴露终端}
+
+无线网络中，节点的通信范围有限，而\textbf{载波监听}只能探测自己附近的信道状态，于是产生两类由「不对称可达性」引发的异常。
+
+\textbf{隐藏终端 (hidden terminal)}：A 与 C 都能到达 B，但 A 与 C 相互听不到。当 A 正在向 B 发送时，C 侦听信道却听不到 A，误判信道空闲而发送，两组信号在 B 处\textbf{碰撞}。载波监听失效的根因是：\emph{发送方监听的是一段自己周边的信道，而碰撞判断发生在接收方 B 处}，二者位置不一致。
+
+\textbf{暴露终端 (exposed terminal)}：B 正发送给 A，C 听得到 B，于是 C 迟迟不敢发送，尽管 C 若发送给 D 并不会干扰 A 的接收。这是\textbf{过度退让}，白白浪费了空间复用机会。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small]
+    \draw[green!55!black, dashed] (-2.6,0) circle (2.9);
+    \draw[red!65!black, dashed] (2.6,0) circle (2.9);
+    \node[circle,draw,fill=green!20] (a) at (-2.6,0) {A};
+    \node[circle,draw,fill=blue!20] (b) at (0,0) {B};
+    \node[circle,draw,fill=red!20] (c) at (2.6,0) {C};
+    \draw[->, thick, bend left=12] (a.north) to node[above,align=center]{\scriptsize A 向 B 发送} (b.north);
+    \draw[->, thick, red, bend left=12] (c.south) to node[below,align=center]{\scriptsize C 也向 B 发送} (b.south);
+    \node[align=center] at (0,-3.6) {\scriptsize A 的覆盖只到 B，C 的覆盖也只到 B；\\
+    \scriptsize A 与 C 互相在侦听范围外，\textbf{在 B 处碰撞}};
+\end{tikzpicture}
+\caption{隐藏终端：A 与 C 都可达 B，却互相侦听不到}
+\label{fig:hidden_terminal}
+\end{figure}
+
+\textbf{例题（隐藏终端为何使载波监听失效）}：设 A、B、C 共线，A 到 B 相距 $50$ m，B 到 C 相距 $50$ m，故 A 到 C 相距 $100$ m。发射功率 $P_t=20$ dBm，参考距离 $d_0=1$ m 处路径损耗 $PL(d_0)=30$ dB，路径损耗指数 $n=3$。由式 \eqref{eq:logdistance}，
+\begin{align}
+    P_r(50)  &= 20 - 30 - 30\log_{10} 50 \approx -61\ \mathrm{dBm}, \\
+    P_r(100) &= 20 - 30 - 30\log_{10} 100 = -70\ \mathrm{dBm}.
+\end{align}
+设节点的载波监听门限 (CCA threshold) 为 $-65$ dBm。A 发出的信号到达 B 时为 $-61$ dBm（高于门限，B 能接收）；到达 C 时仅为 $-70$ dBm（\emph{低于}门限），因此 C \textbf{判定信道空闲} 并开始发送，其信号与 A 的信号在 B 处叠加碰撞。可见：\emph{碰撞发生在 B，而监听发生在 C，两者位置不对称}，这正是隐藏终端问题的本质，也解释了为何 802.11 还需 RTS/CTS 机制（见 \S \ref{sec:rtscts}）。
+
+\section{码分多址 (CDMA) 简介}
+
+信道划分协议中，TDMA 按时间、FDMA 按频率把信道分给用户，而\textbf{码分多址 (Code Division Multiple Access, CDMA)} 让所有用户\textbf{同时、同频}发送，靠\textbf{正交码片}区分彼此。
+
+\textbf{码片 (chip)}：每个比特被扩展为 $m$ 个窄脉冲，因子「码片速率 $\gg$ 比特速率」而被称为\emph{扩频}。为第 $i$ 个用户分配一条码片向量 $\mathbf{c}_i=(c_{i1},\dots,c_{im})$，$c_{ik}\in\{+1,-1\}$，要求任意两个用户码片\textbf{正交}：
+\begin{equation}
+    \mathbf{c}_i \cdot \mathbf{c}_j \;=\; \sum_{k=1}^{m} c_{ik}\,c_{jk} \;=\;
+    \begin{cases}
+        m, & i=j,\\
+        0, & i\neq j.
+    \end{cases}
+    \label{eq:cdma_orth}
+\end{equation}
+
+发送规则：要发比特 $1$，发送 $\mathbf{c}_i$；要发比特 $0$，发送 $-\mathbf{c}_i$。所有用户信号在空中线性叠加为 $\mathbf{S}=\sum_j s_j\,\mathbf{c}_j$。接收方用自己码片做内积即可解调：
+\begin{equation}
+    \hat{b}_i \;=\; \frac{1}{m}\,\mathbf{S}\cdot\mathbf{c}_i
+    \;=\; b_i \;+\; \frac{1}{m}\sum_{j\neq i} b_j\,(\mathbf{c}_j\cdot\mathbf{c}_i)
+    \;=\; b_i,
+    \label{eq:cdma_decode}
+\end{equation}
+式中 $b_j\in\{+1,-1\}$ 表示第 $j$ 用户比特。式 \eqref{eq:cdma_orth} 保证 $i\neq j$ 的项为零，即\emph{他用户信号被正交性完全滤除}——这就是 CDMA 直观的「正交分离」思想。
+
+\textbf{例题（4 码片 CDMA）}：取 $m=4$，四条正交码片
+$\mathbf{c}_1=(+1,+1,+1,+1)$，$\mathbf{c}_2=(+1,-1,+1,-1)$，$\mathbf{c}_3=(+1,+1,-1,-1)$，$\mathbf{c}_4=(+1,-1,-1,+1)$。
+设 A 发比特 $1$（发送 $\mathbf{c}_1$），B 发比特 $0$（发送 $-\mathbf{c}_2$），则叠加信号
+$\mathbf{S}=\mathbf{c}_1-\mathbf{c}_2=(0,+2,0,+2)$。解调：
+\begin{align}
+    \hat{b}_A &= \tfrac{1}{4}\,\mathbf{S}\cdot\mathbf{c}_1 = \tfrac{1}{4}(0+2+0+2)=+1 \;\Rightarrow\; 1,\\
+    \hat{b}_B &= \tfrac{1}{4}\,\mathbf{S}\cdot\mathbf{c}_2 = \tfrac{1}{4}(0-2+0-2)=-1 \;\Rightarrow\; 0.
+\end{align}
+两人同频同时发送仍被正确分离。
+
+\begin{table}[H]
+\centering
+\caption{4 码片 CDMA 的编码与叠加（$+1$ 表示 \texttt{1} 码片，$-1$ 反之）}
+\renewcommand{\arraystretch}{1.4}
+\begin{tabulary}{\textwidth}{@{}CCCCCC@{}}
+\toprule
+\textbf{用户} & \textbf{码片 1} & \textbf{码片 2} & \textbf{码片 3} & \textbf{码片 4} & \textbf{发送比特} \\
+\midrule
+A ($\mathbf{c}_1$) & $+1$ & $+1$ & $+1$ & $+1$ & $1$ \\
+B ($\mathbf{c}_2$) & $+1$ & $-1$ & $+1$ & $-1$ & $0$ \\
+叠加 $\mathbf{S}$   & $0$  & $+2$ & $0$  & $+2$ & --- \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\section{Wi-Fi (IEEE 802.11)}
+
+\subsection{体系结构与术语}
+
+Wi-Fi 的基本构造块是\textbf{基本服务集 (Basic Service Set, BSS)}，由若干无线站点 (station) 与一个\textbf{接入点 (Access Point, AP)} 组成。AP 通过\textbf{分布系统 (Distribution System, DS)} 接入有线骨干网，并用\textbf{服务集标识符 (SSID)} 广播网络名。多个 BSS 经 DS 互连构成\textbf{扩展服务集 (ESS)}。无 AP、站点直连的形式称为\textbf{自组织 (ad hoc)} 模式。
+
+\begin{table}[H]
+\centering
+\caption{常见 802.11 标准}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabulary}{\textwidth}{@{}lCCL@{}}
+\toprule
+\textbf{标准} & \textbf{频段} & \textbf{标称峰值} & \textbf{关键技术} \\
+\midrule
+802.11b & 2.4 GHz & 11 Mbps & DSSS \\
+802.11g & 2.4 GHz & 54 Mbps & OFDM \\
+802.11n & 2.4/5 GHz & 600 Mbps & MIMO、信道绑定 40 MHz \\
+802.11ac & 5 GHz & 数 Gbps & MU-MIMO、80/160 MHz \\
+802.11ax (Wi-Fi 6) & 2.4/5/6 GHz & 数 Gbps & OFDMA、空间复用、TWT \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{CSMA/CA 完整时序}
+
+无线站点\textbf{无法边发边听}（自身发射会淹没接收信号），因此不能用 CSMA/CD 的碰撞检测，而采用\textbf{CSMA/CA（碰撞避免）}——用「先预约、后确认」把碰撞概率降到最低。关键时间参数有三：
+
+\begin{itemize}
+    \item \textbf{DIFS}（分布式帧间间隔）：普通数据帧在竞争信道前必须空闲等待的时间。
+    \item \textbf{SIFS}（短帧间间隔）：控制/确认帧使用的间隔，$T_{\text{SIFS}}<T_{\text{DIFS}}$，从而\textbf{让 ACK 优先于新数据}抢占信道。
+    \item \textbf{时隙 (slot)}：退避计时的基本单位，退避值从竞争窗口 $[0,W-1]$ 中随机取，每次侦听到空闲递推、侦听到忙则\textbf{冻结}。
+\end{itemize}
+
+一次成功发送的完整时序为：发送方侦听空闲 $\to$ 等待 DIFS $\to$ 退避随机时隙 $\to$ 发送 DATA；接收方正确收下后等待 SIFS $\to$ 回送 ACK。发送方若在超时内收不到 ACK，则认为碰撞并\textbf{加倍竞争窗口}后重传（二进制指数退避）。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small]
+    \draw[->, thick] (-0.3,-1.1) -- (11.6,-1.1) node[right] {时间 $t$};
+
+    \node[anchor=east] at (-0.3,3.0) {发送方 S};
+    \draw[fill=blue!15]  (0.0,2.7) rectangle (1.2,3.3) node[midway,align=center]{\scriptsize DIFS};
+    \draw[fill=orange!25](1.2,2.7) rectangle (2.7,3.3) node[midway,align=center]{\scriptsize 退避\\\scriptsize 时隙};
+    \draw[fill=green!20] (2.7,2.7) rectangle (6.7,3.3) node[midway,align=center]{\scriptsize DATA};
+
+    \node[anchor=east] at (-0.3,1.5) {接收方 R};
+    \draw[fill=purple!15](6.7,1.2) rectangle (7.3,1.8) node[midway,align=center]{\scriptsize SIFS};
+    \draw[fill=red!20]   (7.3,1.2) rectangle (8.8,1.8) node[midway,align=center]{\scriptsize ACK};
+
+    \node[anchor=east] at (-0.3,0.0) {其它站};
+    \draw[fill=blue!15]  (0.2,-0.3) rectangle (1.4,0.3) node[midway,align=center]{\scriptsize DIFS};
+    \draw[fill=orange!25](1.4,-0.3) rectangle (2.2,0.3) node[midway,align=center]{\scriptsize 退避};
+    \draw[fill=gray!20]  (2.2,-0.3) rectangle (6.7,0.3) node[midway,align=center]{\scriptsize 侦听到 DATA $\to$ 退避冻结};
+
+    \foreach \x in {1.2,2.7,6.7,7.3,8.8} {\draw[dashed, gray] (\x,-1.1) -- (\x,3.3);}
+
+    \draw[<->] (6.7,-0.8) -- (7.3,-0.8) node[midway,below]{\scriptsize SIFS};
+    \draw[<->] (2.7,3.6) -- (6.7,3.6) node[midway,above]{\scriptsize 帧传输时间};
+\end{tikzpicture}
+\caption{802.11 CSMA/CA 时序：DIFS + 退避 + DATA，接收方 SIFS 后回 ACK}
+\label{fig:csmaca_timing}
+\end{figure}
+
+因为 DIFS 前后还需退避，且 ACK 占用额外时间，MAC 效率为
+\begin{equation}
+    \eta \;=\; \frac{T_{\text{payload}}}
+    {T_{\text{DIFS}} + \overline{W}/2 + T_{\text{DATA}} + T_{\text{SIFS}} + T_{\text{ACK}}},
+    \label{eq:mac_eff}
+\end{equation}
+$\overline{W}/2$ 为平均退避。帧越短，定长开销占比越大，效率越低——这就是小包（如 VoIP）在 802.11 上效率不佳的原因。
+
+\subsection{RTS/CTS 与隐藏终端}
+\label{sec:rtscts}
+
+为缓解 \S 1.3 的隐藏终端问题，802.11 可选\textbf{RTS/CTS 握手}：发送方在竞争到信道后先发一个短\textbf{RTS}（请求发送）；AP 用 SIFS 优先回复\textbf{CTS}（允许发送）。由于 CTS 由 AP 广播，\emph{隐藏终端 C 也能听到 CTS}，因而更新其\textbf{网络分配向量 (NAV)} 并沉默相应时长，不再与 A 碰撞。
+
+RTS/CTS 用两次短控制帧的代价换取对隐藏终端的抑制，因此通常只对\textbf{超过阈值的长数据帧}启用，避免小包支付不必要的握手开销。
+
+\subsection{802.11 帧结构要点}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\scriptsize,
+    fld/.style={draw, minimum height=0.85cm, align=center, inner sep=2pt}]
+    \node[fld, fill=blue!10, minimum width=2.6cm] (fc) {帧控制\\2 B};
+    \node[fld, fill=green!10, right=0pt of fc, minimum width=1.6cm] (dur) {持续时间\\2 B};
+    \node[fld, fill=orange!12, right=0pt of dur, minimum width=1.9cm] (a1) {地址 1\\(RA) 6 B};
+    \node[fld, fill=orange!12, right=0pt of a1, minimum width=1.9cm] (a2) {地址 2\\(TA) 6 B};
+    \node[fld, fill=orange!12, right=0pt of a2, minimum width=1.9cm] (a3) {地址 3\\BSSID 6 B};
+    \node[fld, fill=purple!12, right=0pt of a3, minimum width=1.5cm] (seq) {序号控制\\2 B};
+    \node[fld, fill=gray!15, right=0pt of seq, minimum width=2.3cm] (body) {帧体\\(0--2312 B)};
+    \node[fld, fill=red!15, right=0pt of body, minimum width=1.4cm] (fcs) {FCS\\4 B};
+\end{tikzpicture}
+\caption{IEEE 802.11 数据帧的字段布局（地址 4 仅在 DS$\to$DS 时出现）}
+\label{fig:80211_frame}
+\end{figure}
+
+要点：
+\begin{itemize}
+    \item \textbf{帧控制的类型/子类型} 区分管理帧、控制帧（RTS/CTS/ACK）与数据帧。
+    \item \textbf{To DS / From DS} 两位标识帧在 DS 中的流向，决定地址字段语义：地址 1 为接收方 (RA)，地址 2 为发送方 (TA)，地址 3 为目的/源地址，BSSID 即 AP 的 MAC。
+    \item \textbf{持续时间} 字段用于设置其它站的 NAV，实现虚拟载波监听 (VCS)——与物理载波监听共同判断信道忙闲。
+    \item \textbf{帧检验序列 (FCS)} 用 CRC-32 检测比特差错，出错直接丢弃（802.11 自身不纠错）。
+\end{itemize}
+
+\subsection{速率自适应与功率管理}
+
+\textbf{速率自适应 (rate adaptation)}：AP 与站点根据信道 SNR 动态选择调制与编码方案 (MCS)。SNR 高时用高阶调制与高码率获得高速率，SNR 低时退回低阶调制以保证可解码。典型门限如下表；节点通过 ACK 的得失与 RSSI 间接估计信道质量。
+
+\begin{table}[H]
+\centering
+\caption{速率自适应示意（门限为近似值）}
+\renewcommand{\arraystretch}{1.3}
+\begin{tabulary}{\textwidth}{@{}CCCC@{}}
+\toprule
+\textbf{SNR 区间} & \textbf{调制方式} & \textbf{码率} & \textbf{典型速率} \\
+\midrule
+$<8$ dB & BPSK & 1/2 & 6 Mbps \\
+$8\sim12$ dB & QPSK & 1/2 & 12 Mbps \\
+$12\sim18$ dB & 16-QAM & 1/2 & 24 Mbps \\
+$>24$ dB & 64-QAM & 5/6 & 54 Mbps \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\textbf{功率管理}：电池受限的站点可在无数据时进入\textbf{睡眠}。AP 周期性发送\textbf{信标帧 (beacon)} 并携带\textbf{通信指示图 (TIM)}，标出哪些站点有缓存数据。站点按信标周期醒来查看 TIM：无自己的数据则继续睡，有则发送 PS-Poll 取回数据后再睡。这以少量时延换取显著能耗下降。
+
+\section{蜂窝网络与移动性}
+
+\subsection{频谱、小区与频率复用}
+
+蜂窝系统的核心思想是\textbf{频率复用}：把服务区划分为许多小\textbf{小区 (cell)}，每个小区由一个\textbf{基站 (base station)} 覆盖，相距足够远的小区可重复使用同一频段而不互相严重干扰。若每 $K$ 个小区为一簇，则复用因子为 $1/K$，$K$ 越大干扰越小但频谱效率越低。小区分裂与扇区化用于扩容。
+
+\subsection{4G/5G 网络架构}
+
+蜂窝网络由\textbf{无线接入网 (RAN)} 与\textbf{核心网 (Core Network)} 构成。4G LTE 的 RAN 由 eNodeB（基站）组成，核心网为\textbf{演进分组核心 (EPC)}；5G 的基站为 gNB，核心网为\textbf{5GC}，并引入网络切片、毫米波与大规模 MIMO。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small,
+    box/.style={draw, rounded corners, minimum height=0.9cm, minimum width=2.1cm, align=center, fill=blue!6}]
+    \node[box] (ue) {UE\\(手机)};
+    \node[box, right=1.3cm of ue] (bs) {基站\\eNodeB / gNB};
+    \node[box, right=1.3cm of bs] (core) {核心网\\EPC / 5GC};
+    \node[box, right=1.3cm of core] (net) {因特网};
+    \draw[->, thick] (ue) -- node[above,align=center]{\scriptsize 无线链路} (bs);
+    \draw[->, thick] (bs) -- node[above,align=center]{\scriptsize 回传 (backhaul)} (core);
+    \draw[->, thick] (core) -- node[above,align=center]{\scriptsize 数据出口} (net);
+\end{tikzpicture}
+\caption{蜂窝网络总体架构：UE$\to$基站$\to$核心网$\to$因特网}
+\label{fig:cellular_arch}
+\end{figure}
+
+核心网内部职责划分如下表。EPC 用「按功能拆分的网元」，5GC 进一步\emph{控制与用户面分离 (CUPS)} 并以服务化架构组织。
+
+\begin{table}[H]
+\centering
+\caption{EPC (4G) 与 5GC (5G) 主要网元对照}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabulary}{\textwidth}{@{}lLL@{}}
+\toprule
+\textbf{功能} & \textbf{4G EPC} & \textbf{5G 5GC} \\
+\midrule
+移动性/接入管理 & MME & AMF \\
+会话管理 & SGW 兼 & SMF \\
+用户面转发 & SGW / PGW & UPF \\
+用户数据/鉴权 & HSS & UDM / AUSF \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{移动性管理：归属代理与隧道转发}
+
+移动节点 (MN) 离开归属网络、接入外地网络时，需让通信对端 (CN) 仍能用其固定的\textbf{归属地址}寻址。移动 IP 的解法是：归属网络配置\textbf{归属代理 (Home Agent, HA)}，外地网络配置\textbf{外地代理 (Foreign Agent, FA)}。MN 获得一个\textbf{转交地址 (Care-of Address, CoA)} 并注册到 HA。CN 发往 MN 归属地址的分组被 HA 截获，再\textbf{用隧道 (IP-in-IP) 封装}转发给 CoA，由 FA 解封装后交给 MN——这就是\textbf{三角路由}。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small,
+    box/.style={draw, rounded corners, align=center, minimum width=2.2cm, minimum height=0.9cm}]
+    \node[box, fill=blue!8] (cn) at (0,0) {通信对端 CN};
+    \node[box, fill=green!12] (ha) at (0,2.6) {归属代理 HA\\(归属网络)};
+    \node[box, fill=orange!12] (fa) at (7,2.6) {外地代理 FA\\(外地网络)};
+    \node[box, fill=red!12] (mn) at (7,0) {移动节点 MN};
+
+    \draw[->, thick] (cn) -- node[left,align=center]{\scriptsize (1) 发往\\\scriptsize 归属地址} (ha);
+    \draw[->, thick] (ha) -- node[above,align=center]{\scriptsize (2) 隧道封装\\\scriptsize IP-in-IP} (fa);
+    \draw[->, thick] (fa) -- node[right,align=center]{\scriptsize (3) 解封装\\\scriptsize 交给 MN} (mn);
+    \draw[->, dashed] (mn) to[bend left=15] node[below,align=center]{\scriptsize (4) 可直接回送 CN} (cn);
+\end{tikzpicture}
+\caption{移动 IP：归属代理用隧道把分组转发到外地网络}
+\label{fig:mobile_ip}
+\end{figure}
+
+\subsection{切换 (Handover) 与「无线 $\neq$ 移动」}
+
+\textbf{切换} 指 MN 从一个基站/AP 换到另一个时保持会话连续。\textbf{硬切换}先断后连（可能短暂中断），\textbf{软切换}先连后断（新旧基站同时服务，CDMA/5G 常用）以降低丢包。切换的关键是：\emph{在新链路上建立转发路径并从旧链路迁走状态}，核心网需更新 MN 的位置映射。
+
+必须区分两个概念：
+\begin{itemize}
+    \item \textbf{无线} 描述的是\emph{链路介质}——用电磁波而非电缆传输，与节点是否移动无关（固定台式机的 Wi-Fi 是无线但不移动）。
+    \item \textbf{移动} 描述的是\emph{节点更换接入点}——与是否无线无关（一台用网线的笔记本换交换机端口也是移动）。
+    \item 二者既有\textbf{无线不移动}（Wi-Fi 台式机），也有\textbf{移动不无线}（换端口的有线设备）。真正的「移动且需保持会话」才同时需要无线链路与移动性管理。
+\end{itemize}
+
+\section{无线安全}
+
+早期\textbf{WEP} 用 RC4 配静态 IV，因 IV 过短与密钥直接拼接，可被统计分析在数分钟内破解，现已淘汰。\textbf{WPA2} 引入 AES 的 CCMP 模式做加密与完整性保护，并支持\textbf{个人模式 (PSK)} 与\textbf{企业模式 (802.1X/EAP)}；鉴别通过\textbf{四次握手}从口令派生会话密钥，但对离线字典攻击仍较敏感。\textbf{WPA3} 使用 \textbf{SAE（对等同时鉴别）} 抵抗离线字典攻击，并支持\textbf{前向保密}，尤其适合开放网络 (OWE)。
+
+\begin{table}[H]
+\centering
+\caption{无线安全协议对比}
+\renewcommand{\arraystretch}{1.35}
+\begin{tabulary}{\textwidth}{@{}lLLL@{}}
+\toprule
+\textbf{协议} & \textbf{加密} & \textbf{完整性} & \textbf{状态与要点} \\
+\midrule
+WEP   & RC4 + 静态 IV & CRC-32 & 已破解，淘汰 \\
+WPA2  & AES-CCMP & CCMP 标签 & 四次握手；PSK 易受离线字典攻击 \\
+WPA3  & AES-CCMP / GCMP & 同上 & SAE 抗字典、前向保密，推荐部署 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+除链路加密外，端到端安全仍需 TLS/VPN 在同一 Wi-Fi 上提供独立保护——因为无线信道是广播的，任何人都能被动监听。
+
+\section{本章小结与常见误区}
+
+\subsection{小结}
+
+\begin{itemize}
+    \item 无线链路受\textbf{路径损耗、多径衰落、干扰} 支配，SNR 决定可达速率（式 \eqref{eq:shannon}）。
+    \item \textbf{隐藏终端} 使载波监听失效（碰撞在接收方发生），\textbf{RTS/CTS} 用 NAV 抑制之；\textbf{暴露终端} 则造成过度退让。
+    \item \textbf{CDMA} 用正交码片实现同频同时多址，接收端内积即可分离用户。
+    \item \textbf{802.11} 用 CSMA/CA：DIFS + 退避 + DATA，接收端 SIFS 后回 ACK；DIFS$>$SIFS 保证 ACK 优先。
+    \item 蜂窝网络用频率复用 + 基站 + 核心网（EPC/5GC）；移动 IP 用归属/外地代理与隧道转发支撑移动性。
+    \item \textbf{无线 $\neq$ 移动}：一个说介质，一个说接入点变化。
+\end{itemize}
+
+\subsection{常见误区}
+
+\begin{itemize}
+    \item \textbf{「无线一定用 CSMA/CD」}：无线无法边发边听，只能用 CSMA/CA + ACK。
+    \item \textbf{「监听空闲就一定不碰撞」}：隐藏终端下监听空闲仍可能碰撞。
+    \item \textbf{「DIFS 比 SIFS 短」}：恰好相反，$T_{\text{SIFS}}<T_{\text{DIFS}}$ 才能让 ACK 先于新数据。
+    \item \textbf{「Wi-Fi 与移动是一回事」}：固定无线设备无线但不移动；改接端口的有线设备移动但不无线。
+    \item \textbf{「有 WPA2 就万事大吉」}：链路加密不保护端到端隐私，仍需 TLS/VPN。
+    \item \textbf{「5G 只是更快的 4G」}：5G 还引入核心网服务化、网络切片、超低时延与海量连接三大场景。
+\end{itemize}

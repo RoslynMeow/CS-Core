@@ -91,7 +91,7 @@ export const dataUnifiedModule: ModuleDef<any, Cfg> = {
   id: "data-representation",
   title: T("数据的表示", "Data Representation"),
   desc: T("位权 / 展开 / 后继 / 加法 / 进制转换 / 无符号 / 补码 / 原码反码移码 / 溢出 / IEEE754 / 浮点运算 / 字符编码 / 字符串", "Positional / unsigned / twos-comp / sign codes / overflow / IEEE754 / float / encoding / string"),
-  tags: ["computer-organization"],
+  tags: ["data-structures"],
   defaultConfig: DEFAULT,
   randomize(c) {
     const safe = safeCfg(c.subMode, c);

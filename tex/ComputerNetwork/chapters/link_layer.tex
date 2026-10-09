@@ -1,0 +1,651 @@
+\clearpage
+\begingroup
+\let\clearpage\relax
+\let\cleardoublepage\relax
+\vspace*{\fill}
+\chapter{链路层与局域网}
+\begin{center}
+链路层负责在「直接相连的节点」之间搬运数据帧，是网络层数据报真正落到物理介质上的最后一跳。
+本章从链路层的服务与实现位置讲起，依次展开差错检测、多路访问、ARP、以太网与交换机、VLAN，
+并给出可手算的例题与常见误区，力求让读者能独立完成 CRC 长除、ALOHA 效率推导与交换机自学习表的填写。
+\end{center}
+\vspace*{\fill}
+\endgroup
+\clearpage
+
+\section{链路层服务与实现位置}
+
+\subsection{动机：为什么需要链路层}
+
+网络层把数据报从源主机送到目的主机，靠的是路由器之间的逐跳转发。
+但「一跳」究竟如何把一串比特从一台设备送到\textbf{物理上直接相连}的另一台设备？
+这正是链路层 (link layer) 要解决的问题。链路层运行在每一台主机和每一台路由器上，
+把网络层交下来的数据报封装成\textbf{帧 (frame)}，通过一条具体的链路（有线、无线、交换式以太网、Wi-Fi 等）传送到相邻节点。
+
+所谓「直接相连」，可以是通过一根点对点链路相连，也可以是通过一个共享的广播介质（如早期的同轴电缆或无线信道）相连。
+不同介质的链路层协议差别很大，但它们都提供一组共同的核心服务。
+
+\subsection{链路层提供的服务}
+
+\begin{itemize}
+    \item \textbf{成帧 (framing)}：把网络层数据报封装进帧，加上首部与尾部。
+        首部通常含源/目的 MAC 地址，尾部含差错检测码。帧的边界靠前导码、长度字段或特殊定界符来确定。
+    \item \textbf{链路接入 (link access)}：当多个节点共享同一介质时，由 \textbf{MAC 协议}（介质访问控制协议）决定「谁可以在这条链路上发送」。
+        点对点链路（如 PPP）无需竞争；广播链路（如以太网、Wi-Fi）必须仲裁。
+    \item \textbf{可靠交付 (reliable delivery)}：在误码率高的链路上（典型是无线），链路层可在本地做「确认 + 重传」，
+        把差错尽量在本地修复，避免端到端重传。对于低误码率的有线链路（如光纤、双绞线），通常不做可靠交付，交由运输层负责。
+    \item \textbf{差错检测与纠正 (error detection / correction)}：链路层在帧中附加冗余比特，接收方据此判断帧是否出错，
+        发现错误一般直接丢弃（偶尔可纠正）。常见方法有位/二维奇偶校验、因特网检验和、CRC。
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{不同链路的链路层服务取舍}
+\begin{tabulary}{\textwidth}{@{}LCC@{}}
+\toprule
+\textbf{服务} & \textbf{点对点/有线链路} & \textbf{广播/无线链路} \\
+\midrule
+成帧 & 需要 & 需要 \\
+链路接入 & 简单（几乎独占） & 复杂（需竞争仲裁） \\
+可靠交付 & 通常不做（误码低） & 常做（误码高，本地重传） \\
+差错检测 & 需要（CRC） & 需要（CRC + 确认重传） \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{实现位置：网卡、驱动与硬件}
+
+链路层的一个关键特点是：它\textbf{主要用硬件实现}。承载链路层功能的部件叫\textbf{网络适配器 (network adapter)}，俗称\textbf{网卡 (NIC)}。
+网卡内部集成了链路层控制器（专用芯片），并实现物理层与链路层的功能。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small,
+    box/.style={draw, rounded corners, minimum width=3.4cm, minimum height=0.75cm, align=center},
+    hw/.style={draw, fill=blue!8, rounded corners, minimum width=3.4cm, minimum height=0.75cm, align=center},
+    arrow/.style={->, >=latex, thick}
+]
+    \node[box] (app) at (0,3.6) {应用层 / 运输层 / 网络层};
+    \node[box] (drv) at (0,2.4) {设备驱动程序 (driver)};
+    \node[hw]  (nic) at (0,1.2) {网络适配器（网卡 NIC）};
+    \node[hw]  (phy) at (0,0.0) {物理介质接口（PHY）};
+    \node[box] (bus) at (-4.6,2.4) {主机总线 (PCIe)};
+
+    \draw[arrow] (app) -- (drv);
+    \draw[arrow] (drv) -- (nic);
+    \draw[arrow] (nic) -- (phy);
+    \draw[arrow] (bus.east) -- (drv.west);
+    \node[font=\small, anchor=west, align=left] at (2.2,1.2) {链路层核心逻辑\\在硬件中完成};
+    \node[font=\small, anchor=west, align=left] at (2.2,2.4) {驱动负责在\\主机与网卡间搬运帧};
+\end{tikzpicture}
+\caption{链路层的实现位置：网络层以上是软件，链路层主体在网卡硬件中}
+\label{fig:nic_location}
+\end{figure}
+
+由此得到一个重要结论：\textbf{链路层的大部分逻辑运行在网卡上}。
+当主机收到一个帧时，网卡先做差错检测，若无错则把帧交给驱动，再由驱动交给网络层；
+若出错则直接丢弃，不会打扰 CPU。这也解释了为什么链路层协议在不同硬件上实现各异。
+
+\section{差错检测}
+
+\subsection{一位奇偶校验}
+
+最简单的方法是在数据后附加 \textbf{1 个奇偶校验位 (parity bit)}，使整个码字中「\texttt{1}」的个数满足约定：
+
+\begin{itemize}
+    \item \textbf{偶校验}：让「\texttt{1}」的总个数为偶数。
+    \item \textbf{奇校验}：让「\texttt{1}」的总个数为奇数。
+\end{itemize}
+
+例如数据 \texttt{1011010} 中有 $4$ 个 \texttt{1}（偶数），若采用奇校验则校验位取 \texttt{1}，发送 \texttt{10110101}；
+若采用偶校验则校验位取 \texttt{0}。接收方统计 \texttt{1} 的个数即可判断奇偶性。
+
+\textbf{局限}：一位奇偶校验只能检测\textbf{奇数个}比特错误。若同时翻转 2 个比特，\texttt{1} 的个数奇偶性不变，错误就被漏检了。
+
+\subsection{二维奇偶校验}
+
+把数据排成 $m$ 行 $n$ 列的矩阵，对每一行、每一列各加一个校验位，形成二维校验码。
+接收方既检查每行也检查每列，可以\textbf{定位并纠正}单个比特错误；若两个比特出错，通常也能检测到（但无法纠正）。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\ttfamily\small,
+    cell/.style={draw, minimum size=0.7cm},
+    pcell/.style={draw, minimum size=0.7cm, fill=green!12},
+    hd/.style={font=\small\sffamily}
+]
+    \matrix (m) [matrix of nodes, nodes={cell}, column sep=-\pgflinewidth, row sep=-\pgflinewidth,
+        row 4/.style={nodes={pcell}},
+        column 5/.style={nodes={pcell}}]{
+        1 & 0 & 1 & 1 & 1 \\
+        0 & 1 & 1 & 0 & 0 \\
+        1 & 1 & 0 & 0 & 0 \\
+        0 & 0 & 0 & 1 & 1 \\
+    };
+    \node[hd, above=0.15cm of m.north] {行校验位（第 5 列）};
+    \node[hd, anchor=west] at ($(m.east)+(0.25,0)$) {列校验位（第 4 行）};
+\end{tikzpicture}
+\caption{二维奇偶校验：行、列各加校验位，可定位单个比特错误}
+\label{fig:2d_parity}
+\end{figure}
+
+\subsection{因特网检验和 (Internet Checksum)}
+
+因特网检验和用于 IP、TCP、UDP 首部（及其数据）的差错检测。算法如下：
+
+\begin{enumerate}
+    \item 把数据看成若干 \textbf{16 位字}，逐字相加（\textbf{反码求和}）；
+    \item 若最高位产生进位，把进位\textbf{回卷}到最低位（end-around carry）；
+    \item 对最终和取\textbf{反码 (1 的补码)}，即得检验和。
+\end{enumerate}
+
+接收方把包括检验和在内的所有 16 位字相加再取反，结果应为全 \texttt{0}（即 $1111\cdots1111$ 的反码），否则判为出错。
+
+\noindent\textbf{算例}：设两个 16 位字为
+\[
+w_1 = \texttt{0110011001100110},\qquad w_2 = \texttt{0101010101010101}.
+\]
+反码求和：
+\[
+\begin{array}{r@{\;}l}
+  & \texttt{0110\,0110\,0110\,0110}\\
++ & \texttt{0101\,0101\,0101\,0101}\\
+\hline
+  & \texttt{1011\,1011\,1011\,1011}
+\end{array}
+\]
+无进位，直接取反码得检验和
+\[
+\text{checksum} = \texttt{0100\,0100\,0100\,0100}.
+\]
+发送方把 $w_1,w_2$ 与该检验和一起发出；接收方三者相加应得 \texttt{1111\,1111\,1111\,1111}。
+
+\noindent\textbf{易错点}：检验和只做加法，强度远弱于 CRC，但它实现极简单，软件中一次循环即可完成，
+因此适合在协议栈软件中计算；而 CRC 由网卡硬件计算，速度极快。
+
+\subsection{循环冗余校验 (CRC)}
+
+\textbf{CRC (Cyclic Redundancy Check)} 是链路层最常用的检错方法，由硬件实现。
+把发送的数据 $D$（$d$ 位）视为一个二进制多项式，选定一个 $r+1$ 位的\textbf{生成多项式 (generator)} $G$。
+发送方用模 2 除法（异或，不借位）计算余数 $R$（$r$ 位），并把 $R$ 附在数据后发送：
+
+\begin{equation}
+    D \cdot 2^{r} \;\text{xor}\; R \;=\; nG \quad(\text{即结果可被 } G \text{ 整除})
+    \label{eq:crc}
+\end{equation}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, align=center]
+    \draw (0,0) rectangle (4,0.7) node[midway]{数据 $D$（$d$ 位）};
+    \draw (4,0) rectangle (5.3,0.7) node[midway]{$R$（$r$ 位）};
+    \node[anchor=west] at (5.5,0.35) {$\to$ 发送的码字};
+    \draw[decorate, decoration={brace, amplitude=5pt, mirror}] (0,-0.05) -- (5.3,-0.05)
+        node[midway, below=6pt]{发送码字共 $d+r$ 位};
+\end{tikzpicture}
+\caption{CRC 帧结构：原始数据拼接 $r$ 位余数}
+\label{fig:crc_frame}
+\end{figure}
+
+\subsubsection{完整长除例题}
+
+取数据 $D=\texttt{101110}$，生成多项式 $G=\texttt{1001}$。
+$G$ 有 $4$ 位，故 $r=3$，需在 $D$ 后补 $3$ 个 \texttt{0} 得到被除数
+\[
+D\cdot 2^{3} = \texttt{101110000}.
+\]
+逐步模 2 长除（每位只看当前余数的最高位，为 \texttt{1} 则与 $G$ 异或）：
+
+\begin{align*}
+&\texttt{101110000} \div \texttt{1001}\\[2pt]
+\text{第 1 步: } & \texttt{1011} \oplus \texttt{1001} = \texttt{0010},\ \text{落下下一位得 }\texttt{0101}\\
+\text{第 2 步: } & \texttt{0101} \text{ 最高位为 0，仅落下一位得 }\texttt{1010}\\
+\text{第 3 步: } & \texttt{1010} \oplus \texttt{1001} = \texttt{0011},\ \text{落下一位得 }\texttt{0110}\\
+\text{第 4 步: } & \texttt{0110} \text{ 最高位为 0，落下一位得 }\texttt{1100}\\
+\text{第 5 步: } & \texttt{1100} \oplus \texttt{1001} = \texttt{0101},\ \text{落下一位得 }\texttt{1010}\\
+\text{第 6 步: } & \texttt{1010} \oplus \texttt{1001} = \texttt{0011}
+\end{align*}
+
+最终余数（取低 $r=3$ 位）为
+\[
+R = \texttt{011}.
+\]
+于是发送码字为
+\[
+D\cdot 2^{3} \oplus R = \texttt{101110000} \oplus \texttt{000000011} = \texttt{101110011}.
+\]
+
+\noindent\textbf{验证}：接收方用同一个 $G=\texttt{1001}$ 去除收到的 \texttt{101110011}，若余数为 \texttt{000} 则认为无错。
+用移位寄存器手算（寄存器 3 位，初值 \texttt{000}，逐位「左移入位，最高位为 1 则异或 \texttt{001}」）：
+
+\begin{center}
+\begin{tabular}{cccccccccc}
+\toprule
+输入位 & \texttt{1} & \texttt{0} & \texttt{1} & \texttt{1} & \texttt{1} & \texttt{0} & \texttt{0} & \texttt{1} & \texttt{1}\\
+\midrule
+寄存器 & \texttt{001} & \texttt{010} & \texttt{101} & \texttt{010} & \texttt{101} & \texttt{011} & \texttt{110} & \texttt{100} & \texttt{000}\\
+\bottomrule
+\end{tabular}
+\end{center}
+末态寄存器为 \texttt{000}，说明码字能被 $G$ 整除，与式~\eqref{eq:crc} 一致。
+
+\subsubsection{CRC 的检错能力}
+
+\begin{itemize}
+    \item 若 $G$ 含有因子 $(x+1)$，则 CRC 能检测\textbf{所有奇数个}比特错误（因为奇数个错误对应的多项式在 $x=1$ 处不为零）。
+    \item 只要 $G$ 的位数足够，CRC 可检测所有\textbf{长度不超过 $r$ 位}的突发错误。
+    \item 对长度超过 $r$ 的突发错误，漏检概率约为 $2^{-r}$。工程上取 $r=32$（如 CRC-32）时，漏检概率极低。
+    \item 与奇偶校验、检验和相比，CRC 用同样甚至更少的冗余位，却能检测更广泛的错误模式，且完全由硬件并行实现。
+\end{itemize}
+
+\section{多路访问协议}
+
+当多个节点共享同一条广播信道时，如果两个节点同时发送，信号会\textbf{叠加冲突 (collision)}，接收方无法正确解析。
+\textbf{多路访问协议 (multiple access protocol)} 就是用来协调各节点发送的规则，可分为三大类。
+
+\begin{table}[H]
+\centering
+\caption{三类多路访问协议}
+\begin{tabulary}{\textwidth}{@{}LCC@{}}
+\toprule
+\textbf{类型} & \textbf{基本思想} & \textbf{代表协议} \\
+\midrule
+信道划分 & 把信道在时间/频率/码域上静态切分给各节点 & TDMA / FDMA / CDMA \\
+随机接入 & 不划分，节点随机发送，冲突后重试 & ALOHA / CSMA / CSMA/CD \\
+轮流 & 节点按某种次序轮流获得发送权 & 轮询 / 令牌环 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{信道划分协议}
+
+\begin{itemize}
+    \item \textbf{TDMA（时分多址）}：时间被划分为时隙，每个节点固定分配一个时隙发送。
+        优点是无冲突；缺点是节点空闲时时隙浪费，且需时间同步。
+    \item \textbf{FDMA（频分多址）}：把频带划分为若干子频带，每个节点固定使用一个子频带。
+        同样无冲突，但节点空闲时频段浪费。
+    \item \textbf{CDMA（码分多址）}：所有节点同时同频发送，但各自用不同的\textbf{正交码}对信号编码。
+        接收方用对应的码做相关运算即可分离出目标信号，抗干扰强，广泛用于 3G 等无线系统。
+\end{itemize}
+
+信道划分的共性缺点是：当节点数少、流量突发时，固定分配会浪费大量信道容量。
+
+\subsection{随机接入协议}
+
+\subsubsection{纯 ALOHA 及其效率}
+
+纯 ALOHA 的规则最简单：节点有帧就立即发送；若发生冲突，则等待一段随机时间后重发。
+设帧长为 $1$ 个时间单位，所有节点产生新帧加上重传帧的\textbf{总到达率}为 $G$（每帧时内的帧数），
+则单个节点成功发送的概率等于「在发送该帧的一个帧时内，前后各一个帧时都无人发送」的概率：
+
+\begin{equation}
+    P_{\text{成功}} = e^{-G}\cdot e^{-G} = e^{-2G}.
+\end{equation}
+故吞吐量为
+\begin{equation}
+    S(G) = G\,e^{-2G}.
+\end{equation}
+对 $G$ 求导并令其为零：
+\[
+\frac{dS}{dG} = e^{-2G}(1-2G) = 0 \;\Rightarrow\; G = \tfrac{1}{2}.
+\]
+代回得最大吞吐量
+\begin{equation}
+    S_{\max} = \tfrac{1}{2}\,e^{-2\cdot\frac12} = \frac{1}{2e} \approx 0.184.
+    \label{eq:aloha_pure}
+\end{equation}
+即纯 ALOHA 最多只能利用信道容量的约 $18.4\%$。
+
+\subsubsection{时隙 ALOHA 及其效率}
+
+时隙 ALOHA 把时间划分为等长时隙，节点只能在\textbf{时隙边界}开始发送，冲突只可能发生在同一时隙内。
+此时只需保证「该时隙内没有其他节点发送」，成功概率为 $e^{-G}$，故
+
+\begin{equation}
+    S(G) = G\,e^{-G}.
+\end{equation}
+求导：$\frac{dS}{dG} = e^{-G}(1-G)=0 \Rightarrow G=1$，于是
+\begin{equation}
+    S_{\max} = 1\cdot e^{-1} = \frac{1}{e} \approx 0.368.
+    \label{eq:aloha_slotted}
+\end{equation}
+时隙化把效率提高了一倍，代价是需要全网时间同步。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, x=1.4cm, y=1cm]
+    \draw[->] (0,0) -- (6.2,0) node[right]{$G$};
+    \draw[->] (0,0) -- (0,1.6) node[above]{$S$};
+    \draw[thick, blue, domain=0.02:6, samples=120] plot (\x, {\x*exp(-\x)});
+    \draw[thick, red, domain=0.02:6, samples=120] plot (\x, {\x*exp(-2*\x)});
+    \draw[dashed] (1,0) -- (1,0.368) -- (0,0.368);
+    \node[blue, anchor=west] at (3.2,1.15) {时隙 ALOHA: $Ge^{-G}$};
+    \node[red, anchor=west] at (3.2,0.55) {纯 ALOHA: $Ge^{-2G}$};
+    \node[font=\tiny, blue, anchor=south] at (1,0.368) {$\frac{1}{e}$};
+    \node[font=\tiny, red, anchor=west] at (1.6,0.12) {$\frac{1}{2e}$};
+\end{tikzpicture}
+\caption{两种 ALOHA 的吞吐量 $S$ 随负载 $G$ 的变化}
+\label{fig:aloha_curves}
+\end{figure}
+
+\subsubsection{CSMA 与 CSMA/CD}
+
+ALOHA 的致命弱点是「不等信道空闲就发」。\textbf{载波监听多路访问 (CSMA)} 要求节点\textbf{发送前先监听信道}：
+\begin{itemize}
+    \item \textbf{1-坚持 CSMA}：信道忙则持续监听，一空闲立即发送（冲突概率高）。
+    \item \textbf{非坚持 CSMA}：信道忙则随机等待一段时间再监听（减少冲突但增加空闲时间）。
+    \item \textbf{p-坚持 CSMA}：信道空闲时以概率 $p$ 发送，以 $1-p$ 推迟到下一时隙。
+\end{itemize}
+
+即使监听了，由于\textbf{传播时延}，两个节点可能几乎同时判定「信道空闲」而同时发送，仍会冲突。
+\textbf{CSMA/CD (Collision Detection)} 在 CSMA 基础上增加\textbf{冲突检测}：边发边听，一旦检测到冲突立即停止发送，
+发送一个\textbf{干扰信号 (jam signal)} 通知全网，然后进入退避。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, align=center,
+    node distance=0.6cm,
+    blk/.style={draw, rounded corners, minimum width=2.7cm, minimum height=0.6cm, align=center},
+    arrow/.style={->, >=latex, thick}
+]
+    \node[blk] (a) {载波监听\\信道空闲？};
+    \node[blk, right=1.2cm of a] (b) {发送帧};
+    \node[blk, right=1.2cm of b] (c) {检测到冲突？};
+    \node[blk, below=0.9cm of c] (d) {发送 jam 信号\\执行二进制指数退避};
+    \draw[arrow] (a) -- node[above]{空闲} (b);
+    \draw[arrow] (b) -- (c);
+    \draw[arrow] (c) -- node[right]{是} (d);
+    \draw[arrow] (d) -| (a);
+    \draw[arrow] (c.east) -- ++(1.0,0) node[above, font=\tiny, align=center]{否，\\发送完成};
+\end{tikzpicture}
+\caption{CSMA/CD 的发送流程}
+\label{fig:csmacd_flow}
+\end{figure}
+
+\subsubsection{二进制指数退避（含例题）}
+
+发生第 $m$ 次冲突后，节点从集合
+\[
+\{0,1,2,\dots,2^{m}-1\}
+\]
+中随机取一个整数 $K$，等待 $K \cdot 512$ 比特时间（以太网中 $512$ 比特时间 $=51.2\,\mu s$，即一个\textbf{时隙}）。
+冲突次数越多，退避窗口越大，网络越拥挤时等待越久。当 $m>10$ 时窗口固定为 $\{0,\dots,1023\}$，当 $m>16$ 则放弃并报错。
+
+\noindent\textbf{例题}：某节点连续发生了 3 次冲突。求其本次可选的退避窗口、等待 $K=4$ 的概率以及对应的等待时间。
+
+\noindent\textbf{解}：第 3 次冲突，$m=3$，窗口为 $\{0,1,\dots,2^3-1\}=\{0,1,2,3,4,5,6,7\}$，共 $8$ 个取值。
+若各值等概率，则
+\[
+P(K=4) = \frac{1}{8} = 12.5\%.
+\]
+对应等待时间为
+\[
+K\cdot 512 = 4\times 512 = 2048\ \text{比特时间} = 2048 \times 0.1\,\mu s = 204.8\,\mu s.
+\]
+（在 $10$ Mbps 以太网中，$1$ 比特时间 $=0.1\,\mu s$。）
+
+\subsection{轮流协议}
+
+\begin{itemize}
+    \item \textbf{轮询 (polling)}：设一个主节点，依次询问各从节点是否有数据发送。无冲突、可按需分配，
+        但引入轮询时延，且主节点是单点故障。
+    \item \textbf{令牌环 (token ring)}：一个称为\textbf{令牌}的特殊帧在环上循环，只有持有令牌的节点才能发送。
+        无冲突且高负载下效率高，但令牌丢失或节点故障需要复杂的恢复机制。
+\end{itemize}
+
+\section{ARP：地址解析协议}
+
+\subsection{为什么需要 ARP}
+
+网络层用 \textbf{IP 地址}标识主机，链路层用 \textbf{MAC 地址}标识网卡。当主机要发送 IP 数据报时，
+它知道下一跳的 IP 地址，但网卡真正要填入帧首部的是下一跳的 \textbf{MAC 地址}。
+\textbf{ARP (Address Resolution Protocol)} 就是完成「IP 地址 $\to$ MAC 地址」映射的协议。
+
+\subsection{同一子网内的解析流程}
+
+假设主机 A（IP \texttt{192.168.1.1}，MAC \texttt{AA}）要向同子网的主机 B（IP \texttt{192.168.1.2}，MAC \texttt{BB}）发送数据：
+
+\begin{enumerate}
+    \item A 先查自己的 \textbf{ARP 缓存}，若已有 B 的映射则直接使用。
+    \item 若没有，A 构造 \textbf{ARP 请求}：「谁是 \texttt{192.168.1.2}？请告诉 \texttt{192.168.1.1}」，
+        以\textbf{广播} MAC 地址 \texttt{FF:FF:FF:FF:FF:FF} 发出。
+    \item 子网内所有主机都收到该请求，但只有 IP 匹配的 B 会响应。
+    \item B 以\textbf{单播} \textbf{ARP 应答}回复 A，携带自己的 MAC \texttt{BB}。
+    \item A 收到应答后，把映射 $(\texttt{192.168.1.2} \to \texttt{BB})$ 写入 ARP 缓存（带 TTL，通常 $20$ 分钟），随后发送数据帧。
+\end{enumerate}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, align=center,
+    host/.style={draw, rounded corners, minimum width=2.6cm, minimum height=0.9cm, align=center},
+    arrow/.style={->, >=latex, thick}
+]
+    \node[host] (a) at (0,0) {A\\\texttt{192.168.1.1 / AA}};
+    \node[host] (b) at (6,0) {B\\\texttt{192.168.1.2 / BB}};
+    \draw[arrow] ($(a.east)+(0,0.25)$) -- node[above, font=\small]{ARP 请求（广播）} ($(b.west)+(0,0.25)$);
+    \draw[arrow] ($(b.west)-(0,0.25)$) -- node[below, font=\small]{ARP 应答（单播 \texttt{BB}）} ($(a.east)-(0,0.25)$);
+\end{tikzpicture}
+\caption{同子网 ARP：广播请求，单播应答}
+\label{fig:arp_same_subnet}
+\end{figure}
+
+\subsection{跨子网：经网关}
+
+若目的主机不在同一子网，A 无法直接解析到目的 MAC。此时 A 把\textbf{默认网关（路由器接口）}的 IP 解析为 MAC，
+把帧的目的 MAC 填成网关的 MAC，而 IP 数据报中的目的 IP 仍是最终主机。
+路由器收到后剥离链路层帧，按路由表查下一跳，再在其出口子网中重新用 ARP 解析下一跳的 MAC。
+也就是说：\textbf{MAC 地址逐跳改变，IP 地址端到端不变}。
+
+\noindent\textbf{易错点}：ARP 请求是广播，ARP 应答是单播；ARP 只在同一子网内使用；
+一台主机的 ARP 缓存可能被伪造应答污染（ARP 欺骗），需靠静态绑定或 DAI 等机制防护。
+
+\section{以太网}
+
+\subsection{MAC 地址}
+
+以太网的链路层地址是 \textbf{MAC 地址}，长 \textbf{48 位}（6 字节），通常写成
+\texttt{1A:2B:3C:4D:5E:6F}。其中前 24 位是厂商 OUI，后 24 位由厂商分配。
+\texttt{FF:FF:FF:FF:FF:FF} 是广播地址。MAC 地址\textbf{扁平、不具层次}，与位置无关，
+因此离开本子网后需要靠 ARP 重新解析。
+
+\subsection{以太网帧格式}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, align=center]
+    \def\w{1.5}
+    \draw (0,0) rectangle (\w,0.8) node[midway, align=center]{前导码\\8 B};
+    \draw (\w,0) rectangle (2*\w,0.8) node[midway, align=center]{目的\\MAC 6 B};
+    \draw (2*\w,0) rectangle (3*\w,0.8) node[midway, align=center]{源\\MAC 6 B};
+    \draw (3*\w,0) rectangle (4*\w,0.8) node[midway, align=center]{类型\\2 B};
+    \draw (4*\w,0) rectangle (6.2*\w,0.8) node[midway, align=center]{数据 (载荷)\\46--1500 B};
+    \draw (6.2*\w,0) rectangle (7.2*\w,0.8) node[midway, align=center]{CRC\\4 B};
+    \node[anchor=west, font=\small] at (7.3*\w,0.4) {$\to$ 时间顺序};
+\end{tikzpicture}
+\caption{DIX 以太网帧格式（前导码不计入帧长）}
+\label{fig:eth_frame}
+\end{figure}
+
+逐字段说明：
+
+\begin{itemize}
+    \item \textbf{前导码 (Preamble, 8 B)}：前 7 字节 \texttt{10101010} 用于收发双方时钟同步，第 8 字节 \texttt{10101011} 是帧起始定界符 (SFD)。
+    \item \textbf{目的 MAC (6 B)}：接收网卡据此判断是否接收（匹配本机、广播或组播）。
+    \item \textbf{源 MAC (6 B)}：发送网卡的地址。
+    \item \textbf{类型 (Type, 2 B)}：指出上层协议，如 \texttt{0x0800} 表示 IPv4、\texttt{0x0806} 表示 ARP、\texttt{0x8100} 表示 802.1Q VLAN。
+    \item \textbf{数据 (46--1500 B)}：承载上层数据报。若不足 46 B 需填充到 46 B；1500 B 是以太网的 \textbf{MTU}。
+    \item \textbf{CRC (4 B)}：帧校验序列，用于检错，出错即丢弃。
+\end{itemize}
+
+以太网是\textbf{无连接、不可靠}的：发送前不握手，收到坏帧直接丢弃，不发送确认也不重传。
+
+\subsection{最小帧 64 字节的原因}
+
+以太网规定从目的 MAC 到 CRC 至少 $6+6+2+46+4 = 64$ 字节（前导码不计入）。
+原因是 \textbf{CSMA/CD 必须保证发送方在帧发送完毕之前能检测到冲突}。
+设最远两台主机间的往返传播时延为 $2\tau$，则发送方至少要持续发送 $2\tau$ 时间才能确保听到最远处产生的冲突。
+定义\textbf{时隙}为 $2\tau = 51.2\,\mu s$，在 $10$ Mbps 下对应 $512$ 比特 $=64$ 字节。
+因此帧长不得小于 64 字节，否则可能在检测到冲突前就已发完，误以为发送成功。
+若数据不足 46 字节，靠填充凑够最小帧。
+
+\subsection{链路层交换机与自学习}
+
+\textbf{交换机 (switch)} 是工作在链路层的设备，每个端口是一个独立的碰撞域，采用全双工则完全无碰撞。
+交换机维护一张\textbf{转发表 (forwarding table)}，表项为 $(\text{MAC 地址}, \text{端口}, \text{老化时间})$，
+并通过\textbf{自学习}自动建立。
+
+\subsubsection{自学习算法}
+
+\begin{enumerate}
+    \item 收到帧时，记录其\textbf{源 MAC} 与\textbf{入端口}，更新转发表（覆盖旧表项，重置老化计时）。
+    \item 查目的 MAC：
+    \begin{itemize}
+        \item 若目的端口已知且与入端口不同，则\textbf{仅从该端口转发（过滤/定向转发）}；
+        \item 若目的端口未知（或等于入端口），则向\textbf{除入端口外的所有端口泛洪 (flooding)}。
+    \end{itemize}
+    \item 老化：表项长时间（默认 $300$ s）未更新则删除。
+\end{enumerate}
+
+\subsubsection{自学习例题}
+
+设交换机有端口 1、2、3、4，初始转发表为空。依次到达下列帧：
+
+\begin{enumerate}
+    \item 从端口 1 收到：源 \texttt{AA}，目的 \texttt{BB}。
+    \item 从端口 2 收到：源 \texttt{BB}，目的 \texttt{AA}。
+    \item 从端口 3 收到：源 \texttt{CC}，目的 \texttt{AA}。
+    \item 从端口 1 收到：源 \texttt{AA}，目的 \texttt{CC}。
+\end{enumerate}
+
+逐步填写转发表与动作：
+
+\begin{table}[H]
+\centering
+\caption{交换机自学习过程示例}
+\begin{tabulary}{\textwidth}{@{}CLCC@{}}
+\toprule
+\textbf{步骤} & \textbf{到达帧} & \textbf{学习到的表项} & \textbf{转发动作} \\
+\midrule
+1 & 源 \texttt{AA}，入 1；目的 \texttt{BB} 未知 & $(\texttt{AA},1)$ & 泛洪到 2,3,4 \\
+2 & 源 \texttt{BB}，入 2；目的 \texttt{AA} 已知在 1 & $(\texttt{BB},2)$ & 定向转发到 1 \\
+3 & 源 \texttt{CC}，入 3；目的 \texttt{AA} 已知在 1 & $(\texttt{CC},3)$ & 定向转发到 1 \\
+4 & 源 \texttt{AA}，入 1；目的 \texttt{CC} 已知在 3 & 更新 $(\texttt{AA},1)$ 老化 & 定向转发到 3 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+最终转发表为 $\{(\texttt{AA},1),(\texttt{BB},2),(\texttt{CC},3)\}$。
+可见交换机「听着源地址学，按着目的地址转」，无需人工配置即可工作。
+
+\subsection{交换机与路由器对比}
+
+\begin{table}[H]
+\centering
+\caption{交换机与路由器的对比}
+\begin{tabulary}{\textwidth}{@{}LCC@{}}
+\toprule
+\textbf{维度} & \textbf{链路层交换机} & \textbf{路由器} \\
+\midrule
+工作层次 & 链路层（第 2 层） & 网络层（第 3 层） \\
+转发依据 & MAC 地址（扁平） & IP 地址（层次化） \\
+隔离域 & 隔离碰撞域，\textbf{不}隔离广播域 & 隔离碰撞域与广播域 \\
+转发表 & 自学习得到 & 路由算法/协议计算 \\
+配置 & 即插即用 & 需配置，逻辑复杂 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\section{VLAN：虚拟局域网}
+
+\subsection{动机}
+
+交换机不隔离广播域：一个大型二层网络中的广播（如 ARP 请求）会扩散到所有端口，
+既浪费带宽又带来安全隐患。\textbf{VLAN (Virtual LAN)} 允许在\textbf{同一台物理交换机}上划分多个逻辑局域网，
+使不同 VLAN 的流量相互隔离（隔离广播域），同一 VLAN 内即使跨多台交换机也如同在同一网段。
+
+\subsection{802.1Q 标签}
+
+IEEE 802.1Q 在以太网帧的源 MAC 与类型字段之间插入一个 \textbf{4 字节的 VLAN 标签}：
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, align=center]
+    \def\w{1.5}
+    \draw (0,0) rectangle (\w,0.8) node[midway]{目的 MAC};
+    \draw (\w,0) rectangle (2*\w,0.8) node[midway]{源 MAC};
+    \draw[fill=yellow!20] (2*\w,0) rectangle (2*\w+1.9,0.8) node[midway, align=center]{802.1Q 标签\\4 B};
+    \draw (2*\w+1.9,0) rectangle (2*\w+3.4,0.8) node[midway]{类型};
+    \draw (2*\w+3.4,0) rectangle (2*\w+5.6,0.8) node[midway]{数据};
+    \draw (2*\w+5.6,0) rectangle (2*\w+6.6,0.8) node[midway]{CRC};
+\end{tikzpicture}
+\caption{802.1Q VLAN 标签插入位置}
+\label{fig:vlan_tag}
+\end{figure}
+
+标签含两部分：
+
+\begin{itemize}
+    \item \textbf{TPID (2 B)}：标签协议标识，固定为 \texttt{0x8100}，用于区分普通以太网帧。
+    \item \textbf{TCI (2 B)}：标签控制信息，含 3 位优先级 \textbf{PCP}、1 位丢弃资格 \textbf{DEI}、12 位 \textbf{VLAN ID}。
+        $12$ 位 VLAN ID 最多支持 $2^{12}=4096$ 个 VLAN（其中 0 与 4095 保留）。
+\end{itemize}
+
+\subsection{跨交换机的干道 (Trunk)}
+
+当同一 VLAN 横跨多台交换机时，交换机之间用一条\textbf{干道 (trunk)} 相连。
+干道上传输的帧都带 802.1Q 标签，交换机据 VLAN ID 把帧转发到属于该 VLAN 的端口。
+接入端口 (access port) 连接终端主机，通常不打标签；干道端口 (trunk port) 打标签。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, align=center,
+    sw/.style={draw, rounded corners, minimum width=2.8cm, minimum height=1.0cm, align=center},
+    arrow/.style={->, >=latex, thick}
+]
+    \node[sw] (s1) at (0,0) {交换机 1};
+    \node[sw] (s2) at (6,0) {交换机 2};
+    \draw[arrow] (s1.east) -- node[above, font=\small]{干道（带标签）} (s2.west);
+    \node[font=\small] (a1) at (-1.8,1.3) {VLAN 10 主机};
+    \node[font=\small] (a2) at (-1.8,-1.3) {VLAN 20 主机};
+    \node[font=\small] (b1) at (7.8,1.3) {VLAN 10 主机};
+    \node[font=\small] (b2) at (7.8,-1.3) {VLAN 20 主机};
+    \draw[arrow] (a1) -- (s1);
+    \draw[arrow] (a2) -- (s1);
+    \draw[arrow] (b1) -- (s2);
+    \draw[arrow] (b2) -- (s2);
+    \node[font=\tiny, anchor=west, align=left] at (3,-1.3) {同 VLAN 跨交换机通信\\不同 VLAN 相互隔离};
+\end{tikzpicture}
+\caption{VLAN 跨交换机的干道链路}
+\label{fig:vlan_trunk}
+\end{figure}
+
+\noindent\textbf{易错点}：VLAN 隔离的是\textbf{广播域}，不是碰撞域（碰撞域由交换端口隔离）；
+不同 VLAN 之间通信必须经过第 3 层设备（路由器或三层交换机）做路由，不能靠二层交换机直接转发。
+
+\section{本章小结与常见误区}
+
+\subsection{本章小结}
+
+\begin{itemize}
+    \item 链路层在直接相连的节点间传帧，提供成帧、链路接入、可靠交付、差错检测等服务，主体由网卡硬件实现。
+    \item 差错检测由弱到强依次是：一位奇偶校验 $\to$ 二维奇偶校验 $\to$ 因特网检验和 $\to$ CRC。
+        CRC 用模 2 长除求余数，硬件实现，检错能力最强。
+    \item 多路访问分三类：信道划分（TDMA/FDMA/CDMA）、随机接入（ALOHA/CSMA/CD）、轮流（轮询/令牌环）。
+        纯 ALOHA 效率 $\frac{1}{2e}$，时隙 ALOHA 效率 $\frac{1}{e}$。
+    \item CSMA/CD 先听后发、边发边听、冲突即停、二进制指数退避；退避窗口随冲突次数指数增长。
+    \item ARP 完成 IP 地址到 MAC 地址的解析，同子网广播请求、单播应答，跨子网经网关逐跳改变 MAC。
+    \item 以太网帧最小 64 字节，保证 CSMA/CD 能在发送完成前检测到冲突；交换机自学习源 MAC、按目的 MAC 转发。
+    \item VLAN 用 802.1Q 标签在同一物理网络上划分多个逻辑网络，隔离广播域，跨交换机靠干道连接。
+\end{itemize}
+
+\subsection{常见误区}
+
+\begin{itemize}
+    \item \textbf{误区一}：以为链路层一定提供可靠交付。实际上有线以太网不可靠，坏帧直接丢弃，可靠性由运输层保证；只有高误码链路（无线）才在链路层做本地重传。
+    \item \textbf{误区二}：混淆 MAC 地址与 IP 地址的作用范围。MAC 地址逐跳改变、仅在本子网内有效；IP 地址端到端不变、可跨网路由。
+    \item \textbf{误区三}：把「交换机隔离碰撞域」误说成「隔离广播域」。交换机\textbf{不}隔离广播域，VLAN 才隔离广播域。
+    \item \textbf{误区四}：认为二进制指数退避窗口一直指数增长。当冲突次数 $m>10$ 后窗口固定为 $1024$，$m>16$ 则放弃。
+    \item \textbf{误区五}：以为 CRC 能纠正任意错误。标准 CRC 用于\textbf{检测}，检测到错误通常直接丢帧；能否纠正取决于码的设计与错误模式。
+    \item \textbf{误区六}：认为 VLAN 之间可以二层直接通信。不同 VLAN 属于不同广播域，必须经第 3 层设备路由。
+    \item \textbf{误区七}：把最小帧 64 字节记成「包含前导码」。前导码不计入帧长，$64$ 字节指从目的 MAC 到 CRC 的部分。
+\end{itemize}

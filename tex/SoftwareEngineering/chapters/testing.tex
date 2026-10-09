@@ -1,0 +1,167 @@
+\clearpage
+\begingroup
+\let\clearpage\relax
+\let\cleardoublepage\relax
+\vspace*{\fill}
+\chapter{软件测试}
+\begin{center}
+软件测试通过「执行程序并观察结果」来暴露缺陷，是质量保证的最后一道防线。本章覆盖测试层次与 V 模型、黑盒与白盒测试方法，以及测试用例设计与回归测试。
+\end{center}
+\vspace*{\fill}
+\endgroup
+\clearpage
+
+\section{测试层次与 V 模型}
+
+软件测试按「由小到大、由内到外」分为四个层次：先保证单元正确，再保证组装正确，最后验证系统与业务目标。
+
+\begin{itemize}
+    \item \textbf{单元测试}：验证单个函数或模块的内部逻辑与分支。
+    \item \textbf{集成测试}：验证模块之间的接口、数据传递与协作。
+    \item \textbf{系统测试}：在完整系统上验证功能需求与非功能需求。
+    \item \textbf{验收测试}：由用户确认系统是否满足业务需求（$\alpha$ 测试、$\beta$ 测试）。
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{测试层次的目标与执行者}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+层次 & 目标 & 执行者 \\
+\midrule
+单元测试 & 验证单个函数/模块的内部逻辑 & 开发人员 \\
+集成测试 & 验证模块间接口与数据传递 & 开发/测试人员 \\
+系统测试 & 验证完整系统的功能与非功能需求 & 独立测试团队 \\
+验收测试 & 用户确认是否满足业务需求 & 用户/客户 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, node distance=1.15cm and 3.6cm]
+    \node[draw, rounded corners] (req) {需求分析};
+    \node[draw, rounded corners, below=of req] (design) {概要设计};
+    \node[draw, rounded corners, below=of design] (detail) {详细设计};
+    \node[draw, rounded corners, below=of detail] (code) {编码};
+
+    \node[draw, rounded corners, right=of req] (acc) {验收测试};
+    \node[draw, rounded corners, below=of acc] (sys) {系统测试};
+    \node[draw, rounded corners, below=of sys] (int) {集成测试};
+    \node[draw, rounded corners, below=of int] (unit) {单元测试};
+
+    \draw[->] (req) -- (design);
+    \draw[->] (design) -- (detail);
+    \draw[->] (detail) -- (code);
+
+    \draw[->] (unit) -- (int);
+    \draw[->] (int) -- (sys);
+    \draw[->] (sys) -- (acc);
+
+    \draw[dashed, <->] (req) -- (acc);
+    \draw[dashed, <->] (design) -- (sys);
+    \draw[dashed, <->] (detail) -- (int);
+    \draw[dashed, <->] (code) -- (unit);
+\end{tikzpicture}
+\caption{V 模型：左侧开发阶段与右侧测试阶段一一对应}
+\end{figure}
+
+\begin{center}
+\begin{minipage}{0.9\textwidth}
+\small V 模型把开发与测试对应起来：左边自顶向下逐层细化（需求 $\to$ 编码），右边自底向上逐层验证（单元 $\to$ 验收）。每一层的测试计划应在对应开发阶段就制定——需求阶段写验收/系统测试计划，设计阶段写集成测试计划，编码阶段写单元测试计划，从而尽早发现缺陷，降低修复代价。
+\end{minipage}
+\end{center}
+
+\section{黑盒测试与白盒测试}
+
+\subsection{黑盒测试}
+
+黑盒测试只关心「输入--输出」，不考虑程序内部结构，常用方法如下。
+
+\begin{itemize}
+    \item \textbf{等价类划分}：把输入域划分为若干等价类，同类中输入任取一个即可代表整个类。分为\emph{有效等价类}（合法输入）与\emph{无效等价类}（非法输入）。
+    \item \textbf{边界值分析}：缺陷大多藏在边界，取 $\min-1,\ \min,\ \min+1,\ \max-1,\ \max,\ \max+1$ 设计用例。
+    \item \textbf{因果图}：把「原因（输入条件）」与「结果（输出动作）」用图形表达，再转化为判定表来设计测试用例，处理输入组合与约束。
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{边界值分析示例（输入范围 $[1,100]$）}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+边界点 & 取值 & 预期结果 \\
+\midrule
+$\min-1$ & $0$   & 无效（低于下界） \\
+$\min$   & $1$   & 有效 \\
+$\min+1$ & $2$   & 有效 \\
+$\max-1$ & $99$  & 有效 \\
+$\max$   & $100$ & 有效 \\
+$\max+1$ & $101$ & 无效（高于上界） \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{白盒测试}
+
+白盒测试依据程序内部逻辑设计用例，常见覆盖准则由弱到强为：语句覆盖、判定覆盖、条件覆盖、路径覆盖。
+
+\begin{itemize}
+    \item \textbf{语句覆盖}：每条可执行语句至少执行一次。
+    \item \textbf{判定覆盖}（分支覆盖）：每个判定的真、假分支至少各执行一次。
+    \item \textbf{条件覆盖}：每个原子条件的真、假至少各取一次。
+    \item \textbf{路径覆盖}：每条独立路径至少执行一次，最强但路径数可能指数增长。
+\end{itemize}
+
+\begin{lstlisting}[language=C]
+int f(int a, int b) {
+    int x = 0;
+    if (a > 0 && b > 0) {   /* 判定 D，含原子条件 a>0 与 b>0 */
+        x = a + b;
+    }
+    return x;
+}
+\end{lstlisting}
+
+\begin{table}[H]
+\centering
+\caption{覆盖准则强弱与示例最少用例数（短路求值）}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+覆盖准则 & 含义 & 本例最少用例数 \\
+\midrule
+语句覆盖 & 每条可执行语句至少一次 & 1（如 $a=2,b=2$） \\
+判定覆盖 & 判定 $D$ 的真、假各一次 & 2（如 $(2,2)$、$(-1,2)$） \\
+条件覆盖 & $a>0$、$b>0$ 的真假各一次 & 2（如 $(2,2)$、$(-1,-1)$） \\
+路径覆盖 & 每条独立路径至少一次 & 3（短路三条路径） \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{center}
+\begin{minipage}{0.9\textwidth}
+\small 强弱关系：满足判定覆盖一定满足语句覆盖（判定覆盖 $\supsetneq$ 语句覆盖）；条件覆盖\emph{不}一定满足判定覆盖，需「判定/条件覆盖」同时保证；路径覆盖最强，但独立路径数随分支爆炸，工程上常用基于圈复杂度 $V(G)=E-N+2$ 的基本路径覆盖加以控制。
+\end{minipage}
+\end{center}
+
+\section{测试用例设计与回归测试}
+
+一个好的测试用例应包含四要素：\textbf{前置条件}、\textbf{输入数据}、\textbf{操作步骤}、\textbf{预期输出}，并且要能唯一判定「通过/失败」。
+
+\begin{itemize}
+    \item 设计顺序通常为：先划分等价类 $\to$ 补充边界值 $\to$ 用因果图/判定表处理组合 $\to$ 用白盒准则补齐未覆盖分支。
+    \item \textbf{回归测试}：修改代码后重新运行原有测试，确认没有引入新的缺陷或破坏既有功能。
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{回归测试的常见策略}
+\begin{tabulary}{\textwidth}{CC}
+\toprule
+策略 & 说明 \\
+\midrule
+全量回归 & 重跑全部用例，最安全但代价最高 \\
+选择回归 & 只重跑受影响模块及其依赖的用例 \\
+优先级回归 & 先跑高风险、高优先级用例 \\
+\bottomrule
+\end{tabulary}
+\end{table}

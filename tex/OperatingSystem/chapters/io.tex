@@ -1,0 +1,205 @@
+\clearpage
+\begingroup
+\let\clearpage\relax
+\let\cleardoublepage\relax
+\vspace*{\fill}
+\chapter{I/O 与设备管理}
+\begin{center}
+I/O 子系统把五花八门的硬件抽象成统一的读写接口：向上提供设备无关的编程模型，向下通过设备驱动，并借助中断与 DMA 与控制器交互。本章沿「软件层次--I/O 控制方式--磁盘结构--磁盘调度--SSD」展开。
+\end{center}
+\vspace*{\fill}
+\endgroup
+\clearpage
+
+\section{I/O 软件层次}
+
+I/O 软件自上而下分为四层，每一层向上一层提供更抽象、更易用的接口，同时屏蔽下一层的硬件细节。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, node distance=2pt]
+    \node[draw, rounded corners, fill=blue!8, minimum width=10cm, minimum height=0.85cm] (u) {用户层：\texttt{read} / \texttt{write} / \texttt{ioctl}};
+    \node[draw, rounded corners, fill=green!10, below=of u, minimum width=10cm, minimum height=0.85cm] (indep) {设备无关软件：缓冲 / 缓存 / 设备分配};
+    \node[draw, rounded corners, fill=orange!15, below=of indep, minimum width=10cm, minimum height=0.85cm] (drv) {设备驱动：寄存器读写 / 命令下发};
+    \node[draw, rounded corners, fill=red!10, below=of drv, minimum width=10cm, minimum height=0.85cm] (irq) {中断处理：完成中断 / 唤醒进程};
+    \node[draw, rounded corners, fill=gray!12, below=of irq, minimum width=10cm, minimum height=0.85cm] (hw) {硬件 / 设备控制器};
+    \draw[->] (u) -- (indep);
+    \draw[->] (indep) -- (drv);
+    \draw[->] (drv) -- (irq);
+    \draw[->] (irq) -- (hw);
+\end{tikzpicture}
+\caption{I/O 软件的四层结构}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{各层职责}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+层次 & 主要职责 & 典型内容 \\
+\midrule
+用户层 & 发起 I/O 请求，提供面向应用的接口 & 系统调用 \texttt{read}/\texttt{write}/\texttt{ioctl}、库函数 \\
+设备无关软件 & 统一抽象与公共策略，屏蔽设备差异 & 缓冲、缓存、假脱机、设备分配、逻辑名到物理名映射 \\
+设备驱动 & 把抽象请求翻译为设备相关操作 & 读写控制器寄存器、下发命令、处理设备状态 \\
+中断处理 & 与硬件握手，完成一次 I/O 的收尾 & 响应完成中断、设置状态、唤醒阻塞进程 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{equation}
+\text{用户进程} \xrightarrow{\text{系统调用}} \text{设备无关软件} \xrightarrow{\text{统一接口}} \text{设备驱动} \xrightarrow{\text{寄存器读写}} \text{控制器}
+\end{equation}
+
+关键思想：\textbf{设备无关软件}只依赖统一接口，与具体硬件解耦；\textbf{设备驱动}封装硬件差异，是内核中与设备型号绑定最紧的部分。
+
+\section{I/O 控制方式}
+
+CPU 与设备控制器协同完成一次数据传输，方式有三类：轮询、中断与 DMA。
+
+\subsection{轮询（程序查询方式）}
+
+CPU 不断读取设备状态寄存器，直到设备就绪后亲自搬运数据。实现简单，但 CPU 在等待期间\textbf{忙等}，利用率低，只适合极低速设备。
+
+\subsection{中断驱动 I/O}
+
+设备就绪后主动发出中断，CPU 在中断服务程序中搬运数据。CPU 不必忙等，但\textbf{每传输一个字/字节都要一次中断}，中断开销随数据量线性增长。
+
+\subsection{DMA（直接存储器访问）}
+
+DMA 控制器在设备与内存之间\textbf{直接成块搬运}数据，CPU 只在开始时设置（源、目的、长度）并在结束时收到一次中断。
+
+\begin{table}[H]
+\centering
+\caption{三种 I/O 控制方式对比}
+\begin{tabulary}{\textwidth}{LLLL}
+\toprule
+方式 & 数据搬运者 & CPU 占用 & 适用场景 \\
+\midrule
+轮询 & CPU 逐字搬运 & 全程忙等，几乎 100\% & 简单、低速、状态可预测的设备 \\
+中断 & CPU 在中断服务程序中搬运 & 每字一次中断，开销随数据量增长 & 中低速、事件随机到达的设备 \\
+DMA & DMA 控制器直接搬入内存 & 仅初始化与结束中断，占用极低 & 高速、成块传输（磁盘、网卡） \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{equation}
+T_{\text{DMA}} = T_{\text{setup}} + \frac{N}{BW} + T_{\text{int}}
+\end{equation}
+
+其中 $N$ 为传输字节数，$BW$ 为总线带宽，$T_{\text{setup}}$ 为 CPU 设置开销，$T_{\text{int}}$ 为结束中断处理开销。当 $N$ 较大时，DMA 的固定开销被摊薄，优势明显。
+
+\section{磁盘结构与磁盘调度}
+
+机械硬盘由盘片、磁头、磁道、扇区与柱面组成。一次随机访问的时间由三部分构成：
+
+\begin{equation}
+T_{\text{access}} = T_{\text{seek}} + T_{\text{rotation}} + T_{\text{transfer}}, \qquad T_{\text{rotation}} = \frac{1}{2r}
+\end{equation}
+
+其中 $T_{\text{seek}}$ 为寻道时间（磁头移动到目标磁道），$T_{\text{rotation}}$ 为旋转延迟（平均半圈），$r$ 为转速（转/秒），$T_{\text{transfer}}$ 为传输时间。\textbf{寻道时间通常远大于其余两项}，因此磁盘调度的核心目标是减少寻道长度。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small]
+    \draw[->, thick] (0,0) -- (11,0) node[right]{磁道};
+    \foreach \x/\v in {0.5/14, 1.4/37, 2.2/53, 3.1/65, 3.6/67, 5.0/98, 6.4/122, 6.9/124, 9.6/183} {
+        \draw[thick] (\x,0) -- (\x,0.2);
+        \node[above, font=\tiny] at (\x,0.2) {\v};
+    }
+    \node[below, font=\tiny, text=blue] at (2.2,-0.05) {初始磁头};
+\end{tikzpicture}
+\caption{示例请求序列在磁道轴上的分布（初始磁头位于 53）}
+\end{figure}
+
+\subsection{常见磁盘调度算法}
+
+\begin{itemize}
+    \item \textbf{FCFS（先来先服务）}：按请求到达顺序服务，公平但寻道长度大。
+    \item \textbf{SSTF（最短寻道时间优先）}：每次选距当前磁头最近的请求，平均寻道短，但可能造成远端请求\textbf{饥饿}。
+    \item \textbf{SCAN（电梯算法）}：磁头沿一个方向移动并服务沿途请求，到达该方向最远端后反向；避免饥饿，寻道较均衡。
+    \item \textbf{C-SCAN（循环扫描）}：只沿一个方向服务；到达一端后快速返回另一端从头再来，各磁道等待时间更均匀。
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{四种磁盘调度算法对比}
+\begin{tabulary}{\textwidth}{LLLL}
+\toprule
+算法 & 选择策略 & 优点 & 缺点 \\
+\midrule
+FCFS & 请求到达顺序 & 公平、简单 & 寻道长度大，吞吐低 \\
+SSTF & 距磁头最近 & 寻道长度小 & 远端请求可能饥饿 \\
+SCAN & 单方向扫到底再反向 & 无饥饿、较均衡 & 中间磁道服务更频繁 \\
+C-SCAN & 单方向扫到底再折返 & 等待时间均匀 & 折返空跑，额外开销 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{寻道长度计算示例}
+
+设请求序列为 $98,183,37,122,14,124,65,67$，初始磁头位于磁道 $53$。按「向内（磁道号增大）方向优先」计算：
+
+\begin{table}[H]
+\centering
+\caption{各算法的服务顺序与寻道长度}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+算法 & 服务顺序 & 寻道长度（磁道数） \\
+\midrule
+FCFS & 98,183,37,122,14,124,65,67 & 640 \\
+SSTF & 65,67,37,14,98,122,124,183 & 236 \\
+SCAN & 65,67,98,122,124,183,37,14 & 299 \\
+C-SCAN & 65,67,98,122,124,183,14,37 & 322 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+以 FCFS 为例，寻道长度为相邻访问磁头移动距离之和：
+\begin{equation}
+640 = |53-98| + |98-183| + |183-37| + |37-122| + |122-14| + |14-124| + |124-65| + |65-67|
+\end{equation}
+
+可见合理调度（SSTF/SCAN）可显著降低总寻道长度，从而提升磁盘吞吐。
+
+\section{SSD 与闪存}
+
+固态硬盘（SSD）基于 NAND 闪存，没有机械部件，随机访问延迟远低于 HDD。其存储层级为\textbf{页（Page）}与\textbf{块（Block）}：
+
+\begin{itemize}
+    \item \textbf{页}：读写的最小单位，常见 4\,KB。
+    \item \textbf{块}：擦除的最小单位，通常包含 $128\sim512$ 个页。
+    \item \textbf{擦除}：闪存只能「先擦后写」，且擦除以块为单位，每块的擦写次数有限。
+\end{itemize}
+
+\subsection{FTL 与磨损均衡}
+
+闪存转换层（FTL，Flash Translation Layer）在逻辑地址与物理页之间做映射，把「覆盖写」转化为「写入新页 + 标记旧页无效」，并在后台执行垃圾回收（GC）。这带来\textbf{写放大}：
+
+\begin{equation}
+WAF = \frac{\text{实际写入闪存的数据量}}{\text{主机请求写入的数据量}} \ge 1
+\end{equation}
+
+\textbf{磨损均衡（Wear Leveling）}把写入分散到不同物理块，避免个别块提前磨穿；分为动态均衡（只均衡新写入）与静态均衡（也搬移冷数据）。
+
+\subsection{与 HDD 对比}
+
+\begin{table}[H]
+\centering
+\caption{SSD 与 HDD 对比}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+维度 & HDD & SSD \\
+\midrule
+介质 & 旋转磁盘 + 磁头 & NAND 闪存 \\
+随机访问 & 需寻道与旋转，毫秒级 & 无机械延迟，微秒级 \\
+顺序/随机差异 & 差异大 & 差异小 \\
+写入特性 & 可原地覆盖 & 先擦后写、有写放大 \\
+寿命 & 机械磨损 & 擦写次数有限，靠磨损均衡 \\
+成本/容量 & 单位容量低 & 单位容量高 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{equation}
+T_{\text{SSD}} \approx T_{\text{controller}} + T_{\text{flash read/write}} + T_{\text{GC}}
+\end{equation}

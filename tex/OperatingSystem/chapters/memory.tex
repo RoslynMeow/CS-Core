@@ -1,0 +1,247 @@
+\clearpage
+\begingroup
+\let\clearpage\relax
+\let\cleardoublepage\relax
+\vspace*{\fill}
+\chapter{内存管理}
+\begin{center}
+内存管理解决「多个程序如何共享有限物理内存」的问题：通过逻辑地址与物理地址的分离、重定位与保护机制，为每个进程提供独立地址空间；再以分页、分段及其组合把连续的虚拟地址映射到离散的物理帧，并用 TLB 与多级页表控制平均访存开销。
+\end{center}
+\vspace*{\fill}
+\endgroup
+\clearpage
+
+\section{地址空间与重定位}
+
+\subsection{逻辑地址与物理地址}
+
+\begin{itemize}
+    \item \textbf{逻辑地址（虚拟地址）}：CPU 生成的地址，面向进程视角，从 0 开始连续编号。
+    \item \textbf{物理地址}：内存单元的真实地址，由内存总线送入存储体。
+    \item 二者关系由内存管理单元在运行时完成转换；编译期只能确定逻辑地址。
+\end{itemize}
+
+地址绑定可在三个时机发生：
+
+\begin{table}[H]
+\centering
+\caption{地址绑定的时机}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+时机 & 说明 & 特点 \\
+\midrule
+编译时 & 生成绝对地址代码 & 程序位置固定，重定位需重新编译 \\
+装入时 & 装入时把逻辑地址改写为物理地址 & 一旦装入不能移动 \\
+执行时 & 运行时由 MMU 动态重定位 & 灵活，支持换入换出与虚拟内存 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{MMU 与基址/界限寄存器}
+
+内存管理单元（MMU）是 CPU 与内存之间的硬件，负责把逻辑地址翻译成物理地址并实施保护。最朴素的重定位方案为每个进程维护一对寄存器：
+
+\begin{itemize}
+    \item \textbf{基址寄存器 (base)}：进程可用物理内存的起始地址。
+    \item \textbf{界限寄存器 (limit)}：进程地址空间的长度。
+\end{itemize}
+
+\begin{equation}
+    \text{物理地址} = \text{base} + \text{逻辑地址}, \qquad
+    \text{合法} \iff 0 \le \text{逻辑地址} < \text{limit}
+\end{equation}
+
+若逻辑地址越过 limit，则触发越界陷阱（trap），交由内核处理，从而实现进程间的存储保护。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=stealth, node distance=1.2cm]
+    \node[draw, rounded corners, fill=blue!8, minimum width=3.2cm] (cpu) {CPU};
+    \node[draw, rounded corners, fill=gray!10, right=2.2cm of cpu, minimum width=3.4cm, align=center] (mmu) {MMU\\ \scriptsize base / limit};
+    \node[draw, rounded corners, fill=green!10, right=2.2cm of mmu, minimum width=3.4cm, align=center] (mem) {内存\\ \scriptsize 物理地址空间};
+    \draw[->] (cpu) -- node[above]{\scriptsize 逻辑地址} (mmu);
+    \draw[->] (mmu) -- node[above]{\scriptsize 物理地址} (mem);
+    \draw[->] (mem) to[bend left=35] (cpu);
+    \draw[->, red] (mmu) to[bend right=35] node[below]{\scriptsize 越界陷阱} (cpu);
+\end{tikzpicture}
+\caption{MMU 在逻辑地址与物理地址之间完成重定位}
+\end{figure}
+
+\section{分页}
+
+\subsection{页、帧与页表}
+
+分页把逻辑地址空间切成大小相等的\textbf{页 (page)}，把物理内存切成同样大小的\textbf{帧 (frame)}。页与帧大小相同且为 2 的幂（如 4\,KB），页可以装入任意空闲帧，从而消除外部碎片。
+
+页表（page table）为每个进程建立「页号 $\to$ 帧号」的映射，通常存放在内存中。
+
+\begin{equation}
+    \text{逻辑地址} = \underbrace{p}_{\text{页号}} \;\|\; \underbrace{d}_{\text{页内偏移}}, \qquad
+    p = \left\lfloor \frac{LA}{S} \right\rfloor,\quad d = LA \bmod S
+\end{equation}
+
+\begin{equation}
+    PA = f \times S + d, \qquad f = \text{页表}[p]
+\end{equation}
+
+其中 $S$ 为页大小，$f$ 为页号 $p$ 对应的帧号。由于 $S$ 是 2 的幂，除以 $S$ 等价于右移 $\log_2 S$ 位，取模等价于取低 $\log_2 S$ 位，因此地址翻译可完全由位切分实现。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=stealth]
+    \draw (0,0) rectangle (2,0.8) node[midway] {$p$};
+    \draw (2,0) rectangle (4,0.8) node[midway] {$d$};
+    \node at (1,-0.42) {\scriptsize 页号};
+    \node at (3,-0.42) {\scriptsize 偏移};
+    \node[above] at (2,0.85) {\scriptsize 逻辑地址};
+
+    \node[draw, rounded corners, fill=blue!8, minimum width=2.0cm, minimum height=1.4cm, align=center] (pt) at (5.6,0.4) {页表\\[2pt] \scriptsize $p \Rightarrow f$};
+    \draw[->] (2,0.6) -- (pt.west);
+
+    \draw (8,0) rectangle (9.4,0.8) node[midway] {$f$};
+    \draw (9.4,0) rectangle (11.4,0.8) node[midway] {$d$};
+    \node at (8.7,-0.42) {\scriptsize 帧号};
+    \node at (10.4,-0.42) {\scriptsize 偏移};
+    \node[above] at (9.7,0.85) {\scriptsize 物理地址};
+    \draw[->] (pt.east) -- (8,0.6);
+\end{tikzpicture}
+\caption{分页地址翻译：页号查页表得帧号，偏移原样保留}
+\end{figure}
+
+\subsection{页表项 PTE}
+
+页表项（Page Table Entry）除帧号外还记录若干控制位：
+
+\begin{table}[H]
+\centering
+\caption{页表项的主要字段}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+字段 & 位宽 & 作用 \\
+\midrule
+帧号 (frame number) & 视物理内存大小而定 & 该页映射到的物理帧 \\
+有效位 (valid / present) & 1 & 页面是否已装入内存，0 触发缺页 \\
+修改位 (dirty) & 1 & 页面是否被写过，决定换出时是否回写 \\
+访问位 (reference) & 1 & 是否被访问，供置换算法参考 \\
+保护位 (protection) & 2--3 & 读/写/执行权限，越权触发保护异常 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+在 32 位、4\,KB 页的单级页表下，需要 $2^{20}$ 个表项、约 4\,MB，且每个进程一份。为压缩开销引入\textbf{多级页表}：只把用到的下级页表装入内存，未用的页目录项置空，从而大幅节省空间。
+
+\begin{equation}
+    \text{逻辑地址} = \underbrace{p_1}_{\text{页目录}} \;\|\; \underbrace{p_2}_{\text{页表}} \;\|\; \underbrace{d}_{\text{偏移}}
+\end{equation}
+
+\section{分段}
+
+\subsection{段表与保护}
+
+分段按程序的逻辑结构（代码段、数据段、栈段）把地址空间划分为长度可变的\textbf{段 (segment)}。每个进程一张\textbf{段表}，表项含段的\textbf{基址 base} 与\textbf{界限 limit}。
+
+\begin{equation}
+    \text{逻辑地址} = \underbrace{s}_{\text{段号}} \;\|\; \underbrace{d}_{\text{段内偏移}}, \qquad
+    \text{合法} \iff d < \text{limit}[s],\qquad PA = \text{base}[s] + d
+\end{equation}
+
+若 $d \ge \text{limit}[s]$ 则触发越界异常，实现按段的保护与共享。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=stealth]
+    \node[draw, rounded corners, fill=blue!8, minimum width=3.4cm, minimum height=2.4cm, align=center] (st) {段表\\[3pt] \scriptsize 段号 $s$\\ \scriptsize base$[s]$ \quad limit$[s]$};
+    \node[left=1.8cm of st, align=center] (la) {逻辑地址\\ \scriptsize $s \,\|\, d$};
+    \draw[->] (la) -- (st);
+    \node[right=1.8cm of st, align=center] (pa) {物理地址\\ \scriptsize $base[s]+d$};
+    \draw[->] (st) -- node[above, yshift=2pt]{\scriptsize $d<\text{limit}[s]$?} (pa);
+    \draw[->, red] (st.south) -- ++(0,-0.9) node[below]{\scriptsize $d\ge\text{limit}$：越界异常};
+\end{tikzpicture}
+\caption{分段地址翻译与越界检查}
+\end{figure}
+
+\subsection{分段与分页对比}
+
+\begin{table}[H]
+\centering
+\caption{分页与分段的对比}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+维度 & 分页 & 分段 \\
+\midrule
+划分依据 & 物理等分为固定大小的页 & 按逻辑结构划分为变长段 \\
+大小 & 固定（页 = 帧） & 可变 \\
+地址结构 & 一维：页号 + 偏移 & 二维：段号 + 偏移 \\
+碎片 & 仅内部碎片 & 仅外部碎片 \\
+对用户 & 透明 & 可见，便于共享与保护 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{段页式}
+
+段页式结合二者：先按逻辑分段，再把每段分页装入物理帧。逻辑地址为三维结构。
+
+\begin{equation}
+    \text{逻辑地址} = \underbrace{s}_{\text{段号}} \;\|\; \underbrace{p}_{\text{页号}} \;\|\; \underbrace{d}_{\text{页内偏移}}
+\end{equation}
+
+翻译路径：段表$[s]$ 得该段的页表 $\to$ 页表$[p]$ 得帧号 $f$ $\to$ $PA = f \times S + d$。段页式既保留分段的逻辑与保护，又消除外部碎片；代价是需要多次访存，通常由 TLB 加速。
+
+\section{TLB 与有效访问时间 EAT}
+
+\subsection{快表 TLB}
+
+页表在内存中，若每次访存都先查页表会使访问次数翻倍。\textbf{转换检测缓冲区 (TLB)} 是一块高速相联存储器，缓存最近使用的「页号 $\to$ 帧号」表项。
+
+\begin{itemize}
+    \item \textbf{TLB 命中}：直接得到帧号，与偏移拼接得物理地址，无需访存页表。
+    \item \textbf{TLB 缺失}：访问内存中的页表（可能多级）取帧号，并更新 TLB。
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=stealth, node distance=1.15cm,
+    box/.style={draw, rounded corners, minimum width=3.6cm, minimum height=0.8cm, align=center}]
+    \node[box, fill=blue!8] (cpu) {CPU 逻辑地址};
+    \node[box, fill=yellow!20, below=of cpu] (tlb) {查 TLB};
+    \node[box, fill=green!12, below=of tlb] (hit) {命中：取帧号};
+    \node[box, fill=orange!15, below=of hit] (miss) {缺失：访存查页表};
+    \node[box, fill=gray!12, below=of miss] (pa) {物理地址};
+    \draw[->] (cpu) -- (tlb);
+    \draw[->] (tlb) -- node[right]{\scriptsize hit} (hit);
+    \draw[->] (tlb.east) to[bend left=40] node[right]{\scriptsize miss} (miss.east);
+    \draw[->] (hit) -- node[right]{\scriptsize 拼接 $d$} (pa);
+    \draw[->] (miss) -- (pa);
+    \draw[->] (miss.east) to[bend left=40] node[right]{\scriptsize 回填} (tlb.east);
+\end{tikzpicture}
+\caption{TLB 的命中与缺失路径}
+\end{figure}
+
+\subsection{有效访问时间}
+
+设 TLB 命中率为 $h$，TLB 访问时间为 $t_{\text{TLB}}$，一次内存访问时间为 $t_{\text{mem}}$。命中时只需「查 TLB + 访存数据」，共 $t_{\text{TLB}}+t_{\text{mem}}$；缺失时还需额外一次访存读页表，共 $t_{\text{TLB}}+2t_{\text{mem}}$。
+
+\begin{equation}
+    EAT = h\,(t_{\text{TLB}} + t_{\text{mem}}) + (1-h)\,(t_{\text{TLB}} + 2t_{\text{mem}})
+        = t_{\text{TLB}} + (2-h)\,t_{\text{mem}}
+\end{equation}
+
+若不存在 TLB（每次都查页表），则 $EAT = 2t_{\text{mem}}$。可见 $h \to 1$ 时 $EAT \to t_{\text{TLB}}+t_{\text{mem}}$，接近直接访存的开销。
+
+\begin{table}[H]
+\centering
+\caption{EAT 随 TLB 命中率的变化（$t_{\text{TLB}}=10$\,ns，$t_{\text{mem}}=100$\,ns）}
+\begin{tabulary}{\textwidth}{CCCC}
+\toprule
+$h$ & 命中路径 (ns) & 未命中路径 (ns) & $EAT$ (ns) \\
+\midrule
+0.80 & 110 & 210 & 130.0 \\
+0.90 & 110 & 210 & 120.0 \\
+0.98 & 110 & 210 & 112.0 \\
+1.00 & 110 & 210 & 110.0 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\noindent 结论：TLB 命中率每提升一点都会显著降低平均访存时间，因此命中率与 TLB 容量、置换策略密切相关；多级页表虽然省空间，却增加了缺失时的访存次数，二者需与 TLB 配合折中。

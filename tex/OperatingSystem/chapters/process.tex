@@ -1,0 +1,148 @@
+\clearpage
+\begingroup
+\let\clearpage\relax
+\let\cleardoublepage\relax
+\vspace*{\fill}
+\chapter{进程与线程}
+\begin{center}
+进程是操作系统进行资源分配和调度的基本单位，线程是 CPU 调度的基本单位。本章从进程的状态模型出发，讲清 PCB、上下文切换与线程模型。
+\end{center}
+\vspace*{\fill}
+\endgroup
+\clearpage
+
+\section{进程模型与状态}
+
+进程是\textbf{程序的一次执行}，是系统进行资源分配和调度的独立单位。它由程序段、数据段和进程控制块（PCB）组成。程序是静态的指令集合，进程是动态的执行实体；同一个程序可对应多个进程。
+
+\subsection{五状态模型}
+
+\begin{itemize}
+    \item \textbf{新建 (new)}：进程正在被创建，PCB 已分配但尚未进入就绪队列。
+    \item \textbf{就绪 (ready)}：已获得除 CPU 之外的全部资源，等待被调度。
+    \item \textbf{运行 (running)}：占有 CPU，正在执行指令。
+    \item \textbf{阻塞 (blocked)}：因等待 I/O 或某事件而暂停，即使 CPU 空闲也不能运行。
+    \item \textbf{终止 (terminated)}：执行完毕或被撤销，等待回收资源。
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=stealth, node distance=2.7cm]
+    \node[draw, rounded corners, fill=blue!8] (new) {新建};
+    \node[draw, rounded corners, fill=green!10, right=of new] (ready) {就绪};
+    \node[draw, rounded corners, fill=orange!15, right=of ready] (run) {运行};
+    \node[draw, rounded corners, fill=gray!12, right=of run] (term) {终止};
+    \node[draw, rounded corners, fill=red!10, below=of run] (block) {阻塞};
+
+    \draw[->] (new) -- node[above]{接纳} (ready);
+    \draw[->] (ready) -- node[above]{调度} (run);
+    \draw[->] (run) -- node[above]{退出} (term);
+    \draw[->] (run) to[bend left=40] node[above]{时间片到 / 抢占} (ready);
+    \draw[->] (run) -- node[right]{等待 I/O} (block);
+    \draw[->] (block) -- node[below]{I/O 完成} (ready);
+\end{tikzpicture}
+\caption{进程五状态转换图}
+\end{figure}
+
+关键约束：\textbf{阻塞不能直接回到运行}，必须先回到就绪，再由调度程序决定何时运行；就绪到运行由调度触发，运行到就绪由时间片耗尽或被抢占触发。
+
+\begin{equation}
+    \text{new} \to \text{ready} \to \text{running} \rightleftarrows \{\text{ready},\ \text{blocked}\} \to \text{terminated}
+\end{equation}
+
+\section{进程控制块 PCB}
+
+PCB 是进程存在的\textbf{唯一标志}：创建进程即建立 PCB，撤销进程即回收 PCB。操作系统通过 PCB 感知、控制和调度进程。
+
+\begin{table}[H]
+\centering
+\caption{PCB 的主要字段}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+分类 & 字段 & 用途 \\
+\midrule
+进程标识 & PID、父进程 PPID、用户 UID & 唯一标识与归属 \\
+处理机状态 & 通用寄存器、PC、PSW、栈指针 & 保存现场，用于切换与恢复 \\
+进程调度 & 状态、优先级、时间片、队列指针 & 支撑调度决策 \\
+内存管理 & 页表基址、段表、界限寄存器 & 地址空间与保护 \\
+I/O 与资源 & 打开文件表、设备表、信号量 & 记录占用资源与通信 \\
+记账信息 & CPU 时间、缺页次数、启动时间 & 统计与计费 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{equation}
+    \text{进程} = \text{程序段} + \text{数据段} + \text{PCB}
+\end{equation}
+
+\section{上下文切换}
+
+上下文切换是内核保存当前进程现场、恢复下一个进程现场的过程。它本身不产生用户价值，属于\textbf{纯开销}。
+
+\subsection{切换步骤}
+
+\begin{enumerate}
+    \item 保存当前进程的 PC、通用寄存器、PSW 到其 PCB。
+    \item 更新当前进程状态（运行 $\to$ 就绪 / 阻塞），并插入相应队列。
+    \item 调用调度程序，按策略选择下一个待运行进程。
+    \item 恢复被选中进程 PCB 中保存的现场。
+    \item 切换地址空间（更新页表基址寄存器），返回用户态继续执行。
+\end{enumerate}
+
+\begin{equation}
+    T_{\text{context}} = T_{\text{save}} + T_{\text{dispatch}} + T_{\text{restore}}
+\end{equation}
+
+其中 $T_{\text{save}}$、$T_{\text{restore}}$ 为寄存器与现场读写的开销，$T_{\text{dispatch}}$ 为调度算法选择进程的开销。切换开销与硬件支持密切相关，通常在微秒量级。
+
+\begin{equation}
+    \text{切换开销占比} = \frac{T_{\text{context}}}{T_{\text{time slice}}} \times 100\%
+\end{equation}
+
+时间片越短，切换越频繁，开销占比越高；因此需要在响应时间与切换开销之间折中。
+
+\section{线程}
+
+线程是 \textbf{CPU 调度的基本单位}，进程是 \textbf{资源分配的基本单位}。同一进程内的各线程共享地址空间与资源，但各自拥有独立的栈、寄存器与 PC。
+
+\subsection{进程与线程的对比}
+
+\begin{table}[H]
+\centering
+\caption{进程与线程对比}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+维度 & 进程 & 线程 \\
+\midrule
+定位 & 资源分配单位 & 调度执行单位 \\
+地址空间 & 相互独立 & 同进程内共享 \\
+切换开销 & 大（含地址空间切换） & 小（仅寄存器与栈） \\
+通信方式 & IPC、管道、共享内存 & 直接读写共享变量 \\
+健壮性 & 一个进程崩溃不影响其他进程 & 一个线程崩溃可能拖垮整个进程 \\
+拥有资源 & 文件、内存、设备 & 基本不拥有，借用进程资源 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{用户级线程与内核级线程}
+
+\begin{itemize}
+    \item \textbf{用户级线程 (ULT)}：由用户库管理，内核不可见。切换快、无需陷入内核，但一个线程阻塞会导致整个进程阻塞，且无法利用多核。
+    \item \textbf{内核级线程 (KLT)}：由内核管理。可多核并行、阻塞不影响其他线程，但切换需陷入内核，开销较大。
+\end{itemize}
+
+\subsection{多线程模型}
+
+\begin{table}[H]
+\centering
+\caption{多线程映射模型}
+\begin{tabulary}{\textwidth}{LLL}
+\toprule
+模型 & 映射关系 & 特点 \\
+\midrule
+多对一 & 多 ULT $\to$ 1 KLT & 切换快，但一线程阻塞即全阻塞，无法并行 \\
+一对一 & 1 ULT $\to$ 1 KLT & 并行好、阻塞隔离，但线程创建开销大 \\
+多对多 & 多 ULT $\to$ 多 KLT & 折中，允许受限并行，实现复杂 \\
+\bottomrule
+\end{tabulary}
+\end{table}

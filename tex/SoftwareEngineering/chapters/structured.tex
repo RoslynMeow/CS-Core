@@ -1,0 +1,165 @@
+\clearpage
+\begingroup
+\let\clearpage\relax
+\let\cleardoublepage\relax
+\vspace*{\fill}
+\chapter{结构化分析与设计}
+\begin{center}
+结构化方法从「数据流」与「模块」两个视角刻画系统：用数据流图（DFD）描述数据如何流动与变换，用数据字典精确定义数据，再用「高内聚、低耦合」的模块化原则指导设计。本章建立「DFD $\to$ 数据字典 $\to$ 模块化」的分析与设计主线。
+\end{center}
+\vspace*{\fill}
+\endgroup
+\clearpage
+
+\section{数据流图（DFD）}
+
+数据流图（Data Flow Diagram, DFD）从数据流动的角度描述系统「做什么」：只关心数据及其变换，不关心控制时序与实现细节。
+
+\subsection{四种基本元素}
+
+\begin{table}[H]
+\centering
+\caption{DFD 的四种基本元素}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+元素 & 图形 & 说明 \\
+\midrule
+外部实体 & 矩形 & 系统边界外的参与者（人 / 组织 / 外部系统），是数据的源或宿 \\
+加工 & 圆 / 椭圆 & 对数据执行变换的处理单元，命名用「动词 + 名词」 \\
+数据存储 & 开口矩形 & 数据的静态仓库（文件 / 表 / 库），只能由加工读写 \\
+数据流 & 带箭头的线 & 沿箭头方向流动的数据，命名用名词，不代表控制或时序 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{分层 DFD}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=Stealth,
+    entity/.style={draw, rectangle, minimum width=2.4cm, minimum height=1cm, fill=blue!8, align=center},
+    proc/.style={draw, ellipse, minimum width=3.0cm, minimum height=1.3cm, fill=orange!15, align=center}]
+    \node[entity] (cust) at (0,0) {客户};
+    \node[proc] (sys) at (6,0) {订单处理系统};
+    \node[entity] (wh) at (12,0) {仓库};
+    \draw[->] (cust) -- node[above]{订单} (sys);
+    \draw[->] (sys) -- node[above]{发货单} (wh);
+    \draw[->] (wh) -- node[below]{出库确认} (sys);
+    \draw[->] (sys) -- node[below]{发货通知} (cust);
+\end{tikzpicture}
+\caption{0 层 DFD：上下文图}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=Stealth,
+    entity/.style={draw, rectangle, minimum width=2.2cm, minimum height=1cm, fill=blue!8, align=center},
+    proc/.style={draw, ellipse, minimum width=2.6cm, minimum height=1.2cm, fill=orange!15, align=center},
+    store/.style={draw, minimum width=3.0cm, minimum height=0.9cm, fill=green!10, align=center}]
+    \node[entity] (cust) at (0,0) {客户};
+    \node[proc] (p1) at (4,0) {1\\接收订单};
+    \node[proc] (p2) at (8,0) {2\\核对库存};
+    \node[proc] (p3) at (12,0) {3\\生成发货单};
+    \node[entity] (wh) at (15.8,0) {仓库};
+    \node[store] (d1) at (6,-2.2) {订单表};
+    \draw[->] (cust) -- node[above]{订单} (p1);
+    \draw[->] (p1) -- node[above]{有效订单} (p2);
+    \draw[->] (p2) -- node[above]{可发货清单} (p3);
+    \draw[->] (p3) -- node[above]{发货单} (wh);
+    \draw[->] (p1.south) -- node[left]{写订单} (d1.west);
+    \draw[->] (d1.east) -- node[right]{读订单} (p2.south);
+\end{tikzpicture}
+\caption{1 层 DFD：订单处理系统分解}
+\end{figure}
+
+\subsection{平衡原则}
+
+对加工逐层分解，可得到 0 层、1 层、2 层 $\cdots$ DFD：
+
+\begin{itemize}
+    \item \textbf{0 层（上下文图）}：把整个系统看作一个加工，只画系统与外部实体之间的数据交换。
+    \item \textbf{1 层}：把 0 层的加工分解成若干子加工，并画出与之相关的数据存储。
+    \item \textbf{平衡（父子平衡）}：子图边界上的输入 / 输出数据流，必须与父图中该加工的输入 / 输出一一对应——分解时数据既不凭空产生，也不凭空消失。
+    \item \textbf{编号}：加工编号体现层次，如 1 分解为 1.1、1.2；数据流与数据存储也都要命名。
+\end{itemize}
+
+\section{数据字典}
+
+数据字典（Data Dictionary）为 DFD 中的每个数据流、数据存储与数据项给出精确定义，是 DFD 的「词条说明」。常用下列记号：
+
+\begin{table}[H]
+\centering
+\caption{数据字典常用记号}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+记号 & 含义 & 例 \\
+\midrule
+$=$ & 被定义项 = 其组成 & 订单 = 订单号 + 客户 + \{订单项\} \\
+$+$ & 顺序连接（逻辑与） & 客户 = 姓名 + 地址 + 电话 \\
+$\{\ \}$ & 重复（0 次或多次） & \{订单项\} \\
+$[\ ]$ & 从中选择一项 & 性别 = [男 | 女] \\
+$|$ & 在 $[\ ]$ 内分隔备选项 & 男 | 女 \\
+$(\ )$ & 可选（可有可无） & 电话 = 座机 + (手机) \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+例如订单的数据字典：
+
+\begin{align*}
+\text{订单} &= \text{订单号} + \text{客户} + \{\text{订单项}\} + \text{下单日期} \\
+\text{订单项} &= \text{商品号} + \text{数量} + \text{单价} \\
+\text{客户} &= \text{客户号} + \text{姓名} + (\text{联系电话})
+\end{align*}
+
+数据字典与 DFD 必须保持一致：图里出现的每个名字，都应在字典中有精确的定义。
+
+\section{模块化设计：耦合与内聚}
+
+模块化把系统划分为相对独立、单一职责的模块。衡量划分优劣的两个指标是\textbf{耦合}（模块之间联系的紧密程度）与\textbf{内聚}（模块内部各成分结合的紧密程度）。设计目标是\textbf{高内聚、低耦合}。
+
+\subsection{耦合（Coupling）}
+
+耦合由低到高依次为：数据耦合、标记耦合、控制耦合、公共耦合、内容耦合（更完整地还包含非直接耦合与外部耦合）。耦合越低越好。
+
+\begin{table}[H]
+\centering
+\caption{耦合类型（从低到高）}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+类型 & 传递内容 & 说明 \\
+\midrule
+非直接耦合 & 无 & 模块之间无直接联系，最好 \\
+数据耦合 & 简单数据 & 通过参数传值（如传一个数），最常用的良好耦合 \\
+标记耦合 & 数据结构 & 传整个记录 / 结构，对方只用其中一部分 \\
+控制耦合 & 控制信息 & 传开关 / 标志以控制对方逻辑，增加理解难度 \\
+外部耦合 & 外部约束 & 都受同一外部环境 / 数据格式约束 \\
+公共耦合 & 公共数据区 & 多个模块共享全局变量，牵一发动全身 \\
+内容耦合 & 直接访问内部 & 一个模块直接访问另一模块内部数据 / 代码，最差 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{内聚（Cohesion）}
+
+内聚由高到低依次为：功能内聚、顺序内聚、通信内聚、过程内聚、时间内聚、逻辑内聚、偶然内聚。内聚越高越好。
+
+\begin{table}[H]
+\centering
+\caption{内聚类型（从高到低）}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+类型 & 结合方式 & 说明 \\
+\midrule
+功能内聚 & 单一功能 & 所有成分共同完成一个明确功能，最好 \\
+顺序内聚 & 数据顺序 & 上一步的输出是下一步的输入，数据顺序流动 \\
+通信内聚 & 同一数据 & 各成分操作同一输入数据或产生同一输出数据 \\
+过程内聚 & 执行顺序 & 各成分按固定流程顺序执行，但数据联系较弱 \\
+时间内聚 & 同一时段 & 各成分因需在同一时间段内执行而聚合（如初始化） \\
+逻辑内聚 & 逻辑相似 & 各成分逻辑上同类，由参数选择执行哪一部分 \\
+偶然内聚 & 无关系 & 各成分之间无明显关系，最差 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\noindent\textbf{结论}：理想的模块划分是「高内聚、低耦合」——模块内部职责单一且各成分密切相关，模块之间只通过简单数据进行必要的通信。理想组合是「功能内聚 + 数据耦合」，这样模块更易理解、测试、复用与维护。

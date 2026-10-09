@@ -152,7 +152,7 @@ export const stringOpsModule: ModuleDef<Scene, Cfg> = {
   id: 'string',
   title: T('字符串', 'String'),
   desc: T('$s\\in\\Sigma^*$ 以字符数组存放、$\\#\\notin\\Sigma$（0x00）终结；strlen/strcat/strcmp 逐字节走查。', 'Char array + NUL terminator; strlen/strcat/strcmp.'),
-  tags: ['data-structures', 'computer-organization'],
+  tags: ['data-structures'],
   defaultConfig: { mode: 'layout' as Mode, s1: 'Hi', s2: '!' , execTick: 0 },
   randomize(c) {
     const pick = ['Hi', 'OK', 'Go', 'Cat', 'Dog', 'A', 'bc'];

@@ -1,0 +1,157 @@
+\clearpage
+\begingroup
+\let\clearpage\relax
+\let\cleardoublepage\relax
+\vspace*{\fill}
+\chapter{设计原则与模式}
+\begin{center}
+良好的设计在「可扩展」与「可维护」之间取得平衡：SOLID 原则指导类的职责划分，设计模式沉淀可复用的协作经验，软件架构决定系统的整体骨架。
+\end{center}
+\vspace*{\fill}
+\endgroup
+\clearpage
+
+\section{SOLID 五原则}
+
+SOLID 是一组面向对象设计的指导思想，目标是让系统在需求变化时「改动局部、稳定整体」。
+
+\begin{table}[H]
+\centering
+\caption{SOLID 五原则：含义与反例改进}
+\begin{tabulary}{\textwidth}{CCL}
+\toprule
+原则 & 含义 & 反例 $\to$ 改进 \\
+\midrule
+单一职责 (SRP) & 一个类只有一个引起变化的原因 & 上帝类 $\to$ 按职责拆分 \\
+开闭 (OCP) & 对扩展开放、对修改关闭 & 每加类型就改 \texttt{switch} $\to$ 引入多态/策略 \\
+里氏替换 (LSP) & 子类型可替换父类型而不破坏契约 & 子类抛异常、加强前置条件 $\to$ 保持契约 \\
+接口隔离 (ISP) & 客户端不应依赖不需要的接口 & 胖接口 $\to$ 拆成小而专的接口 \\
+依赖倒置 (DIP) & 高层与低层都依赖抽象 & 高层 \texttt{new} 具体实现 $\to$ 依赖接口注入 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, node distance=1.4cm]
+    \node[draw, rounded corners, fill=blue!8, minimum width=4.2cm] (high) {高层模块（业务策略）};
+    \node[draw, rounded corners, fill=green!12, minimum width=4.2cm, below=1.4cm of high] (abs) {抽象接口 (Abstract)};
+    \node[draw, rounded corners, fill=orange!12, minimum width=4.2cm, below=1.4cm of abs] (low) {低层模块（实现细节）};
+    \draw[->, thick] (high) -- (abs);
+    \draw[->, thick, dashed] (low) -- (abs);
+    \node[right=0.25cm of abs, font=\footnotesize, text=green!50!black] {双方都依赖抽象};
+\end{tikzpicture}
+\caption{依赖倒置：高层与低层都依赖抽象，抽象不依赖细节}
+\end{figure}
+
+\noindent 依赖倒置把「高层直接依赖低层」翻转为「双方依赖抽象」，从而使业务策略不受具体实现替换的影响，也便于替换为测试替身。
+
+\section{设计模式}
+
+\subsection{模式分类}
+
+\begin{table}[H]
+\centering
+\caption{设计模式三大分类}
+\begin{tabulary}{\textwidth}{CCL}
+\toprule
+类型 & 关注点 & 代表模式 \\
+\midrule
+创建型 (Creational) & 对象创建机制，解耦创建与使用 & 单例、工厂方法、抽象工厂、建造者、原型 \\
+结构型 (Structural) & 类与对象的组合，组装更大结构 & 适配器、装饰器、代理、外观、组合 \\
+行为型 (Behavioral) & 对象间职责分配与通信 & 观察者、策略、命令、状态、模板方法 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{代表模式}
+
+\begin{table}[H]
+\centering
+\caption{代表设计模式的意图与适用场景}
+\begin{tabulary}{\textwidth}{CCL}
+\toprule
+模式 & 意图 & 适用 \\
+\midrule
+单例 (Singleton) & 保证一个类仅有一个实例并提供全局访问点 & 全局配置、连接池、日志器 \\
+工厂方法 (Factory Method) & 定义创建对象的接口，由子类决定实例化哪个类 & 框架扩展点、解耦创建与使用 \\
+观察者 (Observer) & 一对多依赖，主题变化时自动通知所有观察者 & 事件通知、GUI 事件、消息订阅 \\
+策略 (Strategy) & 封装可互换的算法，使其可独立变化 & 多种计费/排序/压缩算法切换 \\
+装饰器 (Decorator) & 动态给对象添加职责，比继承更灵活 & 流式 I/O、动态叠加功能 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, node distance=1.0cm and 2.4cm]
+    \node[draw, rounded corners] (ctx) {Context};
+    \node[draw, rounded corners, align=center, right=of ctx] (strat) {\guillemotleft interface\guillemotright\\Strategy};
+    \node[draw, rounded corners, below=0.7cm of strat] (a) {ConcreteStrategyA};
+    \node[draw, rounded corners, below=0.7cm of a] (b) {ConcreteStrategyB};
+    \draw[->] (ctx) -- node[above, font=\footnotesize] {持有} (strat);
+    \draw[->] (a) -- (strat);
+    \draw[->] (b) -- (strat);
+\end{tikzpicture}
+\caption{策略模式：上下文持有抽象策略，运行时替换具体算法}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, node distance=1.2cm and 2.6cm]
+    \node[draw, rounded corners] (subject) {Subject（主题）};
+    \node[draw, rounded corners, align=center, right=of subject] (obs) {\guillemotleft interface\guillemotright\\Observer};
+    \node[draw, rounded corners, below=0.7cm of obs] (o1) {ObserverA};
+    \node[draw, rounded corners, below=0.7cm of o1] (o2) {ObserverB};
+    \draw[->] (subject) -- node[above, font=\footnotesize] {通知 notify()} (obs);
+    \draw[->] (o1) -- (obs);
+    \draw[->] (o2) -- (obs);
+\end{tikzpicture}
+\caption{观察者模式：主题在状态变化时遍历通知观察者列表}
+\end{figure}
+
+\section{软件架构}
+
+\begin{table}[H]
+\centering
+\caption{常见软件架构对比}
+\begin{tabulary}{\textwidth}{CCL}
+\toprule
+架构 & 特点 & 优点 / 代价 \\
+\midrule
+分层 (Layered) & 上层调用下层，层间通过接口隔离 & 结构清晰、易测试 / 调用穿透与性能损耗 \\
+MVC & 模型、视图、控制器分离，视图随模型更新 & UI 与业务解耦、多视图复用 / 控制器易膨胀 \\
+微服务 (Microservices) & 按业务边界拆分为独立部署的服务 & 独立伸缩、技术异构、故障隔离 / 分布式与运维复杂 \\
+事件驱动 (Event-driven) & 组件通过事件异步通信，发布--订阅 & 松耦合、可扩展、异步削峰 / 最终一致、调试困难 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, node distance=0.55cm]
+    \node[draw, rounded corners, fill=blue!8, minimum width=8.5cm] (pres) {表现层 Presentation};
+    \node[draw, rounded corners, fill=green!8, minimum width=8.5cm, below=of pres] (biz) {业务层 Business};
+    \node[draw, rounded corners, fill=orange!8, minimum width=8.5cm, below=of biz] (dao) {持久层 Persistence};
+    \node[draw, rounded corners, fill=gray!12, minimum width=8.5cm, below=of dao] (db) {数据库 Database};
+    \draw[->] (pres) -- (biz);
+    \draw[->] (biz) -- (dao);
+    \draw[->] (dao) -- (db);
+\end{tikzpicture}
+\caption{分层架构：关注点自上而下逐层分离}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, node distance=1.6cm]
+    \node[draw, rounded corners, fill=blue!8, minimum width=2.8cm] (view) {View（视图）};
+    \node[draw, rounded corners, fill=green!10, minimum width=2.8cm, right=2.2cm of view] (ctrl) {Controller（控制器）};
+    \node[draw, rounded corners, fill=orange!10, minimum width=2.8cm, below=1.6cm of ctrl] (model) {Model（模型）};
+    \draw[->] (view) -- (ctrl);
+    \draw[->] (ctrl) -- (model);
+    \draw[->, dashed] (model) -- node[right, font=\footnotesize] {更新} (view);
+\end{tikzpicture}
+\caption{MVC：控制器处理输入、模型保存状态、视图订阅模型}
+\end{figure}
+
+\noindent 架构选型的核心是权衡：分层适合关注点分离的常规业务系统；MVC 适合交互式 UI；微服务适合需要独立伸缩与团队自治的大型系统；事件驱动适合高并发、松耦合的集成场景。

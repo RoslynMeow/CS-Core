@@ -1,15 +1,15 @@
 import { createElement } from "react";
 import { T } from "../../i18n/lang";
-import type { ModuleDef } from "../../engine/types";
+import type { Frame, ModuleDef } from "../../engine/types";
 import { MathText } from "../../lib/tex";
 
 // =====================================================================
 // 计算机系统概述 · 单模块聚合 · 交互式
 //   对应 tex/ComputerOrganization/chapters/intro.tex
-//   vonneumann(冯·诺依曼) / layers(层次结构) / perf(性能计算) / amdahl(Amdahl)
+//   vonneumann(冯·诺依曼 执行周期 动画) / perf(性能计算) / amdahl(Amdahl)
 // =====================================================================
 
-type SubMode = "vonneumann" | "layers" | "perf" | "amdahl";
+type SubMode = "vonneumann" | "perf" | "amdahl";
 
 function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
   return (
@@ -32,22 +32,52 @@ function Panel({ children }: { children: React.ReactNode }) {
 }
 
 // ---------------------------------------------------------------------
-// vonneumann
+// vonneumann: Fetch → Decode → Execute 执行周期 (逐帧动画)
 // ---------------------------------------------------------------------
-function VonNeumannRender({ t }: any) {
+type VNPhase = "fetch" | "decode" | "execute" | "writeback";
+type VNScene = { phase: VNPhase; active: string[]; flow: "instr" | "ctrl" | "data" };
+
+const VN_UNITS: { key: string; zh: string; en: string; dzh: string; den: string; bg: string }[] = [
+  { key: "alu", zh: "运算器 ALU", en: "ALU", dzh: "算术与逻辑运算", den: "arithmetic & logic", bg: "#dbeafe" },
+  { key: "cu", zh: "控制器 CU", en: "Control Unit", dzh: "取指 / 译码 / 控制数据流", den: "fetch / decode / control", bg: "#dcfce7" },
+  { key: "mem", zh: "存储器", en: "Memory", dzh: "存放程序与数据", den: "program + data", bg: "#fef3c7" },
+  { key: "in", zh: "输入设备", en: "Input", dzh: "键盘 / 鼠标 / 传感器", den: "keyboard / sensors", bg: "#fce7f3" },
+  { key: "out", zh: "输出设备", en: "Output", dzh: "显示器 / 打印机 / 网卡", den: "display / NIC", bg: "#ede9fe" },
+];
+
+const VN_PHASE: Record<VNPhase, { bg: string; fg: string; zh: string; en: string }> = {
+  fetch: { bg: "#dbeafe", fg: "#1e40af", zh: "① 取指 Fetch", en: "① Fetch" },
+  decode: { bg: "#dcfce7", fg: "#166534", zh: "② 译码 Decode", en: "② Decode" },
+  execute: { bg: "#fef3c7", fg: "#92400e", zh: "③ 执行 Execute", en: "③ Execute" },
+  writeback: { bg: "#ede9fe", fg: "#5b21b6", zh: "④ 写回 Write-back", en: "④ Write-back" },
+};
+
+const VN_FLOW: Record<"instr" | "ctrl" | "data", { zh: string; en: string; color: string }> = {
+  instr: { zh: "指令流", en: "instruction flow", color: "#2563eb" },
+  ctrl: { zh: "控制流", en: "control flow", color: "#16a34a" },
+  data: { zh: "数据流", en: "data flow", color: "#d97706" },
+};
+
+function VonNeumannRender({ scene, t }: any) {
   const isZh = t(T("中文", "en")) !== "en";
-  const parts: [string, string, string][] = isZh
-    ? [["运算器 ALU", "算术与逻辑运算", "#dbeafe"], ["控制器 CU", "取指 / 译码 / 控制数据流", "#dcfce7"], ["存储器", "存放程序与数据", "#fef3c7"], ["输入设备", "键盘 / 鼠标 / 传感器", "#fce7f3"], ["输出设备", "显示器 / 打印机 / 网卡", "#ede9fe"]]
-    : [["ALU", "arithmetic & logic", "#dbeafe"], ["Control Unit", "fetch / decode / control", "#dcfce7"], ["Memory", "program + data", "#fef3c7"], ["Input", "keyboard / sensors", "#fce7f3"], ["Output", "display / NIC", "#ede9fe"]];
+  const s = (scene ?? { phase: "fetch", active: [], flow: "instr" }) as VNScene;
+  const ph = VN_PHASE[s.phase] ?? VN_PHASE.fetch;
+  const flow = VN_FLOW[s.flow] ?? VN_FLOW.instr;
   return (
     <Panel>
+      <div style={{ textAlign: "center", padding: "8px 14px", borderRadius: 10, background: ph.bg, color: ph.fg, fontWeight: 800, fontSize: 14 }}>
+        {isZh ? ph.zh : ph.en} · <span style={{ color: flow.color }}>{isZh ? flow.zh : flow.en}</span>
+      </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
-        {parts.map(([n, d, bg]) => (
-          <div key={n} style={{ flex: "1 1 150px", minWidth: 140, padding: "12px 14px", borderRadius: 12, background: bg, border: "1px solid #e2e8f0" }}>
-            <div style={{ fontWeight: 900, color: "#1e293b", fontSize: 13 }}>{n}</div>
-            <div style={{ fontSize: 12, color: "#475569", marginTop: 4 }}>{d}</div>
-          </div>
-        ))}
+        {VN_UNITS.map((u) => {
+          const on = s.active.includes(u.key);
+          return (
+            <div key={u.key} style={{ flex: "1 1 150px", minWidth: 140, padding: "12px 14px", borderRadius: 12, background: u.bg, border: `2px solid ${on ? "#4338ca" : "#e2e8f0"}`, boxShadow: on ? "0 0 0 3px #c7d2fe" : "none", transition: "all .2s", opacity: on ? 1 : 0.55 }}>
+              <div style={{ fontWeight: 900, color: "#1e293b", fontSize: 13 }}>{isZh ? u.zh : u.en}</div>
+              <div style={{ fontSize: 12, color: "#475569", marginTop: 4 }}>{isZh ? u.dzh : u.den}</div>
+            </div>
+          );
+        })}
       </div>
       <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", fontSize: 13, color: "#475569" }}>
         <span style={{ padding: "6px 12px", borderRadius: 999, background: "#eef2ff", border: "1px solid #c7d2fe" }}>{isZh ? "运算器 + 控制器 = CPU" : "ALU + CU = CPU"}</span>
@@ -62,27 +92,20 @@ function VonNeumannRender({ t }: any) {
   );
 }
 
-// ---------------------------------------------------------------------
-// layers
-// ---------------------------------------------------------------------
-function LayersRender({ t }: any) {
-  const isZh = t(T("中文", "en")) !== "en";
-  const layers: [string, string][] = isZh
-    ? [["应用层", "高级语言程序 (C / Java / Python)"], ["系统软件层", "编译器 / 操作系统"], ["指令集层", "ISA — 软件与硬件的接口"], ["微体系结构层", "流水线 / 缓存 / 乱序执行"], ["数字逻辑层", "门电路 / 寄存器 / 加法器"], ["物理器件层", "晶体管 / 导线 / 集成电路"]]
-    : [["Application", "high-level programs (C / Java / Python)"], ["System software", "compiler / OS"], ["ISA layer", "software–hardware interface"], ["Microarchitecture", "pipeline / cache / OoO"], ["Digital logic", "gates / registers / adders"], ["Device", "transistors / wires / ICs"]];
-  return (
-    <Panel>
-      <div style={{ display: "grid", gap: 4 }}>
-        {layers.map(([n, d], i) => (
-          <div key={n} style={{ display: "flex", alignItems: "center", gap: 12, padding: "9px 16px", borderRadius: 10, background: `hsl(${230 - i * 8}, 70%, ${96 - i * 3}%)`, border: "1px solid #e2e8f0" }}>
-            <span style={{ fontWeight: 800, color: "#3730a3", fontSize: 13, width: 112 }}>{n}</span>
-            <span style={{ fontSize: 13, color: "#475569" }}>{d}</span>
-          </div>
-        ))}
-      </div>
-    </Panel>
-  );
+function vonneumannGenerate(_config: any): Frame<VNScene>[] {
+  return [
+    { line: 0, caption: T("取指：$PC \\to MAR \\to$ 存储器，指令 $\\to IR$", "Fetch: $PC \\to MAR \\to$ memory, instruction $\\to IR$"), scene: { phase: "fetch", active: ["cu", "mem"], flow: "instr" } },
+    { line: 1, caption: T("译码：控制器分析 $IR$，产生控制信号", "Decode: the control unit decodes $IR$ and emits control signals"), scene: { phase: "decode", active: ["cu"], flow: "ctrl" } },
+    { line: 2, caption: T("执行：运算器按控制信号对数据运算", "Execute: the ALU operates on data under the control signals"), scene: { phase: "execute", active: ["alu", "cu"], flow: "data" } },
+    { line: 3, caption: T("写回：结果写回寄存器/存储器，$PC \\gets PC+1$", "Write-back: result written back, $PC \\gets PC+1$"), scene: { phase: "writeback", active: ["alu", "mem"], flow: "data" } },
+  ];
 }
+const VONNEUMANN_CODE = [
+  T("取指：$PC \\to MAR \\to$ 存储器，指令 $\\to IR$", "Fetch: $PC \\to MAR \\to$ memory, instruction $\\to IR$"),
+  T("译码：控制器分析 $IR$，产生控制信号", "Decode: control unit analyses $IR$, emits control signals"),
+  T("执行：运算器按控制信号运算", "Execute: ALU computes under control signals"),
+  T("写回：结果写回，$PC \\gets PC+1$", "Write-back: store result, $PC \\gets PC+1$"),
+];
 
 // ---------------------------------------------------------------------
 // perf
@@ -195,8 +218,7 @@ function AmdahlRender({ config, t }: any) {
 type Cfg = { subMode: SubMode; [k: string]: any };
 
 const SUB: Record<SubMode, ModuleDef> = {
-  vonneumann: { id: "vonneumann", title: T("冯·诺依曼", "von Neumann"), defaultConfig: {}, generate: () => [{ caption: T("冯·诺依曼体系结构", "von Neumann architecture"), scene: {} }] as never, Render: VonNeumannRender as never } as unknown as ModuleDef,
-  layers: { id: "layers", title: T("层次结构", "Layers"), defaultConfig: {}, generate: () => [{ caption: T("计算机层次结构", "Layers of a computer"), scene: {} }] as never, Render: LayersRender as never } as unknown as ModuleDef,
+  vonneumann: { id: "vonneumann", title: T("冯·诺依曼", "von Neumann"), defaultConfig: {}, generate: vonneumannGenerate, code: VONNEUMANN_CODE, Render: VonNeumannRender as never } as unknown as ModuleDef,
   perf: { id: "perf", title: T("性能评价", "Performance"), defaultConfig: PERF_DEFAULT, Controls: PerfControls as never, generate: () => [{ caption: T("性能评价指标", "Performance metrics"), scene: {} }] as never, Render: PerfRender as never } as unknown as ModuleDef,
   amdahl: { id: "amdahl", title: T("Amdahl 定律", "Amdahl"), defaultConfig: AMDAHL_DEFAULT, Controls: AmdahlControls as never, generate: () => [{ caption: T("Amdahl 定律", "Amdahl's law"), scene: {} }] as never, Render: AmdahlRender as never } as unknown as ModuleDef,
 };
@@ -205,7 +227,6 @@ const MAP: Record<SubMode, ModuleDef> = SUB;
 export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
   { label: "体系", opts: [
     { v: "vonneumann", zh: "冯·诺依曼", en: "von Neumann" },
-    { v: "layers", zh: "层次结构", en: "Layers" },
   ]},
   { label: "性能", opts: [
     { v: "perf", zh: "性能评价", en: "Performance" },
@@ -230,9 +251,9 @@ function safeCfg(sub: unknown, config: Cfg): Cfg {
 export const introModule: ModuleDef<any, Cfg> = {
   id: "computer-overview",
   title: T("计算机概述", "Overview"),
-  desc: T("冯·诺依曼 / 五大部件 / 层次结构 / 性能指标 T=IC×CPI×Tclk / Amdahl 定律。", "von Neumann / five units / layers / performance / Amdahl's law."),
+  desc: T("冯·诺依曼 / 五大部件 / 性能指标 T=IC×CPI×Tclk / Amdahl 定律。", "von Neumann / five units / performance / Amdahl's law."),
   tags: ["computer-organization", "intro"],
-  interactive: true,
+  interactive: false,
   defaultConfig: DEFAULT,
   Controls({ config, onChange, t, embedded }: any) {
     const isZh = t(T("中文", "en")) !== "en";
@@ -262,6 +283,10 @@ export const introModule: ModuleDef<any, Cfg> = {
     const res: any = m.generate(safe);
     const frames: any[] = Array.isArray(res) ? res : res?.frames ?? [];
     return frames.length ? frames : [{ caption: T("计算机概述", "Overview"), scene: safe }];
+  },
+  codeFor(config) {
+    const m = activeOf((config as Cfg).subMode) as any;
+    return m.code ?? [];
   },
   Render(props) {
     const safe = safeCfg((props.config as Cfg).subMode, props.config as Cfg);

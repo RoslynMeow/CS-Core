@@ -159,7 +159,7 @@ const CODE: Record<Op, any> = {
 export const queueModule: ModuleDef<Scene, Cfg> = {
   id: 'queue', title: T('队列', 'Queue (FIFO)'),
   desc: T('Enqueue 入队尾 rear，Dequeue 出队首 front；循环数组用 front/rear 游标，链式队列用 head/tail。$O(1)$。', 'FIFO; circular array or linked head/tail.'),
-  tags: ['data-structures', 'computer-organization'],
+  tags: ['data-structures'],
   defaultConfig: { impl: 'array' as Impl, elemType: 'i32', endian: 'little', capacity: 6, inited: false, front: 0, dataStr: '', op: 'idle', val: 5, execTick: 0 },
   randomize(c) { return { ...c, front: 0, dataStr: '', op: 'idle', execTick: 0 } as Cfg; },
   Controls({ config, onChange, t, onPlay }: any) {

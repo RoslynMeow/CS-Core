@@ -44,7 +44,7 @@ export const placeValueModule: ModuleDef<Scene, Cfg> = {
   id: 'positional-place-value',
   title: T('位权', 'Place Value'),
   desc: T('位置不同则权不同：第 $i$ 位权 $n^i$，贡献 $P_i\\cdot n^i$，$y=\\sum P_i n^i$。', 'Position → weight $n^i$; $y=\\sum P_i n^i$.'),
-  tags: ['data-structures', 'computer-organization'],
+  tags: ['data-structures'],
   defaultConfig: DEFAULT_CFG,
   randomize(c) {
     const base = 2 + Math.floor(Math.random() * 15);

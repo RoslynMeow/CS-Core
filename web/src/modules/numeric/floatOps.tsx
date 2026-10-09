@@ -27,7 +27,7 @@ export const floatOpsModule: ModuleDef<Record<string, never>, Cfg> = {
   id: 'float-ops',
   title: T('浮点运算', 'Floating Point'),
   desc: T('IEEE 754 单精度 1+8+23, 偏置 127; 浮点加法: 对阶 → 尾数相加 → 规格化 → 舍入。', 'IEEE 754 fields and floating-point addition steps.'),
-  tags: ['data-structures', 'computer-organization'],
+  tags: ['data-structures'],
   defaultConfig: DEFAULT_CFG,
   Controls({ config, onChange, t }: any) {
     const isZh = t(T('中文', 'en')) !== 'en';

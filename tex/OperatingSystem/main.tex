@@ -1,0 +1,115 @@
+
+\documentclass[12pt,a4paper]{ctexrep}
+\usepackage{amsmath,amssymb}
+\usepackage{fontspec}
+\xeCJKsetup{AutoFallBack = true}
+\setCJKfallbackfamilyfont\CJKrmdefault{Malgun Gothic}[Scale=MatchLowercase]
+\setCJKfallbackfamilyfont\CJKsfdefault{Malgun Gothic}[Scale=MatchLowercase]
+\setCJKfallbackfamilyfont\CJKttdefault{Malgun Gothic}[Scale=MatchLowercase]
+\usepackage[top=1.5cm,bottom=1.5cm,left=1cm,right=1cm,headheight=15pt]{geometry}
+\usepackage{pdflscape}
+
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{shapes.multipart, decorations.pathreplacing, arrows.meta, positioning, matrix, calc}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{tabulary}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{setspace}
+\usepackage{fancyhdr}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{needspace}
+\usepackage{etoolbox}
+\usepackage{listings}
+\widowpenalty=10000
+\clubpenalty=10000
+\raggedbottom
+\emergencystretch=3em
+\tolerance=2000
+\setlength{\intextsep}{8pt}
+\setlength{\textfloatsep}{10pt}
+\pretocmd{\section}{\needspace{13\baselineskip}}{}{}
+\pretocmd{\subsection}{\needspace{8\baselineskip}}{}{}
+\pretocmd{\subsubsection}{\needspace{5\baselineskip}}{}{}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    numbers=left,
+    numberstyle=\tiny,
+    frame=single,
+    breaklines=true,
+    showstringspaces=false,
+    tabsize=4
+}
+
+\onehalfspacing
+\pagestyle{fancy}
+\fancyhf{}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    citecolor=black,
+    urlcolor=blue
+}
+
+\title{\textbf{\huge 操作系统}}
+\author{}
+\date{}
+
+\begin{document}
+
+\clearpage
+\thispagestyle{empty}
+\vspace*{\fill}
+
+\begin{center}
+{\huge 操作系统}\\[0.8em]
+{\large Operating Systems}\\[2.5em]
+{\large MS Roslyn}\\[0.6em]
+{\large \today}
+\end{center}
+
+\vspace{2.5em}
+
+\begin{center}
+{\bfseries 摘要}
+\end{center}
+
+\vspace{1em}
+
+\begin{center}
+本教程系统讲解操作系统的核心机制：从系统调用与内核态切入，深入进程与线程、CPU 调度、并发同步与死锁、内存管理与虚拟内存、文件系统与 I/O、以及保护与安全。教程强调「抽象 + 机制 + 策略」三条主线，用可计算的例子说明上下文切换开销、调度指标、页面置换、磁盘寻道等核心问题，帮助读者建立贯穿「硬件--内核--应用」的完整系统视角。
+\end{center}
+
+\vspace*{\fill}
+\clearpage
+
+\tableofcontents
+\newpage
+
+\clearpage
+\input{chapters/intro}
+\clearpage
+\input{chapters/process}
+\clearpage
+\input{chapters/scheduling}
+\clearpage
+\input{chapters/sync}
+\clearpage
+\input{chapters/memory}
+\clearpage
+\input{chapters/virtual_memory}
+\clearpage
+\input{chapters/filesystem}
+\clearpage
+\input{chapters/io}
+\clearpage
+\input{chapters/protection}
+
+\end{document}

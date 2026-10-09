@@ -1,0 +1,113 @@
+
+\documentclass[12pt,a4paper]{ctexrep}
+\usepackage{amsmath,amssymb}
+\usepackage{fontspec}
+\xeCJKsetup{AutoFallBack = true}
+\setCJKfallbackfamilyfont\CJKrmdefault{Malgun Gothic}[Scale=MatchLowercase]
+\setCJKfallbackfamilyfont\CJKsfdefault{Malgun Gothic}[Scale=MatchLowercase]
+\setCJKfallbackfamilyfont\CJKttdefault{Malgun Gothic}[Scale=MatchLowercase]
+\usepackage[top=1.5cm,bottom=1.5cm,left=1cm,right=1cm,headheight=15pt]{geometry}
+\usepackage{pdflscape}
+
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{shapes.multipart, shapes.geometric, decorations.pathreplacing, arrows.meta, positioning, matrix, calc}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{tabulary}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{setspace}
+\usepackage{fancyhdr}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{needspace}
+\usepackage{etoolbox}
+\usepackage{listings}
+\widowpenalty=10000
+\clubpenalty=10000
+\raggedbottom
+\emergencystretch=3em
+\tolerance=2000
+\setlength{\intextsep}{8pt}
+\setlength{\textfloatsep}{10pt}
+\pretocmd{\section}{\needspace{13\baselineskip}}{}{}
+\pretocmd{\subsection}{\needspace{8\baselineskip}}{}{}
+\pretocmd{\subsubsection}{\needspace{5\baselineskip}}{}{}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    numbers=left,
+    numberstyle=\tiny,
+    frame=single,
+    breaklines=true,
+    showstringspaces=false,
+    tabsize=4
+}
+
+\onehalfspacing
+\pagestyle{fancy}
+\fancyhf{}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    citecolor=black,
+    urlcolor=blue
+}
+
+\title{\textbf{\huge 软件工程}}
+\author{}
+\date{}
+
+\begin{document}
+
+\clearpage
+\thispagestyle{empty}
+\vspace*{\fill}
+
+\begin{center}
+{\huge 软件工程}\\[0.8em]
+{\large Software Engineering}\\[2.5em]
+{\large MS Roslyn}\\[0.6em]
+{\large \today}
+\end{center}
+
+\vspace{2.5em}
+
+\begin{center}
+{\bfseries 摘要}
+\end{center}
+
+\vspace{1em}
+
+\begin{center}
+本教程系统讲解软件工程的核心方法与建模技术：从软件过程模型切入，涵盖需求工程、结构化分析与设计、面向对象与 UML 建模、数据建模与 ER、设计原则与模式、软件测试，以及项目管理与质量度量。教程强调「过程 + 建模 + 质量」三条主线，把抽象的方法论落到可操作的图表与度量上，帮助读者掌握从需求到交付的完整工程实践。
+\end{center}
+
+\vspace*{\fill}
+\clearpage
+
+\tableofcontents
+\newpage
+
+\clearpage
+\input{chapters/intro}
+\clearpage
+\input{chapters/requirements}
+\clearpage
+\input{chapters/structured}
+\clearpage
+\input{chapters/uml}
+\clearpage
+\input{chapters/er}
+\clearpage
+\input{chapters/design}
+\clearpage
+\input{chapters/testing}
+\clearpage
+\input{chapters/project}
+
+\end{document}

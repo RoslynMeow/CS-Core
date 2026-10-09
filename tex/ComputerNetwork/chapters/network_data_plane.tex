@@ -1,0 +1,549 @@
+\clearpage
+\begingroup
+\let\clearpage\relax
+\let\cleardoublepage\relax
+\vspace*{\fill}
+\chapter{网络层：数据平面}
+\begin{center}
+网络层负责「主机到主机」的交付。数据平面回答「一个到达的分组从哪个端口出去」：
+它由路由器内部结构、IP 数据报格式、IP 编址、最长前缀匹配转发、DHCP/NAT 与 IPv6 组成。
+本章先讲转发机制，下一章再讲控制平面「转发表如何算出」。
+\end{center}
+\vspace*{\fill}
+\endgroup
+\clearpage
+
+\section{数据平面与控制平面}
+
+网络层可拆成两个相互配合的平面，这是理解全章的钥匙：
+
+\begin{itemize}
+    \item \textbf{数据平面 (data plane)}：每台路由器的\emph{本地、每个分组}的动作。分组到达输入端口后，路由器依据\textbf{转发表 (forwarding table)} 在纳秒量级把它送到正确的输出端口。它是「硬件快速路径」。
+    \item \textbf{控制平面 (control plane)}：\emph{全网范围}的路由计算，决定转发表的内容（如 OSPF、BGP、SDN 控制器）。它运行在毫秒到秒的量级，属于「软件慢路径」。
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{数据平面与控制平面对比}
+\begin{tabulary}{\textwidth}{CCCC}
+\toprule
+维度 & 数据平面 & 控制平面 & 典型时间尺度 \\
+\midrule
+作用范围 & 单台路由器 & 全网 & 本地 $\to$ 全网 \\
+处理对象 & 每一个分组 & 路由更新 & 逐分组 vs 周期性 \\
+核心数据结构 & 转发表 & 路由表/拓扑库 & 转发表由路由表生成 \\
+时间尺度 & 纳秒级 & 毫秒--秒级 & 相差数个数量级 \\
+实现方式 & 硬件（ASIC/TCAM） & 软件/控制器 & 快速路径 vs 慢路径 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\noindent 转发表与路由表不是一回事，容易混淆。\textbf{路由表}保存「到哪里、经谁、代价多少」的路由协议结果；
+\textbf{转发表}是路由表经过\emph{编译}后、面向逐分组查表的数据结构，表项形如「前缀 $\to$ 输出端口」。一个路由表项可能展开为多条转发表项。
+
+\section{路由器内部结构}
+
+一台路由器由\textbf{输入端口}、\textbf{交换结构}、\textbf{输出端口}和\textbf{路由处理器}四部分组成。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=latex,
+    port/.style={draw, minimum width=2.4cm, minimum height=0.7cm, align=center},
+    fab/.style={draw, minimum width=2.8cm, minimum height=3.2cm, align=center},
+    proc/.style={draw, minimum width=2.8cm, minimum height=0.7cm, align=center}
+]
+    \node[port] (i1) at (0,2.2) {输入端口 1};
+    \node[port] (i2) at (0,1.1) {输入端口 2};
+    \node[port] (i3) at (0,0) {输入端口 3};
+    \node[fab] (sf) at (4.8,1.1) {交换结构\\（内存/总线/网络）};
+    \node[proc] (rp) at (4.8,-1.5) {路由处理器\\（控制平面）};
+    \node[port] (o1) at (9.6,2.2) {输出端口 1};
+    \node[port] (o2) at (9.6,1.1) {输出端口 2};
+    \node[port] (o3) at (9.6,0) {输出端口 3};
+    \draw[->] (i1) -- (sf);
+    \draw[->] (i2) -- (sf);
+    \draw[->] (i3) -- (sf);
+    \draw[->] (sf) -- (o1);
+    \draw[->] (sf) -- (o2);
+    \draw[->] (sf) -- (o3);
+    \draw[->] (rp) -- (sf);
+    \node[align=center, left=0.25cm of i1] {来自\\输入链路};
+    \node[align=center, right=0.25cm of o1] {去往\\输出链路};
+\end{tikzpicture}
+\caption{路由器体系结构：输入端口、交换结构、输出端口与路由处理器}
+\label{fig:router_arch}
+\end{figure}
+
+\subsection{输入端口}
+
+输入端口在物理与链路层收帧后，执行两步：
+
+\begin{itemize}
+    \item \textbf{查表}：抽取目的 IP 地址，用\textbf{最长前缀匹配}在转发表中查出输出端口号。
+    \item \textbf{转发}：把分组送入交换结构。转发可以「按目的地」或「按目的地 + 源」进行。
+\end{itemize}
+
+输入端口通常缓存「正在等待送入交换结构」的分组。若交换结构速率低于各输入端口到达速率之和，输入队列就会变长。
+
+\subsection{交换结构}
+
+交换结构把输入端口的分组搬到输出端口，三代实现如下：
+
+\begin{table}[H]
+\centering
+\caption{三类交换结构}
+\begin{tabulary}{\textwidth}{CCCC}
+\toprule
+类型 & 原理 & 速率瓶颈 & 备注 \\
+\midrule
+内存交换 & CPU 拷贝到内存再写出 & 受内存带宽限制 & 每分组两次穿越系统总线，最慢 \\
+总线交换 & 共享总线一次传一个分组 & 受总线带宽限制 & 简单，同一时刻仅一个分组 \\
+网络交换 & 交叉杆 (crossbar) 并行连通 & 可达链路速率 & 现代路由器主流，支持并行 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+网络交换结构由 $2N$ 条总线交叉成 $N\times N$ 开关阵列，只要输入与输出不冲突，多个分组可\emph{同时}穿越，理论上可做到无阻塞。
+
+\subsection{输出端口}
+
+输出端口从交换结构取出分组，执行链路层封装（加帧头/校验）后发送。由于交换结构到达速率可能瞬时超过输出链路速率，输出端口必须设置\textbf{缓存 (buffer)}。缓存过小会因突发丢包，过大则排队时延剧增（\emph{bufferbloat}）。经验缓存量常取
+\begin{equation}
+    B = \frac{R \cdot \text{RTT}}{\sqrt{N}},
+\end{equation}
+其中 $R$ 为链路速率，$N$ 为并发 TCP 流数。
+
+\subsection{排队与队头阻塞}
+
+\textbf{队头阻塞 (Head-of-Line blocking, HOL)} 指输入队列\emph{队首}分组因目标输出忙而被阻塞，导致其后本可转发到空闲输出的分组也无法前进。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=latex,
+    pkt/.style={draw, minimum width=1.0cm, minimum height=0.6cm, align=center},
+    outbox/.style={draw, minimum width=2.0cm, minimum height=0.6cm, align=center}
+]
+    \node[pkt, fill=red!15] (a) at (0,0) {A$\to$2};
+    \node[pkt, fill=green!15, right=0.05cm of a] (b) {B$\to$1};
+    \node[pkt, right=0.05cm of b] (c) {C$\to$1};
+    \draw[decorate, decoration={brace, amplitude=5pt, mirror}] ($(a.south west)+(0,-0.02)$) -- ($(c.south east)+(0,-0.02)$)
+        node[midway, below=6pt, font=\small] {输入队列};
+    \node[outbox, right=2.2cm of c] (o1) {输出 1（空闲）};
+    \node[outbox, above=0.9cm of o1] (o2) {输出 2（忙）};
+    \draw[->, red] (a.east) -- node[above, font=\scriptsize] {$1$} (o2.west);
+    \draw[->, densely dashed] (b.north east) to[out=30, in=180] (o1.west);
+    \node[align=center, font=\scriptsize, below=0.05cm of o2] {A 阻塞，\\B 被迫等待};
+\end{tikzpicture}
+\caption{队头阻塞：队首 A 目的输出忙，后面目的输出 1 空闲的 B 也只能等待}
+\label{fig:hol}
+\end{figure}
+
+HOL 会浪费交换结构容量。解法之一是\textbf{虚拟输出队列 (Virtual Output Queue, VOQ)}：在每个输入端口为\emph{每一个}输出端口各维护一条队列，从而消除队头阻塞。
+
+\section{IPv4 数据报}
+
+\subsection{首部逐字段详解}
+
+IPv4 数据报首部固定部分\textbf{20 字节}，加上可变选项最多 \textbf{60 字节}。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\scriptsize, x=0.6cm, y=0.7cm]
+    \draw (0,0) rectangle (16,-1);
+    \draw (2,0) -- (2,-1); \draw (4,0) -- (4,-1); \draw (8,0) -- (8,-1);
+    \node[align=center] at (1,-0.5) {版本};
+    \node[align=center] at (3,-0.5) {首部长度};
+    \node[align=center] at (6,-0.5) {服务类型};
+    \node[align=center] at (12,-0.5) {总长度};
+    \draw (0,-1) rectangle (16,-2);
+    \draw (8,-1) -- (8,-2); \draw (9.5,-1) -- (9.5,-2);
+    \node[align=center] at (4,-1.5) {标识};
+    \node[align=center] at (8.75,-1.5) {标志};
+    \node[align=center] at (12.75,-1.5) {片偏移};
+    \draw (0,-2) rectangle (16,-3);
+    \draw (4,-2) -- (4,-3); \draw (8,-2) -- (8,-3);
+    \node[align=center] at (2,-2.5) {TTL};
+    \node[align=center] at (6,-2.5) {协议};
+    \node[align=center] at (12,-2.5) {首部检验和};
+    \draw (0,-3) rectangle (16,-4);
+    \node[align=center] at (8,-3.5) {源 IP 地址 (32 位)};
+    \draw (0,-4) rectangle (16,-5);
+    \node[align=center] at (8,-4.5) {目的 IP 地址 (32 位)};
+    \draw (0,-5) rectangle (16,-6);
+    \node[align=center] at (8,-5.5) {选项（可变，0--40 字节）};
+    \draw[<->] (0,0.3) -- node[above] {32 位 = 16 个 2 位格} (16,0.3);
+\end{tikzpicture}
+\caption{IPv4 数据报首部字段布局}
+\label{fig:ipv4_header}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{IPv4 首部逐字段说明}
+\begin{tabulary}{\textwidth}{C C L}
+\toprule
+字段 & 位宽 & 作用与注意点 \\
+\midrule
+版本 & 4 & 值为 $4$（IPv6 为 $6$） \\
+首部长度 & 4 & 以 4 字节为单位，最小 $5$（$=20$ 字节），最大 $15$（$=60$ 字节） \\
+服务类型 & 8 & 区分服务/优先级（DSCP + ECN） \\
+总长度 & 16 & 首部 + 数据的总字节数，最大 $2^{16}-1=65535$ \\
+标识 & 16 & 同一原始数据报的所有分片共享同一值 \\
+标志 & 3 & 保留位、DF（禁止分片）、MF（后面还有分片） \\
+片偏移 & 13 & 本片数据在原始数据中的偏移，单位是 \textbf{8 字节} \\
+TTL & 8 & 每经一跳减 1，减到 0 则丢弃并发 ICMP 超时；防环路 \\
+协议 & 8 & 上层协议：$6$=TCP，$17$=UDP，$1$=ICMP \\
+首部检验和 & 16 & 只校验首部（不含数据），每跳重算，故 TTL 变化会使它改变 \\
+源地址 & 32 & 发送方 IP \\
+目的地址 & 32 & 接收方 IP \\
+选项 + 填充 & 0--40 B & 时间戳、路由记录等，填充到 4 字节整数倍 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{IP 分片与重组}
+
+链路层有最大传输单元 \textbf{MTU}（以太网通常 1500 字节）。当 IP 数据报大于出接口 MTU 时，路由器把它切成若干\textbf{分片 (fragment)}。要点：
+
+\begin{itemize}
+    \item 分片以 \textbf{8 字节} 为粒度，因此每片数据部分长度必须是 8 的倍数（最后一片除外）。
+    \item \textbf{MF}=1 表示后面还有分片，最后一片 \textbf{MF}=0。
+    \item \textbf{片偏移} = 本片数据起点相对原始数据的字节偏移 $\div\,8$。
+    \item \textbf{重组只在最终目的主机}进行，中间路由器不重组。
+\end{itemize}
+
+\noindent\textbf{分片计算例题.} 一个总长 $4000$ 字节的 IP 数据报（首部 $20$ 字节，数据 $3980$ 字节）经过 MTU $=1500$ 字节的链路。
+
+\begin{enumerate}
+    \item 每片可带数据 $= \text{MTU} - 20 = 1480$ 字节；$1480$ 已是 8 的倍数。
+    \item 片数 $= \lceil 3980 / 1480 \rceil = 3$：$1480 + 1480 + 1020 = 3980$。
+    \item 各片片偏移（字节数 $\div 8$）：片 1 偏移 $0$；片 2 $1480/8=185$；片 3 $2960/8=370$。
+    \item 标志：片 1、2 的 MF$=1$；片 3 的 MF$=0$。三片标识字段相同。
+\end{enumerate}
+
+\begin{table}[H]
+\centering
+\caption{分片结果（标识 = 设同一值，如 \texttt{0x1A2B}）}
+\begin{tabulary}{\textwidth}{CCCCC}
+\toprule
+分片 & 数据字节数 & 总长度 & 片偏移 & MF \\
+\midrule
+片 1 & 1480 & 1500 & 0 & 1 \\
+片 2 & 1480 & 1500 & 185 & 1 \\
+片 3 & 1020 & 1040 & 370 & 0 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\noindent 目的主机按（源地址、标识、协议）归组分片，按片偏移排序，等 MF$=0$ 的最后一片到达后拼回原始数据报。若某片丢失，整个数据报被丢弃。
+
+\subsection{TTL 与环路防护}
+
+\textbf{TTL (Time To Live)} 初值通常为 $64$、$128$ 或 $255$，每经过一台路由器减 $1$。它解决两个问题：
+
+\begin{itemize}
+    \item \textbf{防止永久环路}：若路由表因配置错误形成环路，TTL 使分组必然在有限跳内被丢弃，而不是永远打转。
+    \item \textbf{限制传播范围}：\texttt{traceroute} 正是利用逐跳递增 TTL，迫使各跳回送 ICMP「超时」报文来发现路径。
+\end{itemize}
+
+当 TTL 减到 $0$，路由器丢弃该分组并向源主机发送 ICMP 时间超过报文。注意：重组后的原始数据报在首跳时 TTL 等字段可能被复制到各分片。
+
+\section{IP 编址}
+
+\subsection{分类编址与私有地址}
+
+传统\textbf{分类编址 (classful addressing)} 由 IP 地址最高几位决定网络类别：
+
+\begin{table}[H]
+\centering
+\caption{分类编址（$W$ 为第一字节）}
+\begin{tabulary}{\textwidth}{CCCCC}
+\toprule
+类别 & 首字节范围 & 首几位 & 默认前缀 & 默认掩码 \\
+\midrule
+A & $1$--$126$ & $0$ & /8 & 255.0.0.0 \\
+B & $128$--$191$ & $10$ & /16 & 255.255.0.0 \\
+C & $192$--$223$ & $110$ & /24 & 255.255.255.0 \\
+D & $224$--$239$ & $1110$ & 多播 & 无 \\
+E & $240$--$255$ & $1111$ & 保留 & 无 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+为避免每台主机都占用公网地址，IANA 预留三段\textbf{私有地址}，仅在内部网络使用，不得在公网路由：
+
+\begin{itemize}
+    \item \texttt{10.0.0.0/8}（单个 A 类段，约 1677 万地址）
+    \item \texttt{172.16.0.0/12}（16 个 B 类段，\texttt{172.16}--\texttt{172.31}）
+    \item \texttt{192.168.0.0/16}（256 个 C 类段）
+\end{itemize}
+
+\noindent 另有 \texttt{127.0.0.0/8}（环回）与 \texttt{169.254.0.0/16}（链路本地，DHCP 失败时自动配置）。
+
+\subsection{子网与子网掩码}
+
+一个 IP 地址可看作「网络部分 + 主机部分」。\textbf{子网 (subnet)} 是一组高位前缀相同、且中间不跨越路由器的主机接口。子网内主机 IP 与\textbf{子网掩码}按位与得到该子网的\textbf{网络地址}：
+
+\begin{equation}
+    \text{网络地址} = \text{IP} \;\&\; \text{掩码}.
+\end{equation}
+
+掩码中「1」对应网络位，「0」对应主机位。去掉「全 0」的网络号与「全 1」的广播地址后，可用主机数为
+
+\begin{equation}
+    \#\text{可用主机} = 2^{h} - 2,
+\end{equation}
+其中 $h$ 为主机位数。忘记减 $2$ 是最常见的错误。
+
+\subsection{CIDR 无类别编址}
+
+\textbf{CIDR (Classless Inter-Domain Routing)} 用 \texttt{a.b.c.d/x} 显式给出前缀长度 $x$，不再绑定类别，从而支持\textbf{路由聚合}。例如把
+\begin{equation}
+    \texttt{200.23.16.0/23},\; \texttt{200.23.18.0/23},\; \texttt{200.23.20.0/23},\; \texttt{200.23.22.0/23}
+\end{equation}
+聚合成一条 \texttt{200.23.16.0/21}，大幅缩小转发表。
+
+\subsection{子网划分计算例题}
+
+\textbf{例题 1（等长划分）.} 把 \texttt{192.168.1.0/24} 划分为 4 个子网。需要借 $2$ 位（$2^2=4$），新前缀 \texttt{/26}，掩码 \texttt{255.255.255.192}，块大小 $2^6=64$。
+
+\begin{table}[H]
+\centering
+\caption{\texttt{192.168.1.0/24} 划分为 4 个 \texttt{/26} 子网}
+\begin{tabulary}{\textwidth}{CCCCC}
+\toprule
+子网 & 网络地址 & 可用主机范围 & 广播地址 & 可用数 \\
+\midrule
+1 & 192.168.1.0 & 192.168.1.1--192.168.1.62 & 192.168.1.63 & 62 \\
+2 & 192.168.1.64 & 192.168.1.65--192.168.1.126 & 192.168.1.127 & 62 \\
+3 & 192.168.1.128 & 192.168.1.129--192.168.1.190 & 192.168.1.191 & 62 \\
+4 & 192.168.1.192 & 192.168.1.193--192.168.1.254 & 192.168.1.255 & 62 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\noindent 每子网 $2^6-2=62$ 台主机，共 $4\times62=248$，其余被 4 个网络号与 4 个广播地址占用。
+
+\needspace{8\baselineskip}
+\textbf{例题 2（由主机与掩码求子网）.} 主机地址 \texttt{172.16.45.200}，掩码 \texttt{255.255.255.224}（\texttt{/27}）。
+
+\begin{itemize}
+    \item 末字节按位与：$200 = \texttt{11001000}$，掩码 $= \texttt{11100000}$，得 $\texttt{11000000}=192$，故网络地址 \texttt{172.16.45.192}。
+    \item 主机位 $5$ 位，块大小 $32$，广播地址为网络地址主机位全 1：\texttt{11011111}$=223$，即 \texttt{172.16.45.223}。
+    \item 可用范围 \texttt{172.16.45.193}--\texttt{172.16.45.222}，共 $2^5-2=30$ 台。
+\end{itemize}
+
+\needspace{8\baselineskip}
+\textbf{例题 3（按需求设计）.} 某公司从 \texttt{192.168.5.0/24} 中划分，需 5 个子网、每子网至少 25 台主机。
+
+\begin{itemize}
+    \item 子网位数：$2^3=8\ge5$，借 $3$ 位 $\Rightarrow$ \texttt{/27}，掩码 \texttt{255.255.255.224}。
+    \item 主机位数 $=5$，每子网 $2^5-2=30\ge25$，满足需求。
+    \item 块大小 $32$，依次得到 \texttt{.0, .32, .64, .96, .128, .160, .192, .224} 共 8 个，取前 5 个即可。
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\caption{例题 3：选取的 5 个 \texttt{/27} 子网}
+\begin{tabulary}{\textwidth}{CCCC}
+\toprule
+子网 & 网络地址 & 可用范围 & 广播地址 \\
+\midrule
+1 & 192.168.5.0 & .1--.30 & .31 \\
+2 & 192.168.5.32 & .33--.62 & .63 \\
+3 & 192.168.5.64 & .65--.94 & .95 \\
+4 & 192.168.5.96 & .97--.126 & .127 \\
+5 & 192.168.5.128 & .129--.158 & .159 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\subsection{最长前缀匹配}
+
+路由器转发时，一条目的地址可能匹配转发表中的多条表项。\textbf{最长前缀匹配 (longest prefix matching)} 规则：选择\emph{前缀最长}（即最具体）的那条表项。转发表用「前缀 + 通配位」表示，未固定位记 \texttt{*}。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, node distance=0.4cm]
+    \draw (0,0.35) rectangle (12.6,-3.1);
+    \node at (6.3,0.05) {\bfseries 转发表};
+    \node[anchor=west] at (0.2,-0.6) {\ttfamily 11001000 00010111 00010*** ******** $\to$ 接口 0};
+    \node[anchor=west] at (0.2,-1.2) {\ttfamily 11001000 00010111 00011000 ******** $\to$ 接口 1};
+    \node[anchor=west] at (0.2,-1.8) {\ttfamily 11001000 00010111 00011*** ******** $\to$ 接口 2};
+    \node[anchor=west] at (0.2,-2.4) {\ttfamily else $\to$ 默认路由（接口 3）};
+\end{tikzpicture}
+\caption{转发表：前缀越长越优先}
+\label{fig:lpm_table}
+\end{figure}
+
+\noindent\textbf{匹配例题.} 目的地址 $\texttt{11001000 00010111 00010110 10100001}$，逐步按位比较：
+
+\begin{enumerate}
+    \item 表项 1 前缀 \texttt{11001000 00010111 00010}（21 位）：目的地址前 21 位为 \texttt{11001000 00010111 00010}，\textbf{匹配}。
+    \item 表项 2 前缀 \texttt{11001000 00010111 00011000}（24 位）：目的地址第 17--24 位是 \texttt{00010110}$\neq$\texttt{00011000}，不匹配。
+    \item 表项 3 前缀 \texttt{11001000 00010111 00011}（21 位）：目的地址第 21 位是 $0$ 而前缀要求 $1$，不匹配。
+    \item 仅表项 1 命中，故转发到\textbf{接口 0}。
+\end{enumerate}
+
+\noindent 为体现「最长优先」，再看目的地址 $\texttt{11001000 00010111 00011000 10100001}$：它同时匹配表项 2（\texttt{/24}）与表项 3（\texttt{/21}），前者更长，故选\textbf{接口 1}。
+
+\section{动态主机配置：DHCP}
+
+主机接入网络时需要 IP 地址、子网掩码、默认网关与 DNS 服务器地址。\textbf{DHCP (Dynamic Host Configuration Protocol)} 自动完成这些配置，是零配置上网的基础。它运行在 UDP 之上（服务器端口 67，客户端口 68）。
+
+\noindent DHCP 四步交互（DORA）：
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=latex]
+    \draw (0,0) -- (0,-5);
+    \draw (8,0) -- (8,-5);
+    \node at (0,0.35) {DHCP 客户};
+    \node at (8,0.35) {DHCP 服务器};
+    \draw[->] (0,-0.8) -- node[above,align=center]{Discover（广播 \texttt{255.255.255.255}）} (8,-0.8);
+    \draw[->] (8,-2.0) -- node[above,align=center]{Offer（携带 yiaddr 候选地址）} (0,-2.0);
+    \draw[->] (0,-3.2) -- node[above,align=center]{Request（确认选用该地址）} (8,-3.2);
+    \draw[->] (8,-4.4) -- node[above,align=center]{ACK（确认，租约生效）} (0,-4.4);
+\end{tikzpicture}
+\caption{DHCP 的 Discover--Offer--Request--ACK 交互}
+\label{fig:dhcp}
+\end{figure}
+
+\begin{enumerate}
+    \item \textbf{DHCP Discover}：客户以源地址 $0.0.0.0$、目的地址 $255.255.255.255$ 广播，寻找可用服务器。
+    \item \textbf{DHCP Offer}：服务器应答一个候选地址（\texttt{yiaddr}）及配置参数。
+    \item \textbf{DHCP Request}：客户回送，表示接受该候选地址（同时用于拒绝其他服务器）。
+    \item \textbf{DHCP ACK}：服务器确认，地址正式分配并附带\textbf{租约 (lease)} 时间。
+\end{enumerate}
+
+\noindent 地址是「租用」而非永久占有，租约过半时客户会续租。若客户与服务器不在同一子网，需要 \textbf{DHCP 中继代理} 把广播转成单播跨子网转发。DHCP 的可靠性依赖 UDP 之上的重传与事务 ID 匹配。
+
+\section{网络地址转换：NAT}
+
+\textbf{NAT (Network Address Translation)} 让整个私有网络共享少量（甚至一个）公网 IP。私有段内的主机使用私有地址，出口路由器在转发时改写源地址，回包时再改回来。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[font=\small, >=latex,
+    h/.style={draw, rounded corners, minimum width=1.8cm, minimum height=0.6cm, align=center},
+    r/.style={draw, rounded corners, minimum width=2.4cm, minimum height=0.8cm, align=center},
+    s/.style={draw, rounded corners, minimum width=2.4cm, minimum height=0.8cm, align=center}
+]
+    \node[h] (h1) at (0,1) {10.0.0.1};
+    \node[h] (h2) at (0,-1) {10.0.0.2};
+    \node[r] (nat) at (4.6,0) {NAT 路由器\\公网 138.76.29.7};
+    \node[s] (srv) at (9.4,0) {服务器\\128.119.40.186:80};
+    \draw (h1) -- (nat);
+    \draw (h2) -- (nat);
+    \draw[->] (nat) -- node[above,align=center,font=\scriptsize]{WAN 侧\\改写源地址/端口} (srv);
+    \node[align=center, font=\scriptsize] at (2.3,0.9) {LAN 侧\\私有地址};
+\end{tikzpicture}
+\caption{NAT 路由器连接私有网络与公网}
+\label{fig:nat}
+\end{figure}
+
+\textbf{NAPT (Network Address Port Translation)} 进一步用\textbf{端口号}区分内部连接，使多台主机共享同一个公网 IP。路由器维护一张转换表：
+
+\begin{table}[H]
+\centering
+\caption{NAT 转换表示例（公网 IP 为 138.76.29.7）}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+方向 & WAN 侧 & LAN 侧 \\
+\midrule
+出站改写 & 138.76.29.7:5001 & 10.0.0.1:3345 \\
+出站改写 & 138.76.29.7:5002 & 10.0.0.2:3345 \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\noindent\textbf{转换例题.} 主机 \texttt{10.0.0.1:3345} 访问 \texttt{128.119.40.186:80}。NAT 路由器把源改为 \texttt{138.76.29.7:5001} 转发出去；服务器回应目的 \texttt{138.76.29.7:5001}，路由器查表反向改写，投递给 \texttt{10.0.0.1:3345}。同一内网主机即便用相同源端口（如上表两行的 \texttt{:3345}），也会被映射到不同公网端口而互不冲突。
+
+\needspace{8\baselineskip}
+\textbf{与端到端原则的冲突.} NAT 违反了「网络只转发、不修改」的分层与端到端原则：
+
+\begin{itemize}
+    \item 路由器修改了传输层端口，破坏网络层与运输层的边界。
+    \item 外部主机无法主动连接 NAT 之后的主机（地址不可见），使 P2P、IP 电话、托管服务困难，需借助 STUN/TURN、UPnP 或端口映射「打洞」。
+    \item 地址在端到端路径上不再唯一稳定，与 IP 的「无状态、全球唯一」设计相悖。
+\end{itemize}
+
+\noindent IPv6 的海量地址原本意在消除对 NAT 的需求，但 NAT 仍因安全隔离等实用性被广泛保留。
+
+\section{IPv6}
+
+\subsection{地址格式与缩写规则}
+
+IPv6 地址长 \textbf{128 位}，写成 8 组、每组 16 位的十六进制，组间用冒号分隔：
+
+\begin{equation}
+    \texttt{2001:0db8:0000:0000:0000:ff00:0042:8329}.
+\end{equation}
+
+\noindent 缩写规则有二：
+
+\begin{itemize}
+    \item \textbf{省前导零}：每组可去掉开头的 $0$，上面地址变为 \texttt{2001:db8:0:0:0:ff00:42:8329}。
+    \item \textbf{压缩连续零组}：把\emph{一段}连续的全零组用 \texttt{::} 表示，且\textbf{整个地址中只能出现一次}，得 \texttt{2001:db8::ff00:42:8329}。
+\end{itemize}
+
+\noindent 注意：\texttt{::} 只能出现一次，否则无法唯一还原。另支持 IPv4 映射写法，如 \texttt{::ffff:192.168.1.1}。
+
+\subsection{首部变化}
+
+IPv6 首部\textbf{固定 40 字节}，与 IPv4 相比：
+
+\begin{table}[H]
+\centering
+\caption{IPv4 与 IPv6 首部关键差异}
+\begin{tabulary}{\textwidth}{CCC}
+\toprule
+特性 & IPv4 & IPv6 \\
+\midrule
+地址长度 & 32 位 & 128 位 \\
+首部长度 & 20--60 字节可变 & 固定 40 字节 \\
+首部检验和 & 有 & \textbf{取消}（交给链路层/上层） \\
+分片 & 路由器可分片 & 仅源主机可分片，路由器不分片 \\
+TTL & TTL & 改名跳数限制 (Hop Limit) \\
+流标签 & 无 & 新增 20 位 Flow Label \\
+选项 & 首部内 & 移入扩展首部 (extension headers) \\
+\bottomrule
+\end{tabulary}
+\end{table}
+
+\noindent 取消首部检验和可省去每跳重算的开销；路由器不分片则简化转发并避免中间重组；128 位地址还支持\textbf{任播 (anycast)}——发往一组接口中最近的一个。
+
+\subsection{过渡：双栈与隧道}
+
+IPv4 与 IPv6 不能直接互通，过渡技术主要有：
+
+\begin{itemize}
+    \item \textbf{双栈 (dual stack)}：主机/路由器同时运行 IPv4 与 IPv6，按目的地址选择版本，逐步迁移。
+    \item \textbf{隧道 (tunneling)}：把 IPv6 数据报整体封装进 IPv4 数据报，穿越只支持 IPv4 的区域（如 6to4、Teredo）。
+    \item \textbf{翻译 (NAT64/DNS64)}：在纯 IPv4 与纯 IPv6 之间做协议转换，供无法升级的旧主机使用。
+\end{itemize}
+
+\section{本章小结与常见误区}
+
+\noindent\textbf{小结.} 数据平面 = 路由器内部结构 + 逐分组转发。路由器由输入端口（查表）、交换结构（内存/总线/网络）、输出端口（排队）和路由处理器组成；排队会带来时延与队头阻塞。IPv4 首部固定 20 字节，分片以 8 字节为粒度、只在目的主机重组，TTL 防环路。编址经历了分类 $\to$ 子网 $\to$ CIDR 的演进，核心是「网络前缀 + 主机位」，转发依据最长前缀匹配。DHCP 用广播实现零配置，NAT/NAPT 用地址与端口复用缓解地址短缺，但牺牲了端到端透明性。IPv6 用 128 位地址、固定首部与取消中间分片来解决 IPv4 的根本局限。
+
+\begin{table}[H]
+\centering
+\caption{常见误区与纠正}
+\begin{tabulary}{\textwidth}{CL}
+\toprule
+误区 & 纠正 \\
+\midrule
+可用主机数直接用 $2^h$ & 必须减去网络号与广播地址，为 $2^h-2$（\texttt{/31}、\texttt{/32} 特例除外） \\
+子网掩码「按位与」算错 & 逐字节转二进制再 AND；如 $200\;\&\;224=192$ 而非 $200$ \\
+把网络地址当可用地址 & 网络地址与广播地址都不可分配给主机 \\
+广播地址写成网段最后一个可用地址 & 广播是主机位全 1，比最后一个可用地址大 1 \\
+CIDR \texttt{/x} 中 $x$ 越大越笼统 & 相反：$x$ 越大前缀越长、子网越具体，最长前缀匹配优先它 \\
+片偏移用字节计 & 片偏移单位是 8 字节；每片（末片除外）数据须为 8 的倍数 \\
+忽略 MTU 动态变化 & 不同链路 MTU 可能不同，可能触发再次分片或需要路径 MTU 发现 \\
+认为 NAT 是「透明」的 & NAT 改写地址与端口，破坏端到端可达性，需打洞才能被外部连接 \\
+TTL 用时间秒计 & IPv4 实践中 TTL 语义已变为「跳数」，每跳减 1 \\
+IPv6 中 \texttt{::} 可多次出现 & 一个地址中 \texttt{::} 至多出现一次，否则无法唯一还原 \\
+\bottomrule
+\end{tabulary}
+\end{table}

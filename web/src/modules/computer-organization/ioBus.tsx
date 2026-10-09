@@ -6,59 +6,13 @@ import { MathText } from "../../lib/tex";
 // =====================================================================
 // I/O 系统与总线 · 单模块聚合 · 交互式
 //   对应 tex/ComputerOrganization/chapters/io_bus.tex
-//   layers(层次) / mapped(内存映射 vs 独立) / sync(轮询·中断·DMA)
-//   / bus(总线·PCIe) / storage(磁盘 vs SSD) / summary(架构总结)
+//   mapped(内存映射 vs 独立) / sync(轮询·中断·DMA) / storage(磁盘 vs SSD)
 // =====================================================================
 
-type SubMode = "layers" | "mapped" | "sync" | "bus" | "storage" | "summary";
+type SubMode = "mapped" | "sync" | "storage";
 
-function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
-  return (
-    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, fontFamily: "ui-monospace, monospace", background: "#fff" }}>
-      <thead>
-        <tr>{head.map((h, i) => <th key={i} style={{ padding: "6px 10px", textAlign: "left", color: "#475569", borderBottom: "2px solid #e2e8f0", fontSize: 12 }}>{h}</th>)}</tr>
-      </thead>
-      <tbody>
-        {rows.map((r, k) => (
-          <tr key={k} style={{ background: k % 2 ? "#f8fafc" : "#fff" }}>
-            {r.map((c, i) => <td key={i} style={{ padding: "5px 10px", borderBottom: "1px solid #f1f5f9", color: i === 0 ? "#0f172a" : "#475569", fontWeight: i === 0 ? 700 : 400 }}>{c}</td>)}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
 function Panel({ children }: { children: React.ReactNode }) {
   return <div style={{ maxWidth: "100%", margin: "0 auto", display: "grid", gap: 12 }}>{children}</div>;
-}
-
-// ---------------------------------------------------------------------
-// layers
-// ---------------------------------------------------------------------
-function LayersRender({ t }: any) {
-  const isZh = t(T("中文", "en")) !== "en";
-  const chain = isZh ? ["设备", "设备控制器", "总线", "CPU / 内存"] : ["Device", "Controller", "Bus", "CPU / Memory"];
-  return (
-    <Panel>
-      <div style={{ display: "flex", gap: 6, alignItems: "center", justifyContent: "center", flexWrap: "wrap" }}>
-        {chain.map((c, i) => (
-          <div key={c} style={{ display: "flex", alignItems: "center" }}>
-            <div style={{ padding: "10px 14px", borderRadius: 10, background: "#eef2ff", border: "1.5px solid #c7d2fe", color: "#3730a3", fontWeight: 800, fontSize: 13 }}>{c}</div>
-            {i < chain.length - 1 && <span style={{ color: "#c7d2fe", padding: "0 4px", fontSize: 16 }}>↔</span>}
-          </div>
-        ))}
-      </div>
-      <Table
-        head={isZh ? ["控制器寄存器", "作用"] : ["Controller register", "Role"]}
-        rows={isZh
-          ? [["状态 (Status)", "设备忙/就绪/错误标志"], ["控制 (Control)", "命令位(启动/复位/方向)"], ["数据 (Data)", "读写的数据缓冲"]]
-          : [["Status", "busy / ready / error flags"], ["Control", "command bits (start/reset/dir)"], ["Data", "data buffer"]]}
-      />
-      <div style={{ fontSize: 12, color: "#64748b", textAlign: "center" }}>
-        {isZh ? "CPU 只与控制器寄存器交互, 屏蔽具体设备差异。" : "CPU talks only to controller registers, abstracting devices."}
-      </div>
-    </Panel>
-  );
 }
 
 // ---------------------------------------------------------------------
@@ -187,59 +141,6 @@ function SyncRender({ config, t }: any) {
 }
 
 // ---------------------------------------------------------------------
-// bus / summary
-// ---------------------------------------------------------------------
-function BusRender({ t }: any) {
-  const isZh = t(T("中文", "en")) !== "en";
-  const rows: React.ReactNode[][] = isZh
-    ? [
-      ["数据总线", "传数据, 宽度决定一次传输位数", "双向"],
-      ["地址总线", "传地址, 宽度决定寻址范围", "单向 (CPU→设备)"],
-      ["控制总线", "读/写/中断/时钟等控制", "双向"],
-      ["同步总线", "由时钟统一节拍", "快, 但受最慢设备拖累"],
-      ["异步总线", "握手信号 (req/ack) 协调", "适应不同速度设备"],
-    ]
-    : [
-      ["Data bus", "carries data; width = transfer size", "bidirectional"],
-      ["Address bus", "carries address; width = range", "unidirectional"],
-      ["Control bus", "read/write/interrupt/clock", "bidirectional"],
-      ["Synchronous", "clocked", "fast; limited by slowest"],
-      ["Asynchronous", "handshake (req/ack)", "tolerates varied speeds"],
-    ];
-  return (
-    <Panel>
-      <Table head={isZh ? ["总线/类型", "含义", "方向/特点"] : ["Bus", "Meaning", "Dir/Trait"]} rows={rows} />
-      <div style={{ fontWeight: 800, color: "#334155", fontSize: 13 }}>PCIe</div>
-      <Table
-        head={isZh ? ["特性", "说明"] : ["Feature", "Note"]}
-        rows={isZh
-          ? [["拓扑", "点对点串行链路 (非共享并行总线), 多 lane 聚合带宽"], ["分层", "事务层 / 数据链路层 / 物理层"], ["方向", "每 lane 收发独立, 全双工"], ["演进", "高频串行取代宽并行, 带宽随代数翻倍"]]
-          : [["Topology", "point-to-point serial, multi-lane aggregation"], ["Layers", "transaction / data-link / physical"], ["Duplex", "independent TX/RX per lane"], ["Trend", "serial beats wide parallel"] ]}
-      />
-    </Panel>
-  );
-}
-function SummaryRender({ t }: any) {
-  const isZh = t(T("中文", "en")) !== "en";
-  const rows: React.ReactNode[][] = isZh
-    ? [
-      ["北桥 / 南桥", "传统: 内存控制器 + PCIe 走北桥, 慢速 I/O 走南桥"],
-      ["SoC 集成", "内存控制器与 PCIe 移入 CPU, 北桥消失"],
-      ["多核互联", "环形/网格片上网络 + 缓存一致性协议"],
-      ["并行 I/O", "NVMe / 多通道, 以 DMA 与队列深度换吞吐"],
-      ["界面", "I/O 是 CPU 与 OS 交互的关键界面 (中断/驱动)"],
-    ]
-    : [
-      ["North/South bridge", "memory ctrl + PCIe on north; slow I/O on south"],
-      ["SoC integration", "memory ctrl & PCIe into CPU; north bridge gone"],
-      ["Interconnect", "ring/mesh NoC + cache coherence"],
-      ["Parallel I/O", "NVMe / multi-channel, DMA + queue depth"],
-      ["Interface", "I/O is the key CPU/OS interface"],
-    ];
-  return <Panel><Table head={isZh ? ["主题", "要点"] : ["Topic", "Point"]} rows={rows} /></Panel>;
-}
-
-// ---------------------------------------------------------------------
 // storage: 磁盘 vs SSD
 // ---------------------------------------------------------------------
 const STORAGE_DEFAULT = { seek: 8, rpm: 7200, xfer: 150, sizeKB: 4 };
@@ -300,35 +201,29 @@ function StorageRender({ config, t }: any) {
 type Cfg = { subMode: SubMode; [k: string]: any };
 
 const SUB: Record<SubMode, ModuleDef> = {
-  layers: { id: "layers", title: T("I/O 层次", "Layers"), defaultConfig: {}, generate: () => [{ caption: T("I/O 系统层次", "I/O layers"), scene: {} }] as never, Render: LayersRender as never } as unknown as ModuleDef,
   mapped: { id: "mapped", title: T("映射方式", "Mapped I/O"), defaultConfig: { scheme: "mmio" }, Controls: MappedControls as never, generate: () => [{ caption: T("内存映射 vs 独立 I/O", "Mapped I/O"), scene: {} }] as never, Render: MappedRender as never } as unknown as ModuleDef,
   sync: { id: "sync", title: T("同步方式", "Synchronization"), defaultConfig: { mode: "polling" }, Controls: SyncControls as never, generate: () => [{ caption: T("轮询 / 中断 / DMA", "Polling / Interrupt / DMA"), scene: {} }] as never, Render: SyncRender as never } as unknown as ModuleDef,
-  bus: { id: "bus", title: T("总线与 PCIe", "Bus & PCIe"), defaultConfig: {}, generate: () => [{ caption: T("总线与 PCIe", "Bus & PCIe"), scene: {} }] as never, Render: BusRender as never } as unknown as ModuleDef,
   storage: { id: "storage", title: T("磁盘与 SSD", "Disk & SSD"), defaultConfig: STORAGE_DEFAULT, Controls: StorageControls as never, generate: () => [{ caption: T("磁盘与 SSD 访问时间", "Disk vs SSD"), scene: {} }] as never, Render: StorageRender as never } as unknown as ModuleDef,
-  summary: { id: "summary", title: T("架构总结", "Summary"), defaultConfig: {}, generate: () => [{ caption: T("系统总线架构总结", "Architecture summary"), scene: {} }] as never, Render: SummaryRender as never } as unknown as ModuleDef,
 };
 
 const MAP: Record<SubMode, ModuleDef> = SUB;
 export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
   { label: "I/O", opts: [
-    { v: "layers", zh: "I/O 层次", en: "Layers" },
     { v: "mapped", zh: "映射方式", en: "Mapped" },
     { v: "sync", zh: "轮询/中断/DMA", en: "Sync" },
   ]},
   { label: "总线与存储", opts: [
-    { v: "bus", zh: "总线/PCIe", en: "Bus" },
     { v: "storage", zh: "磁盘/SSD", en: "Storage" },
-    { v: "summary", zh: "架构总结", en: "Summary" },
   ]},
 ];
 
-const DEFAULT: Cfg = { subMode: "layers", ...(SUB.layers as any).defaultConfig };
+const DEFAULT: Cfg = { subMode: "mapped", ...(SUB.mapped as any).defaultConfig };
 
 function activeOf(sub: unknown): ModuleDef {
-  return (MAP as Record<string, ModuleDef>)[sub as string] ?? SUB.layers;
+  return (MAP as Record<string, ModuleDef>)[sub as string] ?? SUB.mapped;
 }
 function subKeyOf(sub: unknown): SubMode {
-  return (MAP as Record<string, ModuleDef>)[sub as string] ? (sub as SubMode) : "layers";
+  return (MAP as Record<string, ModuleDef>)[sub as string] ? (sub as SubMode) : "mapped";
 }
 function safeCfg(sub: unknown, config: Cfg): Cfg {
   const m = activeOf(sub) as any;
@@ -339,7 +234,7 @@ function safeCfg(sub: unknown, config: Cfg): Cfg {
 export const ioBusModule: ModuleDef<any, Cfg> = {
   id: "io-bus",
   title: T("I/O 与总线", "I/O & Bus"),
-  desc: T("I/O 层次 / 内存映射 / 轮询·中断·DMA / 总线与 PCIe / 磁盘与 SSD / 架构总结。", "I/O layers / mapped I/O / polling, interrupt, DMA / bus & PCIe / disk & SSD / summary."),
+  desc: T("内存映射 / 轮询·中断·DMA / 磁盘与 SSD。", "Mapped I/O / polling, interrupt, DMA / disk & SSD."),
   tags: ["computer-organization", "io"],
   interactive: true,
   defaultConfig: DEFAULT,

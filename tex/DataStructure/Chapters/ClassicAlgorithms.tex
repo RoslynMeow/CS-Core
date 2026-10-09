@@ -329,7 +329,7 @@
 维护 $D:V\to\mathbb{R}\cup\{\infty\}$，松弛：$D[u]+w(u,v)<D[v]\implies D[v]\gets D[u]+w(u,v)$。
 
 \begin{enumerate}
-    \item \textbf{Dijkstra}：贪心取 $u\in V\setminus S$ 使 $D[u]$ 最小入 $S$ 并松弛。不支持负权；优先队列 $\text{ExtractMin}/\text{DecreaseKey}$ 为贪心选择的实例化（实例取堆，见树章堆序）。
+    \item \textbf{Dijkstra}：每次取 $D[u]$ 最小的 $u\in V\setminus S$ 入 $S$ 并松弛。不支持负权；优先队列 $\text{ExtractMin}/\text{DecreaseKey}$ 为其贪心实例化。
     \item \textbf{Bellman-Ford}：$|V|-1$ 轮全量松弛；第 $|V|$ 轮可松弛 $\implies$ 负环，$O(|V||E|)$。
     \item \textbf{Floyd-Warshall}：$D^{(k)}[i][j]=\min(D^{(k-1)}[i][j],D^{(k-1)}[i][k]+D^{(k-1)}[k][j])$，$O(|V|^3)$，支持负权，$D[i][i]<0\implies$负环。
 \end{enumerate}

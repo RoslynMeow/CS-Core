@@ -6,11 +6,11 @@ import { MathText } from "../../lib/tex";
 // =====================================================================
 // 处理器: 数据通路 · 单模块聚合 · 分步数据流
 //   对应 tex/ComputerOrganization/chapters/cpu_datapath.tex
-//   overview / components / exec(逐级数据流·可播放) / full / critical
+//   components(数据流·可播放) / exec(逐级数据流·可播放) / full(完整通路·可播放) / critical(关键路径·可播放)
 //   复用: 指令系统的 R/I 格式与操作数; 控制器章的控制信号。
 // =====================================================================
 
-type SubMode = "overview" | "components" | "exec" | "full" | "critical";
+type SubMode = "components" | "exec" | "full" | "critical";
 type InstrName = "add" | "lw" | "sw" | "beq";
 const INSTR: { name: InstrName; kind: "R" | "I"; args: string }[] = [
   { name: "add", kind: "R", args: "$rd, $rs, $rt" },
@@ -294,113 +294,247 @@ function ExecRender({ scene: _scene, t, config }: any) {
 }
 
 // ---------------------------------------------------------------------
-// 静态卡
+// 数据通路示意: 组件 / 连线 高亮 (SVG)
 // ---------------------------------------------------------------------
-function OverviewRender({ t }: any) {
-  const isZh = t(T("中文", "en")) !== "en";
+type DNode = { id: string; label: string; zh: string; en: string; x: number; y: number; w: number; h: number };
+type DWire = { id: string; d: string };
+
+function Diagram({ nodes, wires, activeNodes, activeWires, values, width, height, zh }: {
+  nodes: DNode[]; wires: DWire[]; activeNodes: string[]; activeWires: string[]; values: Record<string, string>; width: number; height: number; zh: boolean;
+}) {
+  const onN = new Set(activeNodes);
+  const onW = new Set(activeWires);
+  return (
+    <svg viewBox={`0 0 ${width} ${height}`} style={{ width: "100%", height: "auto", display: "block" }}>
+      <defs>
+        <marker id="dp-on" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#4f46e5" /></marker>
+        <marker id="dp-off" markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#cbd5e1" /></marker>
+      </defs>
+      {wires.map((w) => {
+        const on = onW.has(w.id);
+        return <path key={w.id} d={w.d} fill="none" stroke={on ? "#4f46e5" : "#cbd5e1"} strokeWidth={on ? 2.4 : 1.5} markerEnd={on ? "url(#dp-on)" : "url(#dp-off)"} />;
+      })}
+      {nodes.map((n) => {
+        const on = onN.has(n.id);
+        return (
+          <g key={n.id}>
+            <rect x={n.x} y={n.y} width={n.w} height={n.h} rx={10} fill={on ? "#eef2ff" : "#ffffff"} stroke={on ? "#4f46e5" : "#cbd5e1"} strokeWidth={on ? 2.2 : 1.4} />
+            <text x={n.x + n.w / 2} y={n.y + n.h / 2 - 2} textAnchor="middle" fontSize={13} fontWeight={800} fill={on ? "#3730a3" : "#475569"}>{n.label}</text>
+            <text x={n.x + n.w / 2} y={n.y + n.h / 2 + 13} textAnchor="middle" fontSize={9.5} fill="#94a3b8">{zh ? n.zh : n.en}</text>
+            {values[n.id] && <text x={n.x + n.w / 2} y={n.y + n.h + 14} textAnchor="middle" fontFamily="ui-monospace, monospace" fontSize={9.5} fill="#b45309">{values[n.id]}</text>}
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
+
+// ---------------------------------------------------------------------
+// components: 数据在组件间流动 (PC→IM→Registers→ALU→DM→Registers)
+// ---------------------------------------------------------------------
+const COMP_NODES: DNode[] = [
+  { id: "PC", label: "PC", zh: "程序计数器", en: "PC", x: 20, y: 80, w: 90, h: 56 },
+  { id: "IM", label: "IM", zh: "指令存储器", en: "Instr. mem", x: 150, y: 80, w: 90, h: 56 },
+  { id: "REG", label: "RegFile", zh: "寄存器堆", en: "Register file", x: 290, y: 60, w: 90, h: 96 },
+  { id: "ALU", label: "ALU", zh: "运算器", en: "ALU", x: 430, y: 80, w: 90, h: 56 },
+  { id: "DM", label: "DM", zh: "数据存储器", en: "Data mem", x: 580, y: 80, w: 90, h: 56 },
+];
+const COMP_WIRES: DWire[] = [
+  { id: "PC-IM", d: "M 110 108 L 146 108" },
+  { id: "IM-REG", d: "M 240 108 L 286 108" },
+  { id: "REG-ALU", d: "M 380 108 L 426 108" },
+  { id: "ALU-DM", d: "M 520 108 L 576 108" },
+  { id: "DM-REG", d: "M 625 136 L 625 190 L 335 190 L 335 156" },
+];
+type CompScene = { active: string[]; wires: string[]; val: Record<string, string>; step: number; instr: string };
+const COMP_STEPS: { active: string[]; wires: string[]; val: Record<string, string>; cap: [string, string] }[] = [
+  { active: ["PC", "IM"], wires: ["PC-IM"], val: { PC: "0x00400000" }, cap: ["取指: PC → 指令存储器", "Fetch: PC → IM"] },
+  { active: ["IM", "REG"], wires: ["IM-REG"], val: { IM: "lw $t3, 8($t2)" }, cap: ["译码: 指令 → 寄存器堆 (读 rs)", "Decode: instruction → register file (read rs)"] },
+  { active: ["REG", "ALU"], wires: ["REG-ALU"], val: { REG: "$t2 = 0x00000100" }, cap: ["读源操作数: 寄存器堆 → ALU", "Read operands: register file → ALU"] },
+  { active: ["ALU", "DM"], wires: ["ALU-DM"], val: { ALU: "addr = 0x00000108" }, cap: ["执行: ALU 计算地址 → 数据存储器", "Execute: ALU address → data memory"] },
+  { active: ["DM", "REG"], wires: ["DM-REG"], val: { DM: "[0x108] = 0xDEADBEEF", REG: "$t3 ← 0xDEADBEEF" }, cap: ["访存/写回: 数据存储器 → 寄存器堆", "Memory/write-back: data memory → register file"] },
+];
+function generateComponents(_cfg: any): Frame<CompScene>[] {
+  return COMP_STEPS.map((st, i) => ({
+    line: i,
+    caption: T(st.cap[0], st.cap[1]),
+    scene: { active: st.active, wires: st.wires, val: st.val, step: i, instr: "lw $t3, 8($t2)" },
+  }));
+}
+const COMP_CODE = [
+  T("$PC \\to IM[PC] \\to IR$", "$PC \\to IM[PC] \\to IR$"),
+  T("$IR \\to RegFile\\ (\\text{读}\\ rs)$", "$IR \\to RegFile$ (read rs)"),
+  T("$rs \\gets RegFile[rs]$", "$rs \\gets RegFile[rs]$"),
+  T("$ALUOut \\gets rs + sext \\to Addr$", "$ALUOut \\gets rs + sext \\to Addr$"),
+  T("$Data \\gets Mem[ALUOut]$", "$Data \\gets Mem[ALUOut]$"),
+];
+function ComponentsRender({ scene, t }: any) {
+  const zh = t(T("中文", "en")) !== "en";
+  const s = (scene ?? {}) as CompScene;
   return (
     <Panel>
-      <div style={{ padding: "12px 16px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe", fontSize: 13, color: "#3730a3", lineHeight: 2 }}>
-        {isZh
-          ? "单周期 CPU 在「一个时钟周期」内完成 取指 → 译码 → 执行 → 访存 → 写回 全部操作。CPI = 1, 但时钟周期由最慢指令(如 lw)决定; 简单指令(add)也被迫等待同样长的周期, 效率低 —— 这是流水线的直接动机。"
-          : "A single-cycle CPU completes fetch → decode → execute → memory → write-back in one clock cycle. CPI = 1, but the cycle is limited by the slowest instruction (lw); simple add waits the same long cycle — the motivation for pipelining."}
+      <div style={{ textAlign: "center", fontFamily: "ui-monospace, monospace", fontSize: 13, fontWeight: 800, color: "#1e293b" }}>{s.instr}</div>
+      <Diagram nodes={COMP_NODES} wires={COMP_WIRES} activeNodes={s.active ?? []} activeWires={s.wires ?? []} values={s.val ?? {}} width={720} height={220} zh={zh} />
+      <div style={{ padding: "10px 14px", borderRadius: 10, background: "#eef2ff", border: "1px solid #c7d2fe", fontSize: 13, color: "#3730a3", lineHeight: 1.7 }}>
+        {zh ? "数据沿通路逐级流动: 程序计数器提供地址 → 指令存储器取指 → 寄存器堆读操作数 → ALU 运算 → 数据存储器访存 → 写回寄存器堆。" : "Data flows stage by stage: PC provides the address → IM fetches → register file reads operands → ALU computes → data memory access → write back."}
       </div>
     </Panel>
   );
 }
 
-function ComponentsRender({ t }: any) {
-  const isZh = t(T("中文", "en")) !== "en";
-  const rows: React.ReactNode[][] = isZh
-    ? [
-      ["程序计数器 (PC)", "存放下一条指令地址", "PCWrite"],
-      ["指令存储器", "按地址取指令", "—"],
-      ["寄存器堆", "32 个 32 位通用寄存器", "RegWrite"],
-      ["ALU", "算术 / 逻辑运算", "ALUOp, ALUSrc"],
-      ["数据存储器", "读写数据", "MemRead, MemWrite"],
-      ["多路选择器 (MUX)", "选择数据来源", "选择信号"],
-      ["符号扩展单元", "16-bit → 32-bit 扩展", "—"],
-    ]
-    : [
-      ["PC", "next instruction address", "PCWrite"],
-      ["Instruction memory", "fetch by address", "—"],
-      ["Register file", "32 × 32-bit GPRs", "RegWrite"],
-      ["ALU", "arithmetic / logic", "ALUOp, ALUSrc"],
-      ["Data memory", "load / store", "MemRead, MemWrite"],
-      ["MUX", "select data source", "select"],
-      ["Sign extension", "16 → 32 bit", "—"],
-    ];
+// ---------------------------------------------------------------------
+// full: 完整单周期数据通路 (逐步传播并高亮活动连线/组件)
+// ---------------------------------------------------------------------
+const FULL_NODES: DNode[] = [
+  { id: "PC", label: "PC", zh: "程序计数器", en: "PC", x: 20, y: 50, w: 70, h: 46 },
+  { id: "IM", label: "IM", zh: "指令存储器", en: "Instr. mem", x: 120, y: 50, w: 80, h: 46 },
+  { id: "REG", label: "RegFile", zh: "寄存器堆", en: "Register file", x: 250, y: 26, w: 90, h: 104 },
+  { id: "CTRL", label: "Control", zh: "控制器", en: "Control", x: 120, y: 190, w: 80, h: 46 },
+  { id: "SEXT", label: "SignExt", zh: "符号扩展", en: "Sign-ext", x: 250, y: 190, w: 90, h: 40 },
+  { id: "MUX", label: "MUX", zh: "ALUSrc 选择", en: "ALUSrc", x: 400, y: 150, w: 54, h: 36 },
+  { id: "ALU", label: "ALU", zh: "运算器", en: "ALU", x: 475, y: 50, w: 80, h: 58 },
+  { id: "DM", label: "DM", zh: "数据存储器", en: "Data mem", x: 620, y: 50, w: 80, h: 58 },
+  { id: "WBMUX", label: "WBMUX", zh: "写回选择", en: "MemtoReg", x: 475, y: 205, w: 80, h: 40 },
+];
+const FULL_WIRES: DWire[] = [
+  { id: "PC-IM", d: "M 90 73 L 116 73" },
+  { id: "IM-REG", d: "M 200 73 L 246 73" },
+  { id: "IM-CTRL", d: "M 160 96 L 160 186" },
+  { id: "REG-ALU", d: "M 340 55 L 440 55 L 440 66 L 471 66" },
+  { id: "SEXT-MUX", d: "M 340 210 L 372 210 L 372 168 L 396 168" },
+  { id: "MUX-ALU", d: "M 454 168 L 465 168 L 465 90 L 471 90" },
+  { id: "ALU-DM", d: "M 555 79 L 616 79" },
+  { id: "ALU-WB", d: "M 515 108 L 515 201" },
+  { id: "DM-WB", d: "M 660 108 L 660 225 L 559 225" },
+  { id: "WB-REG", d: "M 515 245 L 515 262 L 295 262 L 295 134" },
+];
+type FullScene = { active: string[]; wires: string[]; signals: string[]; val: Record<string, string>; step: number; instr: string };
+const FULL_STEPS: { add: string[]; wires: string[]; signals: string[]; val: Record<string, string>; cap: [string, string] }[] = [
+  { add: ["PC", "IM"], wires: ["PC-IM"], signals: [], val: { PC: "PC=0x00400000", IM: "IR: lw $t3,8($t2)" }, cap: ["取指: PC → 指令存储器 → IR", "Fetch: PC → IM → IR"] },
+  { add: ["CTRL", "REG"], wires: ["IM-REG", "IM-CTRL"], signals: ["RegWrite"], val: { REG: "$t2=0x100" }, cap: ["译码: 指令 → 控制器/寄存器堆", "Decode: instruction → control / register file"] },
+  { add: ["SEXT", "MUX", "ALU"], wires: ["REG-ALU", "SEXT-MUX", "MUX-ALU"], signals: ["ALUSrc=1"], val: { ALU: "addr=0x108" }, cap: ["执行: 符号扩展 + ALUSrc 选择 → ALU 算地址", "Execute: sign-extend + ALUSrc → ALU address"] },
+  { add: ["DM"], wires: ["ALU-DM"], signals: ["MemRead=1"], val: { DM: "[0x108]=0xDEADBEEF" }, cap: ["访存: 读数据存储器", "Memory: read data memory"] },
+  { add: ["WBMUX"], wires: ["DM-WB", "WB-REG"], signals: ["RegWrite=1", "MemtoReg=1"], val: { REG: "$t3 ← 0xDEADBEEF" }, cap: ["写回: 数据 → 寄存器堆 (PC ← PC+4)", "Write-back: data → register file (PC ← PC+4)"] },
+];
+function generateFull(_cfg: any): Frame<FullScene>[] {
+  let active: string[] = []; let wires: string[] = []; let signals: string[] = []; let val: Record<string, string> = {};
+  return FULL_STEPS.map((st, i) => {
+    active = [...active, ...st.add];
+    wires = [...wires, ...st.wires];
+    signals = [...signals, ...st.signals];
+    val = { ...val, ...st.val };
+    return { line: i, caption: T(st.cap[0], st.cap[1]), scene: { active: [...active], wires: [...wires], signals: [...signals], val: { ...val }, step: i, instr: "lw $t3, 8($t2)" } };
+  });
+}
+const FULL_CODE = [
+  T("$PC \\to IM \\to IR$", "$PC \\to IM \\to IR$"),
+  T("$IR \\to \\text{控制器};\\ RegFile[rs,rt]$", "$IR \\to control; RegFile[rs,rt]$"),
+  T("$sext \\gets SignExt(imm);\\ ALUOut \\gets rs + sext$", "$sext \\gets SignExt(imm); ALUOut \\gets rs + sext$"),
+  T("$Data \\gets Mem[ALUOut]$", "$Data \\gets Mem[ALUOut]$"),
+  T("$RegFile[rt] \\gets Data;\\ PC \\gets PC+4$", "$RegFile[rt] \\gets Data; PC \\gets PC+4$"),
+];
+function FullRender({ scene, t }: any) {
+  const zh = t(T("中文", "en")) !== "en";
+  const s = (scene ?? {}) as FullScene;
   return (
     <Panel>
-      <Table head={isZh ? ["组件", "功能", "控制信号"] : ["Component", "Function", "Control"]} rows={rows} />
-      <div style={{ fontSize: 12, color: "#94a3b8" }}>{isZh ? "控制信号由控制器按 opcode/funct 生成 (见「控制器」模块)。" : "Control signals generated by the control unit (see Control Unit module)."}</div>
+      <div style={{ textAlign: "center", fontFamily: "ui-monospace, monospace", fontSize: 13, fontWeight: 800, color: "#1e293b" }}>{s.instr}</div>
+      <Diagram nodes={FULL_NODES} wires={FULL_WIRES} activeNodes={s.active ?? []} activeWires={s.wires ?? []} values={s.val ?? {}} width={800} height={285} zh={zh} />
+      {(s.signals ?? []).length > 0 && (
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center" }}>
+          {(s.signals ?? []).map((sig) => (
+            <span key={sig} style={{ padding: "3px 10px", borderRadius: 999, background: "#dcfce7", color: "#15803d", border: "1px solid #86efac", fontSize: 12, fontFamily: "ui-monospace, monospace", fontWeight: 800 }}>{sig}</span>
+          ))}
+        </div>
+      )}
+      <div style={{ padding: "10px 14px", borderRadius: 10, background: "#eef2ff", border: "1px solid #c7d2fe", fontSize: 13, color: "#3730a3", lineHeight: 1.7 }}>
+        {zh ? "单周期: 一个时钟周期内数据沿通路传播完成 取指→译码→执行→访存→写回; 时钟周期须容纳最慢路径 (lw)。" : "Single-cycle: data propagates through the whole path in one clock; the cycle must cover the slowest path (lw)."}
+      </div>
     </Panel>
   );
 }
 
-function FullRender({ scene: _scene, t }: any) {
-  const isZh = t(T("中文", "en")) !== "en";
-  const stages: [string, string, string][] = isZh
-    ? [
-      ["IF", "取指", "PC → 指令存储器, 取出 32 位指令"],
-      ["ID", "译码", "寄存器堆读 rs/rt, 符号扩展立即数"],
-      ["EX", "执行", "ALU 运算 / 地址计算 / 比较"],
-      ["MEM", "访存", "读写数据存储器 (仅 lw/sw)"],
-      ["WB", "写回", "ALU 结果或存储器数据写回寄存器堆"],
-    ]
-    : [
-      ["IF", "Fetch", "PC → IM, fetch 32-bit instruction"],
-      ["ID", "Decode", "read rs/rt, sign-extend immediate"],
-      ["EX", "Execute", "ALU op / address / compare"],
-      ["MEM", "Memory", "read/write data memory (lw/sw)"],
-      ["WB", "Write-back", "ALU result or memory data → register file"],
-    ];
-  return (
-    <Panel>
-      <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-        {stages.map(([k, zh, desc]) => (
-          <div key={k} style={{ flex: "1 1 160px", minWidth: 150, padding: "10px 12px", borderRadius: 12, border: "1.5px solid #c7d2fe", background: "#f8faff" }}>
-            <div style={{ fontWeight: 900, color: "#4338ca", fontSize: 13 }}>{k} <span style={{ fontWeight: 400, color: "#94a3b8", fontSize: 11 }}>{zh}</span></div>
-            <div style={{ fontSize: 12, color: "#475569", marginTop: 4, lineHeight: 1.6 }}>{desc}</div>
-          </div>
-        ))}
-      </div>
-      <div style={{ fontSize: 12, color: "#64748b" }}>
-        {isZh ? "组件经 MUX 与总线连接; 控制信号由控制器按 opcode/funct 生成。" : "Components wired via MUX/bus; control signals from opcode/funct."}
-      </div>
-    </Panel>
-  );
+// ---------------------------------------------------------------------
+// critical: 关键路径延迟累加
+// ---------------------------------------------------------------------
+type CritPart = { id: string; zh: string; en: string; ps: number };
+const CRIT_PARTS: CritPart[] = [
+  { id: "IF", zh: "取指 (PC→IM)", en: "Fetch (PC→IM)", ps: 230 },
+  { id: "ID", zh: "译码/读寄存器", en: "Decode / RF read", ps: 150 },
+  { id: "EX", zh: "执行/地址计算", en: "Execute / address", ps: 200 },
+  { id: "MEM", zh: "数据访存", en: "Data memory", ps: 250 },
+  { id: "WB", zh: "写回建立", en: "Write-back setup", ps: 20 },
+];
+const CRIT_TOTAL = CRIT_PARTS.reduce((s, p) => s + p.ps, 0);
+type CritScene = { step: number; parts: CritPart[]; total: number; done?: boolean };
+const CRIT_CAPS: [string, string][] = [
+  ["关键路径从 PC → 指令存储器开始, 累加 $t_{IF}$", "Critical path starts at PC → IM; add $t_{IF}$"],
+  ["加上译码与寄存器堆读延迟 $t_{ID}$", "+ decode & register-read delay $t_{ID}$"],
+  ["加上 ALU 执行/地址计算延迟 $t_{EX}$", "+ ALU execute delay $t_{EX}$"],
+  ["加上数据存储器访问延迟 $t_{MEM}$ (最慢一级)", "+ data-memory delay $t_{MEM}$ (slowest)"],
+  ["加上写回建立延迟 $t_{WB}$", "+ write-back setup delay $t_{WB}$"],
+  ["累计 = 时钟周期 $T_{clk}$, 由最慢指令 (lw) 决定", "Total = clock period $T_{clk}$, set by slowest path (lw)"],
+];
+function generateCritical(_cfg: any): Frame<CritScene>[] {
+  const frames: Frame<CritScene>[] = CRIT_PARTS.map((_, i) => ({
+    line: i,
+    caption: T(CRIT_CAPS[i][0], CRIT_CAPS[i][1]),
+    scene: { step: i, parts: CRIT_PARTS, total: CRIT_TOTAL },
+  }));
+  frames.push({ line: 5, caption: T(CRIT_CAPS[5][0], CRIT_CAPS[5][1]), scene: { step: CRIT_PARTS.length - 1, parts: CRIT_PARTS, total: CRIT_TOTAL, done: true } });
+  return frames;
 }
-
-function CriticalRender({ t }: any) {
-  const isZh = t(T("中文", "en")) !== "en";
-  const parts = isZh
-    ? [["IF 取指", 80], ["ID 译码", 60], ["EX 执行", 70], ["MEM 访存", 90], ["WB 写回", 50]]
-    : [["IF Fetch", 80], ["ID Decode", 60], ["EX Execute", 70], ["MEM Memory", 90], ["WB WB", 50]];
-  const total = parts.reduce((s, p) => s + (p[1] as number), 0);
-  const max = Math.max(...parts.map((p) => p[1] as number));
+const CRIT_CODE = [
+  T("$t_{IF} = t_{PC} + t_{IM}$", "$t_{IF} = t_{PC} + t_{IM}$"),
+  T("$t_{ID} = t_{RFread}$", "$t_{ID} = t_{RFread}$"),
+  T("$t_{EX} = t_{ALU} + t_{mux}$", "$t_{EX} = t_{ALU} + t_{mux}$"),
+  T("$t_{MEM} = t_{DM}$", "$t_{MEM} = t_{DM}$"),
+  T("$t_{WB} = t_{RFsetup}$", "$t_{WB} = t_{RFsetup}$"),
+  T("$T_{clk} = \\sum_i t_i$", "$T_{clk} = \\sum_i t_i$"),
+];
+function CriticalRender({ scene, t }: any) {
+  const zh = t(T("中文", "en")) !== "en";
+  const s = (scene ?? { step: 0, parts: CRIT_PARTS, total: CRIT_TOTAL }) as CritScene;
+  const parts = s.parts ?? CRIT_PARTS;
+  const cum = parts.slice(0, s.step + 1).reduce((a, p) => a + p.ps, 0);
+  const slowest = parts.reduce((m, p) => (p.ps > m.ps ? p : m), parts[0]);
   return (
     <Panel>
       <div style={{ fontSize: 13, color: "#334155" }}>
-        {isZh ? "时钟周期 = 最长指令路径。下面按阶段耗时示意 (lw 需走完全部五级):" : "Cycle = worst-case instruction path (lw traverses all 5 stages):"}
+        {zh ? "关键路径 (lw): 逐级累加延迟, 最终决定时钟周期。" : "Critical path (lw): delays accumulate to fix the clock period."}
       </div>
-      <div style={{ display: "grid", gap: 6 }}>
-        {parts.map(([name, w]) => (
-          <div key={name as string} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <span style={{ width: 92, fontSize: 12, color: "#475569" }}>{name as string}</span>
-            <div style={{ flex: 1, height: 16, background: "#f1f5f9", borderRadius: 8, overflow: "hidden" }}>
-              <div style={{ width: `${((w as number) / max) * 100}%`, height: "100%", background: (w as number) === max ? "#4f46e5" : "#a5b4fc" }} />
+      <div style={{ display: "flex", gap: 4, alignItems: "flex-end", justifyContent: "center", flexWrap: "wrap" }}>
+        {parts.map((p, i) => {
+          const on = i <= s.step;
+          return (
+            <div key={p.id} style={{ display: "flex", alignItems: "center" }}>
+              <div style={{ width: 96, padding: "8px 6px", borderRadius: 10, textAlign: "center", border: `2px solid ${on ? "#4f46e5" : "#e2e8f0"}`, background: on ? "#eef2ff" : "#fafafa", opacity: on ? 1 : 0.5, transition: "all .15s" }}>
+                <div style={{ fontSize: 12, fontWeight: 900, color: "#4338ca" }}>{p.id}</div>
+                <div style={{ fontSize: 10.5, color: "#475569", lineHeight: 1.4 }}>{zh ? p.zh : p.en}</div>
+                <div style={{ fontSize: 12, fontFamily: "ui-monospace, monospace", color: "#b45309", fontWeight: 800 }}>{p.ps} ps</div>
+              </div>
+              {i < parts.length - 1 && <span style={{ color: "#c7d2fe", padding: "0 3px" }}>›</span>}
             </div>
-            <span style={{ width: 40, textAlign: "right", fontSize: 12, fontFamily: "ui-monospace, monospace", color: "#475569" }}>{w as number}</span>
-          </div>
-        ))}
+          );
+        })}
       </div>
-      <div style={{ padding: "10px 14px", borderRadius: 10, background: "#fef3c7", border: "1px solid #fde68a", fontSize: 13, color: "#92400e" }}>
-        {isZh
-          ? `总延迟 ≈ ${total} (相对单位); 简单指令 add 只用到前三级, 却被拖到 ${total} 的周期 → 利用率低。`
-          : `Total ≈ ${total}; add only uses 3 stages yet waits the full cycle.`}
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "#475569", marginBottom: 4 }}>
+          <span>{zh ? "累计延迟" : "Accumulated"}</span>
+          <span style={{ fontFamily: "ui-monospace, monospace", fontWeight: 800 }}>{cum} / {s.total} ps</span>
+        </div>
+        <div style={{ height: 16, borderRadius: 8, background: "#f1f5f9", overflow: "hidden" }}>
+          <div style={{ width: `${(cum / s.total) * 100}%`, height: "100%", background: "#4f46e5", transition: "width .2s" }} />
+        </div>
       </div>
-      <div style={{ fontSize: 12, color: "#94a3b8" }}><MathText text={isZh ? "$\\text{加速比} = \\frac{\\text{串行时间}}{\\text{流水线时间}} \\approx \\text{级数}$" : "$speedup \\approx \\#stages$"} /></div>
+      <div style={{ padding: "10px 14px", borderRadius: 10, background: s.done ? "#dcfce7" : "#fef3c7", border: `1px solid ${s.done ? "#86efac" : "#fde68a"}`, fontSize: 13, color: s.done ? "#15803d" : "#92400e" }}>
+        {zh
+          ? `时钟周期 T_clk ≥ ${s.total} ps, 由最长延迟路径决定 (最慢的 ${slowest.id} 级为 ${slowest.ps} ps); add 只走前三段却同样等待整个周期。`
+          : `T_clk ≥ ${s.total} ps, set by the longest path (slowest stage ${slowest.id} = ${slowest.ps} ps); add uses only 3 stages yet waits the full cycle.`}
+      </div>
+      <div style={{ fontSize: 12, color: "#94a3b8", textAlign: "center" }}>
+        <MathText text={zh ? "$\\text{加速比} \\approx \\text{流水线级数}$" : "$speedup \\approx \\#stages$"} />
+      </div>
     </Panel>
   );
 }
@@ -411,17 +545,15 @@ function CriticalRender({ t }: any) {
 type Cfg = { subMode: SubMode; [k: string]: any };
 
 const SUB: Record<SubMode, ModuleDef> = {
-  overview: { id: "overview", title: T("单周期概述", "Overview"), defaultConfig: {}, generate: () => [{ caption: T("单周期 CPU 概述", "Single-cycle overview"), scene: {} }] as never, Render: OverviewRender as never } as unknown as ModuleDef,
-  components: { id: "components", title: T("数据通路组件", "Components"), defaultConfig: {}, generate: () => [{ caption: T("数据通路组件", "Datapath components"), scene: {} }] as never, Render: ComponentsRender as never } as unknown as ModuleDef,
+  components: { id: "components", title: T("数据通路组件", "Components"), defaultConfig: {}, code: COMP_CODE, generate: (c: any) => generateComponents(c) as never, Render: ComponentsRender as never } as unknown as ModuleDef,
   exec: { id: "exec", title: T("指令执行", "Execution"), defaultConfig: DP_DEFAULT, Controls: ExecControls as never, codeFor: (c: any) => codeForInstr((c as DpCfg).instr) as never, generate: (c: any) => generateExec(c as DpCfg) as never, Render: ExecRender as never } as unknown as ModuleDef,
-  full: { id: "full", title: T("完整数据通路", "Full Datapath"), defaultConfig: {}, generate: () => [{ caption: T("完整单周期数据通路", "Complete datapath"), scene: {} }] as never, Render: FullRender as never } as unknown as ModuleDef,
-  critical: { id: "critical", title: T("关键路径", "Critical Path"), defaultConfig: {}, generate: () => [{ caption: T("关键路径与性能", "Critical path & performance"), scene: {} }] as never, Render: CriticalRender as never } as unknown as ModuleDef,
+  full: { id: "full", title: T("完整数据通路", "Full Datapath"), defaultConfig: {}, code: FULL_CODE, generate: (c: any) => generateFull(c) as never, Render: FullRender as never } as unknown as ModuleDef,
+  critical: { id: "critical", title: T("关键路径", "Critical Path"), defaultConfig: {}, code: CRIT_CODE, generate: (c: any) => generateCritical(c) as never, Render: CriticalRender as never } as unknown as ModuleDef,
 };
 
 const MAP: Record<SubMode, ModuleDef> = SUB;
 export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
   { label: "单周期", opts: [
-    { v: "overview", zh: "概述", en: "Overview" },
     { v: "components", zh: "数据通路组件", en: "Components" },
     { v: "exec", zh: "指令执行", en: "Execution" },
     { v: "full", zh: "完整数据通路", en: "Full Datapath" },

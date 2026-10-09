@@ -1,17 +1,17 @@
 import { createElement } from "react";
 import { T } from "../../i18n/lang";
-import type { ModuleDef } from "../../engine/types";
+import type { Frame, ModuleDef } from "../../engine/types";
 import { MathText } from "../../lib/tex";
 
 // =====================================================================
 // 指令系统与汇编 · 单模块聚合 · 交互式
-//   isa(ISA 概念 + RISC/CISC) → regs(MIPS 寄存器约定)
+//   regs(MIPS 寄存器约定, 逐帧读/写动画)
 //   → format(R/I/J 指令格式: 位域编码器) → addressing(寻址方式)
-//   → call(过程调用/栈帧, 逐步演示) → x86(简介)
+//   → call(过程调用/栈帧, 逐步演示)
 //   对应 tex/ComputerOrganization/chapters/instruction_set.tex
 // =====================================================================
 
-type SubMode = "isa" | "regs" | "format" | "addressing" | "call" | "x86";
+type SubMode = "regs" | "format" | "addressing" | "call";
 
 const REG_NAMES = [
   "$zero", "$at", "$v0", "$v1", "$a0", "$a1", "$a2", "$a3",
@@ -95,119 +95,88 @@ function encodeFields(cfg: any): { fields: Field[]; bin: string; hex: string } {
 // ---------------------------------------------------------------------
 // 公共小组件
 // ---------------------------------------------------------------------
-function Table({ head, rows }: { head: string[]; rows: (string | number)[][] }) {
-  return (
-    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, fontFamily: "ui-monospace, monospace", background: "#fff" }}>
-      <thead>
-        <tr>{head.map((h, i) => <th key={i} style={{ padding: "6px 10px", textAlign: "left", color: "#475569", borderBottom: "2px solid #e2e8f0", fontSize: 12 }}>{h}</th>)}</tr>
-      </thead>
-      <tbody>
-        {rows.map((r, k) => (
-          <tr key={k} style={{ background: k % 2 ? "#f8fafc" : "#fff" }}>
-            {r.map((c, i) => <td key={i} style={{ padding: "5px 10px", borderBottom: "1px solid #f1f5f9", color: i === 0 ? "#0f172a" : "#475569", fontWeight: i === 0 ? 700 : 400 }}>{c}</td>)}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
 function Panel({ children }: { children: React.ReactNode }) {
   return <div style={{ maxWidth: "100%", margin: "0 auto", display: "grid", gap: 12 }}>{children}</div>;
 }
 
 // ---------------------------------------------------------------------
-// isa: 概念 + RISC/CISC
+// regs: MIPS 寄存器约定 + 寄存器文件读/写 (逐帧动画)
 // ---------------------------------------------------------------------
-function IsaRender({ t }: any) {
-  const isZh = t(T("中文", "en")) !== "en";
-  const items: [string, string][] = isZh
-    ? [
-      ["寄存器组", "名称 / 数量 / 位宽"],
-      ["指令格式", "操作码 + 操作数的编码方式"],
-      ["寻址方式", "如何定位操作数 (寄存器 / 立即数 / 基址偏移 / PC 相对…)"],
-      ["数据类型", "支持的整数 / 浮点数宽度"],
-      ["I/O 模型", "内存映射 I/O / 独立 I/O"],
-    ]
-    : [
-      ["Registers", "names / count / width"],
-      ["Instruction format", "opcode + operand encoding"],
-      ["Addressing modes", "how operands are located"],
-      ["Data types", "supported integer / float widths"],
-      ["I/O model", "memory-mapped / isolated I/O"],
-    ];
-  const rows: (string | number)[][] = isZh
-    ? [
-      ["指令长度", "定长 (如 32-bit)", "变长 (1–15 字节)"],
-      ["指令数量", "少 (约 100 条)", "多 (约 300+ 条)"],
-      ["寻址方式", "简单 (Load/Store 架构)", "复杂 (可直接访存运算)"],
-      ["典型代表", "MIPS / ARM / RISC-V", "x86 / VAX"],
-      ["硬件设计", "简洁, 易流水", "复杂, 需微程序"],
-      ["编译负担", "重 (编译器优化关键)", "轻 (硬件承担更多)"],
-    ]
-    : [
-      ["Length", "fixed (e.g. 32-bit)", "variable (1–15 bytes)"],
-      ["Count", "few (~100)", "many (~300+)"],
-      ["Addressing", "simple (Load/Store)", "complex (mem operands)"],
-      ["Examples", "MIPS / ARM / RISC-V", "x86 / VAX"],
-      ["Hardware", "simple, pipeline-friendly", "complex, microcode"],
-      ["Compiler burden", "heavy (optimizer key)", "light (hardware does more)"],
-    ];
-  return (
-    <Panel>
-      <div style={{ padding: "10px 14px", borderRadius: 12, background: "#eef2ff", border: "1px solid #c7d2fe", fontSize: 13, color: "#3730a3", lineHeight: 1.8 }}>
-        <b>{isZh ? "指令集架构 (ISA)" : "Instruction Set Architecture (ISA)"}</b>
-        {isZh ? " — 软件与硬件的接口。它定义:" : " — the software/hardware interface. It defines:"}
-      </div>
-      <Table head={isZh ? ["ISA 要素", "含义"] : ["ISA element", "Meaning"]} rows={items} />
-      <div style={{ fontWeight: 800, color: "#334155", fontSize: 13 }}>{isZh ? "RISC 与 CISC 对比" : "RISC vs CISC"}</div>
-      <Table head={isZh ? ["特征", "RISC", "CISC"] : ["Feature", "RISC", "CISC"]} rows={rows} />
-    </Panel>
-  );
-}
+type RegsPhase = "decode" | "read" | "exec" | "write";
+type RegsScene = { phase: RegsPhase; rs: number; rt: number; rd: number; rsVal: number; rtVal: number; result: number; read: boolean; write: boolean };
 
-// ---------------------------------------------------------------------
-// regs: MIPS 寄存器约定
-// ---------------------------------------------------------------------
-function RegsRender({ t }: any) {
+const REGS_PHASE: Record<RegsPhase, { bg: string; fg: string; zh: string; en: string }> = {
+  decode: { bg: "#eef2ff", fg: "#3730a3", zh: "译码：提取 $rs / rt / rd$", en: "Decode: extract $rs / rt / rd$" },
+  read: { bg: "#dcfce7", fg: "#166534", zh: "读寄存器：两个读端口", en: "Read: two read ports" },
+  exec: { bg: "#fef3c7", fg: "#92400e", zh: "执行：ALU 运算", en: "Execute: ALU operation" },
+  write: { bg: "#dbeafe", fg: "#1e40af", zh: "写回：一个写端口", en: "Write-back: one write port" },
+};
+
+function regsGenerate(_config: any): Frame<RegsScene>[] {
+  const rs = 17, rt = 18, rd = 8;
+  const rsVal = 5, rtVal = 7, result = rsVal + rtVal;
+  const base = { rs, rt, rd, rsVal, rtVal, result, read: false, write: false };
+  return [
+    { line: 0, caption: T("译码：$add\\ \\$t0, \\$s1, \\$s2$ → $rs=17, rt=18, rd=8$", "Decode: $add\\ \\$t0, \\$s1, \\$s2$ → $rs=17, rt=18, rd=8$"), scene: { ...base, phase: "decode" } },
+    { line: 1, caption: T("读端口：$A \\gets R[rs]=5$, $B \\gets R[rt]=7$", "Read ports: $A \\gets R[rs]=5$, $B \\gets R[rt]=7$"), scene: { ...base, phase: "read", read: true } },
+    { line: 2, caption: T("执行：$C \\gets A + B = 12$", "Execute: $C \\gets A + B = 12$"), scene: { ...base, phase: "exec", read: true } },
+    { line: 3, caption: T("写端口：$R[rd] \\gets C = 12$", "Write port: $R[rd] \\gets C = 12$"), scene: { ...base, phase: "write", read: true, write: true } },
+  ];
+}
+const REGS_CODE = [
+  T("译码：取 $rs, rt, rd$", "Decode: get $rs, rt, rd$"),
+  T("读端口：$A \\gets R[rs]$, $B \\gets R[rt]$", "Read: $A \\gets R[rs]$, $B \\gets R[rt]$"),
+  T("运算：$C \\gets A + B$", "Compute: $C \\gets A + B$"),
+  T("写端口：$R[rd] \\gets C$", "Write: $R[rd] \\gets C$"),
+];
+
+function RegsRender({ scene, t }: any) {
   const isZh = t(T("中文", "en")) !== "en";
-  const rows: (string | number)[][] = isZh
-    ? [
-      ["$0", "$zero", "恒为 0"],
-      ["$1", "$at", "汇编器保留"],
-      ["$2–$3", "$v0–$v1", "函数返回值"],
-      ["$4–$7", "$a0–$a3", "函数参数"],
-      ["$8–$15", "$t0–$t7", "临时变量 (caller-saved)"],
-      ["$16–$23", "$s0–$s7", "保存变量 (callee-saved, 需恢复)"],
-      ["$24–$25", "$t8–$t9", "临时变量"],
-      ["$26–$27", "$k0–$k1", "内核保留"],
-      ["$28", "$gp", "全局指针"],
-      ["$29", "$sp", "栈指针"],
-      ["$30", "$fp", "帧指针"],
-      ["$31", "$ra", "返回地址"],
-    ]
-    : [
-      ["$0", "$zero", "constant 0"],
-      ["$1", "$at", "assembler reserved"],
-      ["$2–$3", "$v0–$v1", "return values"],
-      ["$4–$7", "$a0–$a3", "function arguments"],
-      ["$8–$15", "$t0–$t7", "temporaries (caller-saved)"],
-      ["$16–$23", "$s0–$s7", "saved (callee-saved)"],
-      ["$24–$25", "$t8–$t9", "temporaries"],
-      ["$26–$27", "$k0–$k1", "kernel reserved"],
-      ["$28", "$gp", "global pointer"],
-      ["$29", "$sp", "stack pointer"],
-      ["$30", "$fp", "frame pointer"],
-      ["$31", "$ra", "return address"],
-    ];
+  const s = (scene ?? { phase: "decode", rs: 17, rt: 18, rd: 8, rsVal: 0, rtVal: 0, result: 0, read: false, write: false }) as RegsScene;
+  const ph = REGS_PHASE[s.phase] ?? REGS_PHASE.decode;
+  const mark = (i: number) => {
+    if (i === s.rd && (s.write || s.phase === "decode")) return { bg: "#dbeafe", bd: "#2563eb", fg: "#1e40af", tag: "W" };
+    if (i === s.rs && (s.read || s.phase === "decode")) return { bg: "#dcfce7", bd: "#16a34a", fg: "#166534", tag: "A" };
+    if (i === s.rt && (s.read || s.phase === "decode")) return { bg: "#ccfbf1", bd: "#0d9488", fg: "#115e59", tag: "B" };
+    return { bg: "#f8fafc", bd: "#e2e8f0", fg: "#64748b", tag: "" };
+  };
+  const valOf = (i: number): string => {
+    if (i === s.rs && s.read) return `${s.rsVal}`;
+    if (i === s.rt && s.read) return `${s.rtVal}`;
+    if (i === s.rd && s.write) return `${s.result}`;
+    return "";
+  };
   return (
     <Panel>
-      <div style={{ padding: "10px 14px", borderRadius: 12, background: "#f8fafc", border: "1px solid #e2e8f0", fontSize: 13, color: "#334155", lineHeight: 1.8 }}>
-        {isZh
-          ? "MIPS 是经典 RISC 架构: 32 个 32 位通用寄存器, $0 恒为 0, Load/Store 架构 (只有 lw/sw 访存)。"
-          : "MIPS: 32 × 32-bit GPRs, $0 hardwired to 0, Load/Store architecture."}
+      <div style={{ textAlign: "center", padding: "8px 14px", borderRadius: 10, background: ph.bg, color: ph.fg, fontWeight: 800, fontSize: 14 }}>{isZh ? ph.zh : ph.en}</div>
+      <div style={{ textAlign: "center", fontFamily: "ui-monospace, monospace", fontSize: 14, color: "#1e293b" }}>
+        <b>add</b> {regName(s.rd)}, {regName(s.rs)}, {regName(s.rt)}
       </div>
-      <Table head={isZh ? ["寄存器号", "名称", "用途"] : ["No.", "Name", "Use"]} rows={rows} />
+      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8, fontSize: 12, color: "#475569" }}>
+          <span style={{ padding: "3px 8px", borderRadius: 6, background: "#dcfce7", border: "1px solid #16a34a" }}>{isZh ? "读端口 A" : "Read A"} = {s.read ? s.rsVal : "—"}</span>
+          <span style={{ padding: "3px 8px", borderRadius: 6, background: "#ccfbf1", border: "1px solid #0d9488" }}>{isZh ? "读端口 B" : "Read B"} = {s.read ? s.rtVal : "—"}</span>
+          <span style={{ padding: "3px 8px", borderRadius: 6, background: "#eef2ff", border: "1px solid #4338ca" }}>ALU = {s.phase === "exec" || s.phase === "write" ? s.result : "—"}</span>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(8, 1fr)", gap: 4, padding: 8, borderRadius: 12, background: "#0f172a" }}>
+        {REG_NAMES.map((_, i) => {
+          const m = mark(i);
+          const v = valOf(i);
+          return (
+            <div key={i} style={{ padding: "5px 4px", borderRadius: 6, background: m.bg, border: `2px solid ${m.bd}`, textAlign: "center", transition: "all .15s" }}>
+              <div style={{ fontSize: 9, color: "#94a3b8" }}>{`$${i}`}{m.tag ? ` · ${m.tag}` : ""}</div>
+              <div style={{ fontSize: 10, fontWeight: 800, color: m.fg, fontFamily: "ui-monospace, monospace" }}>{REG_NAMES[i]}</div>
+              <div style={{ fontSize: 11, fontWeight: 800, color: v ? "#0f172a" : "#cbd5e1", fontFamily: "ui-monospace, monospace" }}>{v || "·"}</div>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{ padding: "10px 14px", borderRadius: 10, background: "#f8fafc", border: "1px solid #e2e8f0", fontSize: 13, color: "#334155", lineHeight: 1.8 }}>
+        {isZh
+          ? "MIPS 是经典 RISC 架构: 32 个 32 位通用寄存器, $0 恒为 0, Load/Store 架构 (只有 lw/sw 访存)。寄存器文件有 2 个读端口 + 1 个写端口。"
+          : "MIPS: 32 × 32-bit GPRs, $0 hardwired to 0, Load/Store architecture. The register file has 2 read ports + 1 write port."}
+      </div>
     </Panel>
   );
 }
@@ -502,31 +471,6 @@ function CallRender({ config, t }: any) {
   );
 }
 
-// ---------------------------------------------------------------------
-// x86: 简介
-// ---------------------------------------------------------------------
-function X86Render({ t }: any) {
-  const isZh = t(T("中文", "en")) !== "en";
-  return (
-    <Panel>
-      <div style={{ padding: "14px 16px", borderRadius: 12, background: "#fff", border: "1px solid #e2e8f0", fontSize: 13, color: "#334155", lineHeight: 2 }}>
-        {isZh ? (
-          <>
-            <b>x86</b> 是典型的 <b>CISC</b> 架构: 变长指令 (1–15 字节), 寄存器较少 (8 个通用寄存器, x86-64 扩展到 16 个),
-            支持内存直接参与运算 (非 Load/Store)。<b>x86-64</b> 是目前桌面 / 服务器主流架构, 与 MIPS/RISC-V 的定长 RISC 风格形成对比。
-          </>
-        ) : (
-          <>
-            <b>x86</b> is a classic <b>CISC</b> architecture: variable-length instructions (1–15 bytes), few registers
-            (8 GPRs, 16 in x86-64), memory operands allowed (not Load/Store). <b>x86-64</b> dominates desktop/servers,
-            contrasting the fixed-length RISC style of MIPS/RISC-V.
-          </>
-        )}
-      </div>
-    </Panel>
-  );
-}
-
 // =====================================================================
 // 聚合
 // =====================================================================
@@ -536,18 +480,15 @@ const fmtDefault = { instr: "add", rs: 1, rt: 2, rd: 3, shamt: 0, imm: 8, target
 const addrDefault = { mode: "base", baseVal: 0x1000, imm: 8, pc: 0x00400000, target: 4 };
 
 const SUB: Record<SubMode, ModuleDef> = {
-  isa: { id: "isa", title: T("指令集架构", "ISA"), defaultConfig: {}, generate: () => [{ caption: T("ISA / RISC 与 CISC", "ISA / RISC vs CISC"), scene: {} }] as never, Render: IsaRender as never } as unknown as ModuleDef,
-  regs: { id: "regs", title: T("MIPS 寄存器", "MIPS Registers"), defaultConfig: {}, generate: () => [{ caption: T("MIPS 寄存器约定", "MIPS register conventions"), scene: {} }] as never, Render: RegsRender as never } as unknown as ModuleDef,
+  regs: { id: "regs", title: T("MIPS 寄存器", "MIPS Registers"), defaultConfig: {}, generate: regsGenerate, code: REGS_CODE, Render: RegsRender as never } as unknown as ModuleDef,
   format: { id: "format", title: T("指令格式 R/I/J", "Instruction Formats"), defaultConfig: fmtDefault, Controls: FmtControls as never, generate: () => [{ caption: T("R/I/J 位域编码", "R/I/J bit-field encoding"), scene: {} }] as never, Render: FmtRender as never } as unknown as ModuleDef,
   addressing: { id: "addressing", title: T("寻址方式", "Addressing Modes"), defaultConfig: addrDefault, Controls: AddrControls as never, generate: () => [{ caption: T("寻址方式", "Addressing modes"), scene: {} }] as never, Render: AddrRender as never } as unknown as ModuleDef,
   call: { id: "call", title: T("过程调用", "Procedure Call"), defaultConfig: { step: 0 }, Controls: CallControls as never, generate: () => [{ caption: T("过程调用与栈帧", "Procedure call & stack frame"), scene: {} }] as never, Render: CallRender as never } as unknown as ModuleDef,
-  x86: { id: "x86", title: T("x86 简介", "x86 Overview"), defaultConfig: {}, generate: () => [{ caption: T("x86 简介", "x86 overview"), scene: {} }] as never, Render: X86Render as never } as unknown as ModuleDef,
 };
 
 const MAP: Record<SubMode, ModuleDef> = SUB;
 export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
   { label: "接口", opts: [
-    { v: "isa", zh: "ISA / RISC-CISC", en: "ISA" },
     { v: "regs", zh: "MIPS 寄存器", en: "Registers" },
   ]},
   { label: "指令", opts: [
@@ -555,18 +496,15 @@ export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string
     { v: "addressing", zh: "寻址方式", en: "Addressing" },
     { v: "call", zh: "过程调用", en: "Proc Call" },
   ]},
-  { label: "体系", opts: [
-    { v: "x86", zh: "x86 简介", en: "x86" },
-  ]},
 ];
 
-const DEFAULT: Cfg = { subMode: "isa", ...(SUB.isa as any).defaultConfig };
+const DEFAULT: Cfg = { subMode: "regs", ...(SUB.regs as any).defaultConfig };
 
 function activeOf(sub: unknown): ModuleDef {
-  return (MAP as Record<string, ModuleDef>)[sub as string] ?? SUB.isa;
+  return (MAP as Record<string, ModuleDef>)[sub as string] ?? SUB.regs;
 }
 function subKeyOf(sub: unknown): SubMode {
-  return (MAP as Record<string, ModuleDef>)[sub as string] ? (sub as SubMode) : "isa";
+  return (MAP as Record<string, ModuleDef>)[sub as string] ? (sub as SubMode) : "regs";
 }
 function safeCfg(sub: unknown, config: Cfg): Cfg {
   const m = activeOf(sub) as any;
@@ -577,9 +515,9 @@ function safeCfg(sub: unknown, config: Cfg): Cfg {
 export const instructionSetModule: ModuleDef<any, Cfg> = {
   id: "instruction-set",
   title: T("指令系统与汇编", "Instruction Set & Assembly"),
-  desc: T("ISA / RISC-CISC / MIPS 寄存器 / R-I-J 指令格式 / 寻址方式 / 过程调用 / x86。", "ISA / RISC-CISC / MIPS registers / R-I-J formats / addressing / procedure call / x86."),
+  desc: T("MIPS 寄存器 / R-I-J 指令格式 / 寻址方式 / 过程调用。", "MIPS registers / R-I-J formats / addressing / procedure call."),
   tags: ["computer-organization", "isa"],
-  interactive: true,
+  interactive: false,
   defaultConfig: DEFAULT,
   randomize(c) {
     const safe = safeCfg(c.subMode, c);
@@ -613,6 +551,10 @@ export const instructionSetModule: ModuleDef<any, Cfg> = {
     const res: any = m.generate(safe);
     const frames: any[] = Array.isArray(res) ? res : res?.frames ?? [];
     return frames.length ? frames : [{ caption: T("指令系统", "Instruction Set"), scene: safe }];
+  },
+  codeFor(config) {
+    const m = activeOf((config as Cfg).subMode) as any;
+    return m.code ?? [];
   },
   Render(props) {
     const safe = safeCfg((props.config as Cfg).subMode, props.config as Cfg);

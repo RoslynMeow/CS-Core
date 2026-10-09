@@ -1,15 +1,15 @@
 import { createElement } from "react";
 import { T } from "../../i18n/lang";
-import type { ModuleDef } from "../../engine/types";
+import type { Frame, ModuleDef } from "../../engine/types";
 import { MathText } from "../../lib/tex";
 
 // =====================================================================
 // C 语言 · 单模块聚合 · 交互式
 //   对应 tex/CProgrammingLanguage
-//   overview / lexical / types / pointers / operators / storage / io / preprocessor / stdlib
+//   lexical / types / pointers / operators / storage / io / preprocessor / stdlib
 // =====================================================================
 
-type SubMode = "overview" | "lexical" | "types" | "pointers" | "operators" | "storage" | "io" | "preprocessor" | "stdlib";
+type SubMode = "lexical" | "types" | "pointers" | "operators" | "storage" | "io" | "preprocessor" | "stdlib";
 
 const hx = (n: number) => `0x${(n >>> 0).toString(16).toUpperCase().padStart(4, "0")}`;
 const bitsOf = (n: number, w: number) => (n >>> 0).toString(2).padStart(w, "0");
@@ -32,48 +32,6 @@ function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
 }
 function Panel({ children }: { children: React.ReactNode }) {
   return <div style={{ maxWidth: "100%", margin: "0 auto", display: "grid", gap: 12 }}>{children}</div>;
-}
-
-// ---------------------------------------------------------------------
-// overview
-// ---------------------------------------------------------------------
-function OverviewRender({ t }: any) {
-  const isZh = t(T("中文", "en")) !== "en";
-  const standards: [string, string, string][] = [
-    ["K&R C", "1978", isZh ? "初版, 事实标准" : "original"],
-    ["C89 / C90", "1989/90", isZh ? "首个 ANSI/ISO 标准" : "first ANSI/ISO"],
-    ["C99", "1999", "_Bool / VLA / // 注释"],
-    ["C11", "2011", "_Generic / 线程 / 原子"],
-    ["C17", "2018", isZh ? "小修订" : "minor"],
-    ["C23", "2023", isZh ? "现代特性" : "modern"],
-  ];
-  const stages: [string, string][] = [
-    ["source.c", isZh ? "源代码" : "source"],
-    ["source.i", isZh ? "预处理展开 (宏/头文件)" : "preprocessed"],
-    ["source.s", isZh ? "汇编代码" : "assembly"],
-    ["source.o", isZh ? "目标文件 (机器码+符号)" : "object"],
-    ["a.out", isZh ? "可执行文件 (链接库)" : "executable"],
-  ];
-  return (
-    <Panel>
-      <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap", justifyContent: "center" }}>
-        {stages.map(([f, d], i) => (
-          <div key={f} style={{ display: "flex", alignItems: "center" }}>
-            <div style={{ padding: "9px 12px", borderRadius: 10, background: "#eef2ff", border: "1.5px solid #c7d2fe", textAlign: "center" }}>
-              <div style={{ fontFamily: "ui-monospace, monospace", fontWeight: 800, color: "#3730a3", fontSize: 12 }}>{f}</div>
-              <div style={{ fontSize: 11, color: "#64748b" }}>{d}</div>
-            </div>
-            {i < stages.length - 1 && <span style={{ color: "#c7d2fe", padding: "0 4px", fontSize: 15 }}>→</span>}
-          </div>
-        ))}
-      </div>
-      <div style={{ fontSize: 12, color: "#64748b", textAlign: "center" }}>
-        {isZh ? "编译四步: 预处理(cpp) → 编译(cc1) → 汇编(as) → 链接(ld)" : "cpp → cc1 → as → ld"}
-      </div>
-      <div style={{ fontWeight: 800, color: "#334155", fontSize: 13 }}>{isZh ? "标准演进" : "Standards"}</div>
-      <Table head={isZh ? ["标准", "年份", "要点"] : ["Standard", "Year", "Note"]} rows={standards} />
-    </Panel>
-  );
 }
 
 // ---------------------------------------------------------------------
@@ -402,36 +360,76 @@ function StorageRender({ config, t }: any) {
 }
 
 // ---------------------------------------------------------------------
-// io: printf 格式 + 文件打开模式
+// io: 文件 I/O 缓冲流 (逐帧)
 // ---------------------------------------------------------------------
-const FMTS = [
-  { s: "%d / %i", zh: "有符号十进制", ex: "42" }, { s: "%u", zh: "无符号十进制", ex: "42" },
-  { s: "%x / %X", zh: "十六进制", ex: "2a / 2A" }, { s: "%o", zh: "八进制", ex: "52" },
-  { s: "%f", zh: "定点小数", ex: "3.141590" }, { s: "%.2f", zh: "指定位数", ex: "3.14" },
-  { s: "%e", zh: "科学计数", ex: "3.141590e+00" }, { s: "%g", zh: "自动选择", ex: "3.14159" },
-  { s: "%c", zh: "字符", ex: "*" }, { s: "%s", zh: "字符串", ex: "hello" },
-  { s: "%p", zh: "指针", ex: "0x7ffd…" }, { s: "%%", zh: "百分号", ex: "%" },
-  { s: "%5d", zh: "宽度 5", ex: "   42" }, { s: "%-5d|", zh: "左对齐", ex: "42   |" },
-];
-const FILE_MODES = [
-  { m: "r", zh: "只读, 文件须存在" }, { m: "w", zh: "只写, 截断/新建" }, { m: "a", zh: "追加" },
-  { m: "r+", zh: "读写, 文件须存在" }, { m: "w+", zh: "读写, 截断/新建" }, { m: "a+", zh: "读+追加" },
-  { m: "rb / wb", zh: "二进制模式 (规避换行转换)" },
-];
-function IoRender({ t }: any) {
+type IoPhase = "open" | "read" | "write" | "flush" | "close";
+type IoScene = { phase: IoPhase; buffer: string[]; disk: string[]; flow: "none" | "in" | "out" };
+
+const IO_PHASE: Record<IoPhase, { bg: string; fg: string; zh: string; en: string }> = {
+  open: { bg: "#dbeafe", fg: "#1e40af", zh: "打开文件：分配 FILE 与控制块", en: "open: allocate FILE + control block" },
+  read: { bg: "#dcfce7", fg: "#166534", zh: "读：磁盘 → 缓冲区 → 程序", en: "read: disk → buffer → program" },
+  write: { bg: "#fef3c7", fg: "#92400e", zh: "写：程序 → 缓冲区（延迟落盘）", en: "write: program → buffer (deferred)" },
+  flush: { bg: "#ede9fe", fg: "#5b21b6", zh: "刷新：缓冲区 → 磁盘", en: "flush: buffer → disk" },
+  close: { bg: "#e2e8f0", fg: "#334155", zh: "关闭：刷新残余并释放资源", en: "close: flush + release" },
+};
+
+function IoBox({ label, sub, bytes, hot, tone }: { label: string; sub: string; bytes: string[]; hot: boolean; tone: string }) {
+  return (
+    <div style={{ flex: 1, minWidth: 110, padding: "10px 12px", borderRadius: 10, background: hot ? tone : "#f8fafc", border: `2px solid ${hot ? "#0f172a" : "#e2e8f0"}` }}>
+      <div style={{ fontWeight: 800, fontSize: 13, color: "#1e293b" }}>{label}</div>
+      <div style={{ fontSize: 11, color: "#64748b" }}>{sub}</div>
+      <div style={{ marginTop: 6, minHeight: 22, fontFamily: "ui-monospace, monospace", fontSize: 12, color: "#0f172a", wordBreak: "break-all" }}>
+        {bytes.length ? bytes.join(" ") : <span style={{ color: "#cbd5e1" }}>—</span>}
+      </div>
+    </div>
+  );
+}
+
+function IoRender({ scene, t }: any) {
   const isZh = t(T("中文", "en")) !== "en";
+  const s = (scene ?? { phase: "open", buffer: [], disk: [], flow: "none" }) as IoScene;
+  const ph = IO_PHASE[s.phase] ?? IO_PHASE.open;
+  const inFlow = s.flow === "in";
+  const arrow = (hot: boolean) => (
+    <div style={{ alignSelf: "center", fontSize: 20, fontWeight: 900, color: hot ? "#4f46e5" : "#cbd5e1", width: 30, textAlign: "center" }}>{inFlow ? "←" : "→"}</div>
+  );
   return (
     <Panel>
-      <div style={{ fontWeight: 800, color: "#334155", fontSize: 13 }}>{isZh ? "printf 格式说明符" : "printf specifiers"}</div>
-      <Table head={isZh ? ["说明符", "含义", "示例"] : ["Specifier", "Meaning", "Example"]} rows={FMTS.map((f) => [f.s, f.zh, <span key={f.s} style={{ fontFamily: "ui-monospace, monospace" }}>{f.ex}</span>])} />
-      <div style={{ fontWeight: 800, color: "#334155", fontSize: 13 }}>{isZh ? "fopen 打开模式" : "fopen modes"}</div>
-      <Table head={isZh ? ["模式", "含义"] : ["Mode", "Meaning"]} rows={FILE_MODES.map((f) => [f.m, f.zh])} />
-      <div style={{ fontSize: 12, color: "#64748b", textAlign: "center" }}>
-        {isZh ? "printf 返回输出字符数, 失败返回负值; 标准流: stdin / stdout / stderr。" : "printf returns chars written, negative on error; streams: stdin/stdout/stderr."}
+      <div style={{ textAlign: "center", padding: "8px 14px", borderRadius: 10, background: ph.bg, color: ph.fg, fontWeight: 800, fontSize: 14 }}>{isZh ? ph.zh : ph.en}</div>
+      <div style={{ display: "flex", gap: 4, alignItems: "stretch" }}>
+        <IoBox label={isZh ? "程序" : "Program"} sub={isZh ? "用户变量 / 字符" : "user vars"} bytes={s.phase === "read" ? ["fgets"] : s.phase === "write" ? ["\"World\""] : []} hot={s.phase === "read" || s.phase === "write"} tone="#fef3c7" />
+        {arrow(s.flow !== "none")}
+        <IoBox label={isZh ? "stdio 缓冲区" : "stdio buffer"} sub={isZh ? "内存中的块" : "in-memory block"} bytes={s.buffer} hot={s.buffer.length > 0} tone="#eef2ff" />
+        {arrow(s.flow !== "none")}
+        <IoBox label={isZh ? "磁盘文件" : "disk file"} sub="data.txt" bytes={s.disk} hot={s.phase !== "open"} tone="#dcfce7" />
+      </div>
+      <div style={{ fontSize: 12, color: "#64748b", lineHeight: 1.8, padding: "8px 12px", borderRadius: 10, background: "#f8fafc", border: "1px solid #e2e8f0" }}>
+        {isZh
+          ? "标准 I/O 带缓冲：读时先块读到缓冲区再交给程序；写时先进缓冲区，满或 $fflush$ / $fclose$ 时才落盘。格式符如 $\\%d\\,\\%x\\,\\%f\\,\\%s\\,\\%c$，打开模式 $r/w/a$（可加 $+$、$b$）。"
+          : "Std I/O is buffered: reads fill the buffer block-wise; writes sit in the buffer until full or $fflush$/$fclose$. Specifiers like $\\%d\\,\\%x\\,\\%f\\,\\%s\\,\\%c$; modes $r/w/a$ (+$+$, $b$)."}
       </div>
     </Panel>
   );
 }
+
+function ioGenerate(_config: any): Frame<IoScene>[] {
+  const HELLO = ["H", "e", "l", "l", "o"];
+  const HELLO_WORLD = [...HELLO, "W", "o", "r", "l", "d"];
+  return [
+    { line: 0, caption: T("$fopen$：建立 FILE 控制块与缓冲区，打开 data.txt（模式 $r$）", "$fopen$: build FILE + buffer, open data.txt (mode $r$)"), scene: { phase: "open", buffer: [], disk: HELLO, flow: "none" } },
+    { line: 1, caption: T("$fgets$：磁盘块读入缓冲区，再交给程序", "$fgets$: block-read disk → buffer → program"), scene: { phase: "read", buffer: [...HELLO], disk: HELLO, flow: "in" } },
+    { line: 2, caption: T("$fprintf$ 写 \"World\"：先写入缓冲区，暂不落盘", "$fprintf$ writes \"World\": into the buffer first"), scene: { phase: "write", buffer: HELLO_WORLD, disk: HELLO, flow: "out" } },
+    { line: 3, caption: T("$fflush$：把缓冲区内容整体写入磁盘", "$fflush$: dump the buffer to disk"), scene: { phase: "flush", buffer: [], disk: HELLO_WORLD, flow: "out" } },
+    { line: 4, caption: T("$fclose$：刷新残余缓冲并释放 FILE", "$fclose$: flush remaining and release FILE"), scene: { phase: "close", buffer: [], disk: HELLO_WORLD, flow: "none" } },
+  ];
+}
+const IO_CODE = [
+  T("FILE *fp = fopen(\"data.txt\", \"r\");", "FILE *fp = fopen(\"data.txt\", \"r\");"),
+  T("fgets(buf, n, fp);  // 读", "fgets(buf, n, fp);  // read"),
+  T("fprintf(fp, \"World\");  // 写", "fprintf(fp, \"World\");  // write"),
+  T("fflush(fp);  // 缓冲落盘", "fflush(fp);  // dump buffer"),
+  T("fclose(fp);  // 关闭", "fclose(fp);  // close"),
+];
 
 // ---------------------------------------------------------------------
 // preprocessor: 宏展开 (示例)
@@ -508,13 +506,12 @@ function StdRender({ config, t }: any) {
 type Cfg = { subMode: SubMode; [k: string]: any };
 
 const SUB: Record<SubMode, ModuleDef> = {
-  overview: { id: "overview", title: T("语言概述", "Overview"), defaultConfig: {}, generate: () => [{ caption: T("C 语言概述", "Overview"), scene: {} }] as never, Render: OverviewRender as never } as unknown as ModuleDef,
   lexical: { id: "lexical", title: T("词法", "Lexical"), defaultConfig: { src: 'int main() { int x = 42; /* comment */ return x + 1; }' }, Controls: LexControls as never, generate: () => [{ caption: T("程序结构与词法", "Lexical"), scene: {} }] as never, Render: LexRender as never } as unknown as ModuleDef,
   types: { id: "types", title: T("数据类型", "Types"), defaultConfig: { view: "basic", preset: 0 }, Controls: TypesControls as never, generate: () => [{ caption: T("数据类型", "Types"), scene: {} }] as never, Render: TypesRender as never } as unknown as ModuleDef,
   pointers: { id: "pointers", title: T("指针与地址", "Pointers"), defaultConfig: PTR_DEFAULT, Controls: PtrControls as never, generate: () => [{ caption: T("指针与地址", "Pointers"), scene: {} }] as never, Render: PtrRender as never } as unknown as ModuleDef,
   operators: { id: "operators", title: T("运算符与位运算", "Operators"), defaultConfig: { a: 0b1100, b: 0b1010, op: "and", sh: 1 }, Controls: OpControls as never, generate: () => [{ caption: T("位运算", "Bitwise"), scene: {} }] as never, Render: OpRender as never } as unknown as ModuleDef,
   storage: { id: "storage", title: T("存储类别与内存", "Storage & Memory"), defaultConfig: { sel: "auto" }, Controls: StorageControls as never, generate: () => [{ caption: T("存储类别与内存模型", "Storage & memory"), scene: {} }] as never, Render: StorageRender as never } as unknown as ModuleDef,
-  io: { id: "io", title: T("输入输出与文件", "I/O"), defaultConfig: {}, generate: () => [{ caption: T("输入输出与文件", "I/O"), scene: {} }] as never, Render: IoRender as never } as unknown as ModuleDef,
+  io: { id: "io", title: T("输入输出与文件", "I/O"), defaultConfig: {}, generate: ioGenerate as never, code: IO_CODE, Render: IoRender as never } as unknown as ModuleDef,
   preprocessor: { id: "preprocessor", title: T("预处理", "Preprocessor"), defaultConfig: { ex: 0 }, Controls: PpControls as never, generate: () => [{ caption: T("预处理与工程", "Preprocessor"), scene: {} }] as never, Render: PpRender as never } as unknown as ModuleDef,
   stdlib: { id: "stdlib", title: T("标准库", "Stdlib"), defaultConfig: { header: "string.h" }, Controls: StdControls as never, generate: () => [{ caption: T("标准库速查", "Stdlib"), scene: {} }] as never, Render: StdRender as never } as unknown as ModuleDef,
 };
@@ -522,7 +519,6 @@ const SUB: Record<SubMode, ModuleDef> = {
 const MAP: Record<SubMode, ModuleDef> = SUB;
 export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string }[] }[] = [
   { label: "基础", opts: [
-    { v: "overview", zh: "语言概述", en: "Overview" },
     { v: "lexical", zh: "程序结构与词法", en: "Lexical" },
     { v: "types", zh: "数据类型", en: "Types" },
   ]},
@@ -538,13 +534,13 @@ export const GROUPS: { label: string; opts: { v: SubMode; zh: string; en: string
   ]},
 ];
 
-const DEFAULT: Cfg = { subMode: "overview", ...(SUB.overview as any).defaultConfig };
+const DEFAULT: Cfg = { subMode: "lexical", ...(SUB.lexical as any).defaultConfig };
 
 function activeOf(sub: unknown): ModuleDef {
-  return (MAP as Record<string, ModuleDef>)[sub as string] ?? SUB.overview;
+  return (MAP as Record<string, ModuleDef>)[sub as string] ?? SUB.lexical;
 }
 function subKeyOf(sub: unknown): SubMode {
-  return (MAP as Record<string, ModuleDef>)[sub as string] ? (sub as SubMode) : "overview";
+  return (MAP as Record<string, ModuleDef>)[sub as string] ? (sub as SubMode) : "lexical";
 }
 function safeCfg(sub: unknown, config: Cfg): Cfg {
   const m = activeOf(sub) as any;
@@ -555,9 +551,9 @@ function safeCfg(sub: unknown, config: Cfg): Cfg {
 export const cProgrammingModule: ModuleDef<any, Cfg> = {
   id: "c-programming",
   title: T("C 语言", "The C Language"),
-  desc: T("概述 / 词法 / 类型与对齐 / 指针 / 位运算 / 存储模型 / IO / 预处理 / 标准库。", "Overview / lexical / types & alignment / pointers / bitwise / storage / I/O / preprocessor / stdlib."),
+  desc: T("词法 / 类型与对齐 / 指针 / 位运算 / 存储模型 / IO / 预处理 / 标准库。", "Lexical / types & alignment / pointers / bitwise / storage / I/O / preprocessor / stdlib."),
   tags: ["c-programming", "programming"],
-  interactive: true,
+  interactive: false,
   defaultConfig: DEFAULT,
   Controls({ config, onChange, t, embedded }: any) {
     const isZh = t(T("中文", "en")) !== "en";
@@ -587,6 +583,10 @@ export const cProgrammingModule: ModuleDef<any, Cfg> = {
     const res: any = m.generate(safe);
     const frames: any[] = Array.isArray(res) ? res : res?.frames ?? [];
     return frames.length ? frames : [{ caption: T("C 语言", "C"), scene: safe }];
+  },
+  codeFor(config) {
+    const m = activeOf((config as Cfg).subMode) as any;
+    return (m.code ?? []) as never;
   },
   Render(props) {
     const safe = safeCfg((props.config as Cfg).subMode, props.config as Cfg);
