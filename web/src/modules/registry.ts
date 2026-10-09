@@ -18,7 +18,6 @@ import { cpuControlModule, GROUPS as controlGroups } from "./computer-organizati
 import { pipelineModule, GROUPS as pipelineGroups } from "./computer-organization/pipeline";
 import { memoryHierarchyModule, GROUPS as memoryGroups } from "./computer-organization/memory";
 import { ioBusModule, GROUPS as ioGroups } from "./computer-organization/ioBus";
-import { cProgrammingModule, GROUPS as cGroups } from "./c-programming/index";
 import { cnIntroModule, cnIntroGroups } from "./computer-network/intro";
 import { cnPacketModule, cnPacketGroups } from "./computer-network/packet";
 import { cnApplicationModule, cnApplicationGroups } from "./computer-network/application";
@@ -51,11 +50,10 @@ const asModule = (m: unknown): ModuleDef => m as ModuleDef;
 type Opt = { v: string; zh: string; en: string };
 type Group = { label: string; opts: Opt[] };
 
-export type SubjectKey = "ds" | "co" | "c" | "cn" | "os" | "se";
+export type SubjectKey = "ds" | "co" | "cn" | "os" | "se";
 export const SUBJECTS: { key: SubjectKey; zh: string; en: string }[] = [
   { key: "ds", zh: "数据结构与算法", en: "Data Structures & Algorithms" },
   { key: "co", zh: "计算机组成原理", en: "Computer Organization" },
-  { key: "c", zh: "C 语言", en: "The C Language" },
   { key: "cn", zh: "计算机网络", en: "Computer Networking" },
   { key: "os", zh: "操作系统", en: "Operating Systems" },
   { key: "se", zh: "软件工程", en: "Software Engineering" },
@@ -79,7 +77,6 @@ const CHAPTERS: Chapter[] = [
   { subject: "co", module: asModule(pipelineModule), groups: pipelineGroups },
   { subject: "co", module: asModule(memoryHierarchyModule), groups: memoryGroups },
   { subject: "co", module: asModule(ioBusModule), groups: ioGroups },
-  { subject: "c", module: asModule(cProgrammingModule), groups: cGroups },
   { subject: "cn", module: asModule(cnIntroModule), groups: cnIntroGroups },
   { subject: "cn", module: asModule(cnPacketModule), groups: cnPacketGroups },
   { subject: "cn", module: asModule(cnApplicationModule), groups: cnApplicationGroups },
@@ -117,7 +114,7 @@ function wrapCard(module: ModuleDef, o: Opt, subject: SubjectKey): ModuleDef {
   // 画布点击推进：仅对「纯线性动画」章节默认开启；带自身画布交互的章节（图/树/数字电路等）不开启，避免误触
   const ADVANCE_CHAPTERS = new Set([
     "computer-overview", "instruction-set", "cpu-datapath", "pipeline",
-    "memory-hierarchy", "c-programming", "algorithm-analysis",
+    "memory-hierarchy", "algorithm-analysis",
   ]);
   return {
     id: `${module.id}/${o.v}`,
